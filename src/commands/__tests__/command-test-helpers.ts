@@ -10,6 +10,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stdio from "effect/Stdio"
 import { TestConsole } from "effect/testing"
+import type { Selection } from "#lib/project/selection.ts"
 import {
   type FileSystemTestContext,
   createFileSystemTestContext,
@@ -40,6 +41,20 @@ const LockfileJson = Schema.fromJsonString(Lockfile)
  */
 export function readLockfile(files: FileSystemTestContext): Lockfile {
   return Schema.decodeSync(LockfileJson)(files.read(LOCKFILE_PATH))
+}
+
+/**
+ * A lockfile with `selection` and no written files, as a fixture file.
+ */
+export function makeLockfileFile(selection: Selection) {
+  return {
+    [LOCKFILE_PATH]: Schema.encodeSync(LockfileJson)({
+      schemaVersion: 1,
+      selection,
+      version: "0.0.0",
+      written: {},
+    }),
+  }
 }
 
 /**

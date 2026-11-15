@@ -243,7 +243,40 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
 const render = (preset: TypeScriptPreset) =>
   formatJson({ extends: TYPESCRIPT_PRESETS[preset] }).pipe(Effect.map((content) => `${content}\n`))
 
+function toMissingPresetFinding(
+  preset: TypeScriptPreset,
+  isMonorepo: boolean,
+  reference: string
+): Finding {
+  const presetImport = TYPESCRIPT_PRESETS[preset]
+
+  const finding: Finding = {
+    currentState: isMonorepo
+      ? `The lockfile selects \`${presetImport}\`, and no \`tsconfig.json\` of the root or the workspace packages extends an Adamantite TypeScript preset.`
+      : `The lockfile selects \`${presetImport}\`, and the root \`tsconfig.json\` is missing or does not extend an Adamantite TypeScript preset.`,
+    goal: [
+      isMonorepo
+        ? `Make the \`tsconfig.json\` of each workspace package, or a base config that they share, extend \`${presetImport}\`. Preserve every other setting.`
+        : `Make the root \`tsconfig.json\` extend \`${presetImport}\`. Create the file when it is missing, and preserve every other setting.`,
+      "Run `adamantite doctor` again. It must not report this finding.",
+    ],
+    id: "missing-typescript-preset",
+    integration: "tsconfig",
+    reference: { content: reference, language: "json" },
+    title: "Missing TypeScript preset",
+  }
+
+  // `adamantite/typescript` adds the type resets, which a library must not publish.
+  return preset === "typescript"
+    ? {
+        ...finding,
+        notes: [`In a library package, extend \`${TYPESCRIPT_PRESETS.tsconfig}\` instead.`],
+      }
+    : finding
+}
+
 export default defineIntegration({
+  // With a lockfile, the integration applies when the selection includes TypeScript. Without one,
   // Doctor checks only the packages that chose a preset, so a project that declined it in init
   // gets no finding. Oxlint's type check runs without a `tsconfig.json`. A config without
   // `extends` cannot load the type resets, so Doctor runs TypeScript only for the others.
@@ -253,9 +286,30 @@ export default defineIntegration({
       const path = yield* Path.Path
       const configured = yield* readConfiguredPackages(project)
 
-      if (configured.length === 0) {
+      const applies = Option.match(project.lockfile, {
+        onNone: () => configured.length > 0,
+        onSome: ({ selection }) => selection.typescript !== null,
+      })
+
+      if (!applies) {
         return { applicable: false } satisfies IntegrationAssessment
       }
+
+      const selected = Option.flatMapNullishOr(
+        project.lockfile,
+        ({ selection }) => selection.typescript
+      )
+
+      const missing =
+        configured.length === 0 && Option.isSome(selected)
+          ? [
+              toMissingPresetFinding(
+                selected.value,
+                project.workspace.isMonorepo,
+                yield* render(selected.value)
+              ),
+            ]
+          : []
 
       const findings = yield* Effect.forEach(
         configured,
@@ -274,7 +328,7 @@ export default defineIntegration({
 
       return {
         applicable: true,
-        findings: findings.flat(),
+        findings: [...missing, ...findings.flat()],
         packageActions: [],
         warnings: [],
       } satisfies IntegrationAssessment

@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { Project } from "#lib/project/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
@@ -9,13 +10,20 @@ import { getManagedScripts } from "#lib/project/package-json.ts"
 const files = [{ path: "AGENTS.md", type: "config" }] as const
 
 export default defineIntegration({
-  // In a monorepo, Doctor runs at the root and checks only the root. A package can have its own
-  // `AGENTS.md`, but Doctor does not require it.
-  assess: ({ cwd, packageJson }: Project) =>
+  // With a lockfile, the integration applies when the selection includes the agent guidance.
+  // Without one, it applies to a project with managed scripts. In a monorepo, Doctor runs at the
+  // root and checks only the root. A package can have its own `AGENTS.md`, but Doctor does not
+  // require it.
+  assess: ({ cwd, lockfile, packageJson }: Project) =>
     Effect.gen(function* () {
       const managedScripts = getManagedScripts(packageJson)
 
-      if (managedScripts.length === 0) {
+      const applies = Option.match(lockfile, {
+        onNone: () => managedScripts.length > 0,
+        onSome: ({ selection }) => selection.agents,
+      })
+
+      if (!applies) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 

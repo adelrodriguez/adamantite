@@ -421,12 +421,40 @@ function checkIsGeneratedLegacyWorkflow(content: string) {
 }
 
 export default defineIntegration({
-  assess: ({ cwd, packageJson }: Project) =>
+  // With a lockfile, the integration applies when the selection includes GitHub Actions. Without
+  // one, it applies to a workflow that exists.
+  assess: ({ cwd, lockfile, packageJson }: Project) =>
     Effect.gen(function* () {
       const state = yield* readWorkflowState(cwd)
 
-      if (state instanceof MissingWorkflow) {
+      const applies = Option.match(lockfile, {
+        onNone: () => !(state instanceof MissingWorkflow),
+        onSome: ({ selection }) => selection.ci === "github",
+      })
+
+      if (!applies) {
         return { applicable: false } satisfies IntegrationAssessment
+      }
+
+      if (state instanceof MissingWorkflow) {
+        return {
+          applicable: true,
+          findings: [
+            {
+              currentState: `The lockfile selects GitHub Actions, and \`${files[0].path}\` does not exist.`,
+              goal: [
+                `Create \`${files[0].path}\` with jobs that run the managed scripts that CI runs, between one \`${START_MARKER}\` comment and one \`${END_MARKER}\` comment.`,
+                "Use the project's Node.js version declaration instead of a hard-coded version.",
+                "Run `adamantite doctor` again. It must not report this finding.",
+              ],
+              id: "missing-adamantite-workflow",
+              integration: "github",
+              title: "Missing Adamantite workflow",
+            },
+          ],
+          packageActions: [],
+          warnings: [],
+        } satisfies IntegrationAssessment
       }
 
       if (state instanceof MalformedWorkflow) {

@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import type { Finding, PackageAction } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
@@ -16,6 +17,7 @@ import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
 const repairPromptTemplate = getRepairPromptTemplate()
@@ -39,6 +41,18 @@ const managedIntegrations = [
   vscode,
   zed,
 ] as const
+
+// Without a lockfile, Doctor decides from the files that exist, so it cannot check what init set up.
+const lockfileMissing: Finding = {
+  currentState: `The project has no \`${LOCKFILE_PATH}\`, so Doctor decides which integrations apply from the files that exist, and cannot check a selected integration whose file is missing.`,
+  goal: [
+    `Run \`adamantite update\`. It writes \`${LOCKFILE_PATH}\` with the setup that the project files show.`,
+    `Commit \`${LOCKFILE_PATH}\`.`,
+  ],
+  id: "lockfile-missing",
+  integration: "lockfile",
+  title: "Missing Adamantite lockfile",
+}
 
 export interface ProjectAssessment {
   /**
@@ -72,9 +86,13 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 
   const applicable = Array.flatten(assessments)
 
+  // A project that Adamantite does not manage needs no lockfile.
+  const lockfileFindings =
+    Option.isNone(project.lockfile) && applicable.length > 0 ? [lockfileMissing] : []
+
   return {
     applicableIntegrations: applicable.map(({ name }) => name),
-    findings: applicable.flatMap(({ assessment }) => assessment.findings),
+    findings: [...applicable.flatMap(({ assessment }) => assessment.findings), ...lockfileFindings],
     packageActions: applicable.flatMap(({ assessment }) => assessment.packageActions),
     warnings: applicable.flatMap(({ assessment }) => assessment.warnings),
   } satisfies ProjectAssessment

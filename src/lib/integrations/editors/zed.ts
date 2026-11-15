@@ -381,14 +381,42 @@ function setOxlintBinary(config: Schema.JsonObject): Schema.JsonObject {
 }
 
 export default defineIntegration({
-  assess: ({ cwd }: Project) =>
+  // With a lockfile, the integration applies when the selection includes Zed. Without one, it
+  // applies to settings that exist.
+  assess: ({ cwd, lockfile }: Project) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(settingsPath)
 
-      if (Option.isNone(content)) {
+      const applies = Option.match(lockfile, {
+        onNone: () => Option.isSome(content),
+        onSome: ({ selection }) => selection.editors.includes("zed"),
+      })
+
+      if (!applies) {
         return { applicable: false } satisfies IntegrationAssessment
+      }
+
+      if (Option.isNone(content)) {
+        return {
+          applicable: true,
+          findings: [
+            {
+              currentState: `The lockfile selects Zed, and \`${files[0].path}\` does not exist.`,
+              goal: [
+                `Create \`${files[0].path}\` with the reference settings.`,
+                "Run `adamantite doctor` again. It must not report this finding.",
+              ],
+              id: "missing-zed-settings",
+              integration: "zed",
+              reference: { content: `${yield* formatJson(CONFIG)}\n`, language: "json" },
+              title: "Missing Zed settings",
+            },
+          ],
+          packageActions: [],
+          warnings: [],
+        } satisfies IntegrationAssessment
       }
 
       const config = yield* Effect.fromResult(Json5.parse(content.value)).pipe(

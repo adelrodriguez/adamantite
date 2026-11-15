@@ -2,7 +2,6 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/project/project.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import {
   defineIntegration,
@@ -31,7 +30,8 @@ import {
   type RetiredLintPreset,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
-import { getManagedScripts, checkRunsTool } from "#lib/project/package-json.ts"
+import { checkRunsTool } from "#lib/project/package-json.ts"
+import { getSelectedScripts, type Project } from "#lib/project/project.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
@@ -156,10 +156,9 @@ const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 export default defineIntegration({
   assess: (project: Project) =>
     Effect.gen(function* () {
-      const { cwd, lintConfig, packageJson } = project
-      const managedScripts = getManagedScripts(packageJson)
+      const { cwd, lintConfig } = project
 
-      if (!checkRunsTool(managedScripts, "oxlint")) {
+      if (!checkRunsTool(getSelectedScripts(project), "oxlint")) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 

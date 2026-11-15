@@ -335,8 +335,8 @@ describe("update", () => {
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
         "✔ `.adamantite/adamantite-lock.json` written with the setup that the project files show. Commit it.",
+        // The lockfile selects no agent guidance, so Doctor checks no `AGENTS.md`.
         expect.stringMatching(/^\n1\. Missing knip configuration\n/u),
-        expect.stringMatching(/^\n2\. Missing AGENTS\.md\n/u),
         "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
         "✅ Update finished.",
       ])

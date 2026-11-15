@@ -4,14 +4,17 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import type { Selection } from "#lib/project/selection.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { UnsupportedLockfile } from "#lib/shared/errors.ts"
 import {
   makeHandoffRunner,
+  makeLockfileFile,
   nonProbeInvocations,
   promptingLayer,
   runCommand,
@@ -27,9 +30,20 @@ function getHeadings(markdown: string) {
   return markdown.match(/^#{1,2} .+$/gm) ?? []
 }
 
+// The setup that init records for the analyze script and the agent guidance.
+const ANALYZE_SELECTION = {
+  agents: true,
+  ci: null,
+  editors: [],
+  presets: [],
+  scripts: ["analyze"],
+  typescript: null,
+} as const satisfies Selection
+
 function makeFindingsFixture() {
   return createFileSystemTestContext({
     files: {
+      ...makeLockfileFile(ANALYZE_SELECTION),
       "AGENTS.md": "# AGENTS.md\n",
       "package.json": manifest({
         devDependencies: { adamantite: "1.0.0", knip: knip.version },
@@ -80,6 +94,7 @@ const NO_INTEGRATION_FILES = {
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2 })
 
 const HEALTHY_FILES = {
+  ...makeLockfileFile(ANALYZE_SELECTION),
   "AGENTS.md": "# AGENTS.md\n",
   "knip.config.ts": toKnipTsConfigContent(),
   "package.json": manifest({
@@ -271,6 +286,7 @@ describe("doctor", () => {
             "          node-version: 22",
             "",
           ].join("\n"),
+          ...makeLockfileFile({ ...ANALYZE_SELECTION, agents: false, ci: "github", scripts: [] }),
           "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
         },
       })
@@ -517,6 +533,56 @@ describe("doctor", () => {
         })
       )
       expect(terminal.output()).toContain("❯ Hand off to Gemini CLI \n  Copy the agent prompt ")
+    })
+  )
+
+  it.effect(
+    "report a missing preset when the lockfile selects TypeScript and tsconfig.json has no extends",
+    () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            ...HEALTHY_FILES,
+            ...makeLockfileFile({ ...ANALYZE_SELECTION, typescript: "typescript" }),
+            "tsconfig.json": '{ "extends": "adamantite/typescript" }\n',
+          },
+        })
+
+        expect(Exit.isSuccess(yield* runCommand(doctorCommand, [], { files }))).toBe(true)
+
+        files.write("tsconfig.json", '{ "compilerOptions": { "strict": true } }\n')
+
+        const logLines: unknown[] = []
+        const exit = yield* runCommand(doctorCommand, [], { files, logLines })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+          [
+            "# Adamantite doctor findings",
+            "## 1. Missing TypeScript preset",
+            "## Verify",
+            "## Check the repair",
+          ],
+        ])
+      })
+  )
+
+  it.effect("report the missing lockfile of a managed project", () =>
+    Effect.gen(function* () {
+      const { [LOCKFILE_PATH]: _lockfile, ...files } = HEALTHY_FILES
+      const logLines: unknown[] = []
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files: createFileSystemTestContext({ files }),
+        logLines,
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(logLines).toStrictEqual([
+        expect.stringMatching(
+          /^# Adamantite doctor findings\n[\s\S]*## 1\. Missing Adamantite lockfile\n[\s\S]*Run `adamantite update`/u
+        ),
+      ])
     })
   )
 

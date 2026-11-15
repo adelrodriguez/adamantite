@@ -13,6 +13,7 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
+import type { Selection } from "#lib/project/selection.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
@@ -24,6 +25,7 @@ import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import {
   makeHandoffRunner,
+  makeLockfileFile,
   promptingLayer,
   nonProbeInvocations,
   runCommand,
@@ -180,8 +182,20 @@ const ADAMANTITE_RESOLUTION = {
   "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
 }
 
+// The lockfile of a project that init set up with nothing selected, so Doctor reports no missing
+// lockfile.
+const NO_SELECTION = {
+  agents: false,
+  ci: null,
+  editors: [],
+  presets: [],
+  scripts: [],
+  typescript: null,
+} as const satisfies Selection
+
 const INSTALLED = {
   ...ADAMANTITE_MODULE,
+  ...makeLockfileFile(NO_SELECTION),
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
 }
 
@@ -1297,6 +1311,7 @@ describe("harden", () => {
         // Knip is installed without its managed config, so Doctor reports one finding.
         files: {
           ...ADAMANTITE_MODULE,
+          ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
           "AGENTS.md": "# AGENTS.md\n",
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },

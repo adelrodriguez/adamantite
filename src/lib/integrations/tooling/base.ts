@@ -6,7 +6,6 @@ import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
@@ -17,11 +16,11 @@ import {
 } from "#lib/integrations/base.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
-  getManagedScripts,
   matchDeclaredVersion,
   parseDependencySpecifier,
   type Script,
 } from "#lib/project/package-json.ts"
+import { getSelectedScripts, type Project } from "#lib/project/project.ts"
 import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 
 export type ToolingConfigFormat = "ts" | "json" | "jsonc"
@@ -402,10 +401,11 @@ export function getConfigFindings(
   return findings
 }
 
-function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Script[]) {
-  const managedScripts = getManagedScripts(packageJson)
+// The lockfile selection decides, and a project without a lockfile has its managed scripts.
+function checkHasSelectedScript(project: Project, scripts: readonly Script[]) {
+  const selected = getSelectedScripts(project)
 
-  return scripts.some((script) => managedScripts.includes(script))
+  return scripts.some((script) => selected.includes(script))
 }
 
 /**
@@ -437,7 +437,7 @@ export function definePackageTooling(options: {
         const { packageJson } = project
 
         const isApplicable =
-          checkHasManagedScript(packageJson, options.scripts)
+          checkHasSelectedScript(project, options.scripts)
           && (!options.monorepoOnly || project.workspace.isMonorepo)
           && (options.isRequired === undefined || options.isRequired(project))
 
@@ -544,11 +544,10 @@ export function defineConfigTooling<
         const {
           cwd,
           lintConfig,
-          packageJson,
           workspace: { isMonorepo },
         } = project
 
-        if (!checkHasManagedScript(packageJson, options.scripts)) {
+        if (!checkHasSelectedScript(project, options.scripts)) {
           return { applicable: false } satisfies IntegrationAssessment
         }
 

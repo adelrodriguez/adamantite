@@ -23,7 +23,7 @@ import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import { type Script, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
 import * as Setup from "#lib/setup/index.ts"
 import {
@@ -84,11 +84,19 @@ function withPackageManagerInMonorepo(packageManager: string) {
 const shippedSkill = getShippedSkillFiles()
 
 /**
- * The keys that check the given choices of a multiselect and submit it. The prompt lists `Select
- * All` and `Inverse Selection` above its choices, and its cursor starts on `Select All`.
+ * The keys that leave exactly the given choices of a multiselect checked and submit it. Space
+ * toggles each choice whose state differs from `initial`, the choices that the prompt checks at the
+ * start. The prompt lists `Select All` and `Inverse Selection` above its choices, and its cursor
+ * starts on `Select All`.
  */
-function pickMany<const T>(choices: readonly T[], selected: readonly T[]): TestKey[] {
-  const rows = choices.flatMap((choice, index) => (selected.includes(choice) ? [index + 2] : []))
+function pickMany<const T>(
+  choices: readonly T[],
+  selected: readonly T[],
+  initial: readonly T[] = []
+): TestKey[] {
+  const rows = choices.flatMap((choice, index) =>
+    selected.includes(choice) === initial.includes(choice) ? [] : [index + 2]
+  )
 
   return [
     ...rows.flatMap((row, index): TestKey[] => [
@@ -97,6 +105,14 @@ function pickMany<const T>(choices: readonly T[], selected: readonly T[]): TestK
     ]),
     "enter",
   ]
+}
+
+/**
+ * The keys that leave exactly the given scripts checked in the scripts prompt, which checks the
+ * recommended `check` and `fix` at the start.
+ */
+function pickScripts(selected: readonly Script[]): TestKey[] {
+  return pickMany(SCRIPT_ORDER, selected, ["check", "fix"])
 }
 
 /**
@@ -137,7 +153,7 @@ function runFreshSetup() {
     const files = createInitTestContext()
 
     const terminal = createTerminalTestContext([
-      ...pickMany(SCRIPT_ORDER, ["check", "analyze"]),
+      ...pickScripts(["check", "analyze"]),
       ...pickMany(LINT_PRESETS, ["react"]),
       // Use the TypeScript preset, which the prompt offers by default.
       "enter",
@@ -231,6 +247,42 @@ function listInstalls(installer: DependencyInstallerTestContext) {
 
 describe("init", () => {
   describe("fresh project setup", () => {
+    it.effect("select the recommended check and fix scripts when the user presses Enter", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+
+        const terminal = createTerminalTestContext([
+          // Accept the preselected scripts and the core preset alone.
+          "enter",
+          "enter",
+          // Decline the TypeScript preset, the editors, the workflow, and the agent guidance.
+          "n",
+          "enter",
+          "n",
+          "n",
+          ...FINISH_WITHOUT_AGENT,
+        ])
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [installer.layer, promptingLayer],
+          terminal,
+        })
+
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
+        expect(readLockfile(files).selection).toMatchObject({
+          presets: ["core"],
+          scripts: ["check", "fix"],
+        })
+        expect(listInstalls(installer).packages).toStrictEqual(
+          expect.arrayContaining([`oxlint@${oxlint.version}`, `oxfmt@${oxfmt.version}`])
+        )
+        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent([]))
+      })
+    )
+
     it.effect("install the managed packages and add the selected scripts", () =>
       Effect.gen(function* () {
         const { exit, files, installer } = yield* runFreshSetup()
@@ -344,7 +396,7 @@ describe("init", () => {
     Effect.gen(function* () {
       // The list pages, so the cursor moves to the last preset to show each one.
       const terminal = createTerminalTestContext([
-        ...pickMany(SCRIPT_ORDER, ["check"]),
+        ...pickScripts(["check"]),
         ...pickMany(LINT_PRESETS, ["tailwind"]),
         "n",
         ...pickMany(INIT_EDITORS, []),
@@ -372,7 +424,7 @@ describe("init", () => {
 
       // The cursor passes each editor choice, so the prompt shows each description.
       const terminal = createTerminalTestContext([
-        ...pickMany(SCRIPT_ORDER, ["check"]),
+        ...pickScripts(["check"]),
         ...pickMany(LINT_PRESETS, []),
         "n",
         ...pickMany(INIT_EDITORS, ["vscode", "zed"]),
@@ -608,7 +660,7 @@ describe("init", () => {
         const logLines: unknown[] = []
 
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickScripts(["check"]),
           ...pickMany(LINT_PRESETS, ["react-strict"]),
           "n",
           ...pickMany(INIT_EDITORS, []),
@@ -641,7 +693,7 @@ describe("init", () => {
         const files = createInitTestContext()
 
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickScripts(["check"]),
           ...pickMany(LINT_PRESETS, ["jest", "vitest", "strict"]),
           ...pickOne(["jest", "vitest"], "vitest"),
           "n",
@@ -843,7 +895,7 @@ describe("init", () => {
         const files = createInitTestContext()
 
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickScripts(["check"]),
           ...pickMany(LINT_PRESETS, []),
           "n",
           ...pickMany(INIT_EDITORS, ["zed"]),
@@ -889,7 +941,7 @@ describe("init", () => {
         const files = createInitTestContext()
 
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, []),
+          ...pickScripts([]),
           "enter",
           ...pickOne(TYPESCRIPT_PRESET_NAMES, "tsconfig"),
           ...pickMany(INIT_EDITORS, []),
@@ -939,7 +991,7 @@ describe("init", () => {
         const logLines: unknown[] = []
 
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, []),
+          ...pickScripts([]),
           "n",
           ...pickMany(INIT_EDITORS, []),
           "n",
@@ -1284,7 +1336,7 @@ describe("init", () => {
 
         // Accept the defaults of TypeScript, the extensions, and the workflow, and decline the agent guidance.
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickScripts(["check"]),
           ...pickMany(LINT_PRESETS, ["react"]),
           "enter",
           ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
@@ -1321,7 +1373,7 @@ describe("init", () => {
         const logLines: unknown[] = []
 
         const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["fix"]),
+          ...pickScripts(["fix"]),
           ...pickMany(LINT_PRESETS, []),
           "n",
           ...pickMany(INIT_EDITORS, []),
@@ -1410,7 +1462,7 @@ describe("init", () => {
             layers: [createDependencyInstallerTestContext().layer, runner.layer, promptingLayer],
             logLines,
             terminal: createTerminalTestContext([
-              ...pickMany(SCRIPT_ORDER, []),
+              ...pickScripts([]),
               "enter",
               ...pickOne(TYPESCRIPT_PRESET_NAMES, "tsconfig"),
               ...pickMany(INIT_EDITORS, []),

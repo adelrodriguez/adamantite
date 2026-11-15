@@ -70,8 +70,8 @@ Inside `integrations`, `base.ts` defines the integration and finding types, and 
 that owns a folder, such as `oxlint/`, `oxfmt/`, `knip/`, `sherif/`, and `vscode/`, exports it from
 `index.ts` as a default export. Helper modules beside it, such as `knip/config.ts`, hold the logic
 that only that integration uses. `config-file.ts` holds the findings of a managed tool config that
-Oxlint, Oxfmt, and Knip share, and `tooling/base.ts` and `tooling/preset-config.ts` hold the package
-and preset checks that several tools share. The `assessment` layer runs every integration. Oxlint,
+Oxlint, Oxfmt, and Knip share, and `tooling/base.ts` holds the package checks that several tools
+share. The `assessment` layer runs every integration. Oxlint,
 Oxfmt, Knip, and Sherif also have command builders in `command.ts`, which return
 `CommandRunOptions` and start no process. The builders stay out of the `Integration`, and Toolchain
 and `setup` import each `command.ts` directly.
@@ -102,6 +102,26 @@ An assessment reads the target project one time. `readProject` in `src/lib/proje
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
 custom rules that the Oxlint configs load, and each integration's `assess` takes that `Project`. A
 `Project` is a snapshot, so a reassessment after a handoff or an install reads a new one.
+
+### Reading configs and source facts
+
+Adamantite reads a tool config the way the tool reads it, and does not parse its source. The
+`ConfigLoader` service in `src/lib/project/config-loader.ts` imports the config with Node.js in a
+separate process, as Oxlint imports it, and prints the default export as JSON. The process keeps
+the output of the config apart, and reads the files again after a coding agent changes a module
+that the config imports. Each reader decodes the JSON with a Schema: `lint-config.ts` for Oxlint,
+and `config.ts` of `oxfmt/` and `knip/`. The trials of `harden` decode the overrides the same way.
+Each preset object, and each `custom()` result, names itself under the `adamantite.preset` symbol of
+`presets/identity.ts`, and the loader writes that identity into the JSON. A spread keeps the key,
+and every installed copy of Adamantite shares it, so a preset counts also through a spread or a
+shared config package. The tools ignore symbol keys. The unit tests evaluate the in-memory configs
+in process with `src/__tests__/config-loader.ts`, and the process tests run the real loader.
+
+A fact that only the parser knows, such as the disable comments of a file or its syntax tree, comes
+from Oxlint itself. `src/probe.ts`, built as `dist/probe.js`, is a small JS plugin whose rules
+report the comments or the tree of each source that Oxlint parses, as JSON.
+`integrations/oxlint/probe.ts` runs Oxlint with a config that loads only that plugin, and decodes
+the reports. `harden` counts the suppressions from them, and `rule ast` prints the tree.
 
 The lockfile is `.adamantite/adamantite-lock.json` at the project root, the workspace root in a
 monorepo. `Lockfile` and `Selection` in `src/lib/project/` are its Effect schemas. `readProject`
@@ -255,7 +275,8 @@ writing files.
   which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
   finding.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,
-  and `rule ast --json` and `rule try --json` print their results through `Output.result`.
+  from the Oxlint probe that "Reading configs and source facts" describes, and `rule ast --json`
+  and `rule try --json` print their results through `Output.result`.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
   Temporary verification cases do not stay in the target project. Users can opt in to saved
   `.test.*` files beside their rules, add them with `rule test add [name]`, and run them explicitly
@@ -295,7 +316,7 @@ src/
   lib/
     shared/         errors, filesystem and JSON helpers, the command runner, and forwarded arguments (bottom layer)
     project/        target-project state and file operations
-      custom-rules/ rules folders, custom() discovery, rule file checks, and rule scaffolding
+      custom-rules/ rules folders, custom() discovery, and rule scaffolding
     handoff/        coding-agent detection and handoff
     integrations/   integration types, one folder for each integration, and the helpers they share
       tooling/      the package and preset checks that several tools share
@@ -357,11 +378,10 @@ package, and its type fails when a package has no version. Init installs the pac
 selected presets. Doctor and update maintain a package while the root config imports its
 preset.
 
-Doctor also reports an Adamantite preset that comes before the last core entry in the `extends`
-array. Oxlint applies the entries in order, so core then replaces the rules that the preset
-changes. `inspectExtendsOrder` in `oxlint/config.ts` reads the order from the config
-source. An entry that is not an Adamantite preset can come before core, and the finding keeps its
-place.
+Doctor also reports an Adamantite preset that Oxlint applies before the last core preset.
+Oxlint applies the entries in order, so core then replaces the rules that the preset changes.
+`findMisplacedCorePreset` in `oxlint/config.ts` reads the order from the loaded config. An entry
+that is not an Adamantite preset can come before core, and the finding keeps its place.
 
 The Effect definition also assesses the language service entry in `tsconfig.json`, through
 `integrations/effect-language-service.ts`. The `typescript` integration writes the entry in the
@@ -522,17 +542,14 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
   `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with
   the test types in its namespace, connected to `node:test`.
-- `src/lib/project/custom-rules/` holds the target project's custom-rules state. It reads
-  `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
-  finds the Oxlint configs and follows their imports to the `custom()` calls. It also records
-  old API imports for Doctor's migration finding. Old calls do not load rules. The
-  `ModuleResolver` service in `src/lib/project/module-resolver.ts` resolves each import
-  with `oxc-resolver`, as Node.js loads a config, so a workspace package resolves only after an
-  install. Tests pass a fake from `src/__tests__/module-resolver.ts`, and the smoke test
-  covers the real resolver. `harden` uses
-  it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
-  copy of the rule file test and the defaults, and a unit test keeps them equal to
-  `presets/rules/folder.ts`.
+- `src/lib/project/custom-rules/` holds the target project's custom-rules state. `discover.ts`
+  finds the Oxlint config of each package, loads it with the `ConfigLoader`, and reads the
+  identity that each `custom()` result holds under `PRESET` of `presets/identity.ts`: the rules
+  folder, the plugin name, and the calling file. A call in a module that the config imports counts,
+  and a call that no config reaches loads no rules. A config that does not load leaves the
+  discovery incomplete, and Doctor and `rule test` warn about it. `harden` uses it too, to list the
+  configs and rules folders in its prompt. `folder.ts` keeps its own copy of the rule file test and
+  the defaults, and a unit test keeps them equal to `presets/rules/folder.ts`.
   `index.ts` writes only the rule stub for `adamantite rule add`, from the template beside it.
   It also lists existing rules for `rule test add`, writes an optional sibling `<name>.test.ts`
   or the file that `--path` names, and finds `.test.*` files in each loaded rules folder for
@@ -540,9 +557,10 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   The shipped skill tells the agent how to run temporary
   RuleTester cases, remove its temporary files, and preserve user-owned tests.
 - The `oxlint-custom` integration in `src/lib/integrations/oxlint/custom.ts` uses
-  that module to report rules folders that no `custom()` call loads, rule files that cannot
-  load, and rules folders that share a plugin name. It also reports old imports, old default
-  folders with migration instructions. Optional saved tests do not produce a finding.
+  that module to report rules folders that no `custom()` call loads, also at the previous
+  default path, a `dir` that names a missing folder, and rules folders that share a plugin name. A
+  rule file that cannot load stops Oxlint, so the `oxlint-config-load-failure` finding reports it.
+  Optional saved tests do not produce a finding.
 - The `github` integration in `src/lib/integrations/github/index.ts` renders
   `.github/workflows/adamantite.yml` whole, with a job for each check and analyze script of the
   selection. It does not add or require a rule-test step. Users can add one themselves, and the

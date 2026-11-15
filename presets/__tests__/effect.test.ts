@@ -227,8 +227,8 @@ describe("effect preset", () => {
   })
 
   // The Effect binding loads through `NAPI_RS_NATIVE_LIBRARY_PATH`, which every napi-rs package
-  // reads. The plugin loads `oxc-parser`, which the entry does not load itself, so the plugin fails
-  // to load when the variable outlives the Oxlint binding.
+  // reads. The plugin loads the binding of `oxfmt`, which the entry does not load itself, so the
+  // plugin fails to load when the variable outlives the Oxlint binding.
   it("load a JS plugin that loads a napi-rs package next to the Effect binding", () => {
     const diagnostics = lint(
       {
@@ -241,9 +241,9 @@ describe("effect preset", () => {
           "",
         ].join("\n"),
         "napi-plugin.mjs": [
-          'import { parseSync } from "oxc-parser"',
+          'import { format } from "oxfmt"',
           "",
-          'parseSync("probe.js", "1")',
+          'await format("probe.js", "1", {})',
           "",
           'export default { meta: { name: "napi" }, rules: {} }',
           "",

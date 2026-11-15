@@ -399,7 +399,7 @@ It exits 0 when every case gives the expected result, 1 when a case does not, an
 trial cannot check the cases, such as for a rule that does not exist.
 
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
-real code.
+real code. Oxlint parses the file, so the project needs Oxlint installed.
 
 `rule try --json` and `rule ast --json` print the trial results and the tree as one JSON document.
 
@@ -1154,10 +1154,11 @@ projects, and remove their temporary verification cases and fixtures before hand
 runtime helpers stay in the target project. The "Custom rules" section of the
 [Adamantite skill](#agent-skill) has the command and the full authoring guidance.
 
-`adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
-that no `custom()` call loads, and two rules folders that use the same plugin name. It also
-provides migration guidance for old API imports and the previous default rules folder.
-User-owned saved tests and optional CI steps remain supported.
+`adamantite doctor` reports a rules folder that no `custom()` call loads, also at the previous
+default path `.adamantite/rules`, a `dir` that names a folder that does not exist, and two rules
+folders that use the same plugin name. A rule file that cannot load stops the whole lint run, and
+Doctor reports the error that Oxlint prints. User-owned saved tests and optional CI steps remain
+supported.
 
 ### Custom rules in a monorepo
 
@@ -1186,10 +1187,10 @@ export default custom({ dir: "rules", name: "acme" })
 ```
 
 Run `adamantite rule add <name> --dir tooling/lint/rules` to add a rule to that folder.
-Doctor starts from the Oxlint config of the root and of each workspace package, and follows
-relative imports, `#` imports, and imports of workspace packages to find the `custom()` calls. It
-resolves them as Node.js does, so run it after you install the dependencies. It resolves
-`dir` and `name` when they are string literals.
+Doctor loads the Oxlint config of the root and of each workspace package with Node.js, as Oxlint
+loads it, and reads the rules folder and the plugin name of each `custom()` call that the config
+reaches, also through a shared tooling package. Run it after you install the dependencies. Doctor
+warns about a config that does not load.
 
 ## Requirements and boundaries
 

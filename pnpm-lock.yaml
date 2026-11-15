@@ -172,9 +172,6 @@ importers:
       effect:
         specifier: 4.1.2
         version: 4.1.2
-      oxc-parser:
-        specifier: 0.154.0
-        version: 0.154.0
       oxc-resolver:
         specifier: 11.24.2
         version: 11.24.2
@@ -218,6 +215,9 @@ importers:
       knip:
         specifier: 6.45.1
         version: 6.45.1
+      oxc-parser:
+        specifier: 0.154.0
+        version: 0.154.0
       oxfmt:
         specifier: 0.78.0
         version: 0.78.0

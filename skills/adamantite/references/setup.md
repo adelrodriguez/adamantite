@@ -3,11 +3,12 @@
 ## Select the setup
 
 Read `adamantite init --help` for the available scripts, presets, and editors.
-Use explicit `--non-interactive` setup as an agent. Include at least one `--script` or `--typescript`.
+As an agent, set up from flags with `--json`, which never prompts and prints one JSON document.
+Include at least one `--script` or `--typescript`.
 For example, to configure checks, fixes, TypeScript, and agent instructions, run:
 
 ```sh
-npx adamantite init --non-interactive --script check --script fix --typescript typescript --agents
+npx adamantite init --json --script check --script fix --typescript typescript --agents
 ```
 
 `--typescript typescript` writes `adamantite/typescript`, which adds type resets, so
@@ -38,8 +39,9 @@ script ran. Before you select a script that already runs another command, check 
 includes replacing it. Otherwise, leave that script out, or move its command to a script of
 another name first.
 It writes each managed config, such as `oxlint.config.ts`, whole, and keeps a config that the
-project changed. Do not merge the reference config into a kept file. Read the output for kept or
-legacy configuration, and run Doctor for the repairs that it needs.
+project changed. Do not merge the reference config into a kept file. Read `setup.files` in the
+JSON for a `Kept` file. `init` exits 1 when findings remain after the setup, and
+`assessment.findings` lists them. Repair them as the Doctor step of the skill says.
 
 Adamantite requires TypeScript 7 or later in the target project's own `package.json`.
 Check that declaration if npm cannot install or update a managed plugin.

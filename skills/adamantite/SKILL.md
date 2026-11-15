@@ -69,8 +69,10 @@ The task is complete when the affected checks exit 0 and you have read their out
 
 ## Repair managed setup
 
-Run `adamantite doctor`. It assesses managed integrations without changing files.
-Without a terminal, it prints a Markdown repair prompt and exits 1 when findings remain.
+Run `adamantite doctor --json`. It assesses managed integrations without changing files, prints
+the assessment as one JSON document, and exits 1 when findings remain. Each finding has its `id`,
+`currentState`, `goal`, and the optional `reference` and `notes`. Without `--json` and a terminal,
+Doctor prints the same findings as a Markdown repair prompt.
 Follow each finding's current state, goal, reference, and verification command.
 For a finding about the previous custom-rules API, use the migration step in
 [How to write and verify custom rules](references/custom-rules.md#repair-an-existing-rules-folder).
@@ -79,24 +81,26 @@ When the config imports an Adamantite preset that the installed package does not
 replacement that the [changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md)
 names for it.
 
-Run Doctor again after the repair. This step is complete when Doctor exits 0 with no
-findings. Report assessment warnings separately, because warnings alone also exit 0.
+Run `adamantite doctor --json` again after the repair. This step is complete when Doctor exits 0
+with no findings. Report the `warnings` separately, because warnings alone also exit 0.
 
 ## Update managed dependencies
 
-Run `adamantite update`. It installs the managed packages of the recorded setup, writes the
+Run `adamantite update --json`. It installs the managed packages of the recorded setup, writes the
 managed files of the recorded setup, such as `.vscode/extensions.json` and this skill, that are
 missing or unchanged since Adamantite wrote them, and writes
-`.adamantite/adamantite-lock.json`. In a
-project without a lockfile, it records the setup that the project files show. Commit the lockfile. It reports remaining setup findings but can exit 0
-with findings still present.
+`.adamantite/adamantite-lock.json`. In a project without a lockfile, it records the setup that the
+project files show. Commit the lockfile. The JSON lists the file writes, the script writes, and the
+installs in `setup`, and the findings that remain in `assessment`. It exits 1 while findings
+remain.
 
 Follow the repair step above. The update is complete when Doctor reports no findings and
 the project's checks pass.
 
 ## Harden coding standards
 
-Run `adamantite harden` and follow its Markdown prompt. Use `--path` to limit the scope
+Run `adamantite harden` and follow its Markdown prompt. `adamantite harden --json` prints what the
+prompt is built from, such as the agent reach and the suppressions, as JSON. Use `--path` to limit the scope
 when the request covers one package or folder. Show the candidate standards and wait for
 the user's approval before writing. If no human can approve, report the candidates and stop.
 

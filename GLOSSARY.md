@@ -151,7 +151,8 @@ _Avoid_: Action, diagnostic, manual fix
 
 **Handoff**:
 Give the terminal to an installed coding agent CLI, seeded with a Markdown prompt. Adamantite
-waits until the agent session ends.
+waits until the agent session ends, then reads the project again to verify the work. A command
+hands off only through `Resolution.offer`, and never with `--json`.
 _Avoid_: Delegation, agent launch
 
 **Adamantite skill**:
@@ -163,7 +164,8 @@ _Avoid_: Plugin, agent guidance
 
 **Resolution menu**:
 The terminal menu that offers a handoff to each installed coding agent, a copy of the Markdown
-prompt, or nothing.
+prompt, or nothing. `doctor`, `harden`, `init`, and `update` show it in an interactive terminal.
+Without one, they print the Markdown prompt.
 _Avoid_: Handoff menu
 
 ## Integration lifecycle

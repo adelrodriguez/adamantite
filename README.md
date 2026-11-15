@@ -128,6 +128,12 @@ Available setup values:
 Presets require the `check` or `fix` script. GitHub Actions requires a compatible script and a
 supported package manager. Omitted boolean flags are disabled.
 
+`init` and `update` assess the project after the setup and exit 1 when findings remain. In an
+interactive terminal they offer the repair through the [resolution menu](#adamantite-doctor).
+Without one, they print the Markdown repair prompt. `--json` sets up from the flags, without
+`--non-interactive`, and prints the setup and the assessment as one JSON document. See
+[JSON output](#json-output).
+
 The GitHub Actions workflow, `.github/workflows/adamantite.yml`, runs the `check` and `analyze`
 scripts that you select. It is a managed file: `init` and `update` replace it while it holds what
 Adamantite wrote, and keep it once you change it, such as to add your own jobs. Doctor then checks
@@ -281,7 +287,10 @@ its input with the seed prompt, so that handoff needs one Enter press to start.
 A coding agent can also run `adamantite doctor` in the target project to receive Markdown
 directly. In a non-interactive run, Doctor prints the combined repair prompt and exits 1
 when findings remain. If only assessment warnings remain, Doctor prints a Markdown
-warning report and exits 0.
+warning report and exits 0. If no agent CLI starts after you choose it, Doctor prints the prompt
+instead. A project that does not declare `adamantite` gets one finding that says to install it.
+`adamantite doctor --json` prints the assessment as one JSON document and exits 1 when findings
+remain. See [JSON output](#json-output).
 
 ### `adamantite harden`
 
@@ -310,27 +319,28 @@ reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 
-In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
-coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff, `harden`
-runs `check`, then the Doctor assessment, and exits 1 when either fails.
+In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
+installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,
+`harden` runs `check`, then the Doctor assessment, and exits 1 when either fails.
 During the session, the agent verifies each new or changed custom rule with temporary
 RuleTester cases and removes the cases before handback.
 Harden also exits 1 when the session added a link to a Markdown file that does not exist. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings.
+`harden --json` prints what the prompt is built from as one JSON document, and starts no agent.
 
 ### `adamantite update`
 
-Update Adamantite-managed dependencies, then report any setup findings:
+Update Adamantite-managed dependencies, then offer the repair of any setup findings:
 
 ```sh
 adamantite update
-adamantite doctor
+adamantite update --json
 ```
 
 `update` installs each package of the recorded setup that the project does not declare at the
 managed version, such as Oxlint, tsrs, and the managed plugin of each selected preset. A version
-from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry. `update` exits 0
-when the install succeeds, even if doctor findings remain. Use `adamantite doctor` as the CI gate.
+from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry. `update` exits 1
+when findings remain after it, and offers their repair as `init` does.
 It also writes the managed files of the recorded setup, such as the
 [Adamantite skill](#agent-skill), that are missing or unchanged since Adamantite wrote them,
 and writes the lockfile again with the installed version. In a project that an earlier version
@@ -390,6 +400,27 @@ trial cannot check the cases, such as for a rule that does not exist.
 
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
 real code.
+
+`rule try --json` and `rule ast --json` print the trial results and the tree as one JSON document.
+
+### JSON output
+
+`doctor`, `harden`, `init`, `update`, `rule ast`, and `rule try` take `--json`. Each one prints one
+JSON document on standard output, and its other lines on standard error. With `--json`, a command
+never asks a question and never starts an agent. The exit codes stay the same. Each document has a
+`schemaVersion`:
+
+| Command          | Document                                                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`. |
+| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, and commits of the prompt.             |
+| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                   |
+| `rule ast`       | The `file` and its `program`.                                                                                                                      |
+| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                            |
+
+Each finding keeps its `id`, `integration`, `title`, `currentState`, and `goal`, and its `notes`
+and `reference` when it has them. The `setup` of `update` is `null` in a project that has no
+lockfile and no setup to record.
 
 ### Pass arguments to underlying tools
 

@@ -26,7 +26,8 @@ Continue when Doctor reports no custom-rule wiring findings.
 ## Write the rule
 
 For a new rule, run `adamantite rule add <name>`. It writes only a stub.
-Use `adamantite rule ast <file>` on real code to find the node types that visitors receive.
+Use `adamantite rule ast <file>` on real code to find the node types that visitors receive. With
+`--json`, it prints the file and its tree as one JSON document.
 
 Apply these authoring constraints:
 

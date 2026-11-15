@@ -35,7 +35,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `project`      | Read target-project files, install dependencies, derive workspace state, and read the lockfile.                                                   |
 | `setup`        | Apply a selection: install the packages, set the managed scripts, write the managed files under the write rule, and write the lockfile last.      |
 | `shared`       | Define errors, filesystem helpers, JSON helpers, the command runner, and the forwarded arguments.                                                 |
-| `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
+| `terminal`     | Decide the output mode, prompt the user, render findings and JSON documents, hand prompts off through `Resolution.offer`, and render the title.   |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
 
 ## Layers
@@ -118,8 +118,9 @@ Without one, each integration applies to the files that exist, and the assessmen
 `init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
 or the flags and adds it to the recorded selection, and `update` takes it from the lockfile, or
 from `inferSelection` once when there is none. Both hand it to `applySetup` in
-`src/commands/setup.ts`, which runs `apply` in `src/lib/setup/`, prints what it did, and reports
-the assessment of the project that it left. `src/lib/integrations/index.ts`
+`src/commands/setup.ts`, which runs `apply` in `src/lib/setup/`, prints what it did, and offers the
+repair of the findings that remain in the project that it left through `Resolution.offer`. Both
+exit 1 while findings remain. `src/lib/integrations/index.ts`
 lists the integrations that own a folder, such as `integrations/vscode/`, and each one implements
 `Integration` from `integrations/base.ts`: whether the selection includes it, its packages, its
 managed files, a `prepare` step for `node_modules`, and its `assess`. `apply` installs
@@ -162,20 +163,29 @@ do not read it. Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` 
 `readWorkspace`, and only `project.ts` and `hardening/index.ts` import `discoverCustomRules`, for
 the scope of a harden session. `adamantite/import-owners` enforces both lists.
 
-Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
-installed coding agent CLI or to copy the combined Markdown prompt. The resolution menu in
-`src/terminal/resolution-menu.ts` offers these choices, so other commands can offer them with
-their own prompt. `CodingAgents` in `src/lib/handoff` detects the agents and does the
-handoff. Installation is
+`Resolution.offer` in `src/terminal/resolution.ts` is the one way that a command hands a prompt to
+a coding agent. `doctor`, `init`, and `update` offer the repair prompt of an assessment, and
+`harden` offers its prompt. The command decides its mode once, in `src/terminal/mode.ts`: `Json`
+with `--json`, `Menu` when the terminal can prompt, and `Plain` otherwise. In `Json`, the offer
+prints the command's JSON document, which an Effect Schema that the command exports describes, and
+`Output` writes every other line on standard error. In `Menu`, interactive runs render findings as
+terminal notes, then the resolution menu in `src/terminal/resolution-menu.ts` offers to hand off
+to an installed coding agent CLI or to copy the combined Markdown prompt. In `Plain`, the offer
+prints the prompt. After a session the offer runs the command's `verify`, and the command exits 0
+only when no finding or failed check remains. A repair fails the command while findings remain; a
+harden prompt is a task that the user can decline. `CodingAgents` in `src/lib/handoff` detects the
+agents and does the handoff. Installation is
 detected by probing each supported CLI's version command, bounded by a timeout; only
 agents whose probe command starts appear in the menu. A handoff hands the terminal to
 the agent CLI with inherited stdio
 and a per-agent seed argument carrying the combined Markdown prompt; Adamantite
 passes no provider permission, sandbox, or trust flags, and reassesses once after the
 agent session ends.
-The agent's exit code is ignored: only the reassessment decides success. Non-interactive runs
-print the Markdown prompt directly when findings remain. If an assessment reports only
-warnings, a non-interactive run prints a Markdown warning report and exits 0.
+The agent's exit code is ignored: only the reassessment decides success. An agent CLI that does
+not start leaves the prompt printed. Non-interactive runs print the Markdown prompt directly when
+findings remain. If an assessment reports only warnings, a non-interactive run prints a Markdown
+warning report and exits 0. Doctor reports a project that does not declare `adamantite` as one
+finding, and an unmanaged project as a warning, so both go through the same offer.
 
 Runtime findings check the installed packages. Package findings check the declarations and
 the managed versions. A project that declares tsrs, but cannot resolve its backend, gets a
@@ -185,7 +195,8 @@ Package drift also stays structured so that `update` can install current managed
 versions. Doctor renders package drift as findings that tell the user to run `update`.
 
 `init` sets up the selection for a target project. It prints a line for each managed file, and a
-file that the project changed is kept, with a pointer to `adamantite doctor`.
+file that the project changed is kept, with a pointer to `adamantite doctor`. `init --json` takes
+the selection from the flags and asks nothing.
 
 The editor integrations select the installed Effect language server when `@effect/tsgo` is
 present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the
@@ -213,20 +224,22 @@ writing files.
   one stage.
 - `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
   runs `applySetup`, which installs the packages, sets the managed scripts, writes the managed
-  files and the lockfile through `Setup.apply`, then reports the findings that remain. When the
+  files and the lockfile through `Setup.apply`, then offers the repair of the findings that remain
+  through `Resolution.offer` and exits 1 while they remain. When the
   selection includes coding agents, the `agents` integration renders `AGENTS.md` with the
   Adamantite section, and the Adamantite skill in `.agents/skills` and in each other skill folder
   whose agent folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/`
   into the CLI, so the copy matches the running Adamantite version without `node_modules` or the
   network. Doctor reports an `AGENTS.md` without the section, and a skill copy that differs from
   the bundled skill.
-- `doctor` assesses managed integrations and emits repair findings. The Oxlint assessment
+- `doctor` assesses managed integrations, emits repair findings, and offers their repair through
+  `Resolution.offer`, which reassesses after a handoff. The Oxlint assessment
   resolves the same runtime as the entry and reports missing installed packages, unsupported
   native builds or platforms, and conflicting overrides. Resolution neither launches a tool
   nor changes files or process variables. Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
-  into custom rules and instructions, and offers it through the resolution menu. After a
-  handoff, it runs Oxfmt and Oxlint as `check` does, then assesses the project as Doctor does.
+  into custom rules and instructions, and offers it through `Resolution.offer`. Its `verify` runs
+  Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
   The agent verifies new and changed custom rules with temporary RuleTester cases during the
   session and removes the cases before handback. Harden never produces findings, so it never changes Doctor's
   result. The prompt lists each Markdown file that `git ls-files` gives, except the changesets
@@ -241,7 +254,8 @@ writing files.
   that Doctor applies the integrations to without one. `update` does not edit `skills-lock.json`,
   which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
   finding.
-- `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
+- `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,
+  and `rule ast --json` and `rule try --json` print their results through `Output.result`.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
   Temporary verification cases do not stay in the target project. Users can opt in to saved
   `.test.*` files beside their rules, add them with `rule test add [name]`, and run them explicitly
@@ -289,7 +303,7 @@ src/
     toolchain/      check, fix, and analyze operations
     hardening/      harden context, harden prompt, rule facts, and rule trials
     setup/          Setup.apply: the write rule, the package install, and the lockfile write
-  terminal/         status output, findings, resolution menu, and title output
+  terminal/         output mode, status output, JSON documents, findings, Resolution.offer, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
   oxlint.ts         entry that runs Oxlint with the project's Oxlint runtime

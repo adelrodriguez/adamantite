@@ -30,10 +30,10 @@ import { publicImport } from "#lib/shared/package-exports.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const CONFIG = {
-  legacy: [".oxlintrc.json"],
+  conflicting: [".oxlintrc.json"],
   path: "oxlint.config.ts",
   tool: "oxlint",
-  whyLegacyBlocks: "Oxlint loads no config when it finds both",
+  whyConflicting: "Oxlint loads no config when it finds both",
 } as const satisfies ConfigFile
 
 export const PACKAGE = { name: "oxlint", version: getDependencyVersion("oxlint") }

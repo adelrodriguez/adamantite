@@ -1,5 +1,6 @@
-import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
@@ -12,7 +13,6 @@ import {
   parseDependencySpecifier,
   type Script,
 } from "#lib/project/package-json.ts"
-import { getSelectedScripts, type Project } from "#lib/project/project.ts"
 
 export type RequiredConfigInspection =
   | { readonly kind: "configured" }
@@ -147,11 +147,11 @@ export function assessPackage(
   })
 }
 
-// The lockfile selection decides, and a project without a lockfile has its managed scripts.
+// The lockfile selection decides.
 function checkHasSelectedScript(project: Project, scripts: readonly Script[]) {
-  const selected = getSelectedScripts(project)
-
-  return scripts.some((script) => selected.includes(script))
+  return Option.exists(project.lockfile, ({ selection }) =>
+    scripts.some((script) => selection.scripts.includes(script))
+  )
 }
 
 /**
@@ -159,11 +159,6 @@ function checkHasSelectedScript(project: Project, scripts: readonly Script[]) {
  * Oxlint's managed plugins build on it through `defineManagedPlugin`.
  */
 export function definePackageTooling(options: {
-  /**
-   * Findings for retired managed packages. While any exist, the integration stays applicable and
-   * reports them so the packages get removed.
-   */
-  readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   /**
    * An extra condition for requiring the package, checked after the managed scripts.
    */
@@ -176,27 +171,17 @@ export function definePackageTooling(options: {
   return defineIntegration({
     assess: (project: Project) =>
       Effect.sync((): IntegrationAssessment => {
-        const { packageJson } = project
-
         const isApplicable =
           checkHasSelectedScript(project, options.scripts)
           && (options.isRequired === undefined || options.isRequired(project))
 
-        const legacyFindings = options.legacyFindings?.(packageJson) ?? []
-
         if (!isApplicable) {
-          return legacyFindings.length > 0
-            ? { applicable: true, findings: [...legacyFindings], packageActions: [], warnings: [] }
-            : { applicable: false }
+          return { applicable: false }
         }
-
-        const pkg = assessPackage(project, options, options.purpose, options.name)
 
         return {
           applicable: true,
-          findings: [...pkg.findings, ...legacyFindings],
-          packageActions: pkg.packageActions,
-          warnings: pkg.warnings,
+          ...assessPackage(project, options, options.purpose, options.name),
         }
       }),
     kind: "tooling",

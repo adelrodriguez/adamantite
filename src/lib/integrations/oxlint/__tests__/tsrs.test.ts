@@ -7,15 +7,32 @@ import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
+// The lockfile selects the `check` script, which runs Oxlint.
 function runAssess(packageJson: PackageJson) {
   return Effect.gen(function* () {
     const files: FileSystemTestContext = createFileSystemTestContext({
-      files: { "package.json": yield* stringifyJson({ name: "test-project", ...packageJson }) },
+      files: {
+        [LOCKFILE_PATH]: yield* stringifyJson({
+          schemaVersion: 1,
+          selection: {
+            agents: false,
+            ci: null,
+            editors: [],
+            presets: ["core"],
+            scripts: ["check"],
+            typescript: null,
+          },
+          version: "0.0.0",
+          written: {},
+        }),
+        "package.json": yield* stringifyJson({ name: "test-project", ...packageJson }),
+      },
       root: ROOT,
     })
 
@@ -27,29 +44,6 @@ function runAssess(packageJson: PackageJson) {
     )
   })
 }
-
-// Each project lists oxlint-tsgolint, which tsrs replaced.
-const LEGACY_CASES: ReadonlyArray<{ readonly name: string; readonly packageJson: PackageJson }> = [
-  {
-    name: "a devDependency",
-    packageJson: {
-      devDependencies: { "oxlint-tsgolint": "7.0.2005", tsrs: tsrs.version },
-      scripts: { check: "adamantite check" },
-    },
-  },
-  {
-    name: "a dependency",
-    packageJson: {
-      dependencies: { "oxlint-tsgolint": "7.0.2005" },
-      devDependencies: { tsrs: tsrs.version },
-      scripts: { check: "adamantite check" },
-    },
-  },
-  {
-    name: "a devDependency of a project without the managed scripts",
-    packageJson: { devDependencies: { "oxlint-tsgolint": "7.0.2005" } },
-  },
-]
 
 describe("tsrs", () => {
   describe("assess", () => {
@@ -76,16 +70,6 @@ describe("tsrs", () => {
           packageActions: [],
           warnings: [],
         })
-      })
-    )
-
-    it.effect.each(LEGACY_CASES)("report oxlint-tsgolint as $name", ({ packageJson }) =>
-      Effect.gen(function* () {
-        const result = yield* runAssess(packageJson)
-
-        expect(result.applicable && result.findings).toStrictEqual([
-          expect.objectContaining({ id: "legacy-oxlint-tsgolint", integration: "tsrs" }),
-        ])
       })
     )
   })

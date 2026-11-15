@@ -12,7 +12,6 @@ import { integrations } from "#lib/integrations/index.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
-import { inferSelection } from "#lib/integrations/selection.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
@@ -29,16 +28,30 @@ const warningReportTemplate = getWarningReportTemplate()
  */
 const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs] as const
 
-// Without a lockfile, Doctor decides from the files that exist, so it cannot check what init set up.
-const lockfileMissing: Finding = {
-  currentState: `The project has no \`${LOCKFILE_PATH}\`, so Doctor decides which integrations apply from the files that exist, and cannot check a selected integration whose file is missing.`,
-  goal: [
-    `Run \`adamantite update\`. It writes \`${LOCKFILE_PATH}\` with the setup that the project files show.`,
-    `Commit \`${LOCKFILE_PATH}\`.`,
+/**
+ * The assessment of a project without a lockfile. The other assessments need the selection that
+ * `init` records, so this finding is the only one.
+ */
+const lockfileMissing: ProjectAssessment = {
+  applicableIntegrations: [],
+  findings: [
+    {
+      currentState: `The project has no \`${LOCKFILE_PATH}\`, so Adamantite does not know what to check.`,
+      goal: [
+        `Run \`adamantite init\`. It sets up the project and writes \`${LOCKFILE_PATH}\`.`,
+        `Commit \`${LOCKFILE_PATH}\`.`,
+      ],
+      id: "lockfile-missing",
+      integration: "lockfile",
+      notes: [
+        "Adamantite versions before the lockfile did not write one. `init` keeps each file that differs from what it would write, and Doctor then reports the changes that break the setup.",
+      ],
+      title: "Missing Adamantite lockfile",
+    },
   ],
-  id: "lockfile-missing",
-  integration: "lockfile",
-  title: "Missing Adamantite lockfile",
+  packageActions: [],
+  selection: null,
+  warnings: [],
 }
 
 /**
@@ -130,8 +143,8 @@ export const ProjectAssessment = Schema.Struct({
   findings: Schema.Array(Finding),
   packageActions: Schema.Array(PackageAction),
   /**
-   * The selection that the assessment checked: the lockfile's, or the one that the project files
-   * show when there is no lockfile. Null when the assessment could not read one.
+   * The selection that the assessment checked, from the lockfile. Null when the project has no
+   * lockfile, or when it does not read.
    */
   selection: Schema.NullOr(Selection),
   warnings: Schema.Array(Schema.String),
@@ -144,6 +157,12 @@ export type ProjectAssessment = typeof ProjectAssessment.Type
  * session or a dependency update reads the project again, so it sees the changes.
  */
 export const assessProject = Effect.fn("assessProject")(function* (project: Project) {
+  if (Option.isNone(project.lockfile)) {
+    return lockfileMissing
+  }
+
+  const { selection } = project.lockfile.value
+
   const assessments = yield* Effect.forEach(
     managedIntegrations,
     (integration) =>
@@ -156,13 +175,6 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
     { concurrency: "unbounded" }
   )
 
-  // Without a lockfile, an integration applies to the files that exist, which the inferred
-  // selection names.
-  const selection = yield* Option.match(project.lockfile, {
-    onNone: () => inferSelection(project),
-    onSome: (lockfile) => Effect.succeed(lockfile.selection),
-  })
-
   const parts = yield* Effect.forEach(
     integrations.filter((integration) => integration.selected(selection)),
     (integration) =>
@@ -174,23 +186,12 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 
   const applicable = [...Array.flatten(assessments), ...parts]
 
-  // A project that Adamantite does not manage needs no lockfile, and init sets it up.
-  const isUnmanaged = Option.isNone(project.lockfile) && applicable.length === 0
-
   return {
     applicableIntegrations: applicable.map(({ name }) => name),
-    findings: [
-      ...applicable.flatMap(({ assessment }) => assessment.findings),
-      ...(Option.isNone(project.lockfile) && !isUnmanaged ? [lockfileMissing] : []),
-    ],
+    findings: applicable.flatMap(({ assessment }) => assessment.findings),
     packageActions: applicable.flatMap(({ assessment }) => assessment.packageActions),
     selection,
-    warnings: [
-      ...applicable.flatMap(({ assessment }) => assessment.warnings),
-      ...(isUnmanaged
-        ? ["No Adamantite-managed setup found. Run `adamantite init` to configure the project."]
-        : []),
-    ],
+    warnings: applicable.flatMap(({ assessment }) => assessment.warnings),
   } satisfies ProjectAssessment
 })
 

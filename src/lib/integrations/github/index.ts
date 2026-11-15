@@ -1,9 +1,7 @@
-import * as Array from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Yaml from "effect/encoding/Yaml"
 import * as Option from "effect/Option"
-import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
@@ -26,7 +24,7 @@ import {
   getRunVerb,
 } from "#lib/project/package-manager.ts"
 import { FailedToParseYaml } from "#lib/shared/errors.ts"
-import { readDirectoryIfExists, readFileIfFile } from "#lib/shared/filesystem.ts"
+import { readFileIfFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
 /**
@@ -51,10 +49,6 @@ const WORKFLOWS_DIRECTORY = ".github/workflows"
  */
 export const WORKFLOW_PATH = `${WORKFLOWS_DIRECTORY}/adamantite.yml`
 
-// Releases before the lockfile let the project rename the workflow, and found its jobs by this
-// comment, which the template still holds. A project that renamed it gets no second workflow.
-const RENAMED_WORKFLOW_MARKER = "# ADAMANTITE:START"
-
 // Only the parts of a job that the assessment reads. A matrix can be an expression, such as
 // `${{ fromJSON(needs.setup.outputs.matrix) }}`, so the matrix decodes on its own.
 const Job = Schema.Struct({
@@ -77,39 +71,6 @@ const Workflow = Schema.Struct({ jobs: Schema.Record(Schema.String, Job) })
 
 const Matrix = Schema.Struct({
   include: Schema.Array(Schema.Struct({ command: Schema.optionalKey(Schema.String) })),
-})
-
-/**
- * The workflow file that runs the Adamantite jobs: `adamantite.yml`, or a workflow that an earlier
- * release wrote and the project renamed. None when the project has neither.
- */
-export const findWorkflow = Effect.fn("findWorkflow")(function* (cwd: string) {
-  const path = yield* Path.Path
-  const names = yield* readDirectoryIfExists(path.join(cwd, WORKFLOWS_DIRECTORY))
-
-  const workflowPaths = Array.sort(
-    Option.getOrElse(names, () => []).filter((name) => /\.ya?ml$/u.test(name)),
-    Order.String
-  ).map((name) => `${WORKFLOWS_DIRECTORY}/${name}`)
-
-  const workflows = Array.getSomes(
-    yield* Effect.forEach(
-      workflowPaths,
-      (workflowPath) =>
-        readFileIfFile(path.join(cwd, workflowPath)).pipe(
-          Effect.map((content) =>
-            Option.map(content, (text) => ({ content: text, path: workflowPath }))
-          )
-        ),
-      { concurrency: "unbounded" }
-    )
-  )
-
-  return Array.findFirst(workflows, (workflow) => workflow.path === WORKFLOW_PATH).pipe(
-    Option.orElse(() =>
-      Array.findFirst(workflows, ({ content }) => content.includes(RENAMED_WORKFLOW_MARKER))
-    )
-  )
 })
 
 /**
@@ -262,7 +223,7 @@ const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection)
     return { findings: [], packageActions: [], warnings: [setup.reason] }
   }
 
-  const workflow = yield* findWorkflow(cwd)
+  const workflow = yield* readFileIfFile(path.join(cwd, WORKFLOW_PATH))
 
   if (Option.isNone(workflow)) {
     return {
@@ -283,7 +244,7 @@ const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection)
     }
   }
 
-  const jobs = yield* parseJobs(workflow.value.content, path.join(cwd, workflow.value.path))
+  const jobs = yield* parseJobs(workflow.value, path.join(cwd, WORKFLOW_PATH))
   const { commands, nodeVersions } = readJobs(Option.getOrElse(jobs, () => []))
   const hasHardcodedNodeVersion = nodeVersions.some((version) => /^\d/.test(`${version}`))
 
@@ -304,11 +265,10 @@ const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection)
       {
         currentState: [
           ...(hasHardcodedNodeVersion
-            ? [`The jobs in \`${workflow.value.path}\` contain a hard-coded Node.js version.`]
+            ? [`The jobs in \`${WORKFLOW_PATH}\` contain a hard-coded Node.js version.`]
             : []),
           ...missingScripts.map(
-            (script) =>
-              `No job in \`${workflow.value.path}\` runs the managed \`${script}\` script.`
+            (script) => `No job in \`${WORKFLOW_PATH}\` runs the managed \`${script}\` script.`
           ),
         ].join(" "),
         goal: [
@@ -334,16 +294,11 @@ const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection)
 
 export default {
   assess: ({ cwd }: Project, selection: Selection) => assess(cwd, selection),
-  // A project that renamed the workflow keeps it, so the rename does not run its jobs twice.
   files: ({ cwd }: Project, selection: Selection) =>
     Effect.gen(function* () {
       const setup = yield* readWorkflowSetup(cwd, selection)
-      const workflow = yield* findWorkflow(cwd)
 
-      if (
-        Predicate.isTagged(setup, "Unavailable")
-        || Option.exists(workflow, ({ path }) => path !== WORKFLOW_PATH)
-      ) {
+      if (Predicate.isTagged(setup, "Unavailable")) {
         return []
       }
 

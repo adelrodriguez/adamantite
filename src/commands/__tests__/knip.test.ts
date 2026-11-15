@@ -120,24 +120,24 @@ describe("Knip setup", () => {
 
   // Knip loads `knip.json` before `knip.config.ts`, so a config beside it would do nothing.
   it.effect.each<{ readonly files: Record<string, string>; readonly state: string }>([
-    { files: {}, state: "The project configures knip in the legacy `knip.jsonc`" },
+    { files: {}, state: "The project configures knip in `knip.jsonc`" },
     {
       files: { [CONFIG]: RENDERED },
       state:
         "The project has `knip.jsonc` beside `knip.config.ts`, and Knip loads the JSON config and ignores `knip.config.ts`.",
     },
-  ])("keep a legacy JSON config, and report it in doctor", ({ files: extra, state }) =>
+  ])("keep a conflicting JSON config, and report it in doctor", ({ files: extra, state }) =>
     Effect.gen(function* () {
-      const legacy = '{\n  "entry": ["src/index.ts"],\n}\n'
-      const files = makeProject({ ...extra, "knip.jsonc": legacy })
+      const conflicting = '{\n  "entry": ["src/index.ts"],\n}\n'
+      const files = makeProject({ ...extra, "knip.jsonc": conflicting })
 
       yield* runLifecycle("init", files, INIT_ARGS)
       const doctor = yield* runLifecycle("doctor", files)
 
       expect({
         config: files.exists(CONFIG) ? files.read(CONFIG) : null,
-        legacy: files.read("knip.jsonc"),
-      }).toStrictEqual({ config: extra[CONFIG] ?? null, legacy })
+        conflicting: files.read("knip.jsonc"),
+      }).toStrictEqual({ config: extra[CONFIG] ?? null, conflicting })
       expect(doctor.output).toContain(state)
     })
   )

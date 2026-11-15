@@ -19,10 +19,10 @@ import { checkRunsTool } from "#lib/project/package-json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const CONFIG = {
-  legacy: ["knip.json", "knip.jsonc"],
+  conflicting: ["knip.json", "knip.jsonc"],
   path: "knip.config.ts",
   tool: "knip",
-  whyLegacyBlocks: "Knip loads the JSON config and ignores `knip.config.ts`",
+  whyConflicting: "Knip loads the JSON config and ignores `knip.config.ts`",
 } as const satisfies ConfigFile
 
 export const PACKAGE = { name: "knip", version: getDependencyVersion("knip") }

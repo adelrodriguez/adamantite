@@ -43,8 +43,7 @@ interface AntiSlopPlugin extends Plugin {
 
 /**
  * The antislop rules that the strict preset enables. They started as a copy of
- * https://github.com/dmmulroy/anti-slop. Adamantite uses the `antislop` namespace. Doctor reports
- * old rule names for migration. See license.md.
+ * https://github.com/dmmulroy/anti-slop. Adamantite uses the `antislop` namespace. See license.md.
  */
 const plugin: AntiSlopPlugin = {
   meta: { name: "antislop" },

@@ -182,7 +182,7 @@ describe("the files that Setup writes", () => {
         '{\n  "recommendations": [\n    "oxc.oxc-vscode",\n    "webpro.vscode-knip",\n    "TypeScriptTeam.native-preview"\n  ]\n}\n'
       )
 
-      // Oxfmt loads no config beside a legacy one, so Setup writes no `oxfmt.config.ts`.
+      // Oxfmt loads no config beside a conflicting one, so Setup writes no `oxfmt.config.ts`.
       const result = runOxfmt(
         ["--check"],
         FORMATTED_FILES.filter((file) => file !== "oxfmt.config.ts")

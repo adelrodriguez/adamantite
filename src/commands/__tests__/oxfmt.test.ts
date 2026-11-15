@@ -138,20 +138,23 @@ describe("Oxfmt setup", () => {
   )
 
   // Oxfmt loads no config when it finds both, so Doctor hands the migration to an agent.
-  it.effect("write no config beside a legacy JSON config, and report the legacy file", () =>
+  it.effect("write no config beside a conflicting JSON config, and report it", () =>
     Effect.gen(function* () {
-      const legacy = '{ "semi": true }\n'
-      const files = makeProject({ ".oxfmtrc.json": legacy })
+      const conflicting = '{ "semi": true }\n'
+      const files = makeProject({ ".oxfmtrc.json": conflicting })
 
       yield* runLifecycle("init", files, INIT_ARGS)
       const doctor = yield* runLifecycle("doctor", files)
 
-      expect({ config: files.exists(CONFIG), legacy: files.read(".oxfmtrc.json") }).toStrictEqual({
+      expect({
+        config: files.exists(CONFIG),
+        conflicting: files.read(".oxfmtrc.json"),
+      }).toStrictEqual({
         config: false,
-        legacy,
+        conflicting,
       })
       expect(doctor.output).toContain(
-        "The project configures oxfmt in the legacy `.oxfmtrc.json`, so Adamantite does not write `oxfmt.config.ts`."
+        "The project configures oxfmt in `.oxfmtrc.json`, so Adamantite does not write `oxfmt.config.ts`."
       )
     })
   )

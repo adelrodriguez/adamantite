@@ -141,41 +141,6 @@ describe("TypeScript setup", () => {
       })
   )
 
-  // Without a lockfile, update records the preset that a chain names, and none for a chain that
-  // reaches the base config of another package without the type resets. The managed script gives
-  // update a setup to record.
-  it.effect.each([
-    {
-      extendsEntry: "./tsconfig.base.json",
-      inferred: "adamantite/tsconfig",
-      typescript: "tsconfig",
-    },
-    { extendsEntry: "@company/config", inferred: "no TypeScript preset", typescript: null },
-  ] as const)(
-    "infer $inferred from a chain through $extendsEntry",
-    ({ extendsEntry, typescript }) =>
-      Effect.gen(function* () {
-        const files = makeProject({
-          [CONFIG]: `{ "extends": "${extendsEntry}", "include": ["src"] }\n`,
-          "node_modules/@company/config/package.json": '{ "name": "@company/config" }\n',
-          "node_modules/@company/config/tsconfig.json": '{ "extends": "adamantite/tsconfig" }\n',
-          "package.json":
-            '{ "name": "test-project", "scripts": { "analyze": "adamantite analyze" } }\n',
-          "tsconfig.base.json": '{ "extends": "adamantite/tsconfig" }\n',
-        })
-
-        yield* runLifecycle("update", files)
-        const doctor = yield* runLifecycle("doctor", files, ["--json"])
-
-        expect({
-          findings: decodeReport(doctor.output).findings.filter(
-            ({ integration }) => integration === "tsconfig"
-          ),
-          typescript: readLockfile(files).selection.typescript,
-        }).toStrictEqual({ findings: [], typescript })
-      })
-  )
-
   // TypeScript adds `.json` to a relative entry that names no file, and a folder is not a file.
   it.effect("find adamantite/tsconfig through ./base.json beside a base folder", () =>
     Effect.gen(function* () {

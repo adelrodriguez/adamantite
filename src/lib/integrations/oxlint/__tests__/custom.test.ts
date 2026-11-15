@@ -82,39 +82,6 @@ describe("oxlint-custom", () => {
       })
   )
 
-  it.effect("accept the previous folder path when the current API loads it explicitly", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
-          "oxlint.config.ts": makeConfig('core, custom({ dir: ".adamantite/rules" })'),
-          "package.json": PACKAGE_JSON,
-        },
-        root: ROOT,
-      })
-
-      expect(getFindings(yield* runAssess(files))).toStrictEqual([])
-    })
-  )
-
-  it.effect("report a workspace package rules folder at the previous default path", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          "oxlint.config.ts": toOxlintTsConfigContent(),
-          "package.json": MONOREPO_PACKAGE_JSON,
-          "packages/web/.adamantite/rules/no-process-env.ts": RULE,
-          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
-        },
-        root: ROOT,
-      })
-
-      expect(getFindings(yield* runAssess(files)).map((finding) => finding.id)).toStrictEqual([
-        "custom-rules-not-loaded:packages/web/.adamantite/rules",
-      ])
-    })
-  )
-
   it.effect("report not applicable without a rules folder or a custom() call", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

@@ -133,13 +133,11 @@ export default defineConfig({
         owners: ["src/lib/project/project.ts", "src/lib/hardening/index.ts"],
       },
       // Only `init` and `update` write the lockfile and the managed files, through `lib/setup` and
-      // the backend that they share. Update reads the selection that the project files show. The
-      // terminal prints what Setup wrote.
+      // the backend that they share. The terminal prints what Setup wrote.
       {
         import: "#lib/setup",
         owners: [
           "src/commands/setup.ts",
-          "src/commands/update.ts",
           "src/commands/__tests__",
           "src/terminal/setup.ts",
         ],

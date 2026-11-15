@@ -1,10 +1,8 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
-import * as Array from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Jsonc from "effect/encoding/Jsonc"
-import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
@@ -149,13 +147,4 @@ export function checkRunsTool(scripts: readonly Script[], tool: ManagedTool): bo
 
     return tools.includes(tool)
   })
-}
-
-export function getManagedScripts(packageJson: PackageJson): Script[] {
-  const scripts = packageJson.scripts ?? {}
-
-  return pipe(
-    Record.keys(MANAGED_SCRIPT_COMMANDS),
-    Array.filter((name) => scripts[name] === MANAGED_SCRIPT_COMMANDS[name])
-  )
 }

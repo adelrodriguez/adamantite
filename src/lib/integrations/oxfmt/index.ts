@@ -19,10 +19,10 @@ import { checkRunsTool } from "#lib/project/package-json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const CONFIG = {
-  legacy: [".oxfmtrc.json", ".oxfmtrc.jsonc"],
+  conflicting: [".oxfmtrc.json", ".oxfmtrc.jsonc"],
   path: "oxfmt.config.ts",
   tool: "oxfmt",
-  whyLegacyBlocks: "Oxfmt loads no config when it finds both",
+  whyConflicting: "Oxfmt loads no config when it finds both",
 } as const satisfies ConfigFile
 
 export const PACKAGE = { name: "oxfmt", version: getDependencyVersion("oxfmt") }

@@ -31,8 +31,6 @@ import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import formatPreset from "#presets/format.ts"
 
-export { inferSelection } from "#lib/integrations/selection.ts"
-
 const version = getPackageVersion()
 
 /**
@@ -91,20 +89,6 @@ export const ScriptWrite = Schema.TaggedUnion({
 export type ScriptWrite = typeof ScriptWrite.Type
 
 const ScriptWrites = Data.taggedEnum<ScriptWrite>()
-
-/**
- * Whether `selection` sets up nothing.
- */
-export function checkIsEmptySelection(selection: Selection): boolean {
-  return (
-    !selection.agents
-    && selection.ci === null
-    && selection.editors.length === 0
-    && selection.presets.length === 0
-    && selection.scripts.length === 0
-    && selection.typescript === null
-  )
-}
 
 /**
  * Applies the write rule to one managed file: write it when it does not exist, or when its hash

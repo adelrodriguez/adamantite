@@ -141,13 +141,6 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual(["local(no-debugger-here):error"])
   })
 
-  it("keep loading a previous rules folder when dir names it", () => {
-    write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
-    write("oxlint.config.ts", makeConfig('custom({ dir: ".adamantite/rules" })'))
-
-    expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
-  })
-
   it("fail the run when two files in a rules folder define one rule", () => {
     write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
     write(".adamantite/lint/no-debugger-here.js", "export default {}\n")

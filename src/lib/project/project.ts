@@ -1,7 +1,7 @@
+import type * as Option from "effect/Option"
 import type * as Result from "effect/Result"
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
 import {
@@ -11,7 +11,7 @@ import {
 import { type LintConfig, readLintConfig } from "#lib/project/lint-config.ts"
 import { type Lockfile, readLockfile } from "#lib/project/lockfile.ts"
 import { readWorkspace, type Workspace } from "#lib/project/monorepo.ts"
-import { getManagedScripts, readPackageJson, type Script } from "#lib/project/package-json.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
 
 const LINT_CONFIG_FILE = "oxlint.config.ts"
 
@@ -58,14 +58,3 @@ export const readProject = Effect.fn("readProject")(function* (cwd: string) {
 
   return { customRules, cwd, lintConfig, lockfile, packageJson, workspace } satisfies Project
 })
-
-/**
- * The managed scripts that the integrations apply for: the scripts that the lockfile selects, or,
- * in a project without a lockfile, the managed scripts in `package.json`.
- */
-export function getSelectedScripts({ lockfile, packageJson }: Project): readonly Script[] {
-  return Option.match(lockfile, {
-    onNone: () => getManagedScripts(packageJson),
-    onSome: ({ selection }) => selection.scripts,
-  })
-}

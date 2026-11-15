@@ -56,13 +56,8 @@ export default defineIntegration({
 
       const loadedFolders = Array.dedupe(calls.map((call) => call.dir))
 
-      // The default folder of Adamantite before 0.31, which a project can still hold rules in.
-      const oldDefaultFolders = packageDirectories.map((directory) =>
-        path.join(directory, ".adamantite/rules")
-      )
-
       const readFolders = yield* Effect.forEach(
-        Array.dedupe([...defaultFolders, ...oldDefaultFolders, ...loadedFolders]),
+        Array.dedupe([...defaultFolders, ...loadedFolders]),
         (dir) => readRulesFolder(dir),
         { concurrency: "unbounded" }
       )

@@ -131,7 +131,7 @@ in `oxlint/custom.ts`, the managed plugins in `oxlint/plugins/managed.ts`, and `
 installs their packages.
 
 `config-file.ts` holds the findings of a managed tool config that Oxlint, Oxfmt, and Knip share:
-a legacy JSON config, a missing config, and a config that does not load. `tooling/base.ts` holds the
+a conflicting JSON config, a missing config, and a config that does not load. `tooling/base.ts` holds the
 package checks that several tools share. Helper modules beside an integration, such as
 `knip/config.ts`, hold the logic that only that integration uses. Oxlint, Oxfmt, Knip, and Sherif
 also have command builders in `command.ts`, which return `CommandRunOptions` and start no process.
@@ -152,8 +152,8 @@ files.
 ## Setup and the write rule
 
 `init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
-or the flags and adds it to the recorded selection. `update` takes it from the lockfile, or from
-`inferSelection` in `integrations/selection.ts` once when there is no lockfile. Both hand it to
+or the flags and adds it to the recorded selection. `update` takes it from the lockfile. Without a
+lockfile, `update` runs no setup and offers the `lockfile-missing` finding. Both hand the selection to
 `applySetup` in `src/commands/setup.ts`, which runs `Setup.apply` from `src/lib/setup/`, prints
 what it did through `src/terminal/setup.ts`, and offers the repair of the findings that remain
 through `Resolution.offer`. Both exit 1 while findings remain.
@@ -186,8 +186,8 @@ gets a `FileWrite`:
 - `Deleted` when the selection no longer renders it and its hash still matched.
 
 Formatting makes `adamantite fix` leave each written file unchanged, so its hash still matches on
-the next run. In a project without a lockfile, a file that an earlier version wrote gets a hash
-only when it equals what this version renders.
+the next run. In a project without a lockfile, a file that already exists gets a hash only when it
+equals what this version renders.
 
 A managed script is the one exception to whole files. `apply` sets each selected `check`, `fix`, or
 `analyze` key of the root `package.json` to its command, overwrites what it held, and returns a
@@ -220,14 +220,13 @@ custom rules that the Oxlint configs load, and each integration's `assess` takes
 that reads the workspace outside an assessment, such as `harden` or `rule try`, reads it one time for
 each phase and passes the `Workspace` down.
 
-`assessProject` in `src/lib/assessment/` runs each integration that the selection includes. With a
-lockfile, the selection is the recorded one, so a selected integration whose file is missing gets a
-finding. Without one, it is the selection that `inferSelection` reads from the project files, and
-the assessment adds one `lockfile-missing` finding when any integration applies. Doctor catches
-`UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
+`assessProject` in `src/lib/assessment/` runs each integration that the lockfile's selection
+includes, so a selected integration whose file is missing gets a finding. A project without a
+lockfile gets the `lockfile-missing` finding alone, which says to run `adamantite init`. Doctor
+catches `UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
 `invalid-lockfile` finding alone, because the other assessments need the selection. A project that
-does not declare `adamantite` gets the `adamantite-not-installed` finding alone, and an unmanaged
-project gets a warning, so both go through the same offer.
+does not declare `adamantite` gets the `adamantite-not-installed` finding alone, so each case goes
+through the same offer.
 
 ```mermaid
 flowchart TD
@@ -354,10 +353,8 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   its `readProject` after the session, because the agent can change the project. The functions in
   `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
 - `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
-  project without a lockfile, `inferSelection` reads the selection one time from the same files
-  that Doctor applies the integrations to without one. While the root `oxlint.config.ts` does not
-  load, the selection misses the lint presets, so `update` runs no setup, records no lockfile, and
-  offers the repair of the load finding. `update` does not edit `skills-lock.json`,
+  project without a lockfile, it runs no setup and offers the `lockfile-missing` finding, which
+  says to run `adamantite init`. `update` does not edit `skills-lock.json`,
   which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
   finding.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,
@@ -625,18 +622,15 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   The shipped skill tells the agent how to run temporary
   RuleTester cases, remove its temporary files, and preserve user-owned tests.
 - The `oxlint-custom` integration in `src/lib/integrations/oxlint/custom.ts` uses
-  that module to report rules folders that no `custom()` call loads, also at the previous
-  default path, a `dir` that names a missing folder, and rules folders that share a plugin name. A
+  that module to report rules folders that no `custom()` call loads, a `dir` that names a missing
+  folder, and rules folders that share a plugin name. A
   rule file that cannot load stops Oxlint, so the `oxlint-config-load-failure` finding reports it.
   Optional saved tests do not produce a finding.
 - The `github` integration in `src/lib/integrations/github/index.ts` renders
   `.github/workflows/adamantite.yml` whole, with a job for each check and analyze script of the
   selection. It does not add or require a rule-test step. Users can add one themselves, and the
   write rule keeps the changed workflow. Doctor then checks that a job of the workflow runs each
-  CI script of the selection. The template keeps the `# ADAMANTITE:START` and `# ADAMANTITE:END`
-  comments of earlier releases as plain text, so a workflow that 0.47.0 wrote equals the render,
-  and the first `update` records its hash. A workflow that an earlier release wrote and the project
-  renamed holds the start comment, so Adamantite writes no second workflow beside it.
+  CI script of the selection.
 
 The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

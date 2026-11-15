@@ -231,20 +231,23 @@ describe("Oxlint setup", () => {
   )
 
   // Oxlint loads no config when it finds both, so Doctor hands the migration to an agent.
-  it.effect("write no config beside a legacy .oxlintrc.json, and report the legacy file", () =>
+  it.effect("write no config beside a conflicting .oxlintrc.json, and report it", () =>
     Effect.gen(function* () {
-      const legacy = '{ "rules": { "semi": "error" } }\n'
-      const files = makeProject({ ".oxlintrc.json": legacy })
+      const conflicting = '{ "rules": { "semi": "error" } }\n'
+      const files = makeProject({ ".oxlintrc.json": conflicting })
 
       yield* runLifecycle("init", files, INIT_ARGS)
       const doctor = yield* runLifecycle("doctor", files)
 
-      expect({ config: files.exists(CONFIG), legacy: files.read(".oxlintrc.json") }).toStrictEqual({
+      expect({
+        config: files.exists(CONFIG),
+        conflicting: files.read(".oxlintrc.json"),
+      }).toStrictEqual({
         config: false,
-        legacy,
+        conflicting,
       })
       expect(doctor.output).toContain(
-        "The project configures oxlint in the legacy `.oxlintrc.json`, so Adamantite does not write `oxlint.config.ts`."
+        "The project configures oxlint in `.oxlintrc.json`, so Adamantite does not write `oxlint.config.ts`."
       )
     })
   )

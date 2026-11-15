@@ -60,22 +60,6 @@ describe("GitHub Actions setup", () => {
     })
   )
 
-  // The template has not changed since 0.47.0, so the first update after it records the workflow,
-  // and a later template change replaces it (#837).
-  it.effect(
-    "record a workflow that an earlier release wrote, in a project without a lockfile",
-    () =>
-      Effect.gen(function* () {
-        const workflow = yield* renderWorkflow()
-        const files = makeProject({ [WORKFLOW]: workflow })
-
-        const { output } = yield* runLifecycle("update", files)
-
-        expect(readLockfile(files).written[WORKFLOW]).toBe(hashContent(workflow))
-        expect(output).toContain(`● \`${WORKFLOW}\` is up to date.`)
-      })
-  )
-
   it.effect("replace a workflow whose hash equals the hash that the lockfile recorded", () =>
     Effect.gen(function* () {
       const older = (yield* renderWorkflow()).replace("timeout-minutes: 10", "timeout-minutes: 5")
@@ -107,20 +91,6 @@ describe("GitHub Actions setup", () => {
       expect(doctor.output).toContain(
         `No job in \`${WORKFLOW}\` runs the managed \`check\` script.`
       )
-    })
-  )
-
-  // Releases before the lockfile let the project rename the workflow.
-  it.effect("write no second workflow beside one that the project renamed", () =>
-    Effect.gen(function* () {
-      const renamed = ".github/workflows/ci.yml"
-      const files = makeProject({ [renamed]: yield* renderWorkflow() })
-
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const doctor = yield* runLifecycle("doctor", files)
-
-      expect(files.exists(WORKFLOW)).toBe(false)
-      expect(doctor.output).not.toContain("Adamantite workflow")
     })
   )
 

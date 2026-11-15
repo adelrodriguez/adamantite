@@ -18,7 +18,7 @@ interface AntiSlopEffectPlugin extends Plugin {
 /**
  * The antislop-effect rules that the effect preset enables. They started as a copy of the Effect
  * rules of https://github.com/dmmulroy/anti-slop. Adamantite uses the `antislop-effect` namespace.
- * Doctor reports old rule names for migration. See license.md.
+ * See license.md.
  */
 const plugin: AntiSlopEffectPlugin = {
   meta: { name: "antislop-effect" },

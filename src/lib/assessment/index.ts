@@ -125,7 +125,7 @@ export const ProjectAssessment = Schema.Struct({
    */
   applicableIntegrations: Schema.Array(Schema.String),
   /**
-   * Empty means the project has converged on the managed state.
+   * Empty means the project has reached the latest supported state.
    */
   findings: Schema.Array(Finding),
   packageActions: Schema.Array(PackageAction),

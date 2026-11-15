@@ -45,8 +45,8 @@ const FindingReference = Schema.Struct({
 })
 
 /**
- * A difference between the current state and the supported state. `doctor --json` prints each one
- * as this schema encodes it.
+ * A difference between the current state and the latest supported state. `doctor --json` prints
+ * each one as this schema encodes it.
  */
 export const Finding = Schema.Struct({
   currentState: Schema.String,

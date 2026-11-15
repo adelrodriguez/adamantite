@@ -85,15 +85,21 @@ _Avoid_: Plugin folder
 The project that Adamantite configures or checks.
 _Avoid_: Adamantite repository, consumer repository
 
-**Managed integration**:
-An adapter for a tool, editor, workspace feature, or CI provider whose supported state
-Adamantite can detect and maintain.
-_Avoid_: Plugin, preset
+**Integration**:
+Everything Adamantite knows about one tool, editor, CI provider, or the agent guidance: whether the
+selection includes it, its packages, its managed files, and its assessment. Each integration in the
+list of `src/lib/integrations/index.ts` owns a folder there, such as `vscode/`.
+_Avoid_: Managed integration, adapter, plugin, preset
 
 **Tooling integration**:
-A managed integration for a package and its configuration, such as Oxlint, Oxfmt, Knip,
-Sherif, or tsrs.
+An integration for a package and its configuration, such as Oxlint, Oxfmt, Knip, Sherif, or tsrs.
 _Avoid_: Dependency adapter
+
+**Latest supported state**:
+The state that the running Adamantite version gives an integration for a selection: its packages at
+the managed versions, and its managed files as this version renders them. A kept file reaches it
+when Doctor reports no finding for it.
+_Avoid_: Managed ideal, managed state, supported state
 
 **Toolchain**:
 The code-quality tools and their plugins that Adamantite configures and runs for a target
@@ -137,11 +143,14 @@ _Avoid_: Generated file, template
 **Write rule**:
 Adamantite writes a managed file only whole, and only when the file does not exist or its hash
 equals the hash in the lockfile. A file that the user changed is kept, and Doctor reports a change
-that breaks the setup. Adamantite never merges, splices, or edits a config.
+that breaks the setup. A file that the selection no longer renders is deleted while its hash
+matches. Adamantite never merges, splices, or edits a config. A managed script is the one exception.
 _Avoid_: Merge, overwrite policy
 
 **Assessment**:
-A read-only classification of a managed integration against its latest supported state.
+The read-only check of a target project against the latest supported state of each integration
+that its selection includes. It gives the findings, the warnings, and the package actions. Doctor
+prints it, and `init` and `update` assess the project that the setup left.
 _Avoid_: Check result, diagnostic
 
 **Finding**:
@@ -164,8 +173,9 @@ _Avoid_: Plugin, agent guidance
 
 **Resolution menu**:
 The terminal menu that offers a handoff to each installed coding agent, a copy of the Markdown
-prompt, or nothing. `doctor`, `harden`, `init`, and `update` show it in an interactive terminal.
-Without one, they print the Markdown prompt.
+prompt, or nothing. `doctor`, `harden`, `init`, and `update` show it in an interactive terminal,
+through `Resolution.offer`. Without one, they print the Markdown prompt, and with `--json` they
+print a JSON document instead.
 _Avoid_: Handoff menu
 
 ## Integration lifecycle
@@ -177,13 +187,14 @@ last. `init` takes the selection from its prompts or flags, and `update` from th
 _Avoid_: Create, migrate, repair
 
 **Assess**:
-Classify package drift and managed configuration differences without changing the target
-project.
-_Avoid_: Fix, update
+What an integration's `assess` does: read the target project, and report its package drift and each
+change that breaks the setup as findings, without changing the project.
+_Avoid_: Fix, update, detect
 
 **Doctor**:
-Report findings for Adamantite-managed integrations and provide one combined repair
-prompt.
+Assess the target project against the selection in its lockfile, or the one that its files show
+without a lockfile, report the findings, and offer one combined repair prompt through
+`Resolution.offer`.
 _Avoid_: Check, fix, update
 
 ## Hardening

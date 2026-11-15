@@ -33,7 +33,7 @@ and update the project.
   and Vue, test runners like Jest and Vitest, Node.js, and stricter opt-in rule sets.
 - **Project setup**: Create package scripts, configuration files, editor settings, and CI
   through an interactive or non-interactive initializer.
-- **Setup maintenance**: Assess managed integrations with `doctor`, update managed
+- **Setup maintenance**: Assess the integrations with `doctor`, update managed
   dependencies, and give humans or agents repair instructions.
 - **Custom rules**: Write project-specific Oxlint rules in `.adamantite/lint/`, one rule
   for each file, and enable all of them with one line.
@@ -262,7 +262,7 @@ adamantite analyze --only monorepo --fix -- --select highest
 
 ### `adamantite doctor`
 
-Assess every Adamantite-managed integration. Doctor is read-only. Each finding describes
+Assess every integration of the setup. Doctor is read-only. Each finding describes
 the current state, the goal state, and how to verify the repair. Doctor checks each integration
 that the lockfile selects, so a selected integration whose file is missing or wrong gets a
 finding. A project without a lockfile gets one finding that says to run `adamantite update`, and

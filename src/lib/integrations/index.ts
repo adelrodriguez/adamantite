@@ -30,7 +30,8 @@ type MemberEffect = ReturnType<Member["assess" | "files" | "prepare"]>
 /**
  * The integrations that own a folder in `src/lib/integrations/`. `Setup.apply` writes their managed
  * files and installs their packages, and the assessment runs each one that the selection includes.
- * The integrations that have not moved here yet keep their own setup steps in `init`.
+ * The integrations that only assess, such as `tsrs`, are in `assessment/index.ts`, and the Oxlint
+ * integration installs their packages.
  */
 export const integrations: ReadonlyArray<
   Integration<Effect.Error<MemberEffect>, Effect.Services<MemberEffect>>

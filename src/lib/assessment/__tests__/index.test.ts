@@ -352,7 +352,6 @@ describe("assessProject", () => {
         "@effect/tsgo",
         "@shadcn/lint",
         "tsrs",
-        "agents",
         "oxlint",
         "oxfmt",
         "knip",

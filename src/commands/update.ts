@@ -4,7 +4,7 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { assessProject } from "#lib/assessment/index.ts"
-import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
+import { removeSkillsLockEntry } from "#lib/execution/skill.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
@@ -33,30 +33,6 @@ export default Command.make("update").pipe(
 
       const project = yield* readProject(cwd)
       const assessment = yield* assessProject(project)
-
-      // The skill that init wrote is a copy, so it stays at the Adamantite version that wrote it.
-      const skill: StepOutcome = yield* findStaleSkillFolders(cwd).pipe(
-        Effect.flatMap((folders) =>
-          folders.length === 0
-            ? Effect.succeed("idle" as const)
-            : writeSkill(cwd, folders).pipe(
-                Effect.andThen(Output.success("Adamantite skill refreshed.")),
-                Effect.as("applied" as const),
-                Effect.catchTag(
-                  ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
-                  (error) =>
-                    Output.warning(`Could not refresh the Adamantite skill. ${error.message}`).pipe(
-                      Effect.as("applyFailed" as const)
-                    )
-                )
-              )
-        ),
-        Effect.catchTag("FailedToReadFile", (error) =>
-          Output.warning(`Could not check the Adamantite skill. ${error.message}`).pipe(
-            Effect.as("checkFailed" as const)
-          )
-        )
-      )
 
       // `npx skills add` records the skill in `skills-lock.json`, and `skills update` would then
       // write the same folders. Adamantite owns the copy, so the lock entry goes away.
@@ -136,7 +112,7 @@ export default Command.make("update").pipe(
         yield* Output.info("Run `adamantite doctor` for the remaining repairs and an agent prompt.")
       }
 
-      const foundWork = [packages, skill, lock, files, lockfile].some(
+      const foundWork = [packages, lock, files, lockfile].some(
         (outcome) => outcome === "applied" || outcome === "applyFailed"
       )
 

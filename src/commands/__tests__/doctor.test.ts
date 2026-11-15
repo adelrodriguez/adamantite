@@ -46,7 +46,7 @@ function makeFindingsFixture() {
   return createFileSystemTestContext({
     files: {
       ...makeLockfileFile(ANALYZE_SELECTION),
-      "AGENTS.md": "# AGENTS.md\n",
+      "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
       "package.json": manifest({
         devDependencies: { adamantite: "1.0.0", knip: knip.version },
         scripts: { analyze: "adamantite analyze" },
@@ -108,7 +108,7 @@ const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 const HEALTHY_FILES = {
   ...makeLockfileFile(ANALYZE_SELECTION),
-  "AGENTS.md": "# AGENTS.md\n",
+  "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
   "knip.config.ts": toKnipTsConfigContent(),
   "package.json": manifest({
     devDependencies: { adamantite: "1.0.0", knip: knip.version },

@@ -400,63 +400,7 @@ describe("update", () => {
     })
   )
 
-  describe("Adamantite skill", () => {
-    it.effect("refresh a copy when only a reference guide differs from the shipped skill", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          ...makeSkillCopy(".claude/skills", {
-            ...shippedSkill,
-            "references/removed.md": "# A guide that the shipped skill no longer has\n",
-            "references/setup.md": "# An older setup guide\n",
-          }),
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.list().filter((file) => file.startsWith(".claude/"))).toStrictEqual(
-          Object.keys(makeSkillCopy(".claude/skills"))
-        )
-        expect(files.read(".claude/skills/adamantite/references/setup.md")).toBe(
-          shippedSkill["references/setup.md"]
-        )
-        // A folder without the skill stays without it.
-        expect(files.exists(".agents/skills/adamantite")).toBe(false)
-        expect(logLines).toStrictEqual([
-          "💠 adamantite update",
-          "✔ Adamantite skill refreshed.",
-          "✅ Update finished.",
-        ])
-      })
-    )
-
-    it.effect("leave a copy alone when it matches the shipped skill", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles(makeSkillCopy(".agents/skills"))
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(logLines).toStrictEqual([
-          "💠 adamantite update",
-          "✅ No managed updates were applied.",
-        ])
-      })
-    )
-
+  describe("skills lock", () => {
     it.effect("delete the skills lock when the adamantite entry was its only entry", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles({
@@ -554,31 +498,6 @@ describe("update", () => {
         expect(logLines).toStrictEqual([
           "💠 adamantite update",
           expect.stringMatching(/^▲ Could not update `skills-lock\.json`\. Could not write /u),
-          "✅ Update finished.",
-        ])
-      })
-    )
-
-    it.effect("warn and finish the update when the refresh fails", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles(
-          makeSkillCopy(".claude/skills", { ...shippedSkill, "SKILL.md": "# Adamantite 1\n" })
-        )
-
-        files.makeReadOnly(".claude/skills/adamantite/SKILL.md")
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(logLines).toStrictEqual([
-          "💠 adamantite update",
-          expect.stringMatching(/^▲ Could not refresh the Adamantite skill\. /u),
           "✅ Update finished.",
         ])
       })

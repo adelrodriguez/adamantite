@@ -1,0 +1,144 @@
+import { describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
+import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+
+const AGENTS = "AGENTS.md"
+
+const SKILL = ".agents/skills/adamantite/SKILL.md"
+
+const PACKAGE_JSON = '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" } }\n'
+
+const INIT_ARGS = ["--non-interactive", "--script", "check", "--agents"]
+
+const shippedSkill = getShippedSkillFiles()
+
+function makeProject(files: Record<string, string> = {}) {
+  return createFileSystemTestContext({ files: { ...files, "package.json": PACKAGE_JSON } })
+}
+
+describe("agent guidance setup", () => {
+  it.effect("create AGENTS.md and the skill, and record their hashes", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
+      const { written } = readLockfile(files)
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read(AGENTS)).toContain("- Run `bun run check` to catch formatting")
+      expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
+      expect({ agents: written[AGENTS], skill: written[SKILL] }).toStrictEqual({
+        agents: hashContent(files.read(AGENTS)),
+        skill: hashContent(files.read(SKILL)),
+      })
+      expect(output).toContain(`✔ \`${AGENTS}\` created.`)
+    })
+  )
+
+  it.effect("write the skill to the skill folder of each agent that the project uses", () =>
+    Effect.gen(function* () {
+      const files = makeProject({ ".claude/settings.json": "{}\n" })
+
+      yield* runLifecycle("init", files, INIT_ARGS)
+
+      expect(files.read(".claude/skills/adamantite/SKILL.md")).toBe(shippedSkill["SKILL.md"])
+    })
+  )
+
+  it.effect("report the files unchanged on a second init", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const before = listHashes(files)
+
+      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
+
+      expect(listHashes(files)).toStrictEqual(before)
+      expect(output).toContain(`● \`${AGENTS}\` is up to date.`)
+    })
+  )
+
+  // Adamantite writes AGENTS.md only when it does not exist, and never splices its section.
+  it.effect("keep an AGENTS.md that the project wrote, and report the missing section", () =>
+    Effect.gen(function* () {
+      const own = "# Team instructions\n\nRun the tests before a commit.\n"
+      const files = makeProject({ [AGENTS]: own })
+
+      const init = yield* runLifecycle("init", files, INIT_ARGS)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(files.read(AGENTS)).toBe(own)
+      expect(init.output).toContain(`● \`${AGENTS}\` kept, because it has changes`)
+      expect(doctor.output).toContain("AGENTS.md has no Adamantite section")
+    })
+  )
+
+  it.effect("accept an AGENTS.md with the section that an earlier release added", () =>
+    Effect.gen(function* () {
+      const files = makeProject({
+        [AGENTS]:
+          "# Team instructions\n\n<!-- ADAMANTITE:START -->\n\n## Adamantite\n\n<!-- ADAMANTITE:END -->\n",
+      })
+
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(doctor.output).not.toContain("AGENTS.md has no Adamantite section")
+    })
+  )
+
+  // The skill copy of an earlier release has no recorded hash, so update keeps it.
+  it.effect("keep a skill copy that differs from the shipped skill, and report it", () =>
+    Effect.gen(function* () {
+      const files = makeProject({ [SKILL]: "# An older skill\n" })
+
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(files.read(SKILL)).toBe("# An older skill\n")
+      expect(doctor.output).toContain(
+        "`.agents/skills/adamantite` differs from the Adamantite skill of the installed version."
+      )
+    })
+  )
+
+  it.effect("replace a skill file whose hash equals the hash that the lockfile recorded", () =>
+    Effect.gen(function* () {
+      const older = "# The skill of an earlier version\n"
+
+      const files = makeProject({
+        ...makeLockfileFile(makeSelection({ agents: true }), { [SKILL]: hashContent(older) }),
+        [SKILL]: older,
+      })
+
+      const { output } = yield* runLifecycle("update", files)
+
+      expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
+      expect(output).toContain(`✔ \`${SKILL}\` replaced with the current version.`)
+    })
+  )
+
+  it.effect("delete the files when the selection no longer names agent guidance", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const { selection, written } = readLockfile(files)
+
+      files.write(
+        LOCKFILE_PATH,
+        makeLockfileFile({ ...selection, agents: false }, written)[LOCKFILE_PATH]
+      )
+
+      yield* runLifecycle("update", files)
+
+      expect({ agents: files.exists(AGENTS), skill: files.exists(SKILL) }).toStrictEqual({
+        agents: false,
+        skill: false,
+      })
+    })
+  )
+})

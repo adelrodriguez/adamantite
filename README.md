@@ -41,8 +41,8 @@ and update the project.
   follows into custom rules, and into instructions for the ones that no rule can check.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
-- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`, and add the
-  Adamantite skill for your coding agents.
+- **Agent guidance**: Write an `AGENTS.md` with the Adamantite section when the project has
+  none, and add the Adamantite skill for your coding agents.
 
 ## Quick start
 
@@ -326,8 +326,8 @@ adamantite doctor
 managed version, such as Oxlint, tsrs, and the managed plugin of each selected preset. A version
 from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry. `update` exits 0
 when the install succeeds, even if doctor findings remain. Use `adamantite doctor` as the CI gate.
-It also refreshes each copy of the
-[Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version,
+It also writes the managed files of the recorded setup, such as the
+[Adamantite skill](#agent-skill), that are missing or unchanged since Adamantite wrote them,
 and writes the lockfile again with the installed version. In a project that an earlier version
 set up, `update` writes the lockfile one time with the setup that the project files show: the
 managed scripts, the presets that `oxlint.config.ts` imports, the TypeScript preset that a
@@ -1175,8 +1175,9 @@ The Adamantite skill teaches coding agents how to initialize, assess, repair, an
 project, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
 
 `adamantite init` asks whether to set up coding agents. When you answer yes, or pass
-`--agents` in non-interactive mode, init adds the Adamantite section to `AGENTS.md` and writes
-the skill to these folders:
+`--agents` in non-interactive mode, init writes `AGENTS.md` with the Adamantite section when the
+project has no `AGENTS.md`, and writes the skill to these folders. Init never edits an existing
+`AGENTS.md`: Doctor reports one without the section, so you or an agent can add it.
 
 | Skill folder     | Agents                                  | When                        |
 | ---------------- | --------------------------------------- | --------------------------- |
@@ -1185,8 +1186,10 @@ the skill to these folders:
 | `.grok/skills`   | Grok Build                              | The project has `.grok/`.   |
 
 The Adamantite CLI bundles the skill, so the copy matches the Adamantite version that wrote
-it. After you update Adamantite, `adamantite update` writes the skill again to each folder
-whose copy changed. It also removes the `adamantite` entry from `skills-lock.json`, so the
+it. Each file of the skill is a managed file: after you update Adamantite, `adamantite update`
+writes the skill of the new version over each copy that nobody changed. Doctor reports a copy
+that differs from the skill of the installed version, such as one that an earlier version wrote
+before the lockfile. Delete that copy, and run `adamantite update`. It also removes the `adamantite` entry from `skills-lock.json`, so the
 `skills` CLI does not write the same folders. Commit the skill folders, so every clone has
 the skill.
 
@@ -1198,7 +1201,7 @@ npx skills add adelrodriguez/adamantite --list
 npx skills add adelrodriguez/adamantite --skill adamantite
 ```
 
-`adamantite update` replaces a copy from GitHub with the skill of the installed Adamantite
+Doctor reports a copy from GitHub that differs from the skill of the installed Adamantite
 version.
 
 With pnpm 12.11 or later, `pnpm install` can also link the skill that the package ships

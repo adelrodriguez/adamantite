@@ -1312,7 +1312,7 @@ describe("harden", () => {
         files: {
           ...ADAMANTITE_MODULE,
           ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
-          "AGENTS.md": "# AGENTS.md\n",
+          "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },
             scripts: { analyze: "adamantite analyze" },

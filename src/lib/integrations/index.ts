@@ -1,5 +1,6 @@
 import type * as Effect from "effect/Effect"
 import type { Integration } from "#lib/integrations/base.ts"
+import agents from "#lib/integrations/agents/index.ts"
 import github from "#lib/integrations/github/index.ts"
 import knip from "#lib/integrations/knip/index.ts"
 import oxfmt from "#lib/integrations/oxfmt/index.ts"
@@ -18,6 +19,7 @@ const list = [
   vscode,
   zed,
   github,
+  agents,
 ] as const satisfies readonly Integration[]
 
 type Member = (typeof list)[number]

@@ -17,8 +17,10 @@ A project that already has ts-reset can delete its `reset.d.ts` files and the
 `@total-typescript/ts-reset` dependency after it extends `adamantite/typescript`.
 
 Adapt the selected options to the request. Omitted boolean flags are disabled.
-`--agents` adds instructions to `AGENTS.md` and writes this skill to `.agents/skills`, and
-to `.claude/skills` or `.grok/skills` when the project has `.claude/` or `.grok/`.
+`--agents` writes `AGENTS.md` with the Adamantite instructions when the project has none, and
+writes this skill to `.agents/skills`, and to `.claude/skills` or `.grok/skills` when the project
+has `.claude/` or `.grok/`. Add the Adamantite section to an existing `AGENTS.md` by hand when
+Doctor reports it missing.
 
 Before selecting `react-strict`, tell the user about its modified MIT license.
 The installed `oxlint-plugin-react-doctor` license requires written permission for use as

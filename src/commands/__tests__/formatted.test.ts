@@ -17,6 +17,7 @@ import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
+import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
 import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
@@ -43,6 +44,8 @@ const FORMATTED_FILES = [
   ".vscode/extensions.json",
   ".zed/settings.json",
   ".github/workflows/adamantite.yml",
+  "AGENTS.md",
+  ...Object.keys(getShippedSkillFiles()).map((file) => `.agents/skills/adamantite/${file}`),
 ]
 
 // Every part of the selection that makes Setup write a file, with the longest renders: the VS Code

@@ -12,7 +12,6 @@ import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { inferSelection } from "#lib/integrations/selection.ts"
-import agents from "#lib/integrations/workspace/agents.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
@@ -24,7 +23,7 @@ const warningReportTemplate = getWarningReportTemplate()
  * before the ones in `integrations/index.ts`. The order fixes how findings are numbered in the
  * rendered output.
  */
-const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs, agents] as const
+const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs] as const
 
 // Without a lockfile, Doctor decides from the files that exist, so it cannot check what init set up.
 const lockfileMissing: Finding = {

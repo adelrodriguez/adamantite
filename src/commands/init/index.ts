@@ -23,13 +23,7 @@ import { printFileWrites, printInstalls } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
-import {
-  addScripts,
-  installDependencies,
-  printZedExtensions,
-  setupAgentsGuidance,
-  setupSkill,
-} from "./setup.ts"
+import { addScripts, installDependencies, printZedExtensions } from "./setup.ts"
 
 export default Command.make("init", initCommandOptions).pipe(
   Command.withDescription(
@@ -152,15 +146,10 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* installDependencies(cwd, ["adamantite"])
       }
 
-      const managedScripts = yield* addScripts(cwd, selectedScripts, {
+      yield* addScripts(cwd, selectedScripts, {
         nonInteractive: options.nonInteractive,
         overwriteScripts: initOptions.overwriteScripts,
       })
-
-      if (initOptions.agents) {
-        yield* setupAgentsGuidance(cwd, packageManager.name, managedScripts, isMonorepo)
-        yield* setupSkill(cwd)
-      }
 
       // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {

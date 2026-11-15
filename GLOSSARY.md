@@ -156,7 +156,8 @@ _Avoid_: Delegation, agent launch
 **Adamantite skill**:
 The agent skill that the Adamantite package ships in `skills/adamantite/`. It teaches coding
 agents how to use Adamantite and how to write custom rules. The CLI bundles it. `init` writes it
-to the skill folders of the agents that the project uses, and `update` writes it again when a copy is stale.
+to the skill folders of the agents that the project uses as managed files, and `update` writes the
+skill of a new version over each copy that nobody changed.
 _Avoid_: Plugin, agent guidance
 
 **Resolution menu**:

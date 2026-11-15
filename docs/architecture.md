@@ -28,7 +28,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `commands`     | Define Effect CLI input, command composition, and user-facing output.                                                                             |
 | `toolchain`    | Coordinate check, fix, and analyze stages, argument routing, and failure policy.                                                                  |
-| `execution`    | Run child commands, hand off to coding agents, install the Adamantite skill, and carry forwarded arguments.                                       |
+| `execution`    | Run child commands, hand off to coding agents, find the skill folders of the agents, and carry forwarded arguments.                               |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.                                         |
@@ -198,11 +198,14 @@ writing files.
   ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
-- `init` creates selected integrations and managed scripts, then writes the lockfile with the
-  selection. A later `init` adds its options to the selection. When the user sets up coding agents, it
-  writes the Adamantite skill to `.agents/skills` and to each other skill folder whose agent
-  folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the
-  copy matches the running Adamantite version without `node_modules` or the network.
+- `init` adds the managed scripts, then runs `Setup.apply` with the selection, which writes the
+  managed files and the lockfile. A later `init` adds its options to the selection. When the
+  selection includes coding agents, the `agents` integration renders `AGENTS.md` with the
+  Adamantite section, and the Adamantite skill in `.agents/skills` and in each other skill folder
+  whose agent folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/`
+  into the CLI, so the copy matches the running Adamantite version without `node_modules` or the
+  network. Doctor reports an `AGENTS.md` without the section, and a skill copy that differs from
+  the bundled skill.
 - `doctor` assesses managed integrations and emits repair findings. The Oxlint assessment
   resolves the same runtime as the entry and reports missing installed packages, unsupported
   native builds or platforms, and conflicting overrides. Resolution neither launches a tool
@@ -219,13 +222,11 @@ writing files.
   verification. `hardening/suppressions.ts` counts the disable comments of each rule in the
   files that Oxlint lints, and `hardening/overrides.ts` marks each file of an override that turns
   a rule off, after a trial that turns the rule on again. The prompt shows both as data.
-- `update` updates managed dependencies, writes the Adamantite skill again to each skill folder
-  whose copy differs from the bundled skill in any file, removes the `adamantite` entry from
-  `skills-lock.json`, runs `Setup.apply` with the recorded selection, which writes the managed
-  files and the lockfile, then emits any remaining doctor findings. In a project
-  without a lockfile, `inferSelection` reads the selection from the same files that Doctor
-  applies the integrations to without one. Doctor does not assess the skill: many CI projects do
-  not need it.
+- `update` removes the `adamantite` entry from `skills-lock.json`, runs `Setup.apply` with the
+  recorded selection, which installs the managed packages and writes the managed files and the
+  lockfile, then emits any remaining doctor findings. In a project without a lockfile,
+  `inferSelection` reads the selection from the same files that Doctor applies the integrations to
+  without one.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
   Temporary verification cases do not stay in the target project. Users can opt in to saved

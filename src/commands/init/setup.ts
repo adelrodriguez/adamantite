@@ -1,8 +1,5 @@
-import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import type { LintPreset } from "#lib/project/selection.ts"
-import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
-import { writeAgentsGuidance } from "#lib/project/agents.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import {
   getConflictingScripts,
@@ -88,48 +85,3 @@ export const printZedExtensions = (presets: readonly LintPreset[]) =>
       )
     }
   })
-
-export const setupAgentsGuidance = (
-  cwd: string,
-  packageManager: PackageManagerName,
-  scripts: Script[],
-  isMonorepo: boolean
-) =>
-  writeAgentsGuidance(cwd, { isMonorepo, packageManager, scripts }).pipe(
-    Effect.flatMap((result) =>
-      result === "malformed"
-        ? Output.warning(
-            "AGENTS.md has an incomplete ADAMANTITE marker. Remove the incomplete marker and run `adamantite init` again."
-          )
-        : Output.success("AGENTS.md updated.")
-    ),
-    Effect.catchTag(["FailedToReadFile", "FailedToWriteFile"], (error) =>
-      Output.warning(
-        `Could not update AGENTS.md. ${error.message} Adamantite will continue initialization.`
-      )
-    )
-  )
-
-const folderList = new Intl.ListFormat("en", { type: "conjunction" })
-
-/**
- * Write the Adamantite skill to the skill folders of the agents that the project uses. The skill is
- * optional, so a failure leaves a warning and initialization continues.
- */
-export const setupSkill = (cwd: string) =>
-  detectSkillFolders(cwd).pipe(
-    Effect.flatMap((folders) =>
-      writeSkill(cwd, folders).pipe(
-        Effect.andThen(
-          Output.success(
-            `Adamantite skill added to ${folderList.format(folders.map((folder) => `\`${folder}\``))}.`
-          )
-        )
-      )
-    ),
-    Effect.catchTag(["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"], (error) =>
-      Output.warning(
-        `Could not add the Adamantite skill. ${error.message} Adamantite will continue initialization.`
-      )
-    )
-  )

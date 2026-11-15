@@ -106,6 +106,27 @@ describe("agent guidance setup", () => {
     })
   )
 
+  // `npx skills update` would write the folders that Adamantite owns. The lock belongs to the
+  // `skills` CLI, so update leaves it as it is, and Doctor hands the edit off.
+  it.effect("keep a skills lock that records the skill, and report its entry", () =>
+    Effect.gen(function* () {
+      const lock =
+        '{ "version": 1, "skills": { "adamantite": { "source": "./node_modules/adamantite" } } }\n'
+
+      const files = makeProject({ "skills-lock.json": lock })
+
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const update = yield* runLifecycle("update", files)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(files.read("skills-lock.json")).toBe(lock)
+      expect(update.output).toContain("The skills lock records the Adamantite skill")
+      expect(doctor.output).toContain(
+        "Remove the `adamantite` entry from `skills` in `skills-lock.json`."
+      )
+    })
+  )
+
   it.effect("replace a skill file whose hash equals the hash that the lockfile recorded", () =>
     Effect.gen(function* () {
       const older = "# The skill of an earlier version\n"

@@ -1,6 +1,9 @@
 import * as Effect from "effect/Effect"
+import * as Jsonc from "effect/encoding/Jsonc"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
 import * as String from "effect/String"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
@@ -124,12 +127,53 @@ const assessSkill = Effect.fn("assessSkill")(function* (cwd: string) {
   }))
 })
 
+const SKILLS_LOCK_PATH = "skills-lock.json"
+
+// Only the part of the `skills` CLI's lock that the assessment reads.
+const SkillsLock = Schema.Struct({
+  skills: Schema.Struct({ adamantite: Schema.Unknown }),
+})
+
+/**
+ * The finding for an `adamantite` entry in `skills-lock.json`. `npx skills add` records the skill
+ * there, and `skills update` would then write the skill folders that Adamantite owns. Adamantite
+ * does not edit a file that another tool owns, so a lock that does not decode gets no finding.
+ */
+const assessSkillsLock = Effect.fn("assessSkillsLock")(function* (cwd: string) {
+  const path = yield* Path.Path
+  const content = yield* readFileIfExists(path.join(cwd, SKILLS_LOCK_PATH))
+
+  const recorded = Option.exists(content, (text) =>
+    Result.match(Jsonc.parse(text), {
+      onFailure: () => false,
+      onSuccess: Schema.is(SkillsLock),
+    })
+  )
+
+  return recorded
+    ? [
+        {
+          currentState: `\`${SKILLS_LOCK_PATH}\` records the \`adamantite\` skill, so \`npx skills update\` would write the skill folders that \`adamantite update\` writes.`,
+          goal: [
+            `Remove the \`adamantite\` entry from \`skills\` in \`${SKILLS_LOCK_PATH}\`. Delete the file when that entry was its only one.`,
+            "Run `adamantite doctor` again. It must not report this finding.",
+          ],
+          id: "skills-lock-adamantite-entry",
+          integration: "agents",
+          title: "The skills lock records the Adamantite skill",
+        } satisfies Finding,
+      ]
+    : []
+})
+
 export default {
   assess: ({ cwd }: Project, _selection: Selection) =>
     Effect.map(
-      Effect.all([assess(cwd), assessSkill(cwd)], { concurrency: "unbounded" }),
-      ([agents, skill]) => ({
-        findings: [...agents, ...skill],
+      Effect.all([assess(cwd), assessSkill(cwd), assessSkillsLock(cwd)], {
+        concurrency: "unbounded",
+      }),
+      ([agents, skill, lock]) => ({
+        findings: [...agents, ...skill, ...lock],
         packageActions: [],
         warnings: [],
       })

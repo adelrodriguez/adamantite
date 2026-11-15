@@ -4,11 +4,9 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { decodeJson } from "#__tests__/json.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import initCommand from "#commands/init/index.ts"
 import updateCommand from "#commands/update.ts"
-import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { PACKAGE as oxfmt } from "#lib/integrations/oxfmt/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
@@ -54,35 +52,6 @@ function makeEffectFiles(oxlintConfig: string) {
 const CHECK_SELECTION = makeSelection({ presets: ["core"], scripts: ["check"] })
 
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
-
-const shippedSkill = getShippedSkillFiles()
-
-/**
- * The shipped skill as test fixture files in the skill folder.
- */
-function makeSkillCopy(folder: string, skill: Record<string, string> = shippedSkill) {
-  return Object.fromEntries(
-    Object.entries(skill).map(([file, content]) => [`${folder}/adamantite/${file}`, content])
-  )
-}
-
-function makeSkillsLock(skills: Record<string, string>): string {
-  return JSON.stringify({
-    skills: Object.fromEntries(
-      Object.entries(skills).map(([name, source]) => [name, { source, sourceType: "local" }])
-    ),
-    version: 1,
-  })
-}
-
-function makeSkillFiles(files: Record<string, string>) {
-  return createFileSystemTestContext({
-    files: {
-      "package.json": manifest({ devDependencies: { knip: knip.version } }),
-      ...files,
-    },
-  })
-}
 
 describe("update", () => {
   it.effect(
@@ -349,8 +318,9 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
+        "● The project has no lockfile, so update records the setup that the project files show.",
         "● `analyze` script is up to date.",
-        "✔ `.adamantite/adamantite-lock.json` written with the setup that the project files show. Commit it.",
+        "✔ `.adamantite/adamantite-lock.json` written. Commit it with the setup.",
         // The lockfile selects no agent guidance, so Doctor checks no `AGENTS.md`.
         expect.stringMatching(/^\n1\. Legacy knip configuration\n/u),
         "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
@@ -400,108 +370,4 @@ describe("update", () => {
       expect(runner.invocations).toStrictEqual([])
     })
   )
-
-  describe("skills lock", () => {
-    it.effect("delete the skills lock when the adamantite entry was its only entry", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          ...makeSkillCopy(".agents/skills"),
-          "skills-lock.json": makeSkillsLock({ adamantite: "./node_modules/adamantite" }),
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists("skills-lock.json")).toBe(false)
-        expect(logLines).toStrictEqual([
-          "💠 adamantite update",
-          "● Removed the `adamantite` entry from `skills-lock.json`.",
-          "✅ Update finished.",
-        ])
-      })
-    )
-
-    it.effect("keep the other entries of the skills lock", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          "skills-lock.json": makeSkillsLock({
-            adamantite: "./node_modules/adamantite",
-            other: "someone/other",
-          }),
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(yield* decodeJson(files.read("skills-lock.json"))).toStrictEqual({
-          skills: { other: { source: "someone/other", sourceType: "local" } },
-          version: 1,
-        })
-      })
-    )
-
-    it.effect("warn and report no applied updates when the skills lock cannot be parsed", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({ "skills-lock.json": "{ invalid" })
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toStrictEqual([])
-        expect(logLines).toStrictEqual([
-          "💠 adamantite update",
-          expect.stringMatching(/^▲ Could not update `skills-lock\.json`\. Failed to parse /u),
-          "✅ No managed updates were applied.",
-        ])
-      })
-    )
-
-    it.effect("warn and finish the update when the skills lock cannot be written", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          "skills-lock.json": makeSkillsLock({
-            adamantite: "./node_modules/adamantite",
-            other: "someone/other",
-          }),
-        })
-
-        files.makeReadOnly("skills-lock.json")
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(logLines).toStrictEqual([
-          "💠 adamantite update",
-          expect.stringMatching(/^▲ Could not update `skills-lock\.json`\. Could not write /u),
-          "✅ Update finished.",
-        ])
-      })
-    )
-  })
 })

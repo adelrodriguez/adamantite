@@ -130,7 +130,7 @@ describe("VS Code setup", () => {
         [
           `● \`${SETTINGS}\` is up to date.`,
           `● \`${EXTENSIONS}\` is up to date.`,
-          `✔ \`${LOCKFILE_PATH}\` already records this setup.`,
+          `● \`${LOCKFILE_PATH}\` already records this setup.`,
         ].join("\n")
       )
     })

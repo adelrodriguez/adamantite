@@ -4,8 +4,9 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
+import { applySetup } from "#commands/setup.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
-import { LOCKFILE_PATH, readLockfile } from "#lib/project/lockfile.ts"
+import { readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
@@ -16,15 +17,9 @@ import {
   type LintPreset,
   type Selection,
 } from "#lib/project/selection.ts"
-import * as Setup from "#lib/setup/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Output from "#terminal/output.ts"
-import {
-  printFileWrites,
-  printInstalls,
-  printScriptWrites,
-  printZedExtensions,
-} from "#terminal/setup.ts"
+import { printZedExtensions } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
@@ -156,22 +151,12 @@ export default Command.make("init", initCommandOptions).pipe(
         onSome: (lockfile) => addSelection(lockfile.selection, asked),
       })
 
-      const setup = yield* Setup.apply(yield* readProject(cwd), selection)
-
-      yield* printInstalls(setup.installs)
-      yield* printScriptWrites(setup.scripts)
-      yield* printFileWrites(setup.files)
-
       // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
         yield* printZedExtensions(presets)
       }
 
-      yield* Output.success(
-        setup.lockfile === "written"
-          ? `\`${LOCKFILE_PATH}\` written. Commit it with the setup.`
-          : `\`${LOCKFILE_PATH}\` already records this setup.`
-      )
+      yield* applySetup(yield* readProject(cwd), selection)
 
       yield* Output.outro("💠 Setup finished.")
     }).pipe(Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")))

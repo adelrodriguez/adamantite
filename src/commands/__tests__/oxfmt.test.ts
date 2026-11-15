@@ -77,7 +77,7 @@ describe("Oxfmt setup", () => {
       }).toStrictEqual({ config: edited, recorded: false })
       expect(init.output).toContain(`● \`${CONFIG}\` kept, because it has changes`)
       expect(doctor.output).toContain(
-        "`oxfmt.config.ts` does not meet Adamantite's required shape. The file must import the Adamantite format preset from `adamantite/format`."
+        "`oxfmt.config.ts` does not meet Adamantite's required shape. The exported config does not apply the Adamantite format preset from `adamantite/format`."
       )
     })
   )

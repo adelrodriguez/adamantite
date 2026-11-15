@@ -17,7 +17,7 @@ import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
 import { PACKAGE as oxfmt } from "#lib/integrations/oxfmt/index.ts"
-import { getExtendedLintPresets } from "#lib/integrations/oxlint/config.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
@@ -326,11 +326,11 @@ describe("init", () => {
         expect({
           "knip.config.ts": files.read("knip.config.ts"),
           "oxfmt.config.ts": files.read("oxfmt.config.ts"),
-          presets: getExtendedLintPresets(files.read("oxlint.config.ts")),
+          "oxlint.config.ts": files.read("oxlint.config.ts"),
         }).toStrictEqual({
           "knip.config.ts": toKnipTsConfigContent(),
           "oxfmt.config.ts": toOxfmtTsConfigContent(),
-          presets: ["react"],
+          "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
         })
         expect(readJson(files, "tsconfig.json")).toMatchObject({ extends: "adamantite/typescript" })
         expect(readJson(files, ".vscode/settings.json")).toMatchObject({
@@ -420,11 +420,9 @@ describe("init", () => {
       )
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-      expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
-        "tanstack",
-        "architecture",
-        "strict",
-      ])
+      expect(files.read("oxlint.config.ts")).toBe(
+        toOxlintTsConfigContent(["tanstack", "architecture", "strict"])
+      )
       expect(listInstalls(installer).packages).toStrictEqual(
         expect.not.arrayContaining([expect.stringMatching(/architecture|strict|tanstack/)])
       )
@@ -498,7 +496,7 @@ describe("init", () => {
         const { exit, files } = yield* runEffectSetup()
 
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-        expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["effect"])
+        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["effect"]))
         expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
             plugins: [{ diagnostics: true, name: "@effect/language-service" }],
@@ -668,10 +666,7 @@ describe("init", () => {
         expect(terminal.output()).toContain(
           "✔ The jest and vitest presets report the same defects. Which one should Adamantite use? …  vitest"
         )
-        expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
-          "vitest",
-          "strict",
-        ])
+        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["vitest", "strict"]))
       })
     )
   })
@@ -1097,7 +1092,7 @@ describe("init", () => {
         )
 
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-        expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["react"])
+        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["react"]))
       })
     )
 

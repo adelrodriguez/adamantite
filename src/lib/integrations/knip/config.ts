@@ -1,9 +1,12 @@
-import * as EffectRegExp from "effect/RegExp"
+import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
-import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
+import { IDENTITY_KEY, PresetIdentity } from "#lib/project/config-loader.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
+
+const ANALYZE_PRESET_MODULE = publicImport("./analyze")
 
 export interface KnipWorkspace {
   readonly isMonorepo: boolean
@@ -42,35 +45,32 @@ const IGNORE_REASON = {
   monorepo: "Knip cannot see that `adamantite analyze` runs Sherif in a monorepo",
 } as const satisfies Record<IgnoreList, string>
 
-// Bounded by the array's closing bracket, so an entry in a later property does not count. Matches
-// a string or a regular expression entry, which Knip both accepts.
-function checkListsEntry(content: string, entry: string) {
-  return new RegExp(
-    String.raw`ignoreDependencies\s*:\s*\[[^\]]*?${EffectRegExp.escape(entry)}`,
-    "u"
-  ).test(content)
-}
-
-// The preset's list, alone or spread into the array. It needs the named import: without it the
-// config passes this check and then throws a ReferenceError when Knip loads it.
-function checkUsesPresetList(content: string, list: IgnoreList) {
-  return new RegExp(
-    String.raw`ignoreDependencies\s*:\s*(?:ignoreDependencies\.${list}|\[[^\]]*?ignoreDependencies\.${list})`,
-    "u"
-  ).test(content)
-}
-
-const PRESET_LIST_IMPORT_REGEX =
-  /import\s[^;]*?\{[^}]*\bignoreDependencies\b[^}]*\}\s*from\s*["']adamantite\/analyze["']/u
-
 function getRequiredLists(workspace: KnipWorkspace) {
   return IGNORE_LISTS.filter((list) => IS_REQUIRED[list](workspace))
 }
 
-function checkIgnoresList(content: string, list: IgnoreList) {
-  return (
-    IGNORED_ENTRIES[list].every((entry) => checkListsEntry(content, entry))
-    || (checkUsesPresetList(content, list) && PRESET_LIST_IMPORT_REGEX.test(content))
+/**
+ * What Adamantite reads from a loaded `knip.config.ts`: the preset that it applies, and its
+ * `ignoreDependencies`, where Knip accepts a name or a regular expression.
+ */
+export const KnipConfig = Schema.Struct({
+  [IDENTITY_KEY]: Schema.optional(PresetIdentity),
+  ignoreDependencies: Schema.optional(
+    Schema.Array(
+      Schema.Union([Schema.String, Schema.Struct({ $regexp: Schema.String, flags: Schema.String })])
+    )
+  ),
+})
+
+export type KnipConfig = typeof KnipConfig.Type
+
+function checkIgnoresList({ ignoreDependencies = [] }: KnipConfig, list: IgnoreList) {
+  return IGNORED_ENTRIES[list].every((entry) =>
+    ignoreDependencies.some((ignored) =>
+      Predicate.isString(ignored)
+        ? ignored === entry
+        : new RegExp(ignored.$regexp, ignored.flags).test(entry)
+    )
   )
 }
 
@@ -95,23 +95,22 @@ export function toKnipWorkspace({ workspace }: Project, { presets }: Selection):
  * `effect` lint preset it must ignore the `@effect/language-service` plugin name.
  */
 export function inspectRequiredKnipConfig(
-  content: string,
+  config: KnipConfig,
   workspace: KnipWorkspace
 ): RequiredConfigInspection {
-  const inspection = inspectRequiredPresetConfig(content, {
-    moduleName: publicImport("./analyze"),
-    presetName: "Adamantite analyze",
-  })
-
-  if (inspection.kind !== "configured") {
-    return inspection
+  if (config[IDENTITY_KEY]?.module !== ANALYZE_PRESET_MODULE) {
+    return {
+      goal: `Spread the Adamantite analyze preset from \`${ANALYZE_PRESET_MODULE}\` into the exported config, or export it alone. Preserve every project-specific setting.`,
+      kind: "invalid",
+      reason: `The exported config does not apply the Adamantite analyze preset from \`${ANALYZE_PRESET_MODULE}\`.`,
+    }
   }
 
   const requiredLists = getRequiredLists(workspace)
-  const missingLists = requiredLists.filter((list) => !checkIgnoresList(content, list))
+  const missingLists = requiredLists.filter((list) => !checkIgnoresList(config, list))
 
   if (missingLists.length === 0) {
-    return inspection
+    return { kind: "configured" }
   }
 
   const setting = `\`ignoreDependencies: ${formatIgnoreDependencies(requiredLists)}\``

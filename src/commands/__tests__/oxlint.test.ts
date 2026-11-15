@@ -92,7 +92,8 @@ describe("Oxlint setup", () => {
     {
       change: "a preset before core",
       config: RENDERED.replace("[core, vitest, custom()]", "[vitest, core, custom()]"),
-      finding: "`oxlint.config.ts` lists `vitest` before the core preset `core` in `extends`.",
+      finding:
+        "`oxlint.config.ts` applies `adamantite/lint/vitest` before the core preset `adamantite/lint` in `extends`.",
     },
     {
       change: "two presets that report the same defects",
@@ -101,6 +102,11 @@ describe("Oxlint setup", () => {
         'import jest from "adamantite/lint/jest"\nimport vitest from "adamantite/lint/vitest"'
       ).replace("[core, vitest, custom()]", "[core, jest, vitest, custom()]"),
       finding: "`oxlint.config.ts` extends the `jest` and `vitest` presets",
+    },
+    {
+      change: "a required option turned off",
+      config: RENDERED.replace("typeCheck: true", "typeCheck: false"),
+      finding: "The required Oxlint options are missing or are not set to true.",
     },
   ])("keep a config with $change, and report it in doctor", ({ config, finding }) =>
     Effect.gen(function* () {

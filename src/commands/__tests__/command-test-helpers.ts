@@ -18,6 +18,7 @@ import * as Stream from "effect/Stream"
 import { TestConsole } from "effect/testing"
 import type { DetectedPackageManager } from "#lib/project/package-manager.ts"
 import type { Selection } from "#lib/project/selection.ts"
+import { configLoaderLayer } from "#__tests__/config-loader.ts"
 import {
   type FileSystemTestContext,
   createFileSystemTestContext,
@@ -433,9 +434,13 @@ export function runCommand<
 
   const platformLayer = Layer.mergeAll(files.layer, Path.layer)
 
-  const testLayer = Layer.mergeAll(
-    makeDefaultLayer(files, options.terminal ?? createTerminalTestContext()),
-    ...(options.layers ?? []).map((layer) => layer.pipe(Layer.provide(platformLayer)))
+  // The config loader reads the files and resolves imports with the services of the test.
+  const testLayer = Layer.provideMerge(
+    configLoaderLayer,
+    Layer.mergeAll(
+      makeDefaultLayer(files, options.terminal ?? createTerminalTestContext()),
+      ...(options.layers ?? []).map((layer) => layer.pipe(Layer.provide(platformLayer)))
+    )
   )
 
   return Effect.exit(

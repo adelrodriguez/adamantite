@@ -10,6 +10,7 @@ import {
 } from "#lib/integrations/config-file.ts"
 import {
   inspectRequiredOxfmtConfig,
+  OxfmtConfig,
   toOxfmtTsConfigContent,
 } from "#lib/integrations/oxfmt/config.ts"
 import { assessPluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
@@ -33,7 +34,7 @@ export default {
 
       const [config, languages] = yield* Effect.all(
         [
-          readConfigFile(project.cwd, CONFIG).pipe(
+          readConfigFile(project.cwd, CONFIG, OxfmtConfig).pipe(
             Effect.flatMap((content) =>
               assessConfigFile(
                 project.cwd,

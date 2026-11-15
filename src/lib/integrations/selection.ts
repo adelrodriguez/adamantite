@@ -2,11 +2,12 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Result from "effect/Result"
 import * as String from "effect/String"
 import type { Project } from "#lib/project/project.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/integrations/agents/section.ts"
 import { findWorkflow } from "#lib/integrations/github/index.ts"
-import { getImportedLintPresets } from "#lib/integrations/oxlint/config.ts"
+import { listLintPresets } from "#lib/integrations/oxlint/config.ts"
 import { detectPreset } from "#lib/integrations/typescript/index.ts"
 import { SETTINGS_PATH as VSCODE_SETTINGS_PATH } from "#lib/integrations/vscode/index.ts"
 import { SETTINGS_PATH as ZED_SETTINGS_PATH } from "#lib/integrations/zed/index.ts"
@@ -20,7 +21,7 @@ const EDITOR_SETTINGS = { vscode: VSCODE_SETTINGS_PATH, zed: ZED_SETTINGS_PATH }
 /**
  * The selection that `init` would record for a project that an earlier Adamantite version set up.
  * Each part comes from the detection that Doctor applies without a lockfile: the managed scripts,
- * the presets that the root Oxlint config imports, the TypeScript configs that name a preset, the
+ * the presets that the root Oxlint config applies, the TypeScript configs that name a preset, the
  * editor settings and the workflow that exist, and the Adamantite section of `AGENTS.md`.
  */
 export const inferSelection = Effect.fn("inferSelection")(function* (project: Project) {
@@ -31,10 +32,10 @@ export const inferSelection = Effect.fn("inferSelection")(function* (project: Pr
   const managedScripts = getManagedScripts(packageJson)
   const scripts = SCRIPT_ORDER.filter((script) => managedScripts.includes(script))
 
-  const imported: readonly string[] = Option.match(lintConfig, {
-    onNone: () => [],
-    onSome: getImportedLintPresets,
-  })
+  const applied: readonly string[] = lintConfig.pipe(
+    Option.flatMap(Result.getSuccess),
+    Option.match({ onNone: () => [], onSome: listLintPresets })
+  )
 
   const editors = yield* Effect.filter(
     INIT_EDITORS,
@@ -50,7 +51,7 @@ export const inferSelection = Effect.fn("inferSelection")(function* (project: Pr
     ci: Option.isSome(workflow) ? "github" : null,
     editors,
     presets: checkRunsTool(scripts, "oxlint")
-      ? ["core", ...LINT_PRESETS.filter((preset) => imported.includes(preset))]
+      ? ["core", ...LINT_PRESETS.filter((preset) => applied.includes(preset))]
       : [],
     scripts,
     typescript: Option.getOrNull(yield* detectPreset(project)),

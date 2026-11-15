@@ -29,6 +29,7 @@ import {
   tryRule,
 } from "#lib/hardening/trial.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
+import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { InvalidTrialCase } from "#lib/shared/errors.ts"
@@ -46,6 +47,7 @@ const MISSING_BACKEND = join(REPO_ROOT, "missing-tsrs-lint")
 // The build writes the Oxlint entry beside the CLI, so a run from source starts its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
+  ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
   Layer.succeed(OxlintCommand)((project) => {
     const command = getOxlintCommand(project)
 

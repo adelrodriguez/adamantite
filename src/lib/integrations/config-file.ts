@@ -1,10 +1,13 @@
+import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Result from "effect/Result"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
+import { readConfig } from "#lib/project/config-loader.ts"
 
 /**
  * A TypeScript config that a tool integration renders whole, and the legacy JSON configs that the
@@ -55,27 +58,30 @@ function listFiles(files: readonly string[]) {
 }
 
 /**
- * The content of the managed config of the project at `cwd`, or none when it does not exist.
+ * The managed config of the project at `cwd`, loaded as the tool loads it and decoded with
+ * `schema`, or none when it does not exist.
  */
-export const readConfigFile = Effect.fn("readConfigFile")(function* (
+export const readConfigFile = Effect.fn("readConfigFile")(function* <A>(
   cwd: string,
-  config: ConfigFile
+  config: ConfigFile,
+  schema: Schema.Decoder<A>
 ) {
   const path = yield* Path.Path
 
-  return yield* readFileIfExists(path.join(cwd, config.path))
+  return yield* readConfig(path.join(cwd, config.path), schema)
 })
 
 /**
- * The findings for a managed config whose content is `content`: a legacy JSON config, a missing
- * config, and a kept config that `inspect` rejects. `reference` is what Adamantite writes.
+ * The findings for a managed config, as `readConfigFile` reads it: a legacy JSON config, a missing
+ * config, a config that does not load, and a loaded config that `inspect` rejects. `reference` is
+ * what Adamantite writes.
  */
-export const assessConfigFile = Effect.fn("assessConfigFile")(function* (
+export const assessConfigFile = Effect.fn("assessConfigFile")(function* <A>(
   cwd: string,
   config: ConfigFile,
-  content: Option.Option<string>,
+  content: Option.Option<Result.Result<A, ConfigLoadFailed>>,
   reference: string,
-  inspect: (content: string) => RequiredConfigInspection
+  inspect: (config: A) => RequiredConfigInspection
 ) {
   const legacy = yield* findLegacyConfigs(cwd, config)
 
@@ -118,7 +124,14 @@ export const assessConfigFile = Effect.fn("assessConfigFile")(function* (
     ] satisfies readonly Finding[]
   }
 
-  const inspection = inspect(content.value)
+  const inspection: RequiredConfigInspection = Result.match(content.value, {
+    onFailure: (error) => ({
+      goal: `Repair the error, so that \`${config.path}\` loads, as ${config.tool} loads it. Preserve every project setting.`,
+      kind: "invalid",
+      reason: error.message,
+    }),
+    onSuccess: inspect,
+  })
 
   return inspection.kind === "invalid"
     ? [

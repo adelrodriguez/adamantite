@@ -1,15 +1,17 @@
+import type * as Result from "effect/Result"
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
 import {
   type CustomRuleDiscovery,
   discoverCustomRules,
 } from "#lib/project/custom-rules/discover.ts"
+import { type LintConfig, readLintConfig } from "#lib/project/lint-config.ts"
 import { type Lockfile, readLockfile } from "#lib/project/lockfile.ts"
 import { readWorkspace, type Workspace } from "#lib/project/monorepo.ts"
 import { getManagedScripts, readPackageJson, type Script } from "#lib/project/package-json.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 const LINT_CONFIG_FILE = "oxlint.config.ts"
 
@@ -24,9 +26,9 @@ export interface Project {
   readonly customRules: CustomRuleDiscovery
   readonly cwd: string
   /**
-   * The content of the root `oxlint.config.ts`, or none when it does not exist.
+   * The root `oxlint.config.ts`, loaded as Oxlint loads it, or none when it does not exist.
    */
-  readonly lintConfig: Option.Option<string>
+  readonly lintConfig: Option.Option<Result.Result<LintConfig, ConfigLoadFailed>>
   /**
    * The lockfile that `init` or `update` wrote, or none when the project has no lockfile.
    */
@@ -46,7 +48,7 @@ export const readProject = Effect.fn("readProject")(function* (cwd: string) {
     [
       readPackageJson(cwd),
       readWorkspace(cwd),
-      readFileIfExists(path.join(cwd, LINT_CONFIG_FILE)),
+      readLintConfig(path.join(cwd, LINT_CONFIG_FILE)),
       readLockfile(cwd),
     ],
     { concurrency: "unbounded" }

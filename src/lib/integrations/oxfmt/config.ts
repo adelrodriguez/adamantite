@@ -1,14 +1,29 @@
+import * as Schema from "effect/Schema"
+import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import { getConfigTemplate } from "#lib/integrations/oxfmt/config.macro.ts" with { type: "macro" }
-import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
+import { IDENTITY_KEY, PresetIdentity } from "#lib/project/config-loader.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
 const configTemplate = getConfigTemplate()
 
-export function inspectRequiredOxfmtConfig(content: string) {
-  return inspectRequiredPresetConfig(content, {
-    moduleName: publicImport("./format"),
-    presetName: "Adamantite format",
-  })
+const FORMAT_PRESET_MODULE = publicImport("./format")
+
+/**
+ * What Adamantite reads from a loaded `oxfmt.config.ts`: the preset that it exports, alone or
+ * spread into its own object.
+ */
+export const OxfmtConfig = Schema.Struct({ [IDENTITY_KEY]: Schema.optional(PresetIdentity) })
+
+export function inspectRequiredOxfmtConfig(
+  config: typeof OxfmtConfig.Type
+): RequiredConfigInspection {
+  return config[IDENTITY_KEY]?.module === FORMAT_PRESET_MODULE
+    ? { kind: "configured" }
+    : {
+        goal: `Export the Adamantite format preset from \`${FORMAT_PRESET_MODULE}\`, alone or spread into the config object. Preserve every project-specific setting.`,
+        kind: "invalid",
+        reason: `The exported config does not apply the Adamantite format preset from \`${FORMAT_PRESET_MODULE}\`.`,
+      }
 }
 
 export function toOxfmtTsConfigContent() {

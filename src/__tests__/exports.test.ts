@@ -3,7 +3,6 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
-import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
 import { PRESET, type PresetIdentity } from "#presets/identity.ts"
 import packageJson from "../../package.json" with { type: "json" }
 import readme from "../../README.md?raw"
@@ -43,8 +42,4 @@ describe("package exports", () => {
       })
     )
   )
-
-  it("keep the removed custom rules import private, so Doctor can ask projects to migrate", () => {
-    expect(exportedImports).not.toContain(LEGACY_CUSTOM_RULES_MODULE)
-  })
 })

@@ -1,7 +1,9 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
@@ -19,7 +21,9 @@ function runAssess(packageJson: PackageJson) {
 
     return yield* readProject(ROOT).pipe(
       Effect.flatMap((project) => tsrs.assess(project)),
-      Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
+      Effect.provide(
+        withConfigLoader(Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT)))
+      )
     )
   })
 }

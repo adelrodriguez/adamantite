@@ -19,6 +19,7 @@ import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
 import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
+import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
@@ -76,6 +77,7 @@ const layer = Layer.mergeAll(
   NodeServices.layer,
   NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
   ModuleResolver.layer,
+  ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
   Digest.layerWebCrypto,
   // The project has its packages, so the install changes nothing.
   Layer.succeed(DependencyInstaller)({

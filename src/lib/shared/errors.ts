@@ -474,6 +474,19 @@ export class TrialConfigNotFound extends Data.TaggedError("TrialConfigNotFound")
 /**
  * Oxlint did not lint the cases, for example because the config does not load.
  */
+/**
+ * Node.js could not load a config of the target project, as the tool that reads the config would
+ * not either.
+ */
+export class ConfigLoadFailed extends Data.TaggedError("ConfigLoadFailed")<{
+  file: string
+  reason: string
+}> {
+  override get message() {
+    return `Node.js cannot load \`${this.file}\`: ${this.reason}`
+  }
+}
+
 export class TrialLintFailed extends Data.TaggedError("TrialLintFailed")<{
   output: string
 }> {

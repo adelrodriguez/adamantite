@@ -1,7 +1,9 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
@@ -17,7 +19,9 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
+  return Effect.provide(
+    withConfigLoader(Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT)))
+  )
 }
 
 function runAssess(files: FileSystemTestContext) {

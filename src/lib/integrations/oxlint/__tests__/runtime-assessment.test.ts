@@ -2,7 +2,9 @@ import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
@@ -67,12 +69,16 @@ function runAssess(
   return readProject(ROOT).pipe(
     Effect.flatMap(assessOxlintRuntime),
     Effect.map((findings) => ({ findings })),
-    Effect.provide([
-      files.layer,
-      makeOxlintFilesLayer(),
-      Path.layer,
-      makeModuleResolverLayer(ROOT, packages),
-    ])
+    Effect.provide(
+      withConfigLoader(
+        Layer.mergeAll(
+          files.layer,
+          makeOxlintFilesLayer(),
+          Path.layer,
+          makeModuleResolverLayer(ROOT, packages)
+        )
+      )
+    )
   )
 }
 
@@ -331,12 +337,16 @@ describe("Oxlint runtime assessment", () => {
 
       const findings = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessOxlintRuntime(project)),
-        Effect.provide([
-          files.layer,
-          makeOxlintFilesLayer(),
-          Path.layer,
-          makeModuleResolverLayer(ROOT, {}),
-        ])
+        Effect.provide(
+          withConfigLoader(
+            Layer.mergeAll(
+              files.layer,
+              makeOxlintFilesLayer(),
+              Path.layer,
+              makeModuleResolverLayer(ROOT, {})
+            )
+          )
+        )
       )
 
       expect(findings).toStrictEqual([])

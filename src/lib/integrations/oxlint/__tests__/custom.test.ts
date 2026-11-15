@@ -1,14 +1,13 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { IntegrationAssessment } from "#lib/integrations/base.ts"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
-import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -49,20 +48,17 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
 function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
   return readProject(ROOT).pipe(
     Effect.flatMap((project) => oxlintCustom.assess(project)),
-    Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions)])
+    Effect.provide(
+      withConfigLoader(
+        Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions))
+      )
+    )
   )
 }
 
 function getFindings(assessment: IntegrationAssessment) {
   return assessment.applicable ? assessment.findings : []
 }
-
-const CUSTOM_ACME = [
-  'import custom from "adamantite/rules"',
-  "",
-  'export default custom({ dir: "rules", name: "acme" })',
-  "",
-].join("\n")
 
 describe("oxlint-custom", () => {
   it.effect.each([".adamantite/lint", "tooling/lint/rules"])(
@@ -298,63 +294,8 @@ describe("oxlint-custom", () => {
     })
   )
 
-  it.effect("clear the resolver cache before each traversal", () =>
-    Effect.gen(function* () {
-      const events: string[] = []
-
-      const resolverLayer = Layer.succeed(ModuleResolver)({
-        clearCache: Effect.sync(() => {
-          events.push("clear")
-        }),
-        resolve: (_from, specifier) =>
-          Effect.sync(() => {
-            events.push(specifier)
-
-            return Option.none()
-          }),
-      })
-
-      const files = createFileSystemTestContext({
-        files: {
-          "oxlint.config.ts": makeConfig("core, rules", ['import rules from "./lint/rules.ts"']),
-          "package.json": PACKAGE_JSON,
-        },
-        root: ROOT,
-      })
-
-      const assess = readProject(ROOT).pipe(
-        Effect.flatMap((project) => oxlintCustom.assess(project)),
-        Effect.provide([files.layer, Path.layer, resolverLayer])
-      )
-
-      yield* assess
-      yield* assess
-
-      expect(
-        events.filter((event) => event === "clear" || event === "./lint/rules.ts")
-      ).toStrictEqual(["clear", "./lint/rules.ts", "clear", "./lint/rules.ts"])
-    })
-  )
-
-  it.effect("do not follow an import that resolves into node_modules", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          "node_modules/@acme/lint/index.ts": CUSTOM_ACME,
-          "oxlint.config.ts": makeConfig("core, tooling", ['import tooling from "@acme/lint"']),
-          "package.json": PACKAGE_JSON,
-        },
-        root: ROOT,
-      })
-
-      expect(
-        yield* runAssess(files, { "@acme/lint": "node_modules/@acme/lint/index.ts" })
-      ).toStrictEqual({ applicable: false })
-    })
-  )
-
   it.effect(
-    "warn about a workspace import that doctor cannot resolve, and skip the folder check",
+    "warn about a config that imports a module that does not resolve, and skip the folder check",
     () =>
       Effect.gen(function* () {
         const files = createFileSystemTestContext({
@@ -379,7 +320,9 @@ describe("oxlint-custom", () => {
 
         expect(getFindings(assessment)).toStrictEqual([])
         expect(assessment.warnings).toStrictEqual([
-          "Doctor cannot resolve the import of `@acme/lint/missing` in `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it. For a workspace package, install the dependencies and run Doctor again.",
+          expect.stringMatching(
+            /^Doctor cannot load `oxlint\.config\.ts`, so it does not check the `custom\(\)` calls and rules folders behind it\. Node\.js reported: /u
+          ),
         ])
       })
   )
@@ -454,7 +397,7 @@ describe("oxlint-custom", () => {
   )
 
   it.effect.each([".adamantite/lint", ".adamantite/rules"])(
-    "warn about an unresolved dir and skip the folder check for %s",
+    "check the rules folder %s that a variable names",
     (folder) =>
       Effect.gen(function* () {
         const files = createFileSystemTestContext({
@@ -468,39 +411,35 @@ describe("oxlint-custom", () => {
           root: ROOT,
         })
 
-        const assessment = yield* runAssess(files)
-
-        expect(getFindings(assessment)).toStrictEqual([])
-        expect(assessment.warnings).toStrictEqual([
-          "Doctor cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
-        ])
+        expect(yield* runAssess(files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
       })
   )
 
-  it.effect(
-    "check the folders of a custom() call whose name doctor cannot read, and warn about the name",
-    () =>
-      Effect.gen(function* () {
-        const files = createFileSystemTestContext({
-          files: {
-            ".adamantite/lint/no-process-env.ts": RULE,
-            "oxlint.config.ts": makeConfig('core, custom({ dir: "rules", name: NAME })', [
-              'const NAME = "acme"',
-            ]),
-            "package.json": PACKAGE_JSON,
-            "rules/no-window.ts": RULE,
-          },
-          root: ROOT,
-        })
-
-        const assessment = yield* runAssess(files)
-
-        expect(getFindings(assessment).map((finding) => finding.id)).toStrictEqual([
-          "custom-rules-not-loaded:.adamantite/lint",
-        ])
-        expect(assessment.warnings).toStrictEqual([
-          "Doctor cannot read the `name` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that its plugin name differs from the other rules folders.",
-        ])
+  it.effect("check the folders of a custom() call whose dir and name variables set", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/lint/no-process-env.ts": RULE,
+          "oxlint.config.ts": makeConfig('core, custom({ dir: "rules", name: NAME })', [
+            'const NAME = "acme"',
+          ]),
+          "package.json": PACKAGE_JSON,
+          "rules/no-window.ts": RULE,
+        },
+        root: ROOT,
       })
+
+      const assessment = yield* runAssess(files)
+
+      expect(getFindings(assessment).map((finding) => finding.id)).toStrictEqual([
+        "custom-rules-not-loaded:.adamantite/lint",
+      ])
+      expect(assessment.warnings).toStrictEqual([])
+    })
   )
 })

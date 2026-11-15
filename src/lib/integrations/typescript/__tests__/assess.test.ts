@@ -8,6 +8,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 import type { Selection } from "#lib/project/selection.ts"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import typescript, { detectPreset } from "#lib/integrations/typescript/index.ts"
@@ -77,12 +78,16 @@ const TYPESCRIPT_RESOLUTIONS = {
 }
 
 function provideFiles(files: FileSystemTestContext, showConfig: ShowConfig = {}) {
-  return Effect.provide([
-    files.layer,
-    Path.layer,
-    makeModuleResolverLayer(ROOT, TYPESCRIPT_RESOLUTIONS),
-    makeShowConfigLayer(showConfig),
-  ])
+  return Effect.provide(
+    withConfigLoader(
+      Layer.mergeAll(
+        files.layer,
+        Path.layer,
+        makeModuleResolverLayer(ROOT, TYPESCRIPT_RESOLUTIONS),
+        makeShowConfigLayer(showConfig)
+      )
+    )
+  )
 }
 
 // As the assessment decides: the lockfile selects the preset, or a project without one gets the
@@ -279,12 +284,16 @@ describe("tsconfig", () => {
           Effect.flatMap((project) =>
             typescript.assess(project, { ...EMPTY_SELECTION, typescript: "typescript" })
           ),
-          Effect.provide([
-            files.layer,
-            Path.layer,
-            makeModuleResolverLayer(ROOT),
-            makeShowConfigLayer({ "": "resets" }),
-          ])
+          Effect.provide(
+            withConfigLoader(
+              Layer.mergeAll(
+                files.layer,
+                Path.layer,
+                makeModuleResolverLayer(ROOT),
+                makeShowConfigLayer({ "": "resets" })
+              )
+            )
+          )
         )
 
         expect(result).toMatchObject({ findings: [] })

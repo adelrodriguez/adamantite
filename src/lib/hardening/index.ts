@@ -11,7 +11,7 @@ import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/harden
 import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
 import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/inspect.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
@@ -69,10 +69,10 @@ export const HardenContext = Schema.Struct({
    */
   suppressions: Schema.OptionFromNullOr(Schema.Array(RuleSuppressions)),
   /**
-   * Files with a `custom()` call whose `dir` is not a string literal, so only the agent can find
-   * its rules folder.
+   * The Oxlint configs that Node.js cannot load, so only the agent can find the rules folders that
+   * their `custom()` calls load.
    */
-  unresolvedCalls: Schema.Array(Schema.String),
+  unloadedConfigs: Schema.Array(Schema.String),
 })
 
 export type HardenContext = typeof HardenContext.Type
@@ -210,7 +210,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   )
 
   // Git lists the Markdown files while discovery reads the workspace packages.
-  const [{ calls, configs, unresolvedCalls }, instructionFiles, documentation] = yield* Effect.all(
+  const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation] = yield* Effect.all(
     [
       discoverCustomRules(packageDirectories, selectedPackages),
       Effect.filter(instructionCandidates, (file) => checkExists(file), {
@@ -240,10 +240,10 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     documentationFiles: documentation.documentationFiles,
     instructionFiles: instructionFiles.map((file) => relative(file)),
     overrides,
-    rulesFolders: [...new Set(calls.map((call) => relative(call.dir)))],
+    rulesFolders: Array.sort(Array.dedupe(calls.map((call) => relative(call.dir))), Order.String),
     scope: projectScope,
     suppressions,
-    unresolvedCalls: [...new Set(unresolvedCalls.map((source) => relative(source)))],
+    unloadedConfigs: unloadedConfigs.map(({ file }) => relative(file)),
   } satisfies HardenContext
 })
 
@@ -280,15 +280,15 @@ function renderAgentReach(reach: AgentReach) {
 }
 
 function renderRulesFolders(context: HardenContext) {
-  if (context.rulesFolders.length === 0 && context.unresolvedCalls.length === 0) {
+  if (context.rulesFolders.length === 0 && context.unloadedConfigs.length === 0) {
     return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/rules\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`
   }
 
   return [
     ...context.rulesFolders.map((folder) => `- \`${folder}\``),
-    ...context.unresolvedCalls.map(
+    ...context.unloadedConfigs.map(
       (file) =>
-        `- A \`custom()\` call in \`${file}\` whose \`dir\` is not a string literal. Read the config to find its rules folder.`
+        `- The rules folders that \`${file}\` loads. Node.js cannot load the config, so read it to find them.`
     ),
   ].join("\n")
 }

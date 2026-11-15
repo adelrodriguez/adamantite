@@ -1,6 +1,7 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Result from "effect/Result"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import {
@@ -9,9 +10,9 @@ import {
   renderConfigFile,
 } from "#lib/integrations/config-file.ts"
 import {
-  getExtendedLintPresets,
-  inspectExtendsOrder,
+  findMisplacedCorePreset,
   inspectRequiredOxlintConfig,
+  listLintPresets,
   type MisplacedCorePreset,
   toOxlintTsConfigContent,
 } from "#lib/integrations/oxlint/config.ts"
@@ -46,12 +47,12 @@ function listPresets({ presets }: Selection): readonly LintPreset[] {
  * Assessment does not write the config.
  */
 function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Finding {
-  const presets = before.map((name) => `\`${name}\``).join(", ")
+  const presets = before.map((module) => `\`${module}\``).join(", ")
 
   return {
-    currentState: `\`oxlint.config.ts\` lists ${presets} before the core preset \`${core}\` in \`extends\`.`,
+    currentState: `\`oxlint.config.ts\` applies ${presets} before the core preset \`${core}\` in \`extends\`.`,
     goal: [
-      `Move \`${core}\` to the position directly before \`${Array.headNonEmpty(before)}\`, the first Adamantite preset in the \`extends\` array. Keep one \`${core}\` entry, and keep the order of the other entries.`,
+      `Move the core preset \`${core}\` to the position directly before \`${Array.headNonEmpty(before)}\`, the first Adamantite preset that Oxlint applies. Keep one core entry, and keep the order of the other entries.`,
       "Oxlint applies the `extends` entries in order, and a later entry replaces the rules of an earlier one. A preset, such as strict or effect, changes some rules of core. When core comes after the preset, the rules of core replace those changes.",
       "Run `adamantite check`, and correct the code that the restored rules report. Then run `adamantite doctor` again.",
     ],
@@ -138,16 +139,16 @@ export default {
         inspectRequiredOxlintConfig
       )
 
-      const presetOrderFindings = lintConfig.pipe(
-        Option.flatMap((content) => inspectExtendsOrder(content)),
+      const loaded = Option.flatMap(lintConfig, Result.getSuccess)
+
+      const presetOrderFindings = loaded.pipe(
+        Option.flatMap((config) => findMisplacedCorePreset(config)),
         Option.map((misplaced) => toCorePresetOrderFinding(misplaced)),
         Option.toArray
       )
 
-      const excludedPresetsFindings = lintConfig.pipe(
-        Option.flatMap((content) =>
-          Array.head(findExcludedPresets(getExtendedLintPresets(content)))
-        ),
+      const excludedPresetsFindings = loaded.pipe(
+        Option.flatMap((config) => Array.head(findExcludedPresets(listLintPresets(config)))),
         Option.map((excluded) => toExcludedPresetsFinding(excluded)),
         Option.toArray
       )

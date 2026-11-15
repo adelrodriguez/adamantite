@@ -10,7 +10,7 @@ import {
   CUSTOM_RULES_DIRECTORY,
   isRuleFile,
   isRuleTestFile,
-} from "#lib/project/custom-rules/inspect.ts"
+} from "#lib/project/custom-rules/folder.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,
@@ -156,9 +156,8 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
 
 /**
  * The optional rule tests of each rules folder that a `custom()` call loads, in sorted order. A
- * test is a `.test.*` file beside the rules, so a `_` file is a helper. Discovery cannot follow a
- * `custom()` call whose `dir` is not a string literal, or an import that it cannot resolve, so the
- * tests of those rules folders are not in the result.
+ * test is a `.test.*` file beside the rules, so a `_` file is a helper. The tests of the rules
+ * folders behind a config that does not load are not in the result.
  */
 export const findCustomRuleTests = Effect.fn("findCustomRuleTests")(function* (
   customRules: CustomRuleDiscovery
@@ -184,8 +183,8 @@ export const findCustomRuleTests = Effect.fn("findCustomRuleTests")(function* (
 
 /**
  * The command that runs the rule tests, with paths relative to the project root, or none when no
- * test exists, and the `custom()` calls and imports that discovery could not follow. `RuleTester`
- * runs only on Node.js, so the tests run under Node.js, also in a Bun project.
+ * test exists, and the configs that did not load. `RuleTester` runs only on Node.js, so the tests
+ * run under Node.js, also in a Bun project.
  */
 export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* ({
   customRules,
@@ -202,7 +201,6 @@ export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(
             args: ["--test", ...tests.map((test) => path.relative(cwd, test))],
             command: "node",
           }),
-    unresolvedCalls: Array.dedupe(customRules.unresolvedCalls),
-    unresolvedImports: customRules.unresolvedImports,
+    unloadedConfigs: customRules.unloadedConfigs,
   }
 })

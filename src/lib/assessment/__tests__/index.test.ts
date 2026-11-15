@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
@@ -253,17 +254,21 @@ describe("assessProject", () => {
 
       const assessment = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessProject(project)),
-        Effect.provide([
-          files.layer,
-          Path.layer,
-          makeModuleResolverLayer(ROOT),
-          noProcessLayer,
-          NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
-          Layer.succeed(DependencyInstaller)({
-            addDevDependencies: () => Effect.void,
-            detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
-          }),
-        ])
+        Effect.provide(
+          withConfigLoader(
+            Layer.mergeAll(
+              files.layer,
+              Path.layer,
+              makeModuleResolverLayer(ROOT),
+              noProcessLayer,
+              NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
+              Layer.succeed(DependencyInstaller)({
+                addDevDependencies: () => Effect.void,
+                detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
+              })
+            )
+          )
+        )
       )
 
       expect(
@@ -305,7 +310,6 @@ describe("assessProject", () => {
       })
 
       const reads: string[] = []
-      const discoveries: string[] = []
 
       const fileSystem = Layer.effect(FileSystem.FileSystem)(
         Effect.gen(function* () {
@@ -324,23 +328,21 @@ describe("assessProject", () => {
 
       const assessment = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessProject(project)),
-        Effect.provide([
-          fileSystem,
-          Path.layer,
-          makeModuleResolverLayer(
-            ROOT,
-            {},
-            Effect.sync(() => {
-              discoveries.push("discovery")
-            })
-          ),
-          noProcessLayer,
-          NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
-          Layer.succeed(DependencyInstaller)({
-            addDevDependencies: () => Effect.void,
-            detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
-          }),
-        ])
+        Effect.provide(
+          withConfigLoader(
+            Layer.mergeAll(
+              fileSystem,
+              Path.layer,
+              makeModuleResolverLayer(ROOT),
+              noProcessLayer,
+              NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
+              Layer.succeed(DependencyInstaller)({
+                addDevDependencies: () => Effect.void,
+                detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
+              })
+            )
+          )
+        )
       )
 
       expect(assessment.applicableIntegrations).toStrictEqual([
@@ -356,9 +358,9 @@ describe("assessProject", () => {
         "github",
       ])
       expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
-      // The project reads the root config, and custom rule discovery reads it as an Oxlint config.
+      // The project loads the root config, and custom rule discovery loads it as the config of the
+      // root package.
       expect(reads.filter((path) => path === `${ROOT}/oxlint.config.ts`)).toHaveLength(2)
-      expect(discoveries).toHaveLength(1)
     })
   )
 })

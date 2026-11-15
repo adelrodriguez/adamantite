@@ -1,19 +1,11 @@
 import * as Array from "effect/Array"
-import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
-import * as Predicate from "effect/Predicate"
-import {
-  parseSync,
-  type ExportDefaultDeclaration,
-  type ObjectExpression,
-  type ObjectProperty,
-  type Program,
-  type PropertyKey,
-} from "oxc-parser"
+import * as Result from "effect/Result"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
+import type { Project } from "#lib/project/project.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
-import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
+import { type LintConfig, listPresetModules } from "#lib/project/lint-config.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
@@ -22,25 +14,8 @@ const REQUIRED_BOOLEAN_OPTIONS = [
   "typeCheck",
 ] as const
 
-const UNSUPPORTED_CONFIG_REASON =
-  "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."
-
-const UNSUPPORTED_OPTIONS_REASON =
-  "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can inspect."
-
-const EXPORT_GOAL =
-  "Export the config object literal directly from `oxlint.config.ts`, with or without `defineConfig(...)`. Preserve every project setting."
-
 const OPTIONS_GOAL =
   "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting."
-
-const NON_BOOLEAN_OPTIONS_REASON =
-  "`oxlint.config.ts` has an `options` object Adamantite cannot inspect. Make sure each required option is a plain `key: true | false` property. Avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
-
-type NamedObjectPropertyResult =
-  | { readonly status: "found"; readonly property: ObjectProperty }
-  | { readonly status: "invalid" }
-  | { readonly status: "missing" }
 
 function getImportName(preset: LintPreset | "core") {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
@@ -89,307 +64,75 @@ export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
   ].join("\n")
 }
 
-const parseThrowable = Option.liftThrowable((content: string) =>
-  parseSync("oxlint.config.ts", content, {
-    astType: "ts",
-    lang: "ts",
-    sourceType: "module",
-  })
-)
+const CORE_PRESET_MODULE = publicImport("./lint")
 
-function parse(content: string) {
-  return parseThrowable(content).pipe(
-    Option.flatMap((result) =>
-      result.errors.length === 0 ? Option.fromNullishOr(result.program) : Option.none<Program>()
-    )
-  )
-}
-
-const LINT_PRESET_PREFIX = `${publicImport("./lint")}/`
+const LINT_PRESET_PREFIX = `${CORE_PRESET_MODULE}/`
 
 /**
- * The Adamantite lint presets that an `oxlint.config.ts` imports, such as `react` for
- * `adamantite/lint/react`. The core preset and `custom()` are not listed. An unparsable config
- * imports none.
+ * The Adamantite lint presets that a loaded `oxlint.config.ts` applies, such as `react` for
+ * `adamantite/lint/react`, in the order that Oxlint applies them. Core and `custom()` are not
+ * listed.
  */
-export function getImportedLintPresets(content: string): string[] {
-  return pipe(
-    parse(content),
-    Option.map((ast) =>
-      ast.body.flatMap((statement) =>
-        statement.type === "ImportDeclaration"
-        && statement.source.value.startsWith(LINT_PRESET_PREFIX)
-        && statement.source.value !== LEGACY_CUSTOM_RULES_MODULE
-          ? [statement.source.value.slice(LINT_PRESET_PREFIX.length)]
-          : []
-      )
-    ),
-    Option.getOrElse((): string[] => [])
+export function listLintPresets(config: LintConfig): string[] {
+  return listPresetModules(config).flatMap((module) =>
+    module.startsWith(LINT_PRESET_PREFIX) ? [module.slice(LINT_PRESET_PREFIX.length)] : []
   )
 }
 
 /**
- * Whether the `oxlint.config.ts` content imports the lint preset, such as `effect` for
- * `adamantite/lint/effect`. A missing config imports none.
+ * Whether the root `oxlint.config.ts` of `project` applies the lint preset, such as `effect` for
+ * `adamantite/lint/effect`. A missing config, or one that does not load, applies none.
  */
-export function checkImportsLintPreset(
-  lintConfig: Option.Option<string>,
+export function checkAppliesLintPreset(
+  lintConfig: Project["lintConfig"],
   preset: LintPreset
 ): boolean {
-  return Option.exists(lintConfig, (content) => getImportedLintPresets(content).includes(preset))
-}
-
-function getStaticPropertyName(key: PropertyKey) {
-  if (key.type === "Identifier") {
-    return pipe(key.name, Option.some)
-  }
-
-  if (key.type === "Literal" && Predicate.isString(key.value)) {
-    return pipe(key.value, Option.some)
-  }
-
-  return Option.none<string>()
-}
-
-function getConfigObjectExpression(declaration: ExportDefaultDeclaration["declaration"]) {
-  if (declaration.type === "ObjectExpression") {
-    return pipe(declaration, Option.some)
-  }
-
-  if (
-    declaration.type !== "CallExpression"
-    || declaration.callee.type !== "Identifier"
-    || declaration.callee.name !== "defineConfig"
-  ) {
-    return Option.none<ObjectExpression>()
-  }
-
-  return pipe(
-    declaration.arguments.length === 1 ? Array.head(declaration.arguments) : Option.none(),
-    Option.filter((argument): argument is ObjectExpression => argument.type === "ObjectExpression")
+  return lintConfig.pipe(
+    Option.flatMap(Result.getSuccess),
+    Option.exists((config) => listLintPresets(config).includes(preset))
   )
-}
-
-function getExportedConfigObject(ast: Program) {
-  return pipe(
-    ast.body,
-    Array.filter(
-      (statement): statement is ExportDefaultDeclaration =>
-        statement.type === "ExportDefaultDeclaration"
-    ),
-    (declarations) => (declarations.length === 1 ? Array.head(declarations) : Option.none()),
-    Option.flatMap((exported) => getConfigObjectExpression(exported.declaration))
-  )
-}
-
-function getNamedObjectProperty(
-  objectExpression: ObjectExpression,
-  propertyName: string
-): NamedObjectPropertyResult {
-  let matchedProperty: ObjectProperty | null = null
-
-  for (const property of objectExpression.properties) {
-    if (property.type === "SpreadElement") {
-      return { status: "invalid" }
-    }
-
-    if (property.computed) {
-      return { status: "invalid" }
-    }
-
-    const nameMatches = Option.contains(getStaticPropertyName(property.key), propertyName)
-
-    if (property.method || property.kind !== "init") {
-      if (nameMatches) {
-        return { status: "invalid" }
-      }
-
-      continue
-    }
-
-    if (!nameMatches) {
-      continue
-    }
-
-    if (matchedProperty) {
-      return { status: "invalid" }
-    }
-
-    matchedProperty = property
-  }
-
-  if (!matchedProperty) {
-    return { status: "missing" }
-  }
-
-  return {
-    property: matchedProperty,
-    status: "found",
-  }
 }
 
 /**
- * The Adamantite presets that an `extends` array lists before the core preset.
+ * The Adamantite lint presets that Oxlint applies before the core preset.
  */
 export interface MisplacedCorePreset {
   /**
-   * The local names of the presets that come before the last core entry, in the order of `extends`.
-   * The list is not empty.
+   * The modules of the presets that Oxlint applies before the last core preset, in order. The list
+   * is not empty.
    */
   readonly before: Array.NonEmptyReadonlyArray<string>
   /**
-   * The local name of the core preset.
+   * The module of the core preset.
    */
   readonly core: string
 }
 
-const CORE_PRESET_MODULE = publicImport("./lint")
-
 /**
- * Each entry of the `extends` array literal of a parsed `oxlint.config.ts`, with the module of an
- * entry that is a default import binding of an Adamantite lint preset. An entry that is not an
- * identifier is `undefined`. A config without an exported object or an `extends` array literal has
- * none.
+ * Find the Adamantite presets that a loaded `oxlint.config.ts` applies before the last core preset.
+ * Oxlint applies the `extends` entries in order, and a later entry replaces the rules of an earlier
+ * one, so core replaces each change that an earlier preset makes to a core rule. A config that does
+ * not extend core has none.
  */
-function getExtendsEntries(ast: Program) {
-  // Each default import of an Adamantite lint preset, by its local name.
-  const presetModules = new Map(
-    ast.body.flatMap((statement) =>
-      statement.type === "ImportDeclaration"
-      && (statement.source.value === CORE_PRESET_MODULE
-        || statement.source.value.startsWith(LINT_PRESET_PREFIX))
-        ? statement.specifiers.flatMap((specifier) =>
-            specifier.type === "ImportDefaultSpecifier"
-              ? [[specifier.local.name, statement.source.value] as const]
-              : []
-          )
-        : []
-    )
+export function findMisplacedCorePreset(config: LintConfig): Option.Option<MisplacedCorePreset> {
+  const modules = listPresetModules(config).filter(
+    (module) => module === CORE_PRESET_MODULE || module.startsWith(LINT_PRESET_PREFIX)
   )
 
-  return pipe(
-    getExportedConfigObject(ast),
-    Option.map((config) => getNamedObjectProperty(config, "extends")),
-    Option.flatMap((result) =>
-      result.status === "found" && result.property.value.type === "ArrayExpression"
-        ? Option.some(result.property.value.elements)
-        : Option.none()
-    ),
-    Option.map((elements) =>
-      elements.map((element) =>
-        element?.type === "Identifier"
-          ? { module: presetModules.get(element.name), name: element.name }
-          : undefined
-      )
-    )
-  )
+  const before = modules
+    .slice(0, Math.max(modules.lastIndexOf(CORE_PRESET_MODULE), 0))
+    .filter((module) => module !== CORE_PRESET_MODULE)
+
+  return Array.isReadonlyArrayNonEmpty(before)
+    ? Option.some({ before, core: CORE_PRESET_MODULE })
+    : Option.none()
 }
 
 /**
- * The Adamantite lint presets that the `extends` array of an `oxlint.config.ts` lists, such as
- * `jest` for the binding of `adamantite/lint/jest`. Core and `custom()` are not listed. A preset
- * that the config uses only in `overrides` is not listed. A config that does not parse or has no
- * `extends` array literal extends none.
+ * Whether a loaded `oxlint.config.ts` sets each required option to `true` in its own `options`.
  */
-export function getExtendedLintPresets(content: string): string[] {
-  return pipe(
-    parse(content),
-    Option.flatMap((ast) => getExtendsEntries(ast)),
-    Option.map((entries) =>
-      entries.flatMap((entry) =>
-        entry?.module?.startsWith(LINT_PRESET_PREFIX) === true
-          ? [entry.module.slice(LINT_PRESET_PREFIX.length)]
-          : []
-      )
-    ),
-    Option.getOrElse((): string[] => [])
-  )
-}
-
-/**
- * Find the Adamantite presets that the `extends` array of an `oxlint.config.ts` lists before the
- * last entry of the core preset. Oxlint applies the entries in order, and a later entry replaces
- * the rules of an earlier one, so core replaces each change that an earlier preset makes to a core
- * rule. A config that does not parse, does not extend core, or has no `extends` array literal has
- * none.
- */
-export function inspectExtendsOrder(content: string): Option.Option<MisplacedCorePreset> {
-  return pipe(
-    parse(content),
-    Option.flatMap((ast) => getExtendsEntries(ast)),
-    Option.flatMap((entries) => {
-      const coreIndex = entries.map((entry) => entry?.module).lastIndexOf(CORE_PRESET_MODULE)
-      const core = entries[coreIndex]
-
-      const before = entries
-        .slice(0, Math.max(coreIndex, 0))
-        .flatMap((entry) =>
-          entry?.module === undefined || entry.module === CORE_PRESET_MODULE ? [] : [entry.name]
-        )
-
-      return core !== undefined && Array.isArrayNonEmpty(before)
-        ? Option.some({ before, core: core.name })
-        : Option.none()
-    })
-  )
-}
-
-function inspectOptionsObject(options: ObjectExpression): RequiredConfigInspection {
-  for (const option of REQUIRED_BOOLEAN_OPTIONS) {
-    const property = getNamedObjectProperty(options, option)
-
-    if (property.status === "invalid") {
-      return { goal: OPTIONS_GOAL, kind: "invalid", reason: NON_BOOLEAN_OPTIONS_REASON }
-    }
-
-    if (
-      property.status === "missing"
-      || property.property.value.type !== "Literal"
-      || property.property.value.value !== true
-    ) {
-      return {
-        goal: OPTIONS_GOAL,
-        kind: "invalid",
-        reason: "The required Oxlint options are missing or are not set to true.",
-      }
-    }
-  }
-
-  return { kind: "configured" }
-}
-
-export function inspectRequiredOxlintConfig(content: string): RequiredConfigInspection {
-  const parsed = parse(content)
-
-  if (Option.isNone(parsed)) {
-    return {
-      goal: "Fix the syntax errors in `oxlint.config.ts`. Preserve every project setting.",
-      kind: "invalid",
-      reason: UNSUPPORTED_CONFIG_REASON,
-    }
-  }
-
-  const configObjectExpression = getExportedConfigObject(parsed.value)
-
-  if (Option.isNone(configObjectExpression)) {
-    return {
-      goal: EXPORT_GOAL,
-      kind: "invalid",
-      reason: UNSUPPORTED_CONFIG_REASON,
-    }
-  }
-
-  const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
-
-  if (optionsPropertyResult.status === "invalid") {
-    return {
-      goal: OPTIONS_GOAL,
-      kind: "invalid",
-      reason: UNSUPPORTED_OPTIONS_REASON,
-    }
-  }
-
-  if (optionsPropertyResult.status === "missing") {
+export function inspectRequiredOxlintConfig(config: LintConfig): RequiredConfigInspection {
+  if (config.options === undefined) {
     return {
       goal: OPTIONS_GOAL,
       kind: "invalid",
@@ -397,13 +140,13 @@ export function inspectRequiredOxlintConfig(content: string): RequiredConfigInsp
     }
   }
 
-  if (optionsPropertyResult.property.value.type !== "ObjectExpression") {
-    return {
-      goal: OPTIONS_GOAL,
-      kind: "invalid",
-      reason: UNSUPPORTED_OPTIONS_REASON,
-    }
-  }
+  const { options } = config
 
-  return inspectOptionsObject(optionsPropertyResult.property.value)
+  return REQUIRED_BOOLEAN_OPTIONS.every((option) => options[option] === true)
+    ? { kind: "configured" }
+    : {
+        goal: OPTIONS_GOAL,
+        kind: "invalid",
+        reason: "The required Oxlint options are missing or are not set to true.",
+      }
 }

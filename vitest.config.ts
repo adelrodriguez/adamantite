@@ -10,7 +10,8 @@ import { defineConfig } from "vitest/config"
 const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 
 // These tests start real processes: Oxlint and Oxfmt runs that lint and format files, rule trials
-// in a copy of a project, and Vitest runs that check the module cache. They touch the host
+// in a copy of a project, Node.js runs that load configs, and Vitest runs that check the module
+// cache. They touch the host
 // filesystem, so they stay out of the unit tests.
 const PROCESS_RUN_TESTS = [
   "presets/__tests__/**/*.test.ts",
@@ -19,6 +20,7 @@ const PROCESS_RUN_TESTS = [
   "src/__tests__/trial.test.ts",
   "src/lib/integrations/oxfmt/__tests__/format-preset.test.ts",
   "src/lib/integrations/oxlint/__tests__/config-load.test.ts",
+  "src/lib/project/__tests__/config-loader.test.ts",
   "src/lib/toolchain/__tests__/idioms.test.ts",
   "src/lib/project/custom-rules/__tests__/stub.test.ts",
 ]

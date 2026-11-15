@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import oxlint, { PACKAGE } from "#lib/integrations/oxlint/index.ts"
+import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 
@@ -29,6 +30,7 @@ function assess(root: string) {
       Effect.provide([
         NodeServices.layer,
         ModuleResolver.layer,
+        ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
         Layer.succeed(OxlintCommand)((project) => ({
           ...getOxlintCommand(project),
           args: [join(REPO, "src/oxlint.ts")],

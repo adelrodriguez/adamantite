@@ -10,6 +10,7 @@ import {
 } from "#lib/integrations/config-file.ts"
 import {
   inspectRequiredKnipConfig,
+  KnipConfig,
   toKnipTsConfigContent,
   toKnipWorkspace,
 } from "#lib/integrations/knip/config.ts"
@@ -35,7 +36,7 @@ export default {
       const config = yield* assessConfigFile(
         project.cwd,
         CONFIG,
-        yield* readConfigFile(project.cwd, CONFIG),
+        yield* readConfigFile(project.cwd, CONFIG, KnipConfig),
         toKnipTsConfigContent(workspace),
         (content) => inspectRequiredKnipConfig(content, workspace)
       )

@@ -361,10 +361,6 @@ interface InteractiveHardenOptions {
   readonly args?: readonly string[]
   readonly files?: Record<string, string>
   /**
-   * Called when custom rule discovery starts.
-   */
-  readonly onDiscovery?: () => void
-  /**
    * Called with the path of each file that Harden reads as text.
    */
   readonly onReadFile?: (path: string) => void
@@ -413,11 +409,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
         runner.layer,
         promptingLayer,
         makeProcessLayer(files),
-        makeModuleResolverLayer(
-          files.root,
-          ADAMANTITE_RESOLUTION,
-          Effect.sync(() => options.onDiscovery?.())
-        ),
+        makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
       ],
       logLines,
       terminal,
@@ -554,7 +546,7 @@ describe("harden", () => {
         suppressions: Option.some([
           { locations: ["src/index.ts:1"], rule: Option.some("no-console") },
         ]),
-        unresolvedCalls: [],
+        unloadedConfigs: [],
       })
     })
   )
@@ -1402,8 +1394,8 @@ describe("harden", () => {
     "read the workspace and discover the custom rules one time before and one time after the session",
     () =>
       Effect.gen(function* () {
-        const workspaceFile = `${createFileSystemTestContext().root}/pnpm-workspace.yaml`
-        const counts = { discoveries: 0, workspaceReads: 0 }
+        const { root } = createFileSystemTestContext()
+        const counts = { configLoads: 0, workspaceReads: 0 }
         let beforeSession = { ...counts }
 
         yield* runInteractiveHarden({
@@ -1413,11 +1405,12 @@ describe("harden", () => {
             "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
           },
           keys: ["enter"],
-          onDiscovery: () => {
-            counts.discoveries += 1
-          },
           onReadFile: (path) => {
-            if (path === workspaceFile) {
+            if (path === `${root}/oxlint.config.ts`) {
+              counts.configLoads += 1
+            }
+
+            if (path === `${root}/pnpm-workspace.yaml`) {
               counts.workspaceReads += 1
             }
           },
@@ -1426,9 +1419,12 @@ describe("harden", () => {
           },
         })
 
+        // Before the session, custom rule discovery and the overrides load the root config, and the
+        // suppression count reads it as a source file. After it, the project and its custom rule
+        // discovery load it again.
         expect({ afterSession: counts, beforeSession }).toStrictEqual({
-          afterSession: { discoveries: 2, workspaceReads: 2 },
-          beforeSession: { discoveries: 1, workspaceReads: 1 },
+          afterSession: { configLoads: 5, workspaceReads: 2 },
+          beforeSession: { configLoads: 3, workspaceReads: 1 },
         })
       })
   )
@@ -1513,7 +1509,7 @@ describe("harden", () => {
   it.effect("show the Doctor warnings and still pass when Doctor finds no issues", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
-        // Doctor cannot read a `dir` that is not a string literal, so it warns without a finding.
+        // Doctor cannot load a config that names an undefined variable, so it warns without a finding.
         files: {
           "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace('dir: "tooling/rules"', "dir: rulesDir"),
           ...INSTALLED,
@@ -1526,7 +1522,7 @@ describe("harden", () => {
         "💠 adamantite harden",
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
-        "▲ Doctor cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
+        "▲ Doctor cannot load `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it. Node.js reported: rulesDir is not defined",
         SUCCESS_LOG,
         "✅ Harden checks passed.",
       ])

@@ -25,7 +25,7 @@ import {
   listCustomRules,
   readCustomRuleTestCommand,
 } from "#lib/project/custom-rules/index.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/inspect.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readProject } from "#lib/project/project.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
@@ -195,19 +195,13 @@ const test = Command.make("test", { path: testPath }).pipe(
         })
       }
 
-      const { command, unresolvedCalls, unresolvedImports } = yield* readCustomRuleTestCommand(
+      const { command, unloadedConfigs } = yield* readCustomRuleTestCommand(
         yield* readProject(cwd)
       )
 
-      for (const source of unresolvedCalls) {
+      for (const { file, reason } of unloadedConfigs) {
         yield* Output.warning(
-          `\`rule test\` cannot read the \`dir\` of a \`custom()\` call in \`${path.relative(cwd, source)}\`, because it is not a string literal. It does not run the tests of that rules folder.`
-        )
-      }
-
-      for (const { from, specifier } of unresolvedImports) {
-        yield* Output.warning(
-          `\`rule test\` cannot resolve the import of \`${specifier}\` in \`${path.relative(cwd, from)}\`, so it does not run the tests of the rules folders behind it.`
+          `\`rule test\` cannot load \`${path.relative(cwd, file)}\`, so it does not run the tests of the rules folders behind it. Node.js reported: ${reason}`
         )
       }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
@@ -60,7 +62,11 @@ function assess({ declares, installed }: Fixture) {
     return yield* readProject(ROOT).pipe(
       Effect.flatMap(assessPluginLanguages),
       Effect.map((findings) => ({ findings })),
-      Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages)])
+      Effect.provide(
+        withConfigLoader(
+          Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages))
+        )
+      )
     )
   })
 }

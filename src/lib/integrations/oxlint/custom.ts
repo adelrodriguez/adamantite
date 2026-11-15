@@ -9,7 +9,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { isDiscoveryComplete } from "#lib/project/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY, isRuleFile } from "#lib/project/custom-rules/inspect.ts"
+import { CUSTOM_RULES_DIRECTORY, isRuleFile } from "#lib/project/custom-rules/folder.ts"
 import { readDirectoryIfExists } from "#lib/shared/filesystem.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
@@ -46,8 +46,8 @@ export default defineIntegration({
       const path = yield* Path.Path
       const relative = (target: string) => path.relative(cwd, target) || "."
       const packageDirectories = [cwd, ...workspace.packageDirectories]
-      const { calls, unresolvedCalls, unresolvedImports } = customRules
-      // A call with an unknown `dir`, or an unresolved import, can load any folder.
+      const { calls, unloadedConfigs } = customRules
+      // A config that does not load can load any folder.
       const isComplete = isDiscoveryComplete(customRules)
 
       const defaultFolders = packageDirectories.map((directory) =>
@@ -85,22 +85,10 @@ export default defineIntegration({
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const unknownNameCalls = calls.filter((call) => Option.isNone(call.name))
-
-      const warnings = [
-        ...unresolvedImports.map(
-          ({ from, specifier }) =>
-            `Doctor cannot resolve the import of \`${specifier}\` in \`${relative(from)}\`, so it does not check the \`custom()\` calls and rules folders behind it. For a workspace package, install the dependencies and run Doctor again.`
-        ),
-        ...unresolvedCalls.map(
-          (source) =>
-            `Doctor cannot read the \`dir\` of a \`custom()\` call in \`${relative(source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
-        ),
-        ...unknownNameCalls.map(
-          (call) =>
-            `Doctor cannot read the \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that its plugin name differs from the other rules folders.`
-        ),
-      ]
+      const warnings = unloadedConfigs.map(
+        ({ file, reason }) =>
+          `Doctor cannot load \`${relative(file)}\`, so it does not check the \`custom()\` calls and rules folders behind it. Node.js reported: ${reason}`
+      )
 
       const findings: Finding[] = missingFolderCalls.map((call) => ({
         currentState: `The \`custom()\` call in \`${relative(call.source)}\` loads \`${relative(call.dir)}\`, but that folder does not exist, so Oxlint runs none of its rules.`,
@@ -135,11 +123,7 @@ export default defineIntegration({
         }
       }
 
-      const loadingCalls = calls.flatMap(({ dir, name, source }) =>
-        Option.isSome(name) && folders.some((folder) => folder.dir === dir)
-          ? [{ dir, name: name.value, source }]
-          : []
-      )
+      const loadingCalls = calls.filter(({ dir }) => folders.some((folder) => folder.dir === dir))
 
       for (const [name, group] of Object.entries(
         Array.groupBy(loadingCalls, (call) => call.name)

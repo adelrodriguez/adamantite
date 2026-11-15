@@ -15,6 +15,7 @@ import initCommand from "#commands/init/index.ts"
 import ruleCommand from "#commands/rule.ts"
 import updateCommand from "#commands/update.ts"
 import { CodingAgents } from "#lib/handoff/coding-agents.ts"
+import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
@@ -59,6 +60,7 @@ export const makeAppLayer = (
     NodeTerminal.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
+    ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
     DependencyInstaller.layer.pipe(Layer.provide(NodeServices.layer)),
     Digest.layerWebCrypto

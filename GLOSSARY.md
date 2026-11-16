@@ -102,9 +102,12 @@ when Doctor reports no finding for it.
 _Avoid_: Managed ideal, managed state, supported state
 
 **Toolchain**:
-The code-quality tools and their plugins that Adamantite configures and runs for a target
-project.
-_Avoid_: Proxy
+The layer between the commands and the integrations, in `src/lib/toolchain`. `check`, `fix`, and
+`analyze` call it with the user's options. The lockfile selection decides which tools it runs, such
+as Oxfmt, Oxlint, Sherif, and Knip. The toolchain runs them in order and decides when the command
+fails. Plugins extend an integration, such as the Effect build of Oxlint, so the toolchain calls
+them through that integration.
+_Avoid_: Proxy, bridge
 
 **Oxlint runtime**:
 The Oxlint package, native binding, and type-aware backend that Adamantite runs Oxlint with for

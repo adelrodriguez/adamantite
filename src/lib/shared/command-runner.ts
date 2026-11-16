@@ -1,6 +1,6 @@
 import type * as PlatformError from "effect/PlatformError"
-import process from "node:process"
 import { styleText } from "node:util"
+import * as Config from "effect/Config"
 import * as Console from "effect/Console"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -60,47 +60,17 @@ interface CommandRunnerService {
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
 }
 
-const printHeading = (title: string, command: string) =>
-  Console.log(`${styleText("bold", title)} ${styleText("dim", `· adamantite (${command})`)}`)
-
-/**
- * Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
- * `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
- */
-export const quietNodeOptions = () =>
-  [process.env["NODE_OPTIONS"], "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"]
-    .filter(Boolean)
-    .join(" ")
-
-const exitCode = Effect.fn("CommandRunner.exitCode")(function* (options: CommandRunOptions) {
-  const { command } = options
-
-  return yield* Effect.scoped(
-    Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, options.args, {
-        cwd: options.cwd,
-        detached: options.stdin === "inherit" ? false : undefined,
-        env: { ...options.env, NODE_OPTIONS: quietNodeOptions() },
-        extendEnv: true,
-        stderr: options.stderr ?? "inherit",
-        stdin: options.stdin ?? "ignore",
-        stdout: options.stdout ?? "inherit",
-      })
-
-      return yield* handle.exitCode
-    })
-  ).pipe(
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new CliNotFound({ command })))
-  )
-})
-
 export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerService>()(
   "CommandRunner"
 ) {
   static make(exitCode: CommandRunnerService["exitCode"]): CommandRunnerService {
     const run = Effect.fn("CommandRunner.run")(function* (options: CommandRunOptions) {
       if (options.title !== undefined) {
-        yield* printHeading(options.title, options.name ?? options.command)
+        const command = options.name ?? options.command
+
+        yield* Console.log(
+          `${styleText("bold", options.title)} ${styleText("dim", `· adamantite (${command})`)}`
+        )
       }
 
       const code = yield* exitCode(options)
@@ -133,10 +103,44 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
 
-      return CommandRunner.make((options) =>
-        exitCode(options).pipe(
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
-        )
+      // Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
+      // `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
+      // Any string decodes, and the default covers a missing variable, so only a provider that
+      // cannot read its source fails. That failure is a defect.
+      const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
+        Config.withDefault(""),
+        Config.map((options) =>
+          [options, "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"].filter(Boolean).join(" ")
+        ),
+        Effect.orDie
+      )
+
+      return CommandRunner.make(
+        Effect.fn("CommandRunner.exitCode")(function* (options: CommandRunOptions) {
+          const { command } = options
+
+          return yield* Effect.scoped(
+            Effect.gen(function* () {
+              const handle = yield* spawner.spawn(
+                ChildProcess.make(command, options.args, {
+                  cwd: options.cwd,
+                  detached: options.stdin === "inherit" ? false : undefined,
+                  env: { ...options.env, NODE_OPTIONS: nodeOptions },
+                  extendEnv: true,
+                  stderr: options.stderr ?? "inherit",
+                  stdin: options.stdin ?? "ignore",
+                  stdout: options.stdout ?? "inherit",
+                })
+              )
+
+              return yield* handle.exitCode
+            })
+          ).pipe(
+            Effect.catchReason("PlatformError", "NotFound", () =>
+              Effect.fail(new CliNotFound({ command }))
+            )
+          )
+        })
       )
     })
   )

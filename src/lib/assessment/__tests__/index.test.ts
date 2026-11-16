@@ -342,9 +342,9 @@ describe("assessProject", () => {
         "github",
       ])
       expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
-      // The project loads the root config, and custom rule discovery loads it as the config of the
-      // root package.
-      expect(reads.filter((path) => path === `${ROOT}/oxlint.config.ts`)).toHaveLength(2)
+      // Custom rule discovery loads the root config as the config of the root package, and the
+      // project takes its read from there.
+      expect(reads.filter((path) => path === `${ROOT}/oxlint.config.ts`)).toHaveLength(1)
     })
   )
 })

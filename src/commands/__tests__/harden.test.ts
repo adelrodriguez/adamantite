@@ -1398,10 +1398,10 @@ describe("harden", () => {
         })
 
         // Before the session, custom rule discovery and the overrides load the root config, and the
-        // suppression count reads it as a source file. After it, the project and its custom rule
-        // discovery load it again.
+        // suppression count reads it as a source file. After it, the custom rule discovery of the
+        // project loads it again.
         expect({ afterSession: counts, beforeSession }).toStrictEqual({
-          afterSession: { configLoads: 5, workspaceReads: 2 },
+          afterSession: { configLoads: 4, workspaceReads: 2 },
           beforeSession: { configLoads: 3, workspaceReads: 1 },
         })
       })

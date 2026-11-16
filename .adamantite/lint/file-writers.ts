@@ -1,7 +1,7 @@
 import { createRequire } from "node:module"
 import { join, relative, sep } from "node:path"
 // `adamantite/rules/plugin` resolves to `dist`, which `pnpm run check` does not build first.
-import { type Context, defineRule, type ESTree } from "#presets/rules/plugin.ts"
+import { type Context, defineRule, type ESTree, type Scope } from "#presets/rules/plugin.ts"
 
 // The modules of `src` that change the disk. A folder covers each file below it. Setup writes the
 // managed files and the lockfile. The other writers write outside them: `rule add` writes the stub of
@@ -48,7 +48,7 @@ const HELPERS_MODULE = "src/lib/shared/filesystem.ts"
 
 const NODE_FS = new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])
 
-// The Effect combinators whose callback receives the service, as in
+// The Effect exports whose callback receives the service, as in
 // `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`.
 const CALLBACK_COMBINATORS = new Set(["andThen", "flatMap", "map", "tap"])
 
@@ -130,11 +130,71 @@ function findTags(context: Context, node: ESTree.ImportDeclaration) {
     : []
 }
 
-// The first parameter of the callback at `index` of a combinator call, such as `fs` in
+// The import specifier that declares the variable that `node` reads, or null when `node` is not an
+// identifier or reads a variable that no import declares.
+function findImportSpecifier(context: Context, node: ESTree.Node) {
+  if (node.type !== "Identifier") return null
+
+  let scope: Scope | null = context.sourceCode.getScope(node)
+
+  while (scope !== null && !scope.set.has(node.name)) {
+    scope = scope.upper
+  }
+
+  const [definition] = scope?.set.get(node.name)?.defs ?? []
+
+  return definition?.type === "ImportBinding" ? definition.node : null
+}
+
+function importSource(specifier: ESTree.Node) {
+  return specifier.parent?.type === "ImportDeclaration" ? specifier.parent.source.value : null
+}
+
+// Whether `node` reads the `effect/Effect` module: a namespace or default import of `effect/Effect`,
+// an `Effect` import from `effect`, or `Fx.Effect` on a namespace import of `effect`.
+function isEffectModule(context: Context, node: ESTree.Node): boolean {
+  if (node.type === "MemberExpression") {
+    const specifier = findImportSpecifier(context, node.object)
+
+    return (
+      memberName(node) === "Effect"
+      && specifier?.type === "ImportNamespaceSpecifier"
+      && importSource(specifier) === "effect"
+    )
+  }
+
+  const specifier = findImportSpecifier(context, node)
+
+  if (specifier?.type === "ImportSpecifier") {
+    return importSource(specifier) === "effect" && importedName(specifier) === "Effect"
+  }
+
+  return specifier !== null && importSource(specifier) === "effect/Effect"
+}
+
+// The `effect/Effect` export that a call reads, such as `flatMap` for `Effect.flatMap(…)`,
+// `Fx.Effect.flatMap(…)`, `flatMap(…)`, or `chain(…)` through `flatMap as chain`. Undefined for a
+// call of anything else, such as a local function.
+function findEffectExport(context: Context, node: ESTree.Node | undefined) {
+  const callee = node?.type === "CallExpression" ? node.callee : undefined
+
+  if (callee?.type === "MemberExpression") {
+    return isEffectModule(context, callee.object) ? memberName(callee) : undefined
+  }
+
+  const specifier = callee === undefined ? null : findImportSpecifier(context, callee)
+
+  return specifier?.type === "ImportSpecifier" && importSource(specifier) === "effect/Effect"
+    ? importedName(specifier)
+    : undefined
+}
+
+// The first parameter of the callback at `index` of an Effect combinator call, such as `fs` in
 // `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`.
-function callbackParameter(node: ESTree.Node | undefined, index: number) {
+function callbackParameter(context: Context, node: ESTree.Node | undefined, index: number) {
   const callback =
-    node?.type === "CallExpression" && CALLBACK_COMBINATORS.has(memberName(node.callee) ?? "")
+    node?.type === "CallExpression"
+    && CALLBACK_COMBINATORS.has(findEffectExport(context, node) ?? "")
       ? node.arguments[index]
       : undefined
 
@@ -144,12 +204,12 @@ function callbackParameter(node: ESTree.Node | undefined, index: number) {
 }
 
 // The bindings that receive the service from `tag` in a callback.
-function findServiceParameters(tag: ESTree.Node) {
+function findServiceParameters(context: Context, tag: ESTree.Node) {
   const { parent } = tag
 
   // `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`
   if (parent?.type === "CallExpression" && parent.arguments[0] === tag) {
-    return [callbackParameter(parent, 1)]
+    return [callbackParameter(context, parent, 1)]
   }
 
   // `FileSystem.FileSystem.pipe(Effect.withSpan("read"), Effect.flatMap((fs) => …))`
@@ -161,11 +221,11 @@ function findServiceParameters(tag: ESTree.Node) {
   // The steps up to and including the first one that may change the value.
   const steps = call.arguments
 
-  const end = steps.findIndex(
-    (step) => step.type !== "CallExpression" || !KEEPS_VALUE.has(memberName(step.callee) ?? "")
-  )
+  const end = steps.findIndex((step) => !KEEPS_VALUE.has(findEffectExport(context, step) ?? ""))
 
-  return (end === -1 ? steps : steps.slice(0, end + 1)).map((step) => callbackParameter(step, 0))
+  return (end === -1 ? steps : steps.slice(0, end + 1)).map((step) =>
+    callbackParameter(context, step, 0)
+  )
 }
 
 export default defineRule({
@@ -216,7 +276,7 @@ export default defineRule({
         reportService(parent)
       }
 
-      for (const parameter of findServiceParameters(tag)) {
+      for (const parameter of findServiceParameters(context, tag)) {
         if (parameter !== undefined) reportBinding(parameter)
       }
     }

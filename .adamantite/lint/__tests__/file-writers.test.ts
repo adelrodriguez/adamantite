@@ -19,7 +19,7 @@ function file(path: string) {
   return join(ROOT, path)
 }
 
-const READER = file("src/lib/toolchain/reader.ts")
+const READER = file("src/lib/bridge/reader.ts")
 
 const IMPORTS =
   'import * as Effect from "effect/Effect"\nimport * as FileSystem from "effect/FileSystem"\n'
@@ -235,10 +235,10 @@ export const remove = FileSystem.FileSystem.pipe(Steps.flatMap((fs) => fs.remove
       "src/lib/shared/filesystem.ts",
     ].map((writer) => ({ code: WRITES, filename: file(writer) })),
     // Tests write their fixtures, and the macros read templates at build time.
-    { code: WRITES, filename: file("src/lib/toolchain/__tests__/index.test.ts") },
+    { code: WRITES, filename: file("src/lib/bridge/__tests__/index.test.ts") },
     {
       code: 'import { readFileSync } from "node:fs"\nexport const template = () => readFileSync("a", "utf8")',
-      filename: file("src/lib/toolchain/template.macro.ts"),
+      filename: file("src/lib/bridge/template.macro.ts"),
     },
     // The rule covers only `src`.
     {

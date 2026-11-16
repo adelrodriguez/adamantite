@@ -3,10 +3,10 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
 import { readSelection } from "#lib/project/lockfile.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Files to fix. Omit to fix the project"),
@@ -41,7 +41,7 @@ function toFixLevel(flags: {
   readonly all: boolean
   readonly dangerous: boolean
   readonly suggested: boolean
-}): Toolchain.FixLevel {
+}): Bridge.FixLevel {
   if (flags.all || (flags.suggested && flags.dangerous)) {
     return "all"
   }
@@ -57,7 +57,7 @@ export default Command.make("fix", { all, dangerous, files, only, suggested }).p
   Command.withDescription("Apply lint fixes and format code"),
   Command.withHandler(({ all, dangerous, files, only, suggested }) =>
     Effect.gen(function* () {
-      yield* Toolchain.fix({
+      yield* Bridge.fix({
         files,
         forwardedArguments: yield* ForwardedArguments,
         level: toFixLevel({ all, dangerous, suggested }),

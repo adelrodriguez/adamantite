@@ -1,0 +1,321 @@
+import { describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
+import {
+  type FileSystemTestContext,
+  createFileSystemTestContext,
+  makeSystemError,
+} from "#__tests__/filesystem.ts"
+import {
+  NodeVersion,
+  NodeVersionFile,
+  NodeVersionResolver,
+} from "#lib/project/node-version-resolver.ts"
+import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
+
+const ROOT = "/project"
+
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
+
+function makeTestLayer(fileSystemLayer: Layer.Layer<FileSystem.FileSystem>) {
+  return NodeVersionResolver.layer.pipe(Layer.provide(Layer.mergeAll(fileSystemLayer, Path.layer)))
+}
+
+function resolve(cwd: string) {
+  return Effect.gen(function* () {
+    const resolver = yield* NodeVersionResolver
+
+    return yield* resolver.resolve(cwd)
+  })
+}
+
+function runResolve(files: FileSystemTestContext) {
+  return resolve(ROOT).pipe(Effect.provide(makeTestLayer(files.layer)))
+}
+
+describe("NodeVersionResolver", () => {
+  it.effect("fall back to lts/* when no declaration exists", () =>
+    Effect.gen(function* () {
+      const files = makeFiles()
+
+      const source = yield* runResolve(files)
+
+      expect(source).toStrictEqual(new NodeVersion({ value: "lts/*" }))
+    })
+  )
+
+  it.effect("return FailedToReadFile for an unreadable .node-version", () =>
+    Effect.gen(function* () {
+      // The in-memory filesystem cannot make reads fail with permissions, so a noop layer
+      // fails every read with PermissionDenied, as for a file with mode 0o000.
+      const cause = makeSystemError("PermissionDenied", "readFileString", `${ROOT}/.node-version`)
+
+      const fileSystemLayer = FileSystem.layerNoop({
+        readFileString: () => Effect.fail(cause),
+      })
+
+      const error = yield* resolve(ROOT).pipe(
+        Effect.provide(makeTestLayer(fileSystemLayer)),
+        Effect.flip
+      )
+
+      expect(error).toBeInstanceOf(FailedToReadFile)
+      expect(error).toMatchObject({ path: `${ROOT}/.node-version` })
+    })
+  )
+
+  it.effect("return FailedToParseFile for a malformed package.json", () =>
+    Effect.gen(function* () {
+      const files = makeFiles({ "package.json": "{ not json" })
+
+      const result = yield* Effect.result(runResolve(files))
+
+      expect(Result.isFailure(result)).toBe(true)
+
+      if (Result.isFailure(result)) {
+        expect(result.failure).toBeInstanceOf(FailedToParseFile)
+      }
+    })
+  )
+
+  const nodeLine = Schema.TemplateLiteral([
+    Schema.Literals(["", "  ", "\t"]),
+    Schema.Literals(["node", "nodejs"]),
+    Schema.Literals([" ", "  ", "\t"]),
+    Schema.Literals(["22.19.0", "22", "lts/iron"]),
+    Schema.Literals(["", "  ", " # pinned"]),
+  ])
+
+  // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
+  // `node` entries without a version. The `node # pinned` shapes stay inert only when comments
+  // are stripped before matching, so they keep the comment handling load-bearing.
+  const inertLine = Schema.Literals([
+    "",
+    "# pinned tools",
+    "  # node 22.19.0",
+    "node # pinned",
+    "nodejs\t# 22.19.0",
+    "python 3.12.0",
+    "ruby 3.3.0  # main",
+    "node",
+    "nodejs",
+    "node-canvas 1.0.0",
+    "gonode 1.0.0",
+  ])
+
+  it.effect.prop(
+    "detect a .tool-versions node entry regardless of surrounding noise",
+    {
+      hasNode: Schema.Boolean,
+      lines: Schema.mutable(Schema.Array(inertLine).check(Schema.isMaxLength(8))),
+      node: nodeLine,
+      position: Schema.Int.check(Schema.isBetween({ maximum: 8, minimum: 0 })),
+    },
+    ({ hasNode, lines, node, position }) =>
+      Effect.gen(function* () {
+        const allLines: string[] = [...lines]
+
+        if (hasNode) {
+          allLines.splice(Math.min(position, allLines.length), 0, node)
+        }
+
+        const files = makeFiles({ ".tool-versions": allLines.join("\n") })
+
+        const source = yield* runResolve(files)
+
+        expect(source).toStrictEqual(
+          hasNode
+            ? new NodeVersionFile({ path: ".tool-versions" })
+            : new NodeVersion({ value: "lts/*" })
+        )
+      }),
+    { arbitrary: { runs: 200 } }
+  )
+
+  const versionFileContent = Schema.Union([
+    Schema.Struct({ content: Schema.Literal("22.19.0\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal("22\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal(""), valid: Schema.Literal(false) }),
+    Schema.Struct({ content: Schema.Literal("   \n"), valid: Schema.Literal(false) }),
+  ])
+
+  const toolVersionsContent = Schema.Union([
+    Schema.Struct({ content: Schema.Literal("nodejs 22.19.0\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal("node 22\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal("python 3.12.0\n"), valid: Schema.Literal(false) }),
+    Schema.Struct({ content: Schema.Literal("# only comments\n"), valid: Schema.Literal(false) }),
+  ])
+
+  const packageJsonContent = Schema.Union([
+    Schema.Struct({
+      content: Schema.Literal(JSON.stringify({ engines: { node: ">=22" }, name: "pkg" })),
+      valid: Schema.Literal(true),
+    }),
+    Schema.Struct({
+      content: Schema.Literal(JSON.stringify({ name: "pkg", volta: { node: "22.19.0" } })),
+      valid: Schema.Literal(true),
+    }),
+    Schema.Struct({
+      content: Schema.Literal(
+        JSON.stringify({
+          devEngines: { runtime: { name: "node", version: "22" } },
+          name: "pkg",
+        })
+      ),
+      valid: Schema.Literal(true),
+    }),
+    Schema.Struct({
+      content: Schema.Literal(JSON.stringify({ name: "pkg" })),
+      valid: Schema.Literal(false),
+    }),
+  ])
+
+  it.effect.prop(
+    "resolve the highest-precedence valid declaration for any file combination",
+    {
+      nodeVersion: Schema.Union([...versionFileContent.members, Schema.Null]),
+      nvmrc: Schema.Union([...versionFileContent.members, Schema.Null]),
+      packageJson: Schema.Union([...packageJsonContent.members, Schema.Null]),
+      toolVersions: Schema.Union([...toolVersionsContent.members, Schema.Null]),
+    },
+    ({ nodeVersion, nvmrc, packageJson, toolVersions }) =>
+      Effect.gen(function* () {
+        const fixtures: Record<string, string> = {}
+
+        if (nodeVersion) {
+          fixtures[".node-version"] = nodeVersion.content
+        }
+
+        if (nvmrc) {
+          fixtures[".nvmrc"] = nvmrc.content
+        }
+
+        if (toolVersions) {
+          fixtures[".tool-versions"] = toolVersions.content
+        }
+
+        if (packageJson) {
+          fixtures["package.json"] = packageJson.content
+        }
+
+        const files = makeFiles(fixtures)
+
+        const source = yield* runResolve(files)
+
+        const expected = nodeVersion?.valid
+          ? new NodeVersionFile({ path: ".node-version" })
+          : nvmrc?.valid
+            ? new NodeVersionFile({ path: ".nvmrc" })
+            : toolVersions?.valid
+              ? new NodeVersionFile({ path: ".tool-versions" })
+              : packageJson?.valid
+                ? new NodeVersionFile({ path: "package.json" })
+                : new NodeVersion({ value: "lts/*" })
+
+        expect(source).toStrictEqual(expected)
+      }),
+    { arbitrary: { runs: 200 } }
+  )
+
+  const nonEmptyVersion = Schema.Literals(["22.19.0", ">=22", "lts/*"])
+
+  const declaringManifest = Schema.Union([
+    Schema.Struct({ volta: Schema.Struct({ node: nonEmptyVersion }) }),
+    Schema.Struct({ engines: Schema.Struct({ node: nonEmptyVersion }) }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.Struct({
+          name: Schema.Literals(["node", "Node", "NODE"]),
+          version: nonEmptyVersion,
+        }),
+      }),
+    }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.Tuple([
+          Schema.Struct({ name: Schema.Literal("deno"), version: Schema.Literal("2.0.0") }),
+          Schema.Struct({ name: Schema.Literal("node"), version: nonEmptyVersion }),
+        ]),
+      }),
+    }),
+  ])
+
+  const nonDeclaringManifest = Schema.Union([
+    Schema.Struct({}),
+    Schema.Struct({ engines: Schema.Struct({}) }),
+    Schema.Struct({ engines: Schema.Struct({ node: Schema.Literal("") }) }),
+    Schema.Struct({ volta: Schema.Struct({}) }),
+    Schema.Struct({ volta: Schema.Struct({ node: Schema.Literal("") }) }),
+    Schema.Struct({ devEngines: Schema.Struct({}) }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.Struct({ name: Schema.Literal("bun"), version: Schema.Literal("1.2.0") }),
+      }),
+    }),
+    Schema.Struct({
+      devEngines: Schema.Struct({ runtime: Schema.Struct({ name: Schema.Literal("node") }) }),
+    }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.mutable(
+          Schema.Tuple([
+            Schema.Struct({ name: Schema.Literal("deno"), version: Schema.Literal("2.0.0") }),
+          ])
+        ),
+      }),
+    }),
+  ])
+
+  it.effect.prop(
+    "recognize every supported package.json declaration shape",
+    { manifest: declaringManifest },
+    ({ manifest }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({ name: "pkg", ...manifest }),
+        })
+
+        const source = yield* runResolve(files)
+
+        expect(source).toStrictEqual(new NodeVersionFile({ path: "package.json" }))
+      }),
+    { arbitrary: { runs: 200 } }
+  )
+
+  it.effect.prop(
+    "fall back to lts/* when package.json declares nothing",
+    { manifest: nonDeclaringManifest },
+    ({ manifest }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({ name: "pkg", ...manifest }),
+        })
+
+        const source = yield* runResolve(files)
+
+        expect(source).toStrictEqual(new NodeVersion({ value: "lts/*" }))
+      }),
+    { arbitrary: { runs: 100 } }
+  )
+
+  it.effect.prop(
+    "resolve without failing for arbitrary package.json JSON",
+    { value: Schema.MutableJson },
+    ({ value }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "package.json": yield* stringifyJson(value) })
+
+        const source = yield* runResolve(files)
+
+        expect(["File", "Version"]).toContain(source._tag)
+      }),
+    { arbitrary: { runs: 200 } }
+  )
+})

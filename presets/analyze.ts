@@ -1,4 +1,5 @@
 import type { KnipConfiguration } from "knip"
+import type { PresetIdentity } from "./identity.ts"
 
 interface SuggestedIgnoreDependencies {
   effect: string[]
@@ -33,6 +34,8 @@ export const ignoreDependencies: SuggestedIgnoreDependencies = {
 // with `_` are helpers, so Knip still reports one that no file imports. A rules folder at another
 // path (`custom({ dir })`) needs its own patterns.
 const config: KnipConfiguration = {
+  // The `PRESET` key of `identity.ts`, which `presets/tsconfig.json` cannot import here.
+  [Symbol.for("adamantite.preset")]: { module: "adamantite/analyze" } satisfies PresetIdentity,
   ignoreExportsUsedInFile: true,
   oxlint: {
     entry: [".adamantite/lint/[!_]*.{js,mjs,mts,ts}"],

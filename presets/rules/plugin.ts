@@ -1,4 +1,19 @@
-// Keep the authoring API on Adamantite's pinned Oxlint version, including under strict pnpm.
-export { definePlugin, defineRule, eslintCompatPlugin } from "@oxlint/plugins"
+import type { Plugin, Rule } from "@oxlint/plugins"
 
+// The build inlines the authoring types of Adamantite's pinned Oxlint version into the published
+// declarations, so a project type-checks its rules without installing `@oxlint/plugins`.
 export type * from "@oxlint/plugins"
+
+/**
+ * Define a plugin. It returns the plugin unchanged and only checks its type.
+ */
+export function definePlugin(plugin: Plugin): Plugin {
+  return plugin
+}
+
+/**
+ * Define a rule. It returns the rule unchanged and only checks its type.
+ */
+export function defineRule(rule: Rule): Rule {
+  return rule
+}

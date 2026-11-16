@@ -1,23 +1,26 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import type { FixLevel } from "#lib/integrations/oxlint/command.ts"
+import * as knip from "#lib/integrations/knip/command.ts"
+import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
+import * as oxlint from "#lib/integrations/oxlint/command.ts"
+import { probeAst } from "#lib/integrations/oxlint/probe.ts"
+import * as sherif from "#lib/integrations/sherif/command.ts"
+import { checkIsMonorepo } from "#lib/project/monorepo.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
   CliNotFound,
+  FailedToParseSource,
   InvalidAnalyzeOptions,
   InvalidCheckOptions,
   InvalidFixOptions,
 } from "#lib/shared/errors.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
-export type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
+export type { FixLevel } from "#lib/integrations/oxlint/command.ts"
 
 /**
  * Checks the formatting with Oxfmt, then lints with Oxlint. Both stages run, and the operation
@@ -186,7 +189,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   // dependency graph.
   yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
     Effect.mapError((error) =>
-      Predicate.isTagged(error, "CliNotFound") && error.command === sherif.name
+      Predicate.isTagged(error, "CliNotFound") && error.command === stages.monorepo.command
         ? new CliNotFound({
             command: error.command,
             hint: "Run `adamantite update` to install it.",
@@ -194,4 +197,32 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
         : error
     )
   )
+})
+
+/**
+ * The syntax tree that Oxlint gives rules for `file`, relative to `cwd`, from the Oxlint runtime of
+ * the project. Fails with the parse errors of a file that does not parse, and for a file that
+ * Oxlint does not lint.
+ */
+export const ast = Effect.fn("Toolchain.ast")(function* ({
+  cwd,
+  file,
+}: {
+  readonly cwd: string
+  readonly file: string
+}) {
+  const { errors, program } = yield* probeAst(cwd, file)
+
+  if (errors.length > 0) {
+    return yield* new FailedToParseSource({ errors, path: file })
+  }
+
+  if (Option.isNone(program)) {
+    return yield* new FailedToParseSource({
+      errors: ["Oxlint does not lint the file, so it gives rules no syntax tree."],
+      path: file,
+    })
+  }
+
+  return program.value
 })

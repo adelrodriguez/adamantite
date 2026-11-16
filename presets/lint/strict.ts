@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 import { testFiles as jestTestFiles } from "./jest.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 import { testFiles as vitestTestFiles } from "./vitest.ts"
@@ -13,6 +14,7 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // use the `antislop` namespace. Doctor reports old rule names for migration.
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,
   jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("antislop")],
   overrides: [
     {

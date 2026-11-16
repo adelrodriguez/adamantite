@@ -5,7 +5,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Runtime from "effect/Runtime"
 import * as Stdio from "effect/Stdio"
 import { makeAppLayer, runCli } from "#cli.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Output from "#terminal/output.ts"
 

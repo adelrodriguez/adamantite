@@ -1,21 +1,15 @@
 import * as Array from "effect/Array"
-import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
-import {
-  parseSync,
-  type ArrayExpressionElement,
-  type Expression,
-  type ObjectExpression,
-  type ObjectProperty,
-  type Program,
-} from "oxc-parser"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
 import type { ProjectPath } from "#lib/hardening/project-files.ts"
-import type { Workspace } from "#lib/workspace/monorepo.ts"
+import type { Workspace } from "#lib/project/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib/hardening/trial.ts"
-import { checkExists, readFile } from "#lib/shared/filesystem.ts"
+import { IDENTITY_KEY, readConfig } from "#lib/project/config-loader.ts"
+import { checkExists } from "#lib/shared/filesystem.ts"
 
 /**
  * An entry of `overrides` in an Oxlint config that turns one or more rules off.
@@ -37,204 +31,107 @@ export interface RuleOffOverride {
  * the file, the rule no longer reports it, the config ignores it, it does not parse, or it does not
  * exist. Only a file that Oxlint linted and parsed can be clean.
  */
-export type OverrideFileMark = "breaks" | "clean" | "ignored" | "missing" | "unparsable"
+const OverrideFileMark = Schema.Literals(["breaks", "clean", "ignored", "missing", "unparsable"])
+
+type OverrideFileMark = typeof OverrideFileMark.Type
 
 /**
  * The files for which an override turns a rule off, with paths relative to the project root.
  */
-export interface OverriddenRule {
+const OverriddenRule = Schema.Struct({
   /**
    * The config of the override, relative to the project root.
    */
-  readonly config: string
-  readonly files: ReadonlyArray<{ readonly file: string; readonly mark: OverrideFileMark }>
+  config: Schema.String,
+  files: Schema.Array(Schema.Struct({ file: Schema.String, mark: OverrideFileMark })),
   /**
    * The globs of the override, as the config writes them. A glob is a scope decision, so Adamantite
    * does not lint its files.
    */
-  readonly globs: readonly string[]
-  readonly rule: string
-}
+  globs: Schema.Array(Schema.String),
+  rule: Schema.String,
+})
 
 /**
  * The overrides that turn a rule off, with a mark for each file that they name.
  */
-export class LintedOverrides extends Data.TaggedClass("Linted")<{
-  readonly rules: readonly OverriddenRule[]
-}> {}
+export class LintedOverrides extends Schema.TaggedClass<
+  LintedOverrides,
+  { readonly brand: unique symbol }
+>()("Linted", {
+  rules: Schema.Array(OverriddenRule),
+}) {}
 
 /**
  * The reason why Adamantite could not lint the files of the overrides.
  */
-export class OverridesLintFailed extends Data.TaggedClass("Failed")<{ readonly reason: string }> {}
+export class OverridesLintFailed extends Schema.TaggedClass<
+  OverridesLintFailed,
+  { readonly brand: unique symbol }
+>()("Failed", {
+  reason: Schema.String,
+}) {}
 
-export type OverridesReport = LintedOverrides | OverridesLintFailed
+export const OverridesReport = Schema.Union([LintedOverrides, OverridesLintFailed])
+
+export type OverridesReport = typeof OverridesReport.Type
 
 const GLOB_CHARACTERS = /[!*?[\]{}]/u
 
-function getStaticString(expression: Expression | ArrayExpressionElement) {
-  if (expression === null) {
-    return null
-  }
+/**
+ * The severity of a rule setting, such as `"off"`, `"error"`, or `2`.
+ */
+const Severity = Schema.Union([Schema.String, Schema.Finite])
 
-  if (expression.type === "Literal" && Predicate.isString(expression.value)) {
-    return expression.value
-  }
+/**
+ * A rule setting: a severity, alone or as the first item of an array with the options.
+ */
+const RuleSetting = Schema.Union([
+  Severity,
+  Schema.TupleWithRest(Schema.Tuple([Severity]), [Schema.Unknown]),
+])
 
-  if (expression.type === "TemplateLiteral" && expression.expressions.length === 0) {
-    return expression.quasis[0]?.value.cooked ?? null
-  }
+/**
+ * The name of a rule in the `rules` of a loaded override. The rules of a preset, such as vitest,
+ * name the preset under `IDENTITY_KEY`, which is not a rule, and a record skips each key that its
+ * key schema rejects.
+ */
+const RuleName = Schema.String.check(Schema.makeFilter((key: string) => key !== IDENTITY_KEY))
 
-  return null
-}
+/**
+ * What Adamantite reads from a loaded Oxlint config for the trials: the `files` and `rules` of each
+ * override, in the order of `overrides`.
+ */
+const OverridesConfig = Schema.Struct({
+  overrides: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        files: Schema.optional(Schema.Array(Schema.String)),
+        rules: Schema.optional(Schema.Record(RuleName, RuleSetting)),
+      })
+    )
+  ),
+})
 
-function getPropertyName(property: ObjectProperty) {
-  if (property.computed) {
-    return null
-  }
+/**
+ * Whether a rule setting turns the rule off: `"off"`, `"allow"`, or `0`.
+ */
+function isOff(setting: typeof RuleSetting.Type): boolean {
+  const [severity] = Array.isArray(setting) ? setting : [setting]
 
-  if (property.key.type === "Identifier") {
-    return property.key.name
-  }
-
-  return property.key.type === "Literal" && Predicate.isString(property.key.value)
-    ? property.key.value
-    : null
-}
-
-function getProperty(object: ObjectExpression, name: string) {
-  const property = object.properties.find(
-    (candidate) => candidate.type === "Property" && getPropertyName(candidate) === name
-  )
-
-  return property?.type === "Property" ? property.value : undefined
+  return severity === "off" || severity === "allow" || severity === 0
 }
 
 /**
- * Whether a rule setting turns the rule off: `"off"`, `"allow"`, or `0`, alone or as the first item
- * of an array.
+ * The overrides of a loaded Oxlint config that turn a rule off for the files that they list.
  */
-function isOff(setting: Expression): boolean {
-  if (setting.type === "ArrayExpression") {
-    const [severity] = setting.elements
+function listRuleOffOverrides({ overrides = [] }: typeof OverridesConfig.Type): RuleOffOverride[] {
+  return overrides.flatMap(({ files = [], rules = {} }, index) => {
+    const offRules = Object.entries(rules).flatMap(([rule, setting]) =>
+      isOff(setting) ? [rule] : []
+    )
 
-    return severity !== undefined && severity !== null && severity.type !== "SpreadElement"
-      ? isOff(severity)
-      : false
-  }
-
-  return (
-    setting.type === "Literal"
-    && (setting.value === "off" || setting.value === "allow" || setting.value === 0)
-  )
-}
-
-/**
- * The object that the config exports: the argument of `defineConfig({ … })`, the object itself, or
- * the object of a top-level `const` that the default export names.
- */
-function findConfigObject(program: Program): ObjectExpression | undefined {
-  const [exported] = program.body.flatMap((statement) =>
-    statement.type === "ExportDefaultDeclaration" ? [statement] : []
-  )
-
-  if (exported === undefined) {
-    return undefined
-  }
-
-  const unwrap = (expression: Expression): ObjectExpression | undefined => {
-    if (expression.type === "ObjectExpression") {
-      return expression
-    }
-
-    if (expression.type === "CallExpression") {
-      const [argument] = expression.arguments
-
-      return argument !== undefined && argument.type !== "SpreadElement"
-        ? unwrap(argument)
-        : undefined
-    }
-
-    if (expression.type === "Identifier") {
-      const declarator = program.body
-        .flatMap((statement) =>
-          statement.type === "VariableDeclaration"
-            ? statement.declarations
-            : statement.type === "ExportNamedDeclaration"
-                && statement.declaration?.type === "VariableDeclaration"
-              ? statement.declaration.declarations
-              : []
-        )
-        .find(
-          (candidate) => candidate.id.type === "Identifier" && candidate.id.name === expression.name
-        )
-
-      return declarator?.init ? unwrap(declarator.init) : undefined
-    }
-
-    if (expression.type === "TSAsExpression" || expression.type === "TSSatisfiesExpression") {
-      return unwrap(expression.expression)
-    }
-
-    return undefined
-  }
-
-  const declaration = exported.declaration
-
-  return declaration.type === "ObjectExpression"
-    || declaration.type === "CallExpression"
-    || declaration.type === "Identifier"
-    || declaration.type === "TSAsExpression"
-    || declaration.type === "TSSatisfiesExpression"
-    ? unwrap(declaration)
-    : undefined
-}
-
-/**
- * The overrides of an Oxlint config that turn a rule off and list their `files` as strings. The
- * file is read without running it, so an override that code builds, such as a spread or a call, is
- * not in the list. A spread in `overrides` hides the positions after it, so the list stops there.
- */
-export function findRuleOffOverrides(file: string, content: string): RuleOffOverride[] {
-  const { errors, program } = parseSync(file, content, { sourceType: "module" })
-
-  if (errors.length > 0) {
-    return []
-  }
-
-  const config = findConfigObject(program)
-  const overrides = config === undefined ? undefined : getProperty(config, "overrides")
-
-  if (overrides?.type !== "ArrayExpression") {
-    return []
-  }
-
-  const spread = overrides.elements.findIndex((element) => element?.type === "SpreadElement")
-  const elements = spread === -1 ? overrides.elements : overrides.elements.slice(0, spread)
-
-  return elements.flatMap((element, index) => {
-    if (element?.type !== "ObjectExpression") {
-      return []
-    }
-
-    const files = getProperty(element, "files")
-    const rules = getProperty(element, "rules")
-
-    if (files?.type !== "ArrayExpression" || rules?.type !== "ObjectExpression") {
-      return []
-    }
-
-    const patterns = files.elements.map((pattern) => getStaticString(pattern))
-
-    const offRules = rules.properties.flatMap((property) => {
-      const name = property.type === "Property" ? getPropertyName(property) : null
-
-      return property.type === "Property" && name !== null && isOff(property.value) ? [name] : []
-    })
-
-    return patterns.every((pattern) => pattern !== null) && offRules.length > 0
-      ? [{ files: patterns, index, rules: offRules }]
-      : []
+    return files.length > 0 && offRules.length > 0 ? [{ files, index, rules: offRules }] : []
   })
 }
 
@@ -261,11 +158,18 @@ export const readOverrides = Effect.fn("readOverrides")(
         .split(path.sep)
         .join("/")
 
+    // A config that does not load has no override that Adamantite can read. Doctor reports it.
     const found = yield* Effect.forEach(
       configs,
       (config) =>
-        readFile(path.join(cwd, config)).pipe(
-          Effect.map((content) => ({ config, overrides: findRuleOffOverrides(config, content) }))
+        readConfig(cwd, path.join(cwd, config), OverridesConfig).pipe(
+          Effect.map((loaded) => ({
+            config,
+            overrides: loaded.pipe(
+              Option.flatMap(Result.getSuccess),
+              Option.match({ onNone: () => [], onSome: listRuleOffOverrides })
+            ),
+          }))
         ),
       { concurrency: "unbounded" }
     )
@@ -369,7 +273,7 @@ export const readOverrides = Effect.fn("readOverrides")(
     return new LintedOverrides({
       rules: entries
         .filter((entry) => entry.literals.length > 0 || entry.globs.length > 0)
-        .map((entry): OverriddenRule => ({
+        .map((entry): typeof OverriddenRule.Type => ({
           config: entry.config,
           files: entry.literals.map((file) => ({
             file,

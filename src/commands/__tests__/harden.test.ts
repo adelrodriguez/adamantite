@@ -11,22 +11,28 @@ import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
+import type { AgentReach } from "#lib/hardening/agent-reach.ts"
+import type { Selection } from "#lib/project/selection.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
-import hardenCommand from "#commands/harden.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
-import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import hardenCommand, { Report } from "#commands/harden.ts"
+import { LintedOverrides } from "#lib/hardening/overrides.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
+import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import {
   makeHandoffRunner,
+  makeLockfileFile,
   promptingLayer,
   nonProbeInvocations,
   runCommand,
+  SKILL_FILES,
 } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
@@ -180,8 +186,20 @@ const ADAMANTITE_RESOLUTION = {
   "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
 }
 
+// The lockfile of a project that init set up with nothing selected, so Doctor reports no missing
+// lockfile.
+const NO_SELECTION = {
+  agents: false,
+  ci: null,
+  editors: [],
+  presets: [],
+  scripts: [],
+  typescript: null,
+} as const satisfies Selection
+
 const INSTALLED = {
   ...ADAMANTITE_MODULE,
+  ...makeLockfileFile(NO_SELECTION),
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
 }
 
@@ -221,6 +239,11 @@ interface ProcessOptions {
    */
   readonly lintIgnoredFiles?: readonly string[]
   readonly oxlintExitCode?: number
+  /**
+   * What the Oxlint probe prints for the files that it parses. The process tests in
+   * `src/lib/hardening/__tests__/suppressions.test.ts` run the probe.
+   */
+  readonly probeReport?: string
 }
 
 function makeHandle(exitCode: number, stdout: string) {
@@ -246,6 +269,7 @@ function makeProcessLayer(
     indexOnlyFiles = [],
     lintIgnoredFiles = [],
     oxlintExitCode = 0,
+    probeReport = '{ "diagnostics": [], "number_of_files": 0 }',
   }: ProcessOptions = {}
 ) {
   const listFiles = () =>
@@ -285,7 +309,18 @@ function makeProcessLayer(
         )
       }
 
-      return Effect.die("Harden tests spawn only git, and oxlint to list the files")
+      if (
+        ChildProcess.isStandardCommand(command)
+        && command.command === OXLINT.command
+        && command.args[0] === OXLINT.args[0]
+        && command.args.includes("--disable-nested-config")
+      ) {
+        return Effect.succeed(makeHandle(0, probeReport))
+      }
+
+      return Effect.die(
+        "Harden tests spawn only git, and oxlint to list the files or to probe them"
+      )
     })
   )
 }
@@ -331,7 +366,7 @@ const CUSTOM_RULE_FILES = {
   ...INSTALLED,
 }
 
-const SUCCESS_LOG = "✔ `adamantite check` and Doctor pass after the Claude Code session."
+const SUCCESS_LOG = "✔ Nothing remains to resolve after the Claude Code session."
 
 // The lines that the check runs print after the session, with a blank line between the tools.
 const CHECK_TITLES = [
@@ -341,11 +376,8 @@ const CHECK_TITLES = [
 ]
 
 interface InteractiveHardenOptions {
+  readonly args?: readonly string[]
   readonly files?: Record<string, string>
-  /**
-   * Called when custom rule discovery starts.
-   */
-  readonly onDiscovery?: () => void
   /**
    * Called with the path of each file that Harden reads as text.
    */
@@ -388,18 +420,14 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
       })
     ).pipe(Layer.provide(files.layer))
 
-    const exit = yield* runCommand(hardenCommand, [], {
+    const exit = yield* runCommand(hardenCommand, options.args ?? [], {
       files,
       layers: [
         fileSystem,
         runner.layer,
         promptingLayer,
         makeProcessLayer(files),
-        makeModuleResolverLayer(
-          files.root,
-          ADAMANTITE_RESOLUTION,
-          Effect.sync(() => options.onDiscovery?.())
-        ),
+        makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
       ],
       logLines,
       terminal,
@@ -503,7 +531,178 @@ function getContext(prompt: string) {
   }
 }
 
+const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
+
+// What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`.
+const INDEX_PROBE_REPORT = JSON.stringify({
+  diagnostics: [
+    {
+      code: "adamantite-probe(comments)",
+      filename: "src/index.ts",
+      labels: [{ span: { column: 1, line: 1 } }],
+      message: JSON.stringify({
+        anchor: "start",
+        comments: [{ line: 1, value: " oxlint-disable-next-line no-console" }],
+        lines: 3,
+      }),
+    },
+  ],
+  number_of_files: 1,
+})
+
 describe("harden", () => {
+  it.effect("print the harden context as JSON that decodes with the report schema", () =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runHarden(
+        {
+          ...CUSTOM_RULE_FILES,
+          "AGENTS.md": "Read [the guide](docs/missing.md).\n",
+          "docs/unreached.md": "# Unreached\n",
+          "src/index.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
+        },
+        ["--json", "--commits", "20"],
+        {
+          probeReport: INDEX_PROBE_REPORT,
+        }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(logLines).toHaveLength(1)
+      expect(decodeReport(logLines[0])).toStrictEqual({
+        agentReach: Option.some({
+          brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
+          unreached: ["docs/unreached.md"],
+        }),
+        commits: 20,
+        configs: ["oxlint.config.ts"],
+        documentationFiles: Option.some(["AGENTS.md", "docs/unreached.md"]),
+        instructionFiles: ["AGENTS.md"],
+        overrides: new LintedOverrides({ rules: [] }),
+        rulesFolders: [".adamantite/lint"],
+        schemaVersion: 1,
+        scope: null,
+        suppressions: Option.some([
+          { locations: ["src/index.ts:1"], rule: Option.some("no-console") },
+        ]),
+        unloadedConfigs: [],
+      })
+    })
+  )
+
+  it.effect("open no menu and start no agent with --json in an interactive terminal", () =>
+    Effect.gen(function* () {
+      const { exit, logLines, output, runner } = yield* runInteractiveHarden({
+        args: ["--json"],
+        keys: [],
+      })
+
+      expect({
+        invocations: runner.invocations,
+        lines: logLines.length,
+        output,
+        succeeded: Exit.isSuccess(exit),
+      }).toStrictEqual({ invocations: [], lines: 1, output: "", succeeded: true })
+      expect(decodeReport(logLines[0]).schemaVersion).toBe(1)
+    })
+  )
+
+  // Agent reach is a fact that Adamantite computes for the agent, so `--json` shows each case.
+  it.effect.each<{
+    readonly files: Readonly<Record<string, string>>
+    readonly name: string
+    readonly reach: AgentReach
+  }>([
+    {
+      files: {
+        "AGENTS.md": "Read `GLOSSARY.md` and [the architecture](docs/architecture.md#layers).\n",
+        "GLOSSARY.md": "# Glossary\n",
+        "docs/architecture.md": "See [the testing guide](./guides/testing.md).\n",
+        "docs/guides/testing.md": "# Testing\n",
+        "docs/plans/old.md": "# Old plan\n",
+        "src/README.md": "# Source\n",
+      },
+      name: "reach the files that links and code spans name, also through other files",
+      reach: { brokenLinks: [], unreached: ["docs/plans/old.md", "src/README.md"] },
+    },
+    {
+      files: {
+        ".cursor/rules/style.mdc": "See `docs/style.md`.\n",
+        "CLAUDE.md": "See `docs/testing.md`.\n",
+        "docs/style.md": "# Style\n",
+        "docs/testing.md": "# Testing\n",
+        "packages/web/AGENTS.md": "See [the web guide](docs/guide.md).\n",
+        "packages/web/docs/guide.md": "# Web\n",
+      },
+      name: "start from each AGENTS.md, and not from the files of one vendor",
+      reach: {
+        brokenLinks: [],
+        unreached: [".cursor/rules/style.mdc", "CLAUDE.md", "docs/style.md", "docs/testing.md"],
+      },
+    },
+    {
+      files: {
+        "AGENTS.md": "Record decisions in `docs/adr`, and keep `src/lib` in layers.\n",
+        "docs/adr/0001-use-adamantite.md": "# Use Adamantite\n",
+        "docs/adr/0002-use-effect.md": "# Use Effect\n",
+        "docs/plans/old.md": "# Old plan\n",
+        "src/lib/hardening/prompt.md": "# Prompt\n",
+      },
+      name: "reach each Markdown file directly in a folder that a file names",
+      reach: { brokenLinks: [], unreached: ["docs/plans/old.md", "src/lib/hardening/prompt.md"] },
+    },
+    {
+      files: {
+        "AGENTS.md":
+          "Use [Effect](https://effect.website), see [below](#tests), install `@effect/vitest`, and run `pnpm run check`.\n",
+        "docs/testing.md": "# Testing\n",
+      },
+      name: "ignore a URL, an anchor, a package name, and a code span that names no file",
+      reach: { brokenLinks: [], unreached: ["docs/testing.md"] },
+    },
+    {
+      // A code span can name a file that a step creates later, so only a link counts as broken.
+      files: { "AGENTS.md": "Read [the guide](docs/guide.md), then `docs/missing-span.md`.\n" },
+      name: "list a link to a Markdown file that does not exist",
+      reach: { brokenLinks: [{ file: "AGENTS.md", target: "docs/guide.md" }], unreached: [] },
+    },
+    {
+      // A fence with text after it cannot close a block, so the block ends on the third line.
+      files: {
+        "AGENTS.md":
+          "```text\n```typescript\n```\n\nRead [the guide](docs/guide.md) and [the plan](docs/missing.md).\n",
+        "docs/guide.md": "# Guide\n",
+      },
+      name: "read the links after a code block that shows a fence with a language",
+      reach: { brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }], unreached: [] },
+    },
+    {
+      files: {
+        "AGENTS.md": [
+          "Write a pointer like `[the guide](docs/example.md)`:",
+          "",
+          "```markdown",
+          "Read [the guide](docs/fenced.md).",
+          "```",
+          "",
+          "~~~",
+          "[style]: docs/style.md",
+          "~~~",
+          "",
+        ].join("\n"),
+        "docs/style.md": "# Style\n",
+      },
+      name: "ignore the links of an example in a code block or in inline code",
+      reach: { brokenLinks: [], unreached: ["docs/style.md"] },
+    },
+  ])("$name", ({ files, reach }) =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runHarden({ ...INSTALLED, ...files }, ["--json"])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(decodeReport(logLines[0]).agentReach).toStrictEqual(Option.some(reach))
+    })
+  )
+
   it.effect("print the prompt and succeed in a non-interactive terminal", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden({
@@ -685,51 +884,6 @@ describe("harden", () => {
     })
   )
 
-  it.effect("count the disable comments of each rule in the source files", () =>
-    Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({
-        "docs/rules.md": "Use `// oxlint-disable-next-line no-console` with a reason.\n",
-        "oxlint.config.ts": CORE_CONFIG,
-        "src/a.ts": [
-          "// oxlint-disable-next-line no-console -- the CLI prints",
-          "console.log(1)",
-          "// eslint-disable-next-line no-console, typescript/no-explicit-any",
-          "export const value: any = console.log(2)",
-          'export const text = "// oxlint-disable-line no-console"',
-          "",
-        ].join("\n"),
-        "src/b.tsx": "/* oxlint-disable */\nexport const b = <div />\n",
-        ...INSTALLED,
-      })
-
-      expect(getListItems(getSection(prompt, "### Suppressions"))).toStrictEqual([
-        "- `no-console`: 2 comments, in `src/a.ts:1`, `src/a.ts:3`",
-        "- All rules: 1 comment, in `src/b.tsx:1`",
-        "- `typescript/no-explicit-any`: 1 comment, in `src/a.ts:3`",
-      ])
-    })
-  )
-
-  it.effect("leave out the disable comments of the files that the Oxlint config ignores", () =>
-    Effect.gen(function* () {
-      const { exit, logLines } = yield* runHarden(
-        {
-          "oxlint.config.ts": CORE_CONFIG,
-          "src/a.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
-          "src/fixtures/bad.ts": "// oxlint-disable-next-line no-alert\nalert(1)\n",
-          ...INSTALLED,
-        },
-        [],
-        { lintIgnoredFiles: ["src/fixtures/bad.ts"] }
-      )
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(getListItems(getSection(logLines[0] ?? "", "### Suppressions"))).toStrictEqual([
-        "- `no-console`: 1 comment, in `src/a.ts:1`",
-      ])
-    })
-  )
-
   it.effect("tell the agent to count the disable comments when Oxlint cannot list its files", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden(
@@ -745,21 +899,22 @@ describe("harden", () => {
     })
   )
 
-  it.effect("count only the disable comments inside the folder that --path selects", () =>
+  it.effect("tell the agent to count the disable comments when Oxlint cannot read them", () =>
     Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt(
+      const { exit, logLines } = yield* runHarden(
         {
           "oxlint.config.ts": CORE_CONFIG,
-          "packages/api/src/a.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
-          "packages/web/src/a.ts": "// oxlint-disable-next-line no-alert\nalert(1)\n",
+          "src/index.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
           ...INSTALLED,
         },
-        ["--path", "packages/web"]
+        [],
+        { probeReport: "Failed to load JS plugin: dist/probe.js" }
       )
 
-      expect(getListItems(getSection(prompt, "### Suppressions"))).toStrictEqual([
-        "- `no-alert`: 1 comment, in `packages/web/src/a.ts:1`",
-      ])
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getSection(logLines[0] ?? "", "### Suppressions")).toContain(
+        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`'
+      )
     })
   )
 
@@ -922,10 +1077,15 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden({ "package.json": manifest({}) })
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
-      ])
+      // The runtime boundary prints the error once, on standard error.
+      expect({
+        error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
+        logLines,
+      }).toStrictEqual({
+        error:
+          "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
+        logLines: [],
+      })
     })
   )
 
@@ -935,10 +1095,15 @@ describe("harden", () => {
         "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
       })
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`.",
-      ])
+      // The runtime boundary prints the error once, on standard error.
+      expect({
+        error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
+        logLines,
+      }).toStrictEqual({
+        error:
+          "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`.",
+        logLines: [],
+      })
     })
   )
 
@@ -952,10 +1117,14 @@ describe("harden", () => {
         }),
       })
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
-      ])
+      // The runtime boundary prints the error once, on standard error.
+      expect({
+        error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
+        logLines,
+      }).toStrictEqual({
+        error: `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
+        logLines: [],
+      })
     })
   )
 
@@ -984,10 +1153,14 @@ describe("harden", () => {
         "package.json": yield* stringifyJson({ name: "adamantite", version: "0.0.1" }),
       })
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
-      ])
+      // The runtime boundary prints the error once, on standard error.
+      expect({
+        error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
+        logLines,
+      }).toStrictEqual({
+        error: `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
+        logLines: [],
+      })
     })
   )
 
@@ -1110,12 +1283,16 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden(MONOREPO_FILES, ["--path", ".."])
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        expect.stringMatching(
+      // The runtime boundary prints the error once, on standard error.
+      expect({
+        error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
+        logLines,
+      }).toStrictEqual({
+        error: expect.stringMatching(
           /^`--path` must be a folder inside the project\. `.+` is outside `.+`\.$/u
         ),
-      ])
+        logLines: [],
+      })
     })
   )
 
@@ -1211,8 +1388,8 @@ describe("harden", () => {
     "read the workspace and discover the custom rules one time before and one time after the session",
     () =>
       Effect.gen(function* () {
-        const workspaceFile = `${createFileSystemTestContext().root}/pnpm-workspace.yaml`
-        const counts = { discoveries: 0, workspaceReads: 0 }
+        const { root } = createFileSystemTestContext()
+        const counts = { configLoads: 0, workspaceReads: 0 }
         let beforeSession = { ...counts }
 
         yield* runInteractiveHarden({
@@ -1222,11 +1399,12 @@ describe("harden", () => {
             "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
           },
           keys: ["enter"],
-          onDiscovery: () => {
-            counts.discoveries += 1
-          },
           onReadFile: (path) => {
-            if (path === workspaceFile) {
+            if (path === `${root}/oxlint.config.ts`) {
+              counts.configLoads += 1
+            }
+
+            if (path === `${root}/pnpm-workspace.yaml`) {
               counts.workspaceReads += 1
             }
           },
@@ -1235,9 +1413,12 @@ describe("harden", () => {
           },
         })
 
+        // Before the session, custom rule discovery and the overrides load the root config, and the
+        // suppression count reads it as a source file. After it, the project and its custom rule
+        // discovery load it again.
         expect({ afterSession: counts, beforeSession }).toStrictEqual({
-          afterSession: { discoveries: 2, workspaceReads: 2 },
-          beforeSession: { discoveries: 1, workspaceReads: 1 },
+          afterSession: { configLoads: 5, workspaceReads: 2 },
+          beforeSession: { configLoads: 3, workspaceReads: 1 },
         })
       })
   )
@@ -1266,8 +1447,8 @@ describe("harden", () => {
         "💠 adamantite harden",
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
-        "✖ `adamantite check` failed after the Claude Code session.",
-        "⚠️ Harden verification failed.",
+        "✖ `adamantite check` failed.",
+        "⚠️ Harden found issues.",
       ])
     })
   )
@@ -1285,8 +1466,8 @@ describe("harden", () => {
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
         "✖ The command `oxfmt` was not found on PATH. Install it, then run the command again.",
-        "✖ `adamantite check` failed after the Claude Code session.",
-        "⚠️ Harden verification failed.",
+        "✖ `adamantite check` failed.",
+        "⚠️ Harden found issues.",
       ])
     })
   )
@@ -1297,13 +1478,15 @@ describe("harden", () => {
         // Knip is installed without its managed config, so Doctor reports one finding.
         files: {
           ...ADAMANTITE_MODULE,
-          "AGENTS.md": "# AGENTS.md\n",
+          ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
+          ...SKILL_FILES,
+          "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
           }),
         },
-        keys: ["enter"],
+        keys: ["enter", "n"],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -1311,9 +1494,9 @@ describe("harden", () => {
         "💠 adamantite harden",
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
-        "▲ Doctor found issues after the Claude Code session.",
+        "▲ 1 finding remains after the Claude Code session.",
         expect.stringMatching(/^\n1\. Missing knip configuration\n {2}Current state\n/u),
-        "⚠️ Harden verification failed.",
+        "⚠️ Harden found issues.",
       ])
     })
   )
@@ -1321,7 +1504,7 @@ describe("harden", () => {
   it.effect("show the Doctor warnings and still pass when Doctor finds no issues", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
-        // Doctor cannot read a `dir` that is not a string literal, so it warns without a finding.
+        // Doctor cannot load a config that names an undefined variable, so it warns without a finding.
         files: {
           "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace('dir: "tooling/rules"', "dir: rulesDir"),
           ...INSTALLED,
@@ -1334,7 +1517,7 @@ describe("harden", () => {
         "💠 adamantite harden",
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
-        "▲ Doctor cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
+        "▲ Doctor cannot load `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it. Node.js reported: rulesDir is not defined",
         SUCCESS_LOG,
         "✅ Harden checks passed.",
       ])
@@ -1357,70 +1540,9 @@ describe("harden", () => {
         "💠 adamantite harden",
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
-        "✖ `AGENTS.md` links to `docs/style.md`, which does not exist, after the Claude Code session.",
-        "⚠️ Harden verification failed.",
+        "✖ `AGENTS.md` links to `docs/style.md`, which does not exist.",
+        "⚠️ Harden found issues.",
       ])
-    })
-  )
-
-  it.effect("print the prompt and copy it when the user chooses to copy", () =>
-    Effect.gen(function* () {
-      const { copied, exit, logLines, runner } = yield* runInteractiveHarden({
-        files: CUSTOM_RULE_FILES,
-        keys: ["down", "down", "enter"],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(nonProbeInvocations(runner)).toStrictEqual([])
-      expect(logLines).toStrictEqual([
-        "💠 adamantite harden",
-        expect.stringMatching(/^# Adamantite harden\n/u),
-        "✔ The agent prompt is printed above and sent to the terminal clipboard.",
-        "Harden ended without an agent session.",
-      ])
-      expect(copied).toStrictEqual([logLines[1]])
-    })
-  )
-
-  it.effect("say that no agent CLI is installed and still offer the copy", () =>
-    Effect.gen(function* () {
-      const { exit, logLines, output } = yield* runInteractiveHarden({
-        keys: ["down", "enter"],
-        runner: { installedCommands: [] },
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "💠 adamantite harden",
-        expect.stringMatching(
-          /^● No supported coding agent was found on PATH\. Harden can hand the prompt off when one of these CLIs is installed: /u
-        ),
-        "Harden ended without an agent session.",
-      ])
-      expect(output).toContain(
-        "? How do you want to harden this project? › \n❯ Copy the agent prompt \n  Finish without an agent "
-      )
-    })
-  )
-
-  it.effect("offer the copy when the agent fails to start", () =>
-    Effect.gen(function* () {
-      const { copied, exit, logLines, output, runner } = yield* runInteractiveHarden({
-        files: CUSTOM_RULE_FILES,
-        keys: ["enter", "enter"],
-        runner: { agentExit: "not-found" },
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(logLines).toContainEqual(
-        "✖ `claude` was not found on PATH. Install Claude Code or copy the prompt instead."
-      )
-      // Enter accepts the default answer, so the copy is the default.
-      expect(output).toContain("✔ Copy the agent prompt? … yes")
-      expect(copied).toStrictEqual([expect.stringMatching(/^# Adamantite harden\n/u)])
-      expect(
-        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
-      ).toStrictEqual(["claude"])
     })
   )
 
@@ -1447,12 +1569,14 @@ describe("harden", () => {
         logLines,
       })
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "💠 adamantite harden",
-        "▲ `adamantite` is not installed in this project. Install it before running `adamantite harden`.",
-        "⚠️ Harden did not start.",
-      ])
+      expect({
+        error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
+        logLines,
+      }).toStrictEqual({
+        error:
+          "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
+        logLines: ["💠 adamantite harden"],
+      })
     })
   )
 })

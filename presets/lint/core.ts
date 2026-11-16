@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 /**
  * Canonical ignore patterns for dependencies, build output, and generated code.
@@ -66,6 +67,7 @@ export const ignorePatterns: string[] = [
 ]
 
 const config: OxlintConfig & { ignorePatterns: string[] } = {
+  [PRESET]: { module: "adamantite/lint" } satisfies PresetIdentity,
   ignorePatterns,
   options: {
     // Check fails on a suppression that suppresses nothing, and fix removes it. The Oxlint language

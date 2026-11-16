@@ -11,7 +11,7 @@ export default defineConfig([
       onlyImport: Object.keys(packageJson.dependencies),
     },
     dts: false,
-    entry: ["src/index.ts", "src/oxlint.ts"],
+    entry: ["src/index.ts", "src/oxlint.ts", "src/probe.ts"],
     fixedExtension: false,
     minify: true,
     plugins: [Macros.rolldown()],
@@ -24,13 +24,17 @@ export default defineConfig([
       // its own path. `scripts/test-build.ts` checks that every notice under presets ships.
       { flatten: false, from: "presets/lint/plugins/**/license.md", to: "dist/presets" },
     ],
-    // The first-party plugin imports only types from @oxlint/plugins. Keeping the package external
-    // leaves a type reference in its declarations instead of inlining Oxlint's AST types. The
-    // layers rule loads oxc-resolver's native bindings at runtime, so it stays external too.
-    deps: { neverBundle: ["@oxlint/plugins", "knip", "oxc-resolver", "oxfmt", "oxlint"] },
+    // The layers rule loads oxc-resolver's native bindings at runtime, so it stays external. The
+    // presets import only types from @oxlint/plugins, a devDependency, so the declarations inline
+    // them and a project type-checks its rules without installing the package.
+    deps: {
+      neverBundle: ["knip", "oxc-resolver", "oxfmt", "oxlint"],
+      onlyBundle: ["@oxlint/plugins"],
+    },
     dts: { generator: "oxc" },
-    // The type resets are declaration files that the build copies.
-    entry: ["presets/**/*.ts", "!presets/**/*.d.ts"],
+    // The type resets are declaration files that the build copies. The tests stay out of the
+    // package.
+    entry: ["presets/**/*.ts", "!presets/**/*.d.ts", "!presets/**/__tests__/**"],
     fixedExtension: false,
     outDir: "dist/presets",
   },

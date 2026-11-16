@@ -1,4 +1,3 @@
-import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
@@ -6,28 +5,22 @@ import * as Option from "effect/Option"
 import {
   findExcludedPresets,
   findMissingRequiredPresets,
+} from "#lib/integrations/oxlint/presets.ts"
+import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
+import { type Script, SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
+import {
+  type SupportedPackageManager,
+  listSupportedPackageManagers,
+} from "#lib/project/package-manager.ts"
+import {
+  INIT_EDITORS,
+  type InitEditor,
   LINT_PRESETS,
   type LintPreset,
-} from "#lib/integrations/tooling/oxlint/presets.ts"
-import {
   TYPESCRIPT_PRESET_NAMES,
   type TypeScriptPreset,
-} from "#lib/integrations/workspace/tsconfig.ts"
+} from "#lib/project/selection.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
-import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
-import { INIT_FLAGS } from "#lib/workspace/init-command.ts"
-import {
-  checkIsSupportedPackageManager,
-  type Script,
-  type SupportedPackageManager,
-  SCRIPT_ORDER,
-  checkRunsTool,
-  listSupportedPackageManagers,
-} from "#lib/workspace/package-json.ts"
-
-export const INIT_EDITORS = ["vscode", "zed"] as const
-
-export type InitEditor = (typeof INIT_EDITORS)[number]
 
 /**
  * The title and description that the interactive prompt shows for each editor. The `vscode`
@@ -36,7 +29,8 @@ export type InitEditor = (typeof INIT_EDITORS)[number]
  */
 export const INIT_EDITOR_CHOICES = {
   vscode: {
-    description: "creates .vscode/settings.json for VS Code, Cursor, Windsurf, and more",
+    description:
+      "creates .vscode/settings.json and .vscode/extensions.json for VS Code, Cursor, Windsurf, and more",
     title: "Universal",
   },
   zed: { description: "creates .zed/settings.json", title: "Zed" },
@@ -44,7 +38,7 @@ export const INIT_EDITOR_CHOICES = {
 
 /**
  * The setup that init applies. Each optional part exists only with the parts that it needs, so the
- * options cannot select a preset without linting or an extension install without an editor.
+ * options cannot select a preset without linting.
  */
 export interface InitOptions {
   /**
@@ -52,12 +46,9 @@ export interface InitOptions {
    */
   readonly agents: boolean
   /**
-   * The editors to configure, and whether to install their recommended extensions.
+   * The editors to configure.
    */
-  readonly editors: Option.Option<{
-    readonly installExtensions: boolean
-    readonly names: Array.NonEmptyReadonlyArray<InitEditor>
-  }>
+  readonly editors: Option.Option<Array.NonEmptyReadonlyArray<InitEditor>>
   /**
    * The package manager that the GitHub Actions workflow runs.
    */
@@ -68,7 +59,9 @@ export interface InitOptions {
   readonly lint: Option.Option<{
     readonly presets: readonly LintPreset[]
   }>
-  readonly overwriteScripts: boolean
+  /**
+   * The managed scripts. `Setup.apply` sets each one in `package.json` and overwrites what it held.
+   */
   readonly scripts: readonly Script[]
   /**
    * The TypeScript preset that `tsconfig.json` extends. It needs no script.
@@ -80,8 +73,6 @@ export interface InitOptionsInput {
   readonly agents: boolean
   readonly editors: readonly InitEditor[]
   readonly githubActions: boolean
-  readonly installExtensions: boolean
-  readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
   readonly typescript: Option.Option<TypeScriptPreset>
@@ -92,14 +83,12 @@ export interface InitOptionsInput {
  */
 export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   input: InitOptionsInput,
-  packageManager: PackageManagerName
+  packageManager: SupportedPackageManager
 ) {
   const options = {
     agents: input.agents,
     editors: Array.dedupe(input.editors),
     githubActions: input.githubActions,
-    installExtensions: input.installExtensions,
-    overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
     typescript: input.typescript,
@@ -133,57 +122,44 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (options.installExtensions && options.editors.length === 0) {
-    return yield* new InvalidInitOptions({
-      reason: "`--install-extensions` requires at least one `--editor`.",
-    })
-  }
-
   if (options.githubActions && !hasCICompatibleScripts(options.scripts)) {
     return yield* new InvalidInitOptions({
       reason: "`--github-actions` requires --script check or --script analyze.",
     })
   }
 
-  if (options.githubActions && !checkIsSupportedPackageManager(packageManager)) {
-    return yield* new InvalidInitOptions({
-      reason: `\`--github-actions\` does not support the detected package manager \`${packageManager}\`. Use ${listSupportedPackageManagers("disjunction")}.`,
-    })
-  }
-
   return {
     agents: options.agents,
     editors: Array.isReadonlyArrayNonEmpty(options.editors)
-      ? Option.some({ installExtensions: options.installExtensions, names: options.editors })
+      ? Option.some(options.editors)
       : Option.none(),
-    githubActions: options.githubActions
-      ? Option.liftPredicate(packageManager, checkIsSupportedPackageManager)
-      : Option.none(),
+    githubActions: options.githubActions ? Option.some(packageManager) : Option.none(),
     lint: hasOxlint ? Option.some({ presets: options.presets }) : Option.none(),
-    overwriteScripts: options.overwriteScripts,
     scripts: options.scripts,
     typescript: options.typescript,
   } satisfies InitOptions
 })
 
-const nonInteractive = Flag.Boolean(INIT_FLAGS.nonInteractive).pipe(
+const nonInteractive = Flag.Boolean("non-interactive").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Configure without prompts. Select at least one --script or --typescript")
 )
 
-const scripts = Flag.Literals(INIT_FLAGS.script, SCRIPT_ORDER).pipe(
+const scripts = Flag.Literals("script", SCRIPT_ORDER).pipe(
   Flag.atMost(SCRIPT_ORDER.length),
-  Flag.withDescription("Add a package script. Repeat --script to add more")
+  Flag.withDescription(
+    "Set a package script to its Adamantite command, replacing what it ran. Repeat --script to add more"
+  )
 )
 
-const presets = Flag.Literals(INIT_FLAGS.preset, LINT_PRESETS).pipe(
+const presets = Flag.Literals("preset", LINT_PRESETS).pipe(
   Flag.atMost(LINT_PRESETS.length),
   Flag.withDescription(
     "Select an Oxlint preset. Repeat --preset to add more. Requires --script check or --script fix"
   )
 )
 
-const editors = Flag.Literals(INIT_FLAGS.editor, INIT_EDITORS).pipe(
+const editors = Flag.Literals("editor", INIT_EDITORS).pipe(
   Flag.atMost(INIT_EDITORS.length),
   Flag.withDescription("Configure an editor. Repeat --editor to add more")
 )
@@ -195,11 +171,6 @@ const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
   )
 )
 
-const installExtensions = Flag.Boolean("install-extensions").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Install recommended editor extensions. Select at least one --editor")
-)
-
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
@@ -207,17 +178,10 @@ const githubActions = Flag.Boolean("github-actions").pipe(
   )
 )
 
-const agents = Flag.Boolean(INIT_FLAGS.agents).pipe(
+const agents = Flag.Boolean("agents").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
     "Add Adamantite guidance to AGENTS.md and the Adamantite skill to the skill folders of your coding agents"
-  )
-)
-
-const overwriteScripts = Flag.Boolean("overwrite-scripts").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription(
-    "Replace existing package scripts that conflict with Adamantite's managed commands"
   )
 )
 
@@ -225,9 +189,7 @@ export const initCommandOptions = {
   agents,
   editors,
   githubActions,
-  installExtensions,
   nonInteractive,
-  overwriteScripts,
   presets,
   scripts,
   typescript,

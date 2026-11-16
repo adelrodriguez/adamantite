@@ -6,6 +6,7 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as String from "effect/String"
 
@@ -14,7 +15,9 @@ import * as String from "effect/String"
  * Discovery gives absolute paths, so the brand keeps one from reaching code that joins a project
  * path with the project root.
  */
-export type ProjectPath = string & Brand.Brand<"ProjectPath">
+export const ProjectPath = Schema.String.pipe(Schema.brand("ProjectPath"))
+
+export type ProjectPath = typeof ProjectPath.Type
 
 const ProjectPathBrand = Brand.nominal<ProjectPath>()
 

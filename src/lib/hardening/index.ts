@@ -3,17 +3,18 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { RuleSuppressions } from "#lib/hardening/suppressions.ts"
-import type { Workspace } from "#lib/workspace/monorepo.ts"
-import { type AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
+import * as Schema from "effect/Schema"
+import type { Workspace } from "#lib/project/monorepo.ts"
+import { AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
-import { OverridesLintFailed, type OverridesReport } from "#lib/hardening/overrides.ts"
-import { listProjectFiles, type ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
+import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
+import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
+import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
+import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
-import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
@@ -34,31 +35,48 @@ function isDocumentation(file: string) {
 }
 
 /**
- * The files that a harden session starts from. Paths are relative to the project root.
+ * What a harden session starts from: the files that Adamantite found, and what it computed about
+ * the rules. Paths are relative to the project root. `harden --json` prints it as this schema
+ * encodes it.
  */
-interface HardenContext {
+export const HardenContext = Schema.Struct({
   /**
    * Which Markdown files each `AGENTS.md` reaches, or none when git cannot list them.
    */
-  readonly agentReach: Option.Option<AgentReach>
-  readonly configs: readonly ProjectPath[]
+  agentReach: Schema.OptionFromNullOr(AgentReach),
+  /**
+   * The number of recent commits that the agent reads for fixed mistakes.
+   */
+  commits: Schema.Int,
+  configs: Schema.Array(ProjectPath),
   /**
    * The Markdown files of the project, or none when git cannot list them.
    */
-  readonly documentationFiles: Option.Option<readonly string[]>
-  readonly instructionFiles: readonly string[]
-  readonly rulesFolders: readonly string[]
+  documentationFiles: Schema.OptionFromNullOr(Schema.Array(Schema.String)),
+  instructionFiles: Schema.Array(Schema.String),
+  /**
+   * The trial of each override that turns a rule off.
+   */
+  overrides: OverridesReport,
+  rulesFolders: Schema.Array(Schema.String),
   /**
    * The folder that `--path` selects, relative to the project root with `/` between folders, as git
    * and Oxlint list files, or `null` for the whole project.
    */
-  readonly scope: ProjectPath | null
+  scope: Schema.NullOr(ProjectPath),
   /**
-   * Files with a `custom()` call whose `dir` is not a string literal, so only the agent can find
-   * its rules folder.
+   * The disable comments of each rule, or none when Oxlint cannot list the files that it lints or
+   * read their comments.
    */
-  readonly unresolvedCalls: readonly string[]
-}
+  suppressions: Schema.OptionFromNullOr(Schema.Array(RuleSuppressions)),
+  /**
+   * The Oxlint configs that Node.js cannot load, so only the agent can find the rules folders that
+   * their `custom()` calls load.
+   */
+  unloadedConfigs: Schema.Array(Schema.String),
+})
+
+export type HardenContext = typeof HardenContext.Type
 
 /**
  * The packages that a scope selects: the packages inside the scope, or the innermost package that
@@ -174,12 +192,14 @@ export const readHardenReach = Effect.fn("readHardenReach")(function* (
  * the packages inside that folder, or the package that contains it. The context keeps the configs
  * that lint those packages, an ancestor config included, and the rules folders that those configs
  * load, also when they are outside the scope. A scope also keeps the Markdown files outside each
- * workspace package, because the root documentation applies to every package.
+ * workspace package, because the root documentation applies to every package. `commits` is the
+ * number of recent commits that the agent reads for fixed mistakes.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
   workspace: Workspace,
-  scope: string = cwd
+  scope: string,
+  commits: number
 ) {
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
@@ -191,9 +211,9 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   )
 
   // Git lists the Markdown files while discovery reads the workspace packages.
-  const [{ calls, configs, unresolvedCalls }, instructionFiles, documentation] = yield* Effect.all(
+  const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation] = yield* Effect.all(
     [
-      discoverCustomRules(packageDirectories, selectedPackages),
+      discoverCustomRules(cwd, packageDirectories, selectedPackages),
       Effect.filter(instructionCandidates, (file) => checkExists(file), {
         concurrency: "unbounded",
       }),
@@ -202,14 +222,29 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     { concurrency: "unbounded" }
   )
 
+  const projectConfigs = configs.map((config) => toProjectPath(path, cwd, config))
+  const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
+
+  // These reads change no file in the project, so they run together.
+  const [overrides, suppressions] = yield* Effect.all(
+    [
+      readOverrides(cwd, workspace, projectConfigs, projectScope),
+      readSuppressions(cwd, projectScope),
+    ],
+    { concurrency: "unbounded" }
+  )
+
   return {
     agentReach: documentation.agentReach,
-    configs: configs.map((config) => toProjectPath(path, cwd, config)),
+    commits,
+    configs: projectConfigs,
     documentationFiles: documentation.documentationFiles,
     instructionFiles: instructionFiles.map((file) => relative(file)),
-    rulesFolders: [...new Set(calls.map((call) => relative(call.dir)))],
-    scope: scope === cwd ? null : toProjectPath(path, cwd, scope),
-    unresolvedCalls: [...new Set(unresolvedCalls.map((source) => relative(source)))],
+    overrides,
+    rulesFolders: Array.sort(Array.dedupe(calls.map((call) => relative(call.dir))), Order.String),
+    scope: projectScope,
+    suppressions,
+    unloadedConfigs: unloadedConfigs.map(({ file }) => relative(file)),
   } satisfies HardenContext
 })
 
@@ -246,15 +281,15 @@ function renderAgentReach(reach: AgentReach) {
 }
 
 function renderRulesFolders(context: HardenContext) {
-  if (context.rulesFolders.length === 0 && context.unresolvedCalls.length === 0) {
+  if (context.rulesFolders.length === 0 && context.unloadedConfigs.length === 0) {
     return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/rules\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`
   }
 
   return [
     ...context.rulesFolders.map((folder) => `- \`${folder}\``),
-    ...context.unresolvedCalls.map(
+    ...context.unloadedConfigs.map(
       (file) =>
-        `- A \`custom()\` call in \`${file}\` whose \`dir\` is not a string literal. Read the config to find its rules folder.`
+        `- The rules folders that \`${file}\` loads. Node.js cannot load the config, so read it to find them.`
     ),
   ].join("\n")
 }
@@ -268,7 +303,7 @@ const SHOWN_SUPPRESSIONS = 5
 function renderSuppressions(suppressions: Option.Option<readonly RuleSuppressions[]>) {
   return Option.match(suppressions, {
     onNone: () =>
-      'Adamantite could not count the comments that turn a rule off, because Oxlint could not list the files that it lints. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`, and leave out the files that the config ignores.',
+      'Adamantite could not count the comments that turn a rule off, because Oxlint could not list the files that it lints or read their comments. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`, and leave out the files that the config ignores.',
     onSome: (rules) => {
       if (rules.length === 0) {
         return "No `oxlint-disable` or `eslint-disable` comment turns a rule off."
@@ -311,7 +346,7 @@ const OVERRIDE_MARKS = {
 } as const
 
 function renderOverrides(report: OverridesReport) {
-  if (report instanceof OverridesLintFailed) {
+  if (Schema.is(OverridesLintFailed)(report)) {
     return [
       "Adamantite could not lint the files of the overrides that turn a rule off:",
       "",
@@ -345,24 +380,11 @@ function renderOverrides(report: OverridesReport) {
  */
 export const DEFAULT_FIX_HISTORY_COMMITS = 200
 
-interface RenderHardenPromptOptions {
-  readonly adamantiteVersion: string
-  /**
-   * The number of recent commits that the agent reads for fixed mistakes.
-   */
-  readonly commits: number
-  readonly overrides: OverridesReport
-  readonly suppressions: Option.Option<readonly RuleSuppressions[]>
-}
-
 /**
  * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
  * files, the facts that Adamantite computes, and the commands; `harden-prompt.md` holds the rest.
  */
-export function renderHardenPrompt(
-  context: HardenContext,
-  { adamantiteVersion, commits, overrides, suppressions }: RenderHardenPromptOptions
-): string {
+export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
   // `.` keeps the history to the project folder when the project is a folder of a larger repository.
   const fixHistoryPath = quoteShellArgument(context.scope ?? ".")
 
@@ -382,18 +404,18 @@ export function renderHardenPrompt(
         "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, and changelogs. Record the search scope and report this fallback with the missing sources.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
-    fixHistoryCommand: `\`git log -n ${commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,
+    fixHistoryCommand: `\`git log -n ${context.commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,
     instructionFiles: renderList(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."
     ),
-    overrides: renderOverrides(overrides),
+    overrides: renderOverrides(context.overrides),
     rulesFolders: renderRulesFolders(context),
     scope:
       context.scope === null
         ? "Adamantite found these files in the project and its workspace packages. Paths are relative to the project root."
         : `Adamantite found these files for \`${context.scope}\`, the folder that \`--path\` selects. Survey only the code in this folder. Paths are relative to the project root.`,
-    suppressions: renderSuppressions(suppressions),
+    suppressions: renderSuppressions(context.suppressions),
     version: adamantiteVersion,
   })
 }

@@ -1,6 +1,8 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/react" } satisfies PresetIdentity,
   plugins: ["react", "react-perf", "jsx-a11y"],
   rules: {
     "jsx-a11y/alt-text": "error",

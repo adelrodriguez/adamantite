@@ -1,32 +1,19 @@
 import type * as Terminal from "effect/Terminal"
-import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Prompt from "effect/cli/Prompt"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import type { TypeScriptPreset } from "#lib/integrations/workspace/tsconfig.ts"
 import {
   describeLintPreset,
   findExcludedPresets,
   findMissingRequiredPresets,
-  type LintPreset,
   lintPresets,
-} from "#lib/integrations/tooling/oxlint/presets.ts"
-import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
-import {
-  checkIsSupportedPackageManager,
-  getConflictingScripts,
-  readPackageJson,
-  MANAGED_SCRIPT_COMMANDS,
-  type ScriptConflict,
-  checkRunsTool,
-  listSupportedPackageManagers,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/integrations/oxlint/presets.ts"
+import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
+import { checkRunsTool } from "#lib/project/package-json.ts"
+import { INIT_EDITORS, type LintPreset, type TypeScriptPreset } from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
-import { INIT_EDITOR_CHOICES, INIT_EDITORS, type InitOptionsInput } from "./options.ts"
-
-const describeScriptConflict = (conflict: ScriptConflict) =>
-  `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
+import { INIT_EDITOR_CHOICES, type InitOptionsInput } from "./options.ts"
 
 /**
  * Asks which preset to keep of each selected pair that excludes each other, and removes the other
@@ -77,9 +64,7 @@ const promptPresets = Effect.gen(function* () {
 })
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
-  cwd: string,
-  isMonorepo: boolean,
-  packageManager: PackageManagerName
+  isMonorepo: boolean
 ) {
   const selectedScripts = yield* Prompt.MultiSelect({
     choices: [
@@ -100,26 +85,9 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         value: "analyze",
       },
     ],
-    message: "Which scripts should Adamantite add to `package.json`?",
+    message:
+      "Which scripts should Adamantite set in `package.json`? It replaces what a selected script runs.",
   })
-
-  const packageJson = yield* readPackageJson(cwd)
-  const conflicts = getConflictingScripts(packageJson, selectedScripts)
-
-  for (const conflict of conflicts) {
-    yield* Output.warning(describeScriptConflict(conflict))
-  }
-
-  const shouldOverwriteScripts =
-    conflicts.length > 0
-      ? yield* Prompt.Confirm({
-          initial: false,
-          message:
-            conflicts.length === 1
-              ? "Replace this script with Adamantite's command?"
-              : "Replace these scripts with Adamantite's commands?",
-        })
-      : false
 
   const hasOxlint = checkRunsTool(selectedScripts, "oxlint")
   const selectedPresets = hasOxlint ? yield* promptPresets : []
@@ -154,34 +122,12 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     message: "Which editors should Adamantite configure?",
   })
 
-  const shouldInstallExtensions =
-    selectedEditors.length > 0
-      ? yield* Prompt.Confirm({
-          initial: true,
-          message: "Install the recommended editor extensions?",
-        })
-      : false
-
-  const canEnableGitHubActions = checkIsSupportedPackageManager(packageManager)
-  const keptConflicts = shouldOverwriteScripts ? [] : conflicts.map((conflict) => conflict.script)
-
-  // The workflow runs the selected scripts that init makes managed. A conflicting script that the
-  // user keeps does not run Adamantite, and init accepts the workflow only for a selected script.
-  const writtenScripts = selectedScripts.filter((script) => !keptConflicts.includes(script))
-
-  if (hasCICompatibleScripts(writtenScripts) && !canEnableGitHubActions) {
-    yield* Output.info(
-      `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports ${listSupportedPackageManagers("conjunction")}.`
-    )
-  }
-
-  const shouldEnableGitHubActions =
-    hasCICompatibleScripts(writtenScripts) && canEnableGitHubActions
-      ? yield* Prompt.Confirm({
-          initial: true,
-          message: "Add a GitHub Actions workflow to run the selected checks?",
-        })
-      : false
+  const shouldEnableGitHubActions = hasCICompatibleScripts(selectedScripts)
+    ? yield* Prompt.Confirm({
+        initial: true,
+        message: "Add a GitHub Actions workflow to run the selected checks?",
+      })
+    : false
 
   const shouldSetupAgents = yield* Prompt.Confirm({
     initial: true,
@@ -193,8 +139,6 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     agents: shouldSetupAgents,
     editors: selectedEditors,
     githubActions: shouldEnableGitHubActions,
-    installExtensions: shouldInstallExtensions,
-    overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
     typescript: typescriptPreset,

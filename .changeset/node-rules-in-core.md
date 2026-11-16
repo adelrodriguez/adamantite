@@ -4,7 +4,7 @@
 
 Move the Node.js lint rules into core
 
-Core now enables `node/handle-callback-err`, `node/no-exports-assign`, `node/no-mixed-requires`, `node/no-new-require`, and `node/no-path-concat`. The separate `adamantite/lint/node` preset and `--preset node` choice are removed. Doctor reports the retired import.
+Core now enables `node/handle-callback-err`, `node/no-exports-assign`, `node/no-mixed-requires`, `node/no-new-require`, and `node/no-path-concat`. The separate `adamantite/lint/node` preset and `--preset node` choice are removed. A config that still imports `adamantite/lint/node` fails to load, and Doctor reports the load error.
 
 Remove the Node preset import and its `extends` entry from `oxlint.config.ts`. Keep the core `adamantite/lint` preset and any `node/*` rule settings. Remove `--preset node` from init commands.
 

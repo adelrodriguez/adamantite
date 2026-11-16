@@ -104,6 +104,7 @@ export function createFileSystemTestContext(options?: {
   const directories = new Set<string>([root])
   const readOnlyPaths = new Set<string>()
   const unreadablePaths = new Set<string>()
+  let temporaryDirectories = 0
 
   // Register every ancestor so strict parent-directory checks pass for roots.
   for (let current = root; dirname(current) !== current; current = dirname(current)) {
@@ -227,7 +228,33 @@ export function createFileSystemTestContext(options?: {
         return Effect.void
       }),
     makeTempDirectory: makeUnimplemented("makeTempDirectory"),
-    makeTempDirectoryScoped: makeUnimplemented("makeTempDirectoryScoped"),
+    // A temporary folder outside the root, which the scope removes with its entries.
+    makeTempDirectoryScoped: (makeOptions) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          temporaryDirectories += 1
+
+          const target = resolve("/tmp", `${makeOptions?.prefix ?? "tmp-"}${temporaryDirectories}`)
+
+          addDirectoryRecursive(target)
+
+          return target
+        }),
+        (target) =>
+          Effect.sync(() => {
+            for (const file of files.keys()) {
+              if (file.startsWith(`${target}/`)) {
+                files.delete(file)
+              }
+            }
+
+            for (const directory of directories) {
+              if (directory === target || directory.startsWith(`${target}/`)) {
+                directories.delete(directory)
+              }
+            }
+          })
+      ),
     makeTempFile: makeUnimplemented("makeTempFile"),
     makeTempFileScoped: makeUnimplemented("makeTempFileScoped"),
     open: makeUnimplemented("open"),
@@ -337,7 +364,32 @@ export function createFileSystemTestContext(options?: {
           ? Effect.succeed(makeFileInfo("Directory", 0))
           : Effect.fail(makeSystemError("NotFound", "stat", path))
       }),
-    stream: () => Stream.die(makeUnimplementedError("stream")),
+    // The bytes of a file, at most `bytesToRead` of them, in one chunk.
+    stream: (path, streamOptions) =>
+      Stream.suspend(() => {
+        const target = normalize(path)
+        const content = files.get(target)
+
+        if (unreadablePaths.has(target)) {
+          return Stream.fail(makeSystemError("PermissionDenied", "stream", path))
+        }
+
+        if (content === undefined) {
+          return Stream.fail(makeSystemError("NotFound", "stream", path))
+        }
+
+        const bytes = new TextEncoder().encode(content)
+
+        if (streamOptions?.offset !== undefined) {
+          return Stream.die(makeUnimplementedError("stream with an offset"))
+        }
+
+        return Stream.make(
+          streamOptions?.bytesToRead === undefined
+            ? bytes
+            : bytes.slice(0, Number(ByteSize.fromInputUnsafe(streamOptions.bytesToRead)))
+        )
+      }),
     symlink: makeUnimplemented("symlink"),
     truncate: makeUnimplemented("truncate"),
     utimes: makeUnimplemented("utimes"),

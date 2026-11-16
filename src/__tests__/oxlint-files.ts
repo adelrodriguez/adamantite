@@ -5,10 +5,8 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 
-/**
- * The linted files returned by Oxlint, without a host process.
- */
-export function makeOxlintFilesLayer(files: readonly string[] = []) {
+// An Oxlint file list run that exits with `exitCode` and prints `stdout`, without a host process.
+function makeFileListLayer(exitCode: number, stdout: string) {
   return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
     ChildProcessSpawner.make((command) => {
       if (!ChildProcess.isStandardCommand(command) || !command.args.includes("--debug=files")) {
@@ -18,7 +16,7 @@ export function makeOxlintFilesLayer(files: readonly string[] = []) {
       return Effect.succeed(
         ChildProcessSpawner.makeHandle({
           all: Stream.empty,
-          exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+          exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(exitCode)),
           getInputFd: () => Sink.drain,
           getOutputFd: () => Stream.empty,
           isRunning: Effect.succeed(false),
@@ -26,10 +24,24 @@ export function makeOxlintFilesLayer(files: readonly string[] = []) {
           pid: ChildProcessSpawner.ProcessId(1),
           stderr: Stream.empty,
           stdin: Sink.drain,
-          stdout: Stream.make(new TextEncoder().encode(files.join("\n"))),
+          stdout: Stream.make(new TextEncoder().encode(stdout)),
           unref: Effect.succeed(Effect.void),
         })
       )
     })
   )
+}
+
+/**
+ * The linted files returned by Oxlint, without a host process.
+ */
+export function makeOxlintFilesLayer(files: readonly string[] = []) {
+  return makeFileListLayer(0, files.join("\n"))
+}
+
+/**
+ * An Oxlint that cannot load the lint config and prints `output`, without a host process.
+ */
+export function makeOxlintLoadFailureLayer(output: string) {
+  return makeFileListLayer(1, output)
 }

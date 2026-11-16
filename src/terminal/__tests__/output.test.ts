@@ -2,10 +2,12 @@ import { describe, expect, it } from "@effect/vitest"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
 import { TestConsole } from "effect/testing"
+import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
-function provideCapabilities(canColor: boolean) {
+function provideCapabilities(canColor: boolean, mode: Mode.Mode = Mode.Menu()) {
   return Effect.provide(
     Layer.mergeAll(
       TestConsole.layer,
@@ -13,7 +15,8 @@ function provideCapabilities(canColor: boolean) {
         canAnimate: false,
         canColor,
         canPrompt: false,
-      })
+      }),
+      Layer.succeed(Mode.CurrentMode, mode)
     )
   )
 }
@@ -83,5 +86,36 @@ describe("Output", () => {
         "\u001B[1m💠 adamantite init\u001B[22m",
       ])
     }).pipe(provideCapabilities(true))
+  )
+
+  it.effect("print no heading outside a terminal session", () =>
+    Effect.gen(function* () {
+      yield* Output.intro("💠 adamantite doctor")
+      yield* Output.success("Dependencies installed.")
+      yield* Output.outro("✅ Doctor finished.")
+
+      expect(yield* TestConsole.logLines).toStrictEqual(["✔ Dependencies installed."])
+    }).pipe(provideCapabilities(false, Mode.Plain()))
+  )
+
+  // Standard output holds only the JSON document, so a command's lines go to standard error.
+  it.effect("write every line but the JSON document to standard error in the JSON mode", () =>
+    Effect.gen(function* () {
+      yield* Output.intro("💠 adamantite doctor")
+      yield* Output.warning("Kept the existing `check` script.")
+      yield* Output.note("1. Missing script", "Current state\nNo `check` script.")
+      yield* Output.result(Schema.Struct({ ok: Schema.Boolean }), { ok: true }, "ok")
+
+      expect({
+        errors: yield* TestConsole.errorLines,
+        logs: yield* TestConsole.logLines,
+      }).toStrictEqual({
+        errors: [
+          "▲ Kept the existing `check` script.",
+          "\n1. Missing script\n  Current state\n  No `check` script.",
+        ],
+        logs: ['{\n  "ok": true\n}'],
+      })
+    }).pipe(provideCapabilities(false, Mode.Json()))
   )
 })

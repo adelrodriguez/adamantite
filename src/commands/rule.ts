@@ -10,54 +10,62 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
-import { parseSync } from "oxc-parser"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
   CurrentSetting,
   ErrorSetting,
   parseTrialCase,
-  type TrialCaseResult,
-  type TrialSetting,
+  TrialCaseResult,
+  TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
-import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
-import { readFile } from "#lib/shared/filesystem.ts"
-import { formatJson } from "#lib/shared/json.ts"
-import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
   listCustomRules,
   readCustomRuleTestCommand,
-} from "#lib/workspace/custom-rules/index.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
-import { readWorkspace } from "#lib/workspace/monorepo.ts"
-import { readProject } from "#lib/workspace/project.ts"
+} from "#lib/project/custom-rules/index.ts"
+import { readWorkspace } from "#lib/project/monorepo.ts"
+import { readProject } from "#lib/project/project.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
+import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
+import { formatJson } from "#lib/shared/json.ts"
+import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import * as Toolchain from "#lib/toolchain/index.ts"
+import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(
   Argument.withDescription("The JavaScript or TypeScript file to parse")
 )
 
-const ast = Command.make("ast", { file: astFile }).pipe(
+/**
+ * What `rule ast --json` prints: the file, relative to the current directory, and its syntax tree
+ * in the ESTree shape that Oxlint gives rules.
+ */
+export const AstReport = Schema.Struct({
+  file: Schema.String,
+  program: Schema.Unknown,
+  schemaVersion: Schema.Literal(1),
+})
+
+const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   Command.withDescription(
     "Print the syntax tree Oxlint rules use, with node names for custom rules"
   ),
-  Command.withHandler(({ file }) =>
+  Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
-      const content = yield* readFile(file)
-      // Oxlint gives rules an AST without parenthesized expressions.
-      const result = parseSync(file, content, { preserveParens: false })
+      const path = yield* Path.Path
+      const cwd = process.cwd()
+      const relative = path.relative(cwd, path.resolve(cwd, file))
+      const program = yield* Toolchain.ast({ cwd, file: relative })
 
-      if (result.errors.length > 0) {
-        return yield* new FailedToParseSource({
-          errors: result.errors.map((error) => error.message),
-          path: file,
-        })
-      }
-
-      yield* Console.log(yield* formatJson(result.program))
-    })
+      yield* Output.result(
+        AstReport,
+        { file: relative, program, schemaVersion: 1 },
+        yield* formatJson(program)
+      )
+    }).pipe(Mode.provide({ json }))
   )
 )
 
@@ -179,19 +187,11 @@ const test = Command.make("test", { path: testPath }).pipe(
         })
       }
 
-      const { command, unresolvedCalls, unresolvedImports } = yield* readCustomRuleTestCommand(
-        yield* readProject(cwd)
-      )
+      const { command, unloadedConfigs } = yield* readCustomRuleTestCommand(yield* readProject(cwd))
 
-      for (const source of unresolvedCalls) {
+      for (const { file, reason } of unloadedConfigs) {
         yield* Output.warning(
-          `\`rule test\` cannot read the \`dir\` of a \`custom()\` call in \`${path.relative(cwd, source)}\`, because it is not a string literal. It does not run the tests of that rules folder.`
-        )
-      }
-
-      for (const { from, specifier } of unresolvedImports) {
-        yield* Output.warning(
-          `\`rule test\` cannot resolve the import of \`${specifier}\` in \`${path.relative(cwd, from)}\`, so it does not run the tests of the rules folders behind it.`
+          `\`rule test\` cannot load \`${path.relative(cwd, file)}\`, so it does not run the tests of the rules folders behind it. Node.js reported: ${reason}`
         )
       }
 
@@ -239,7 +239,7 @@ const current = Flag.Boolean("current").pipe(
 )
 
 function describeSetting(rule: string, setting: TrialSetting) {
-  return setting instanceof CurrentSetting
+  return Schema.is(CurrentSetting)(setting)
     ? `\`${rule}\` as the project config sets it`
     : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
 }
@@ -296,9 +296,21 @@ export function renderTrial(
   ].join("\n")
 }
 
+/**
+ * What `rule try --json` prints: the rule, the setting of the trial, and what the rule reported on
+ * each case.
+ */
+export const TrialReport = Schema.Struct({
+  results: Schema.Array(TrialCaseResult),
+  rule: Schema.String,
+  schemaVersion: Schema.Literal(1),
+  setting: TrialSetting,
+})
+
 const trial = Command.make("try", {
   accept,
   current,
+  json: Mode.json,
   options: trialOptions,
   report,
   rule: trialRule,
@@ -306,8 +318,10 @@ const trial = Command.make("try", {
   Command.withDescription(
     "Test a rule against cases in a project copy. Exit codes: 0 for expected results, 1 for a mismatch, and 2 if a case could not be checked. Project files stay unchanged"
   ),
-  Command.withHandler(({ accept, current, options, report, rule }) =>
+  Command.withHandler((flags) =>
     Effect.gen(function* () {
+      const { accept, current, options, report, rule } = flags
+
       const setting = current
         ? new CurrentSetting()
         : new ErrorSetting({ options: Option.getOrElse(options, () => []) })
@@ -347,7 +361,11 @@ const trial = Command.make("try", {
         )
       )
 
-      yield* Console.log(renderTrial(rule, setting, results))
+      yield* Output.result(
+        TrialReport,
+        { results, rule, schemaVersion: 1, setting },
+        renderTrial(rule, setting, results)
+      )
 
       if (!results.every((result) => isAsExpected(result))) {
         return yield* new CommandFailed({
@@ -355,7 +373,7 @@ const trial = Command.make("try", {
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       }
-    })
+    }).pipe(Mode.provide({ json: flags.json }))
   )
 )
 

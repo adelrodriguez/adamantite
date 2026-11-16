@@ -3,7 +3,7 @@ import * as Console from "effect/Console"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Terminal from "effect/Terminal"
-import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
 import { TerminalInput } from "#terminal/input.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -67,8 +67,8 @@ export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: s
 
 /**
  * Offers a handoff to each installed coding agent, a copy of the Markdown prompt, or nothing, and
- * runs the choice. When the agent CLI does not start, it offers the prompt copy instead. It returns
- * the user's choice, and the command decides what happens next.
+ * runs the choice. When the agent CLI does not start, it prints and copies the prompt instead. It
+ * returns the user's choice, and `Resolution.offer` decides what happens next.
  */
 export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
@@ -126,7 +126,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   )
 
   if (!started) {
-    yield* offerPromptCopy(options.prompt)
+    yield* copyPrompt(options.prompt)
 
     return new AgentStartFailed({ agent })
   }

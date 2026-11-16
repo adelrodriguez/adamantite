@@ -33,7 +33,7 @@ and update the project.
   and Vue, test runners like Jest and Vitest, Node.js, and stricter opt-in rule sets.
 - **Project setup**: Create package scripts, configuration files, editor settings, and CI
   through an interactive or non-interactive initializer.
-- **Setup maintenance**: Assess managed integrations with `doctor`, update managed
+- **Setup maintenance**: Assess the integrations with `doctor`, update managed
   dependencies, and give humans or agents repair instructions.
 - **Custom rules**: Write project-specific Oxlint rules in `.adamantite/lint/`, one rule
   for each file, and enable all of them with one line.
@@ -41,8 +41,8 @@ and update the project.
   follows into custom rules, and into instructions for the ones that no rule can check.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
-- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`, and add the
-  Adamantite skill for your coding agents.
+- **Agent guidance**: Write an `AGENTS.md` with the Adamantite section when the project has
+  none, and add the Adamantite skill for your coding agents.
 
 ## Quick start
 
@@ -70,6 +70,33 @@ adamantite fix
 adamantite analyze
 ```
 
+Init records the setup in `.adamantite/adamantite-lock.json`, the lockfile. Commit it with the
+rest of the setup. In a monorepo, the lockfile sits at the workspace root.
+
+```json
+{
+  "schemaVersion": 1,
+  "selection": {
+    "agents": true,
+    "ci": "github",
+    "editors": ["vscode"],
+    "presets": ["core", "strict"],
+    "scripts": ["check", "fix", "analyze"],
+    "typescript": "typescript"
+  },
+  "version": "0.47.0",
+  "written": {
+    "oxlint.config.ts": "sha256-…"
+  }
+}
+```
+
+`selection` is what you asked init to set up. A later `init` adds its options to the selection.
+`version` is the Adamantite version that last wrote
+the lockfile. `written` maps each file that Adamantite wrote whole, by its path from the project
+root, to the hash of what it wrote. Doctor reads the selection, and only `init` and `update` write
+the lockfile.
+
 ## Non-interactive setup
 
 Use `--non-interactive` to configure a project entirely from flags. Specify at least one
@@ -84,7 +111,6 @@ npx adamantite init \
   --preset react \
   --editor vscode \
   --typescript typescript \
-  --install-extensions \
   --github-actions \
   --agents
 ```
@@ -99,33 +125,57 @@ Available setup values:
 - Editors: `vscode` and `zed`.
 - TypeScript presets: `typescript` and `tsconfig`. See [the TypeScript presets](#the-typescript-presets).
 
-Presets require the `check` or `fix` script. Editor extension installation
-requires an editor. GitHub Actions requires a compatible script and a supported package
-manager. Omitted boolean flags are disabled.
+Presets require the `check` or `fix` script. GitHub Actions requires a compatible script and a
+supported package manager. Omitted boolean flags are disabled.
 
-The GitHub Actions workflow runs the `check` and `analyze` scripts that you select.
-Its job sits between `# ADAMANTITE:START` and `# ADAMANTITE:END` comments. Adamantite owns
-the jobs between these comments, and you own the rest of the workflow. You can rename the
-file in `.github/workflows` and add your own jobs outside the comments. Doctor checks only the
-jobs between the comments, and init updates them when you did not change them.
+`init` and `update` assess the project after the setup and exit 1 when findings remain. In an
+interactive terminal they offer the repair through the [resolution menu](#adamantite-doctor).
+Without one, they print the Markdown repair prompt. `--json` sets up from the flags, without
+`--non-interactive`, and prints the setup and the assessment as one JSON document. See
+[JSON output](#json-output).
+
+The GitHub Actions workflow, `.github/workflows/adamantite.yml`, runs the `check` and `analyze`
+scripts that you select. It is a managed file: `init` and `update` replace it while it holds what
+Adamantite wrote, and keep it once you change it, such as to add your own jobs. Doctor then checks
+that a job runs each selected script. A workflow that an earlier release wrote and you renamed
+stays as it is, and Adamantite writes no second workflow beside it.
 Agents verify custom rules with temporary cases while they work. CI runs the rules through
 `check` by default. Users can add an explicit `adamantite rule test` step for optional saved tests.
 Init preserves a workflow with an explicit rule-test command, including its setup and other settings.
 
-Existing package scripts whose commands differ from Adamantite's are kept and reported
-instead of being replaced. The interactive initializer asks before overwriting them; in
-non-interactive mode, pass `--overwrite-scripts` to replace them. To keep custom flags,
-forward them to the Adamantite command after `--`, e.g.
-`adamantite analyze -- --directory packages/app`.
+Each script that you select is a managed script. `init` and `update` set it in `package.json` to
+its Adamantite command, such as `"check": "adamantite check"`, and replace what it ran before.
+They print each script that they added or replaced, with its earlier command. A script that you
+did not select stays as it is. To keep custom flags, put them in a script of your own name and
+forward them to the Adamantite command after `--`, such as
+`adamantite analyze -- --directory packages/app`. When `init` or `update` changes
+`package.json`, it formats the file with the project's Oxfmt, so `adamantite fix` leaves it as it
+is.
 
 In a detected monorepo, TypeScript setup does not write a root `tsconfig.json`, because a
-catch-all root config makes TypeScript treat all packages as one project. Adamantite
-prints guidance instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
-in a library, to each package's `tsconfig.json` or to a shared base config.
+catch-all root config makes TypeScript treat all packages as one project. Doctor reports the
+packages instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
+in a library, to each package's `tsconfig.json` or to a shared base config. A root
+`tsconfig.json` that Adamantite wrote before the project became a monorepo stays managed.
 
-Init rewrites an existing `tsconfig.json`, `.vscode/settings.json`, or `.zed/settings.json` only
-when the file is plain JSON. A file with comments or trailing commas stays as it is, and init
-prints the change to make by hand.
+`init` and `update` write each managed file whole: `oxlint.config.ts`, `oxfmt.config.ts`,
+`knip.config.ts`, `tsconfig.json`, `.vscode/settings.json`, `.vscode/extensions.json`,
+`.zed/settings.json`, `.github/workflows/adamantite.yml`, a new `AGENTS.md`, and the Adamantite
+skill. They write a file only when it does not exist or still holds what Adamantite wrote, by the
+hash in the lockfile. They format it with the project's Oxfmt first, so `adamantite fix` leaves
+it as it is. A file that you changed stays as it is, and `adamantite doctor` reports a change that
+breaks the setup, such as a missing extension recommendation. A file that the setup no longer
+needs is deleted when nobody changed it.
+
+The `tsconfig.json` extends the selected preset, and adds the Effect language service entry for
+the `effect` preset. A project that keeps a legacy JSON config, such as `.oxlintrc.json`,
+`.oxfmtrc.json`, or `knip.json`, gets no TypeScript config beside it, because the tool would not
+load both, and Doctor reports the migration. `.vscode/extensions.json` recommends the Oxc
+extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
+for the `effect` preset, so VS Code offers to install them.
+
+Zed installs extensions only from its user settings, so `init` prints a link to each Zed
+extension that the setup needs.
 
 ## Commands
 
@@ -212,8 +262,11 @@ adamantite analyze --only monorepo --fix -- --select highest
 
 ### `adamantite doctor`
 
-Assess every Adamantite-managed integration. Doctor is read-only. Each finding describes
-the current state, the goal state, and how to verify the repair. Doctor also checks that the
+Assess every integration of the setup. Doctor is read-only. Each finding describes
+the current state, the goal state, and how to verify the repair. Doctor checks each integration
+that the lockfile selects, so a selected integration whose file is missing or wrong gets a
+finding. A project without a lockfile gets one finding that says to run `adamantite update`, and
+Doctor checks the integrations whose files exist. Doctor also checks that the
 installed packages can run Oxlint: each declared package is installed, and `@effect/tsgo` has
 a build for the installed Oxlint, tsrs, and platform. It starts no tool for this check.
 
@@ -234,7 +287,10 @@ its input with the seed prompt, so that handoff needs one Enter press to start.
 A coding agent can also run `adamantite doctor` in the target project to receive Markdown
 directly. In a non-interactive run, Doctor prints the combined repair prompt and exits 1
 when findings remain. If only assessment warnings remain, Doctor prints a Markdown
-warning report and exits 0.
+warning report and exits 0. If no agent CLI starts after you choose it, Doctor prints the prompt
+instead. A project that does not declare `adamantite` gets one finding that says to install it.
+`adamantite doctor --json` prints the assessment as one JSON document and exits 1 when findings
+remain. See [JSON output](#json-output).
 
 ### `adamantite harden`
 
@@ -263,26 +319,35 @@ reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 
-In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
-coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff, `harden`
-runs `check`, then the Doctor assessment, and exits 1 when either fails.
+In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
+installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,
+`harden` runs `check`, then the Doctor assessment, and exits 1 when either fails.
 During the session, the agent verifies each new or changed custom rule with temporary
 RuleTester cases and removes the cases before handback.
 Harden also exits 1 when the session added a link to a Markdown file that does not exist. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings.
+`harden --json` prints what the prompt is built from as one JSON document, and starts no agent.
 
 ### `adamantite update`
 
-Update Adamantite-managed dependencies, then report any setup findings:
+Update Adamantite-managed dependencies, then offer the repair of any setup findings:
 
 ```sh
 adamantite update
-adamantite doctor
+adamantite update --json
 ```
 
-`update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
-`adamantite doctor` as the CI gate. It also refreshes each copy of the
-[Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version.
+`update` installs each package of the recorded setup that the project does not declare at the
+managed version, such as Oxlint, tsrs, and the managed plugin of each selected preset. A version
+from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry. `update` exits 1
+when findings remain after it, and offers their repair as `init` does.
+It also writes the managed files of the recorded setup, such as the
+[Adamantite skill](#agent-skill), that are missing or unchanged since Adamantite wrote them,
+and writes the lockfile again with the installed version. In a project that an earlier version
+set up, `update` writes the lockfile one time with the setup that the project files show: the
+managed scripts, the presets that `oxlint.config.ts` imports, the TypeScript preset that a
+`tsconfig.json` extends, the editor settings and the workflow that exist, and the Adamantite
+section of `AGENTS.md`.
 
 ### `adamantite rule`
 
@@ -334,7 +399,28 @@ It exits 0 when every case gives the expected result, 1 when a case does not, an
 trial cannot check the cases, such as for a rule that does not exist.
 
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
-real code.
+real code. Oxlint parses the file, so the project needs Oxlint installed.
+
+`rule try --json` and `rule ast --json` print the trial results and the tree as one JSON document.
+
+### JSON output
+
+`doctor`, `harden`, `init`, `update`, `rule ast`, and `rule try` take `--json`. Each one prints one
+JSON document on standard output, and its other lines on standard error. With `--json`, a command
+never asks a question and never starts an agent. The exit codes stay the same. Each document has a
+`schemaVersion`:
+
+| Command          | Document                                                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`. |
+| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, and commits of the prompt.             |
+| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                   |
+| `rule ast`       | The `file` and its `program`.                                                                                                                      |
+| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                            |
+
+Each finding keeps its `id`, `integration`, `title`, `currentState`, and `goal`, and its `notes`
+and `reference` when it has them. The `setup` of `update` is `null` in a project that has no
+lockfile and no setup to record.
 
 ### Pass arguments to underlying tools
 
@@ -376,7 +462,7 @@ the imports in this table, and Node.js rejects any other path in the package:
 | `adamantite/lint/strict`       | Framework-neutral opinions: no type assertions outside tests, no `unknown` in signatures, no module mocks, no deep or wide destructuring, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                               |
 | `adamantite/lint/tailwind`     | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the tailwind preset](#the-tailwind-preset). |
 | `adamantite/rules`             | A function, `custom()`, that loads the project's own rules from `.adamantite/lint/`. See [custom rules](#custom-rules).                                                                                                                                                                    |
-| `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, `eslintCompatPlugin`, and all Oxlint authoring types.                                                                                                                                                                                                        |
+| `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, and all Oxlint authoring types.                                                                                                                                                                                                                              |
 | `adamantite/rules/testing`     | `RuleTester` and its types for temporary agent verification and optional saved tests.                                                                                                                                                                                                      |
 | `adamantite/format`            | Oxfmt configuration. Formats Astro files with Astro 7 and later, and Svelte files with Svelte 5 and later.                                                                                                                                                                                 |
 | `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo and `ignoreDependencies.effect` with the effect preset.                                                                                   |
@@ -659,8 +745,6 @@ as a hosted product. Read the
 you select the preset.
 
 If you add `react-strict` by hand, install `oxlint-plugin-react-doctor` as a devDependency.
-Run `adamantite doctor` for an existing `react-doctor` configuration. Its repair prompt
-moves the preset to `react-strict` and preserves project settings and rule overrides.
 
 ### The tanstack preset
 
@@ -763,16 +847,15 @@ To upgrade an existing editor setup, run:
 
 ```sh
 adamantite update
-adamantite init --non-interactive --script check --preset effect --editor vscode --editor zed --install-extensions
+adamantite init --non-interactive --script check --preset effect --editor vscode --editor zed
 ```
 
-Init installs the TypeScript 7 extension for VS Code when `--install-extensions` is set.
+`.vscode/extensions.json` recommends the TypeScript 7 extension for VS Code.
 In VS Code, run **TypeScript: Select TypeScript Version...**, then select **Use Workspace Version**
 to use the Effect SDK. Install Zed's TypeScript language server extension (`zed://extension/tsgo`);
 the managed server ID is `typescript-ls`.
 
-After a fresh dependency install or an update, run
-`adamantite init --non-interactive --script check --editor vscode` to prepare or refresh the SDK cache.
+After a fresh dependency install, run `adamantite update` to prepare or refresh the SDK cache.
 Doctor reports missing editor settings and a missing, incomplete, or stale SDK. It does not
 write files. Install scripts can stay disabled.
 
@@ -1021,9 +1104,10 @@ it to every generated config. It takes these options:
 - `rules`: severity or options for a rule, by rule name without the prefix, such as
   `{ "no-process-env": "warn" }`.
 
-`adamantite/rules/plugin` re-exports the helpers and types from Adamantite's pinned
-`@oxlint/plugins` dependency. Use `definePlugin` from that module if you write a plugin
-that you register in `jsPlugins` yourself. You do not need to add `@oxlint/plugins` to your project.
+`adamantite/rules/plugin` exports `definePlugin`, `defineRule`, and the authoring types of
+the Oxlint version that Adamantite pins. The package ships the types itself, so you do not need
+to add `@oxlint/plugins` to your project. Use `definePlugin` from that module if you write a
+plugin that you register in `jsPlugins` yourself.
 
 Optional saved RuleTester tests use `node:test`. Exclude them from Vitest or Jest discovery
 so those runners do not also try to run them. Keep the runner's default and existing
@@ -1070,10 +1154,11 @@ projects, and remove their temporary verification cases and fixtures before hand
 runtime helpers stay in the target project. The "Custom rules" section of the
 [Adamantite skill](#agent-skill) has the command and the full authoring guidance.
 
-`adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
-that no `custom()` call loads, and two rules folders that use the same plugin name. It also
-provides migration guidance for old API imports and the previous default rules folder.
-User-owned saved tests and optional CI steps remain supported.
+`adamantite doctor` reports a rules folder that no `custom()` call loads, also at the previous
+default path `.adamantite/rules`, a `dir` that names a folder that does not exist, and two rules
+folders that use the same plugin name. A rule file that cannot load stops the whole lint run, and
+Doctor reports the error that Oxlint prints. User-owned saved tests and optional CI steps remain
+supported.
 
 ### Custom rules in a monorepo
 
@@ -1102,10 +1187,10 @@ export default custom({ dir: "rules", name: "acme" })
 ```
 
 Run `adamantite rule add <name> --dir tooling/lint/rules` to add a rule to that folder.
-Doctor starts from the Oxlint config of the root and of each workspace package, and follows
-relative imports, `#` imports, and imports of workspace packages to find the `custom()` calls. It
-resolves them as Node.js does, so run it after you install the dependencies. It resolves
-`dir` and `name` when they are string literals.
+Doctor loads the Oxlint config of the root and of each workspace package with Node.js, as Oxlint
+loads it, and reads the rules folder and the plugin name of each `custom()` call that the config
+reaches, also through a shared tooling package. Run it after you install the dependencies. Doctor
+warns about a config that does not load.
 
 ## Requirements and boundaries
 
@@ -1128,8 +1213,9 @@ The Adamantite skill teaches coding agents how to initialize, assess, repair, an
 project, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
 
 `adamantite init` asks whether to set up coding agents. When you answer yes, or pass
-`--agents` in non-interactive mode, init adds the Adamantite section to `AGENTS.md` and writes
-the skill to these folders:
+`--agents` in non-interactive mode, init writes `AGENTS.md` with the Adamantite section when the
+project has no `AGENTS.md`, and writes the skill to these folders. Init never edits an existing
+`AGENTS.md`: Doctor reports one without the section, so you or an agent can add it.
 
 | Skill folder     | Agents                                  | When                        |
 | ---------------- | --------------------------------------- | --------------------------- |
@@ -1138,10 +1224,12 @@ the skill to these folders:
 | `.grok/skills`   | Grok Build                              | The project has `.grok/`.   |
 
 The Adamantite CLI bundles the skill, so the copy matches the Adamantite version that wrote
-it. After you update Adamantite, `adamantite update` writes the skill again to each folder
-whose copy changed. It also removes the `adamantite` entry from `skills-lock.json`, so the
-`skills` CLI does not write the same folders. Commit the skill folders, so every clone has
-the skill.
+it. Each file of the skill is a managed file: after you update Adamantite, `adamantite update`
+writes the skill of the new version over each copy that nobody changed. Doctor reports a copy
+that differs from the skill of the installed version, such as one that an earlier version wrote
+before the lockfile. Delete that copy, and run `adamantite update`. Doctor also reports an
+`adamantite` entry in `skills-lock.json`, so the `skills` CLI does not write the same folders.
+Commit the skill folders, so every clone has the skill.
 
 To install the skill from GitHub instead, with the
 [`skills` CLI](https://github.com/vercel-labs/skills):
@@ -1151,7 +1239,7 @@ npx skills add adelrodriguez/adamantite --list
 npx skills add adelrodriguez/adamantite --skill adamantite
 ```
 
-`adamantite update` replaces a copy from GitHub with the skill of the installed Adamantite
+Doctor reports a copy from GitHub that differs from the skill of the installed Adamantite
 version.
 
 With pnpm 12.11 or later, `pnpm install` can also link the skill that the package ships

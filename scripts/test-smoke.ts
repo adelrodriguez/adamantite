@@ -18,6 +18,10 @@ import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
+
+// The commands decode their own documents in the unit tests. This checks that the packed CLI
+// prints only the document on standard output.
+const JsonDocument = Schema.fromJsonString(Schema.Struct({ schemaVersion: Schema.Literal(1) }))
 const cliPath = join(repoRoot, "bin", "adamantite")
 
 interface RunOptions {
@@ -288,6 +292,8 @@ try {
         name: "adamantite-smoke-fixture",
         packageManager: `npm@${npmVersion}`,
         private: true,
+        // Init replaces a selected script that runs another command, and keeps the others.
+        scripts: { check: "tsc --noEmit", test: "node --test" },
         version: "0.0.0",
       },
       null,
@@ -463,6 +469,9 @@ try {
     ),
     join(effectFixture, "index.ts")
   )
+  // Init in the package wrote a root Oxlint config there. Oxlint rejects the type-aware options of
+  // that config as a nested config of the fixture, so the fixture's lint and Doctor need it gone.
+  rmSync(effectWorkspacePackage, { force: true, recursive: true })
 
   rmSync(sdkDirectory, { force: true, recursive: true })
   assertIncludes(
@@ -490,26 +499,24 @@ try {
     throw new Error("Effect editor setup changed the installed TypeScript package")
   }
 
+  const initArgs = [
+    cliPath,
+    "init",
+    "--non-interactive",
+    "--script",
+    "check",
+    "--script",
+    "analyze",
+    "--preset",
+    "architecture",
+    "--typescript",
+    "typescript",
+    "--agents",
+    "--github-actions",
+  ]
+
   console.info("Running `adamantite init` against the fixture project...")
-  run(
-    process.execPath,
-    [
-      cliPath,
-      "init",
-      "--non-interactive",
-      "--script",
-      "check",
-      "--script",
-      "analyze",
-      "--preset",
-      "architecture",
-      "--typescript",
-      "typescript",
-      "--agents",
-      "--github-actions",
-    ],
-    { cwd: fixture }
-  )
+  run(process.execPath, initArgs, { cwd: fixture })
 
   // Prove init kept the tarball: a registry install would validate the published presets
   // instead of this checkout's.
@@ -524,6 +531,31 @@ try {
   assertFileContains(join(fixture, ".github", "workflows", "adamantite.yml"), "runs-on")
   assertFileContains(join(fixture, "package.json"), '"check": "adamantite check"')
   assertFileContains(join(fixture, "package.json"), '"analyze": "adamantite analyze"')
+  assertFileContains(join(fixture, "package.json"), '"test": "node --test"')
+
+  console.info("Running `adamantite init` again, which must leave every file unchanged...")
+  const initialized = readFileSync(join(fixture, "package.json"), "utf8")
+  const again = spawn(process.execPath, initArgs, { cwd: fixture })
+
+  if (readFileSync(join(fixture, "package.json"), "utf8") !== initialized) {
+    throw new Error("Expected a second `adamantite init` to leave package.json byte-identical")
+  }
+
+  for (const line of again.stdout.split("\n").filter((text) => /^[✔●] `/u.test(text))) {
+    if (!line.endsWith("is up to date.") && !line.endsWith("already records this setup.")) {
+      throw new Error(`Expected a second \`adamantite init\` to change nothing, received: ${line}`)
+    }
+  }
+
+  // `--json` prints one document on standard output, so an agent can parse the whole stream.
+  console.info("Running `adamantite init --json` and `adamantite doctor --json`...")
+
+  for (const args of [
+    ["init", "--json", ...initArgs.slice(3)],
+    ["doctor", "--json"],
+  ]) {
+    Schema.decodeSync(JsonDocument)(run(process.execPath, [cliPath, ...args], { cwd: fixture }))
+  }
 
   console.info("Checking the public and private imports of the installed package...")
   const privateImports = await verifyPackageExports(fixture)
@@ -547,6 +579,56 @@ try {
 
   console.info("Running `adamantite rule add` and temporary RuleTester verification...")
   addRuleAndVerify(fixture, fixtureEnv)
+
+  // The rule authoring types ship inside the package, so a custom rule type-checks in a project
+  // that does not install `@oxlint/plugins`. The expected error proves that the types did not
+  // resolve to `any`.
+  console.info("Type-checking a custom rule without `@oxlint/plugins` installed...")
+
+  if (existsSync(join(fixture, "node_modules", "@oxlint", "plugins"))) {
+    throw new Error("Expected the package to install without `@oxlint/plugins`")
+  }
+
+  const ruleTypesProbe = join(fixture, "rule-types-probe.mts")
+  writeFileSync(
+    ruleTypesProbe,
+    [
+      'import { type Context, type ESTree, defineRule } from "adamantite/rules/plugin"',
+      "",
+      "export default defineRule({",
+      "  create(context: Context) {",
+      "    return {",
+      "      DebuggerStatement(node: ESTree.DebuggerStatement) {",
+      '        context.report({ message: "Remove the debugger statement.", node })',
+      "      },",
+      "    }",
+      "  },",
+      "})",
+      "",
+      "// @ts-expect-error - A rule must supply create or createOnce.",
+      'defineRule({ meta: { type: "problem" } })',
+      "",
+    ].join("\n")
+  )
+
+  try {
+    run(
+      "tsc",
+      [
+        "--ignoreConfig",
+        "--noEmit",
+        "--strict",
+        "--module",
+        "nodenext",
+        "--target",
+        "esnext",
+        ruleTypesProbe,
+      ],
+      { cwd: fixture, env: fixtureEnv }
+    )
+  } finally {
+    rmSync(ruleTypesProbe)
+  }
 
   // Check the generated config and custom rule, and keep the rule as a Knip entry file.
   for (const command of ["fix", "check", "analyze"]) {

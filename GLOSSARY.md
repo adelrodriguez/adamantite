@@ -20,7 +20,7 @@ _Avoid_: Combination, preset group
 **Fixture packages**:
 The npm packages that the preset test fixtures import, such as React and TanStack Query, so a
 type-aware run gets their real types. They have their own manifest and lockfile in
-`src/__tests__/presets/fixture-packages/`, apart from the packages of the repository.
+`presets/__tests__/fixture-packages/`, apart from the packages of the repository.
 _Avoid_: Target project, test project, sandbox
 
 **Vendored bundle**:
@@ -85,15 +85,21 @@ _Avoid_: Plugin folder
 The project that Adamantite configures or checks.
 _Avoid_: Adamantite repository, consumer repository
 
-**Managed integration**:
-An adapter for a tool, editor, workspace feature, or CI provider whose supported state
-Adamantite can detect and maintain.
-_Avoid_: Plugin, preset
+**Integration**:
+Everything Adamantite knows about one tool, editor, CI provider, or the agent guidance: whether the
+selection includes it, its packages, its managed files, and its assessment. Each integration in the
+list of `src/lib/integrations/index.ts` owns a folder there, such as `vscode/`.
+_Avoid_: Managed integration, adapter, plugin, preset
 
 **Tooling integration**:
-A managed integration for a package and its configuration, such as Oxlint, Oxfmt, Knip,
-Sherif, or tsrs.
+An integration for a package and its configuration, such as Oxlint, Oxfmt, Knip, Sherif, or tsrs.
 _Avoid_: Dependency adapter
+
+**Latest supported state**:
+The state that the running Adamantite version gives an integration for a selection: its packages at
+the managed versions, and its managed files as this version renders them. A kept file reaches it
+when Doctor reports no finding for it.
+_Avoid_: Managed ideal, managed state, supported state
 
 **Toolchain**:
 The code-quality tools and their plugins that Adamantite configures and runs for a target
@@ -113,17 +119,38 @@ reports a project that does not install a version of the package that Oxfmt supp
 _Avoid_: Framework language, plugin format
 
 **Managed script**:
-A `package.json` script whose command is owned by Adamantite.
+A `package.json` script whose command is owned by Adamantite, such as `check`. Setup sets each
+selected one to its command and replaces what it ran, the one exception to whole files.
 _Avoid_: User script, package command
 
-**Managed block**:
-The jobs of a GitHub Actions workflow between the `# ADAMANTITE:START` and `# ADAMANTITE:END`
-comments. Adamantite owns the jobs in it, and the target project owns the rest of the workflow.
-A target project has one managed block.
-_Avoid_: Managed workflow, Adamantite job
+**Selection**:
+What `init` was asked to set up in a target project: the lint presets, the TypeScript preset, the
+editors, the CI provider, the agent guidance, and the managed scripts. The lockfile records it, and
+Doctor checks each integration that it includes.
+_Avoid_: Options, config, setup flags
+
+**Lockfile**:
+`.adamantite/adamantite-lock.json` at the root of a target project, or at the workspace root of a
+monorepo. It records the selection, the Adamantite version that last wrote it, and the hash of each
+file that Adamantite wrote whole. Only `init` and `update` write it, and the project commits it.
+_Avoid_: Manifest, state file, `skills-lock.json`
+
+**Managed file**:
+A file that Adamantite renders whole for a selection, such as `.vscode/extensions.json`. `init` and
+`update` write it under the write rule, and the lockfile records the hash of what they wrote.
+_Avoid_: Generated file, template
+
+**Write rule**:
+Adamantite writes a managed file only whole, and only when the file does not exist or its hash
+equals the hash in the lockfile. A file that the user changed is kept, and Doctor reports a change
+that breaks the setup. A file that the selection no longer renders is deleted while its hash
+matches. Adamantite never merges, splices, or edits a config. A managed script is the one exception.
+_Avoid_: Merge, overwrite policy
 
 **Assessment**:
-A read-only classification of a managed integration against its latest supported state.
+The read-only check of a target project against the latest supported state of each integration
+that its selection includes. It gives the findings, the warnings, and the package actions. Doctor
+prints it, and `init` and `update` assess the project that the setup left.
 _Avoid_: Check result, diagnostic
 
 **Finding**:
@@ -133,43 +160,41 @@ _Avoid_: Action, diagnostic, manual fix
 
 **Handoff**:
 Give the terminal to an installed coding agent CLI, seeded with a Markdown prompt. Adamantite
-waits until the agent session ends.
+waits until the agent session ends, then reads the project again to verify the work. A command
+hands off only through `Resolution.offer`, and never with `--json`.
 _Avoid_: Delegation, agent launch
 
 **Adamantite skill**:
 The agent skill that the Adamantite package ships in `skills/adamantite/`. It teaches coding
 agents how to use Adamantite and how to write custom rules. The CLI bundles it. `init` writes it
-to the skill folders of the agents that the project uses, and `update` writes it again when a copy is stale.
+to the skill folders of the agents that the project uses as managed files, and `update` writes the
+skill of a new version over each copy that nobody changed.
 _Avoid_: Plugin, agent guidance
 
 **Resolution menu**:
 The terminal menu that offers a handoff to each installed coding agent, a copy of the Markdown
-prompt, or nothing.
+prompt, or nothing. `doctor`, `harden`, `init`, and `update` show it in an interactive terminal,
+through `Resolution.offer`. Without one, they print the Markdown prompt, and with `--json` they
+print a JSON document instead.
 _Avoid_: Handoff menu
 
 ## Integration lifecycle
 
-**Detect**:
-Inspect whether a managed integration is present and identify its supported or legacy
-configuration state.
-_Avoid_: Assess, create
-
-**Create**:
-Write the latest supported configuration when it is missing.
-_Avoid_: Migrate, update
-
-**Update**:
-Rewrite an existing supported configuration into the latest supported shape.
-_Avoid_: Migration, dependency update
+**Setup**:
+What `Setup.apply` does for a selection, the one backend of `init` and `update`: one install of the
+managed packages, the managed scripts, the managed files under the write rule, and the lockfile
+last. `init` takes the selection from its prompts or flags, and `update` from the lockfile.
+_Avoid_: Create, migrate, repair
 
 **Assess**:
-Classify package drift and managed configuration differences without changing the target
-project.
-_Avoid_: Fix, update
+What an integration's `assess` does: read the target project, and report its package drift and each
+change that breaks the setup as findings, without changing the project.
+_Avoid_: Fix, update, detect
 
 **Doctor**:
-Report findings for Adamantite-managed integrations and provide one combined repair
-prompt.
+Assess the target project against the selection in its lockfile, or the one that its files show
+without a lockfile, report the findings, and offer one combined repair prompt through
+`Resolution.offer`.
 _Avoid_: Check, fix, update
 
 ## Hardening

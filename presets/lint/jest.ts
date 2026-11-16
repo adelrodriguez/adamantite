@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 /**
  * The files that Jest runs as tests by default. The preset applies its rules only to these files.
@@ -19,7 +20,12 @@ export const testFiles: string[] = [
 
 const plugins: OxlintConfig["plugins"] = ["jest"]
 
+const identity: PresetIdentity = { module: "adamantite/lint/jest" }
+
+// The rules name the preset too, so an override that spreads `jest.rules`, as the comment of
+// `testFiles` shows, applies the preset for Doctor.
 const rules: OxlintConfig["rules"] = {
+  [PRESET]: identity,
   // TEMPORARY: The fix of the rule renames a test call, such as `test` to `it` in `describe`, but
   // it does not change the import. The file then calls a function that it does not import. Turn the
   // rule on again when an Oxlint release keeps the import:
@@ -102,12 +108,13 @@ const rules: OxlintConfig["rules"] = {
 }
 
 const config: OxlintConfig = {
+  [PRESET]: identity,
   overrides: [{ files: testFiles, plugins, rules }],
 }
 
 // Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties. So a config
 // that extends the preset gets only the override for test files, while a project override can still
-// read `jest.plugins` and `jest.rules`. `src/__tests__/presets/test-presets.test.ts`
+// read `jest.plugins` and `jest.rules`. `presets/__tests__/test-presets.test.ts`
 // checks both uses.
 Object.defineProperties(config, { plugins: { value: plugins }, rules: { value: rules } })
 

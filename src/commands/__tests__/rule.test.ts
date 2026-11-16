@@ -7,15 +7,14 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
+import { toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
 import {
   CommandFailed,
   CustomRuleExists,
   CustomRuleNotFound,
-  FailedToParseSource,
   InvalidRuleName,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 import { createRunnerTestContext, promptingLayer, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {
@@ -477,7 +476,7 @@ describe("rule test", () => {
     })
   )
 
-  it.effect("warn about a rules folder that it cannot find, and run the other tests", () =>
+  it.effect("run the tests of a rules folder whose dir a variable sets", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
@@ -501,17 +500,14 @@ describe("rule test", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "▲ `rule test` cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. It does not run the tests of that rules folder.",
-        "🧪 Testing custom rules · adamantite (node)",
-      ])
+      expect(logLines).toStrictEqual(["🧪 Testing custom rules · adamantite (node)"])
       expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
-        ["--test", ".adamantite/lint/no-a.test.ts"],
+        ["--test", ".adamantite/lint/no-a.test.ts", "tooling/rules/no-b.test.ts"],
       ])
     })
   )
 
-  it.effect("warn about an import that it cannot follow when it finds no tests", () =>
+  it.effect("warn about a config that does not load when it finds no tests", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
@@ -532,7 +528,9 @@ describe("rule test", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toStrictEqual([])
       expect(logLines).toStrictEqual([
-        "▲ `rule test` cannot resolve the import of `./tooling/missing.ts` in `oxlint.config.ts`, so it does not run the tests of the rules folders behind it.",
+        expect.stringMatching(
+          /^▲ `rule test` cannot load `oxlint\.config\.ts`, so it does not run the tests of the rules folders behind it\. Node\.js reported: /u
+        ),
         "● No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
       ])
     })
@@ -565,52 +563,6 @@ describe("rule test", () => {
       expect(logLines).toStrictEqual([
         "● No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
       ])
-    })
-  )
-})
-
-describe("rule ast", () => {
-  it.effect("print the ESTree-shaped AST without parenthesized expressions", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
-      })
-
-      const logLines: unknown[] = []
-
-      const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts"], {
-        files,
-        logLines,
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-
-      const [output] = logLines
-
-      expect(output).toContain('"type": "TSAsExpression"')
-      expect(output).toContain('"type": "BinaryExpression"')
-      expect(output).not.toContain("ParenthesizedExpression")
-    })
-  )
-
-  it.effect("fail with the parse errors of a file that does not parse", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "src/broken.ts": "export const = 1\n" },
-      })
-
-      const logLines: unknown[] = []
-
-      const exit = yield* runCommand(ruleCommand, ["ast", "src/broken.ts"], {
-        files,
-        logLines,
-      })
-
-      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(FailedToParseSource)
-      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        path: `${files.root}/src/broken.ts`,
-      })
-      expect(logLines).toStrictEqual([])
     })
   )
 })

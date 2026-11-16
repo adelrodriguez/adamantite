@@ -10,7 +10,7 @@ export default defineConfig({
   extends: [core, effect, strict, vitest],
   ignorePatterns: [
     ...ignorePatterns,
-    // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.
+    // Rule fixtures break rules on purpose; see presets/__tests__/rule-fixtures.ts.
     "src/__tests__/presets/fixtures/",
   ],
   options: {
@@ -67,7 +67,7 @@ export default defineConfig({
       {
         import: "oxc-resolver",
         owners: [
-          "src/lib/workspace/module-resolver.ts",
+          "src/lib/project/module-resolver.ts",
           "presets/lint/plugins/adamantite/shared/resolver.ts",
         ],
       },
@@ -75,10 +75,14 @@ export default defineConfig({
       // the tooling integrations directly.
       {
         import: "#lib/integrations/tooling",
+        owners: ["src/lib"],
+      },
+      {
+        import: "#lib/integrations/oxlint",
         owners: [
           "src/lib",
+          // Init offers the lint presets from the preset catalog.
           "src/commands/init",
-          "src/commands/update.ts",
           "src/commands/__tests__",
           "src/__tests__",
           "src/oxlint.ts",
@@ -86,26 +90,97 @@ export default defineConfig({
           "scripts/test-build.ts",
         ],
       },
+      // Commands reach an integration that owns a folder through `lib/setup` and the assessment.
+      // Each integration that moves to its own folder adds an entry.
+      {
+        import: "#lib/integrations/knip",
+        owners: ["src/lib", "src/commands/__tests__"],
+      },
+      {
+        import: "#lib/integrations/oxfmt",
+        owners: ["src/lib", "src/commands/__tests__"],
+      },
+      {
+        import: "#lib/integrations/sherif",
+        owners: ["src/lib", "src/commands/__tests__"],
+      },
+      {
+        import: "#lib/integrations/typescript",
+        owners: ["src/lib"],
+      },
+      {
+        import: "#lib/integrations/vscode",
+        owners: ["src/lib"],
+      },
+      {
+        import: "#lib/integrations/zed",
+        owners: ["src/lib"],
+      },
+      {
+        import: "#lib/integrations/github",
+        owners: ["src/lib"],
+      },
+      {
+        import: "#lib/integrations/agents",
+        owners: ["src/lib", "src/commands/__tests__"],
+      },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
       // scope.
       {
-        import: "#lib/workspace/custom-rules/discover.ts",
+        import: "#lib/project/custom-rules/discover.ts",
         names: ["discoverCustomRules"],
-        owners: ["src/lib/workspace/project.ts", "src/lib/hardening/index.ts"],
+        owners: ["src/lib/project/project.ts", "src/lib/hardening/index.ts"],
+      },
+      // Only `init` and `update` write the lockfile and the managed files, through `lib/setup` and
+      // the backend that they share. Update reads the selection that the project files show. The
+      // terminal prints what Setup wrote.
+      {
+        import: "#lib/setup",
+        owners: [
+          "src/commands/setup.ts",
+          "src/commands/update.ts",
+          "src/commands/__tests__",
+          "src/terminal/setup.ts",
+        ],
+      },
+      // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
+      // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
+      // `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, a trial writes
+      // cases and configs in a temporary copy of the project, and the Oxlint probe writes its config
+      // to a temporary folder.
+      {
+        import: "#lib/shared/filesystem.ts",
+        names: ["ensureDirectory", "writeFile", "writeJsonFile"],
+        owners: [
+          "src/lib/setup",
+          "src/lib/project/custom-rules/index.ts",
+          "src/lib/integrations/effect-sdk.ts",
+          "src/lib/hardening/trial.ts",
+          "src/lib/hardening/oxlint.ts",
+          "src/lib/integrations/oxlint/probe.ts",
+          "src/lib/shared/__tests__/filesystem.test.ts",
+        ],
       },
       // A command that reads the workspace outside an assessment reads it one time for each phase,
       // and passes the `Workspace` down. Harden reads again after the session, because the agent
       // can change the project.
       {
-        import: "#lib/workspace/monorepo.ts",
+        import: "#lib/project/monorepo.ts",
         names: ["readWorkspace"],
         owners: [
-          "src/lib/workspace/project.ts",
+          "src/lib/project/project.ts",
           "src/commands/harden.ts",
           "src/commands/rule.ts",
-          "src/lib/workspace/__tests__/monorepo.test.ts",
+          "src/lib/project/__tests__/monorepo.test.ts",
         ],
+      },
+      // The package builds the presets apart from the CLI, so no file below `presets/` imports
+      // `src/`, tests included. A path module also covers each import that resolves into it, such
+      // as `#lib/...`.
+      {
+        import: "./src",
+        owners: ["src", "scripts"],
       },
     ],
     // Each scope states its dependency graph. Child maps keep their own settings and checks.
@@ -115,20 +190,21 @@ export default defineConfig({
       // Terminal interaction belongs to `commands` and the entries. Lib code returns data for
       // commands to render. Tests share the helpers in `src/__tests__`, so this map skips them.
       {
-        entries: ["cli.ts", "index.ts", "oxlint.ts"],
+        entries: ["cli.ts", "index.ts", "oxlint.ts", "probe.ts"],
         ignore: ["**/__tests__/**"],
         layers: {
           lib: {
             imports: [],
             layers: {
               assessment: { imports: ["integrations"] },
-              execution: { imports: ["shared"] },
+              handoff: { imports: ["shared"] },
               // These layers independently compose integrations.
               hardening: { imports: ["integrations"] },
-              integrations: { imports: ["workspace", "execution"] },
+              integrations: { imports: ["handoff", "project"] },
+              project: { imports: ["shared"] },
+              setup: { imports: ["integrations"] },
               shared: { imports: [] },
               toolchain: { imports: ["integrations"] },
-              workspace: { imports: ["shared"] },
             },
           },
 
@@ -141,12 +217,13 @@ export default defineConfig({
       // Each plugin uses the helpers of all plugins in `shared`, and no plugin imports another
       // plugin's code. `shared` imports no plugin. `entry.ts` gives the presets the `jsPlugins` entry
       // of each plugin. In a plugin, `index.ts` registers the rules, and the rules use the helpers
-      // of the plugin.
+      // of the plugin. The tests in each `__tests__` folder are entries: they load a plugin through
+      // its entry, and no rule imports a test.
       {
-        entries: ["entry.ts"],
+        entries: ["entry.ts", "__tests__/**"],
         layers: {
           adamantite: {
-            entries: ["index.ts"],
+            entries: ["index.ts", "__tests__/**"],
             imports: ["shared"],
             layers: {
               rules: { imports: ["shared"] },
@@ -154,7 +231,7 @@ export default defineConfig({
             },
           },
           antislop: {
-            entries: ["index.ts"],
+            entries: ["index.ts", "__tests__/**"],
             imports: ["shared"],
             layers: {
               rules: { imports: ["shared", "stylistic"] },
@@ -163,7 +240,7 @@ export default defineConfig({
             },
           },
           "antislop-effect": {
-            entries: ["index.ts"],
+            entries: ["index.ts", "__tests__/**"],
             imports: ["shared"],
             layers: {
               rules: { imports: ["shared"] },

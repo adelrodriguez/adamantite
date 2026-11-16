@@ -26,14 +26,14 @@ export function runResult<A, E, R>(
   return provided.pipe(Effect.result)
 }
 
-// Prefer: the editor tests create an in-memory context.
+// Prefer: the agent reach tests create an in-memory context.
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
 }
 ```
 
 The [filesystem helper](src/__tests__/filesystem.ts) exposes fixture operations and a layer.
-The [editor tests](src/lib/integrations/editors/__tests__/vscode.test.ts) provide that layer with
+The [agent reach tests](src/lib/hardening/__tests__/agent-reach.test.ts) provide that layer with
 `Path.layer`. [PR #378](https://github.com/adelrodriguez/adamantite/pull/378) replaced host-backed
 unit tests so they could run independently without changing the machine.
 
@@ -55,13 +55,12 @@ Effect.gen(function* () {
 // Prefer: the installed-agent detection test advances the clock first.
 Effect.gen(function* () {
   yield* TestClock.adjust("9 seconds")
-  const installed = yield* Fiber.join(fiber)
-  return installed
+  yield* Fiber.join(fiber)
 })
 ```
 
-The example comes from
-[coding-agents.test.ts](src/lib/execution/__tests__/coding-agents.test.ts).
+The example comes from the agent order test in
+[doctor.test.ts](src/commands/__tests__/doctor.test.ts).
 [PR #375](https://github.com/adelrodriguez/adamantite/pull/375) introduced the Effect Vitest setup
 and this repository instruction.
 
@@ -77,21 +76,21 @@ Spot it: A standalone helper uses an arrow even though its body is not an Effect
 
 ```ts
 // Avoid: turning the standalone Knip workspace helper into an arrow.
-const toKnipWorkspace = ({ isMonorepo, lintConfig }: ToolingFacts): KnipWorkspace => ({
-  isMonorepo,
-  usesEffectPreset: checkImportsLintPreset(lintConfig, "effect"),
+const toKnipWorkspace = ({ workspace }: Project, { presets }: Selection): KnipWorkspace => ({
+  isMonorepo: workspace.isMonorepo,
+  usesEffectPreset: presets.includes("effect"),
 })
 
 // Prefer: the declaration in knip/config.ts.
-export function toKnipWorkspace({ isMonorepo, lintConfig }: ToolingFacts): KnipWorkspace {
+export function toKnipWorkspace({ workspace }: Project, { presets }: Selection): KnipWorkspace {
   return {
-    isMonorepo,
-    usesEffectPreset: checkImportsLintPreset(lintConfig, "effect"),
+    isMonorepo: workspace.isMonorepo,
+    usesEffectPreset: presets.includes("effect"),
   }
 }
 ```
 
-[Knip's config helper](src/lib/integrations/tooling/knip/config.ts) shows the declaration form.
+[Knip's config helper](src/lib/integrations/knip/config.ts) shows the declaration form.
 [Filesystem helpers](src/lib/shared/filesystem.ts) show the Effect-chain exception. This moves the
 existing rule retained by [PR #344](https://github.com/adelrodriguez/adamantite/pull/344).
 
@@ -111,7 +110,7 @@ its host tool.
 import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 
 // Prefer: the plugin registry keeps the definition under its host tool.
-import tailwind from "#lib/integrations/tooling/oxlint/plugins/tailwind.ts"
+import tailwind from "#lib/integrations/oxlint/plugins/tailwind.ts"
 ```
 
 [PR #472](https://github.com/adelrodriguez/adamantite/pull/472) moved managed plugins under Oxlint.
@@ -120,12 +119,13 @@ modules, the plugin registry, and shared infrastructure.
 
 ### Keep lifecycle writes within their command
 
-Keep `init` deterministic and independent from assessment, keep `assess` and `doctor` read-only,
-and limit `update` to managed dependencies and the installed Adamantite skill. A finding describes
-a repair for an agent or a human, and does not authorize another command to make that repair.
+Keep `init` and `update` deterministic: each applies its selection through `Setup.apply`, then
+offers the repair of the findings that remain through `Resolution.offer`, without choosing its
+work from them. Keep `assess` and `doctor` read-only. A finding describes a repair for an agent or
+a human, and does not authorize another command to make that repair.
 
-Spot it: An assessment repairs a file, init chooses its work from Doctor findings, or an update
-fails because unrelated findings remain.
+Spot it: An assessment repairs a file, init or update chooses its work from Doctor findings, or
+code outside `src/lib/setup/` writes a file of the target project.
 
 ```ts
 // Avoid: Doctor installed packages before #393.
@@ -157,18 +157,18 @@ Effect.gen(function* () {
   yield* writeWorkflow(cwd, options)
 })
 
-// Prefer: github.update rewrites only a managed block that Adamantite generated.
+// Prefer: Setup.apply writes a managed file only when its hash equals the recorded hash.
 Effect.gen(function* () {
-  if (!checkIsGeneratedBody(state.block.body)) {
-    return "kept" as const
+  if (!Option.contains(recorded, yield* hashContent(current.value))) {
+    return { hash: Option.none<string>(), write: Kept({ path: file.path }) }
   }
-  yield* writeFile(path.join(cwd, state.path), replaceBlock(state.block, body))
-  return "updated" as const
+  yield* write
+  return { hash, write: Replaced({ path: file.path }) }
 })
 ```
 
-The [GitHub integration](src/lib/integrations/ci/github.ts) keeps any managed block that differs
-from every block it can generate, and `init` points to `adamantite doctor`.
+[`Setup.apply`](src/lib/setup/index.ts) keeps a workflow, or any other managed file, that the
+project changed, and the integration's `assess` reports only a change that breaks the setup.
 [PR #636](https://github.com/adelrodriguez/adamantite/pull/636) fixed the repeated-init path after
 review found that it removed the optional test step. A later audit found that the fix matched only
 the literal `adamantite rule test` command, so other edits were still lost.
@@ -205,7 +205,7 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
     if (parent === directory) {
       return yield* new EffectEditorUnavailable({
         reason:
-          "Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run `adamantite init --non-interactive --script check --editor zed`.",
+          "Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run `adamantite update`.",
       })
     }
     directory = parent
@@ -213,6 +213,6 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
 })
 ```
 
-The [Zed resolver](src/lib/integrations/editors/zed.ts) walks ancestor folders without saving a
+The [Zed resolver](src/lib/integrations/zed/index.ts) walks ancestor folders without saving a
 real package-store path. [PR #633's review](https://github.com/adelrodriguez/adamantite/pull/633#discussion_r4503357503)
 found the broken nested-workspace command and the assessment that accepted it.

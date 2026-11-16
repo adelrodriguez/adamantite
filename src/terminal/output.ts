@@ -2,6 +2,8 @@ import { styleText } from "node:util"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import { CurrentMode, is } from "#terminal/mode.ts"
 
 /**
  * The status of a line, with the symbol and color that mark it. The symbols match the prompts of
@@ -32,8 +34,17 @@ const renderStatus = (status: Status, message: string) =>
     (symbol) => `${symbol} ${message.replaceAll(/\n(?=.)/gu, "\n  ")}`
   )
 
+/**
+ * Writes a line on standard output, or on standard error in the JSON mode, where standard output
+ * holds only the JSON document.
+ */
+const write = (line: string) =>
+  Effect.flatMap(CurrentMode, (mode) =>
+    is("Json")(mode) ? Console.error(line) : Console.log(line)
+  )
+
 const log = (status: Status) => (message: string) =>
-  Effect.flatMap(renderStatus(status, message), (line) => Console.log(line))
+  Effect.flatMap(renderStatus(status, message), write)
 
 export const info = log("info")
 
@@ -48,7 +59,7 @@ export const error = log("error")
  * 4.1.2 leaves the cursor at the end of its last line, so the line starts with a line break.
  */
 export const cancel = (message: string) =>
-  Effect.flatMap(renderStatus("cancel", message), (line) => Console.log(`\n${line}`))
+  Effect.flatMap(renderStatus("cancel", message), (line) => write(`\n${line}`))
 
 /**
  * Reports the error that ended the command, on standard error. Every other line goes to standard
@@ -57,10 +68,17 @@ export const cancel = (message: string) =>
 export const failure = (message: string) =>
   Effect.flatMap(renderStatus("error", message), (line) => Console.error(line))
 
-const heading = (text: string) => Effect.flatMap(style("bold", text), (line) => Console.log(line))
+// A heading frames an interactive session, so the other modes print none.
+const heading = (text: string) =>
+  Effect.flatMap(CurrentMode, (mode) =>
+    is("Menu")(mode)
+      ? Effect.flatMap(style("bold", text), (line) => Console.log(line))
+      : Effect.void
+  )
 
 /**
- * Names the command at the start of its output, such as `💠 adamantite init`.
+ * Names the command at the start of its output, such as `💠 adamantite init`. Only a command that
+ * asks in a terminal prints it.
  */
 export const intro = heading
 
@@ -75,5 +93,29 @@ export const outro = heading
  */
 export const note = (title: string, body: string) =>
   Effect.flatMap(style("bold", title), (styledTitle) =>
-    Console.log(`\n${styledTitle}\n${body.replaceAll(/^(?=.)/gmu, "  ")}`)
+    write(`\n${styledTitle}\n${body.replaceAll(/^(?=.)/gmu, "  ")}`)
+  )
+
+/**
+ * Prints `value` as the one JSON document of the command, on standard output with two-space
+ * indentation. The schema is the contract that agents and tests decode it with.
+ */
+export const json = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: S["Type"]) =>
+  Schema.encodeEffect(Schema.fromJsonString(schema, { space: 2 }))(value).pipe(
+    // The command builds the value from its own schema, so a value that does not encode is a defect.
+    Effect.orDie,
+    Effect.flatMap((text) => Console.log(text))
+  )
+
+/**
+ * Prints the result of a command that hands nothing off: the JSON document of `value` in the JSON
+ * mode, and `text` in the other modes.
+ */
+export const result = <S extends Schema.Codec<unknown, unknown>>(
+  schema: S,
+  value: S["Type"],
+  text: string
+) =>
+  Effect.flatMap(CurrentMode, (mode) =>
+    is("Json")(mode) ? json(schema, value) : Console.log(text)
   )

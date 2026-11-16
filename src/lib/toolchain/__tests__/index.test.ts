@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-runner.ts"
+import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
 
 describe("Toolchain", () => {

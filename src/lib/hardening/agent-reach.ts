@@ -3,27 +3,29 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
 /**
  * The Markdown files that a coding agent can find from `AGENTS.md`. Paths are relative to the
  * project root, with `/` between folders, as git prints them.
  */
-export interface AgentReach {
+export const BrokenLink = Schema.Struct({ file: Schema.String, target: Schema.String })
+
+export type BrokenLink = typeof BrokenLink.Type
+
+export const AgentReach = Schema.Struct({
   /**
    * The Markdown links to Markdown files that do not exist.
    */
-  readonly brokenLinks: readonly BrokenLink[]
+  brokenLinks: Schema.Array(BrokenLink),
   /**
    * The Markdown files that no chain of references from an `AGENTS.md` reaches.
    */
-  readonly unreached: readonly string[]
-}
+  unreached: Schema.Array(Schema.String),
+})
 
-export interface BrokenLink {
-  readonly file: string
-  readonly target: string
-}
+export type AgentReach = typeof AgentReach.Type
 
 const MARKDOWN_EXTENSION = /\.(?:md|mdx|mdc)$/u
 

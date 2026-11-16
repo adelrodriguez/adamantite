@@ -1,57 +1,143 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import type { Finding, PackageAction } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import * as Match from "effect/Match"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import type { Project } from "#lib/project/project.ts"
+import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
-import github from "#lib/integrations/ci/github.ts"
-import vscode from "#lib/integrations/editors/vscode.ts"
-import zed from "#lib/integrations/editors/zed.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
-import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import agents from "#lib/integrations/workspace/agents.ts"
-import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { Finding, PackageAction } from "#lib/integrations/base.ts"
+import { integrations } from "#lib/integrations/index.ts"
+import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
+import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
+import tsrs from "#lib/integrations/oxlint/tsrs.ts"
+import { inferSelection } from "#lib/integrations/selection.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
+import { Selection } from "#lib/project/selection.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
 const repairPromptTemplate = getRepairPromptTemplate()
 const warningReportTemplate = getWarningReportTemplate()
 
 /**
- * Every integration assessed against a project. The order fixes how findings are numbered in the
+ * The integrations that have not moved to a folder of their own yet, assessed against a project
+ * before the ones in `integrations/index.ts`. The order fixes how findings are numbered in the
  * rendered output.
  */
-const managedIntegrations = [
-  knip,
-  oxfmt,
-  oxlint,
-  oxlintCustom,
-  ...managedPlugins,
-  sherif,
-  tsrs,
-  tsconfig,
-  agents,
-  github,
-  vscode,
-  zed,
-] as const
+const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs] as const
 
-export interface ProjectAssessment {
+// Without a lockfile, Doctor decides from the files that exist, so it cannot check what init set up.
+const lockfileMissing: Finding = {
+  currentState: `The project has no \`${LOCKFILE_PATH}\`, so Doctor decides which integrations apply from the files that exist, and cannot check a selected integration whose file is missing.`,
+  goal: [
+    `Run \`adamantite update\`. It writes \`${LOCKFILE_PATH}\` with the setup that the project files show.`,
+    `Commit \`${LOCKFILE_PATH}\`.`,
+  ],
+  id: "lockfile-missing",
+  integration: "lockfile",
+  title: "Missing Adamantite lockfile",
+}
+
+/**
+ * The assessment of a project whose lockfile does not read. The other assessments need the
+ * selection, so the lockfile finding is the only one. Doctor reports it, and the commands that
+ * write the lockfile fail instead, so they do not overwrite it.
+ */
+function assessUnreadableLockfile(error: InvalidLockfile | UnsupportedLockfile): ProjectAssessment {
+  const finding = Match.valueTags(error, {
+    InvalidLockfile: ({ issue, path }): Finding => ({
+      currentState: `\`${path}\` does not decode as an Adamantite lockfile. ${issue}`,
+      goal: [
+        `Make \`${path}\` decode again, for example by resolving a merge conflict. Preserve the recorded \`selection\` and the hashes in \`written\`.`,
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "invalid-lockfile",
+      integration: "lockfile",
+      notes: ["Doctor reports the other findings after the lockfile decodes."],
+      title: "Invalid Adamantite lockfile",
+    }),
+    UnsupportedLockfile: ({ path, schemaVersion, version }): Finding => ({
+      currentState: Option.match(version, {
+        onNone: () =>
+          `\`${path}\` has schema version ${JSON.stringify(schemaVersion)}, which a newer Adamantite version wrote.`,
+        onSome: (writer) =>
+          `\`${path}\` has schema version ${JSON.stringify(schemaVersion)}, which Adamantite ${writer} wrote.`,
+      }),
+      goal: [
+        Option.match(version, {
+          onNone: () =>
+            "Update the project's `adamantite` dependency to the version that wrote the lockfile, or newer, and install it.",
+          onSome: (writer) =>
+            `Update the project's \`adamantite\` dependency to ${writer} or newer, and install it.`,
+        }),
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "unsupported-lockfile",
+      integration: "lockfile",
+      notes: ["Doctor reports the other findings after the lockfile decodes."],
+      title: "Unsupported Adamantite lockfile",
+    }),
+  })
+
+  return {
+    applicableIntegrations: [],
+    findings: [finding],
+    packageActions: [],
+    selection: null,
+    warnings: [],
+  }
+}
+
+/**
+ * The assessment of a project that does not declare `adamantite`. The other assessments need the
+ * installed version, so this finding is the only one.
+ */
+const notInstalled: ProjectAssessment = {
+  applicableIntegrations: [],
+  findings: [
+    {
+      currentState:
+        "The root `package.json` does not declare `adamantite`, so the project runs no installed Adamantite version.",
+      goal: [
+        "Add `adamantite` to the `devDependencies` of the root `package.json` with the project's package manager, and install it.",
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "adamantite-not-installed",
+      integration: "adamantite",
+      notes: ["Doctor reports the other findings after the project installs Adamantite."],
+      title: "Adamantite is not installed",
+    },
+  ],
+  packageActions: [],
+  selection: null,
+  warnings: [],
+}
+
+/**
+ * What an assessment found in a project. `doctor --json` prints it as this schema encodes it.
+ */
+export const ProjectAssessment = Schema.Struct({
   /**
    * Names of the integrations that apply to this project. Empty means nothing is managed.
    */
-  readonly applicableIntegrations: readonly string[]
+  applicableIntegrations: Schema.Array(Schema.String),
   /**
-   * Empty means the project has converged on the managed state.
+   * Empty means the project has reached the latest supported state.
    */
-  readonly findings: readonly Finding[]
-  readonly packageActions: readonly PackageAction[]
-  readonly warnings: readonly string[]
-}
+  findings: Schema.Array(Finding),
+  packageActions: Schema.Array(PackageAction),
+  /**
+   * The selection that the assessment checked: the lockfile's, or the one that the project files
+   * show when there is no lockfile. Null when the assessment could not read one.
+   */
+  selection: Schema.NullOr(Selection),
+  warnings: Schema.Array(Schema.String),
+})
+
+export type ProjectAssessment = typeof ProjectAssessment.Type
 
 /**
  * Assess every managed integration against one read of the project. A reassessment after an agent
@@ -70,14 +156,64 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
     { concurrency: "unbounded" }
   )
 
-  const applicable = Array.flatten(assessments)
+  // Without a lockfile, an integration applies to the files that exist, which the inferred
+  // selection names.
+  const selection = yield* Option.match(project.lockfile, {
+    onNone: () => inferSelection(project),
+    onSome: (lockfile) => Effect.succeed(lockfile.selection),
+  })
+
+  const parts = yield* Effect.forEach(
+    integrations.filter((integration) => integration.selected(selection)),
+    (integration) =>
+      integration
+        .assess(project, selection)
+        .pipe(Effect.map((assessment) => ({ assessment, name: integration.name }))),
+    { concurrency: "unbounded" }
+  )
+
+  const applicable = [...Array.flatten(assessments), ...parts]
+
+  // A project that Adamantite does not manage needs no lockfile, and init sets it up.
+  const isUnmanaged = Option.isNone(project.lockfile) && applicable.length === 0
 
   return {
     applicableIntegrations: applicable.map(({ name }) => name),
-    findings: applicable.flatMap(({ assessment }) => assessment.findings),
+    findings: [
+      ...applicable.flatMap(({ assessment }) => assessment.findings),
+      ...(Option.isNone(project.lockfile) && !isUnmanaged ? [lockfileMissing] : []),
+    ],
     packageActions: applicable.flatMap(({ assessment }) => assessment.packageActions),
-    warnings: applicable.flatMap(({ assessment }) => assessment.warnings),
+    selection,
+    warnings: [
+      ...applicable.flatMap(({ assessment }) => assessment.warnings),
+      ...(isUnmanaged
+        ? ["No Adamantite-managed setup found. Run `adamantite init` to configure the project."]
+        : []),
+    ],
   } satisfies ProjectAssessment
+})
+
+/**
+ * The assessment that Doctor reports for the project at `cwd`, from a new read of it. A project
+ * that does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so
+ * a coding agent can repair it.
+ */
+export const readAssessment = Effect.fn("readAssessment")(function* (cwd: string) {
+  // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets
+  // the install finding even when its workspace packages do not read.
+  const packageJson = yield* readPackageJson(cwd)
+
+  if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
+    return notInstalled
+  }
+
+  return yield* readProject(cwd).pipe(
+    Effect.flatMap(assessProject),
+    Effect.catchTag(["InvalidLockfile", "UnsupportedLockfile"], (error) =>
+      Effect.succeed(assessUnreadableLockfile(error))
+    )
+  )
 })
 
 /**
@@ -85,7 +221,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
  * folded in; a warning-only assessment produces the warning report.
  */
 export function renderAssessmentMarkdown(
-  assessment: ProjectAssessment,
+  assessment: Pick<ProjectAssessment, "findings" | "warnings">,
   adamantiteVersion: string
 ): string {
   return assessment.findings.length === 0

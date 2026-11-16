@@ -161,15 +161,16 @@ jobs:
             command: pnpm run test:presets
           - name: e2e
             command: pnpm run test:dist
-          # The rules rely on the AST shape of each Oxlint version that peerDependencies allows,
-          # so the RuleTester tests and the preset fixtures also run with the minimum version.
+          # The rules and the probe plugin rely on the AST shape of each Oxlint version that
+          # peerDependencies allows, so the RuleTester tests, the preset fixtures, and the probe
+          # tests also run with the minimum version.
           - name: minimum-oxlint
             command: |
               oxlint_version="$(node -p "const range = JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).peerDependencies.oxlint; const match = /^>=(\d+\.\d+\.\d+)$/.exec(range); if (match === null) throw new Error('Expected peerDependencies.oxlint to be >=<version>, not ' + range); match[1]")"
               oxlint_dir="${RUNNER_TEMP}/adamantite-minimum-oxlint"
               mkdir "${oxlint_dir}"
               npm install --prefix "${oxlint_dir}" "oxlint@${oxlint_version}"
-              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run src/__tests__/plugins src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
+              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts presets/__tests__/effect.test.ts src/commands/__tests__/rule-ast.test.ts src/lib/hardening/__tests__/suppressions.test.ts
 
     steps:
       - name: Checkout
@@ -186,7 +187,7 @@ jobs:
           # The preset tests install the fixture packages from their own lockfile.
           cache-dependency-path: |
             pnpm-lock.yaml
-            src/__tests__/presets/fixture-packages/pnpm-lock.yaml
+            presets/__tests__/fixture-packages/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

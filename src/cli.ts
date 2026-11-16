@@ -2,9 +2,10 @@ import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import type { CommandRunner } from "#lib/execution/command-runner.ts"
+import type { CommandRunner } from "#lib/shared/command-runner.ts"
 import analyzeCommand from "#commands/analyze.ts"
 import checkCommand from "#commands/check.ts"
 import doctorCommand from "#commands/doctor.ts"
@@ -13,12 +14,13 @@ import hardenCommand from "#commands/harden.ts"
 import initCommand from "#commands/init/index.ts"
 import ruleCommand from "#commands/rule.ts"
 import updateCommand from "#commands/update.ts"
-import { CodingAgents } from "#lib/execution/coding-agents.ts"
-import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { CodingAgents } from "#lib/handoff/coding-agents.ts"
+import { ConfigLoader } from "#lib/project/config-loader.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as NodeTerminal from "#terminal/node-terminal.ts"
 
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
@@ -58,8 +60,10 @@ export const makeAppLayer = (
     NodeTerminal.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
+    ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
-    DependencyInstaller.layer
+    DependencyInstaller.layer.pipe(Layer.provide(NodeServices.layer)),
+    Digest.layerWebCrypto
   )
 
 export const runCli = Effect.fn("runCli")(function* (args: readonly string[], version: string) {

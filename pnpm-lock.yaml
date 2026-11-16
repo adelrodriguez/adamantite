@@ -169,21 +169,9 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(effect@4.1.2)(redis@6.2.1)
-      '@effect/platform-node-shared':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)
-      '@oxlint/plugins':
-        specifier: 1.93.0
-        version: 1.93.0
       effect:
         specifier: 4.1.2
         version: 4.1.2
-      nypm:
-        specifier: 0.6.10
-        version: 0.6.10
-      oxc-parser:
-        specifier: 0.154.0
-        version: 0.154.0
       oxc-resolver:
         specifier: 11.24.2
         version: 11.24.2
@@ -200,6 +188,9 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(effect@4.1.2)(vitest@5.0.5)
+      '@oxlint/plugins':
+        specifier: 1.93.0
+        version: 1.93.0
       '@shadcn/lint':
         specifier: 0.2.1
         version: 0.2.1
@@ -224,6 +215,9 @@ importers:
       knip:
         specifier: 6.45.1
         version: 6.45.1
+      oxc-parser:
+        specifier: 0.154.0
+        version: 0.154.0
       oxfmt:
         specifier: 0.78.0
         version: 0.78.0
@@ -1686,9 +1680,6 @@ packages:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
     engines: {node: '>=18'}
 
-  citty@0.2.2:
-    resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
-
   cluster-key-slot@1.1.2:
     resolution: {integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==}
     engines: {node: '>=0.10.0'}
@@ -1935,11 +1926,6 @@ packages:
   nanoid@3.3.18:
     resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
-    hasBin: true
-
-  nypm@0.6.10:
-    resolution: {integrity: sha512-W72Hrj1petq+b3Hk2aAC+9zswetlIFTnDW4s5djseZh2nYqBbyQLOtj472HwcbcWykPBUW1WpWpjOd4nK6gMRw==}
-    engines: {node: '>=18'}
     hasBin: true
 
   obug@3.0.0:
@@ -3339,8 +3325,6 @@ snapshots:
 
   chai@6.3.0: {}
 
-  citty@0.2.2: {}
-
   cluster-key-slot@1.1.2: {}
 
   cn@0.4.0: {}
@@ -3533,12 +3517,6 @@ snapshots:
   mrmime@2.0.1: {}
 
   nanoid@3.3.18: {}
-
-  nypm@0.6.10:
-    dependencies:
-      citty: 0.2.2
-      pathe: 2.0.3
-      tinyexec: 1.3.1
 
   obug@3.0.0: {}
 

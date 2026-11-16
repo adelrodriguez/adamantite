@@ -4,7 +4,7 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(

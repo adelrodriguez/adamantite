@@ -1,14 +1,15 @@
 import { execFileSync, spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, join, sep } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import * as Jsonc from "effect/encoding/Jsonc"
 import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import packageJson from "../package.json" with { type: "json" }
-import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/tooling/oxlint/entry.ts"
+import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/oxlint/entry.ts"
+import { PROBE_FILE } from "../src/lib/integrations/oxlint/probe.ts"
 
 const cliPath = join(import.meta.dirname, "..", "bin", "adamantite")
 
@@ -32,6 +33,12 @@ if (!existsSync(join(import.meta.dirname, "..", "dist", OXLINT_ENTRY_FILE))) {
 }
 
 console.info(`Verified the Oxlint entry: dist/${OXLINT_ENTRY_FILE}`)
+
+if (!existsSync(join(import.meta.dirname, "..", "dist", PROBE_FILE))) {
+  throw new Error(`Expected the build to write the Oxlint probe plugin dist/${PROBE_FILE}.`)
+}
+
+console.info(`Verified the Oxlint probe plugin: dist/${PROBE_FILE}`)
 
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-cli-"))
 
@@ -145,14 +152,17 @@ const loadedFiles = collectLoadedFiles(
 console.info(`Verified the ${loadedFiles.size} type reset files of the built TypeScript preset`)
 
 // Copied code keeps the license notice of its source, so every license file under `presets/` must
-// ship at the same path under `dist/presets/`.
+// ship at the same path under `dist/presets/`. The tests do not ship, and their folders hold the
+// licenses of the installed fixture packages.
 const sourcePresetDirectory = join(import.meta.dirname, "..", "presets")
 const builtPresetDirectory = join(import.meta.dirname, "..", "dist", "presets")
 
 const licenseFiles = readdirSync(sourcePresetDirectory, {
   encoding: "utf8",
   recursive: true,
-}).filter((file) => /^license(?:\.md)?$/iu.test(basename(file)))
+})
+  .filter((file) => !file.split(sep).includes("__tests__"))
+  .filter((file) => /^license(?:\.md)?$/iu.test(basename(file)))
 
 for (const file of licenseFiles) {
   if (!existsSync(join(builtPresetDirectory, file))) {

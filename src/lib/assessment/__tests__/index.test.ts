@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
@@ -11,25 +13,20 @@ import {
   type ProjectAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
-import vscode from "#lib/integrations/editors/vscode.ts"
-import zed from "#lib/integrations/editors/zed.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
+import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
 // These assessments resolve no TypeScript package, so the tsconfig integration starts no process.
 const noProcessLayer = makeOxlintFilesLayer()
 
-function makeAssessment(value: Partial<ProjectAssessment>): ProjectAssessment {
-  return {
-    applicableIntegrations: ["tool"],
-    findings: [],
-    packageActions: [],
-    warnings: [],
-    ...value,
-  }
+type RenderedAssessment = Pick<ProjectAssessment, "findings" | "warnings">
+
+function makeAssessment(value: Partial<RenderedAssessment>): RenderedAssessment {
+  return { findings: [], warnings: [], ...value }
 }
 
 describe("renderAssessmentMarkdown", () => {
@@ -194,79 +191,6 @@ describe("renderAssessmentMarkdown", () => {
 })
 
 describe("assessProject", () => {
-  it.effect.each([vscode, zed])(
-    "clear the $name finding after the settings are repaired",
-    (editor) =>
-      Effect.gen(function* () {
-        const settingsPath = `.${editor.name}/settings.json`
-
-        const files = createFileSystemTestContext({
-          files: {
-            "package.json": "{}",
-            [settingsPath]: '{ "projectSetting": true }',
-          },
-          root: ROOT,
-        })
-
-        const provideFiles = Effect.provide([
-          files.layer,
-          Path.layer,
-          makeModuleResolverLayer(ROOT),
-        ])
-
-        const assess = Effect.gen(function* () {
-          const project = yield* readProject(ROOT)
-
-          return yield* editor.assess(project)
-        }).pipe(provideFiles)
-
-        expect(yield* assess).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("no value"),
-              goal: [expect.stringContaining("Preserve every other setting")],
-              id: `${editor.name}-oxlint-entry`,
-              reference: {
-                content: expect.stringContaining("node_modules/adamantite/dist/oxlint.js"),
-                language: "json",
-              },
-            },
-          ],
-        })
-
-        yield* editor.update(ROOT).pipe(provideFiles)
-
-        expect(yield* assess).toMatchObject({ applicable: true, findings: [] })
-        expect(files.read(settingsPath)).toContain('"projectSetting": true')
-      })
-  )
-
-  it.effect.each([vscode, zed])("reject invalid $name settings", (editor) =>
-    Effect.gen(function* () {
-      for (const { content, error } of [
-        { content: "[]", error: "InvalidConfigFormat" },
-        { content: "{", error: "FailedToParseFile" },
-      ]) {
-        const files = createFileSystemTestContext({
-          files: { "package.json": "{}", [`.${editor.name}/settings.json`]: content },
-          root: ROOT,
-        })
-
-        const result = yield* Effect.gen(function* () {
-          const project = yield* readProject(ROOT)
-
-          return yield* editor.assess(project)
-        }).pipe(
-          Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)]),
-          Effect.flip
-        )
-
-        expect(result).toMatchObject({ _tag: error })
-      }
-    })
-  )
-
   it.effect.each([
     { editor: "vscode", finding: "vscode-oxlint-entry", settings: "{}" },
     {
@@ -331,16 +255,22 @@ describe("assessProject", () => {
 
       const assessment = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessProject(project)),
-        Effect.provide([
-          files.layer,
-          Path.layer,
-          makeModuleResolverLayer(ROOT),
-          noProcessLayer,
-          Layer.succeed(DependencyInstaller)({
-            addDevDependencies: () => Effect.void,
-            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
-          }),
-        ])
+        Effect.provide(
+          withConfigLoader(
+            Layer.mergeAll(
+              files.layer,
+              Path.layer,
+              makeModuleResolverLayer(ROOT),
+              noProcessLayer,
+              Digest.layerWebCrypto,
+              NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
+              Layer.succeed(DependencyInstaller)({
+                addDevDependencies: () => Effect.void,
+                detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
+              })
+            )
+          )
+        )
       )
 
       expect(
@@ -382,7 +312,6 @@ describe("assessProject", () => {
       })
 
       const reads: string[] = []
-      const discoveries: string[] = []
 
       const fileSystem = Layer.effect(FileSystem.FileSystem)(
         Effect.gen(function* () {
@@ -401,41 +330,40 @@ describe("assessProject", () => {
 
       const assessment = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessProject(project)),
-        Effect.provide([
-          fileSystem,
-          Path.layer,
-          makeModuleResolverLayer(
-            ROOT,
-            {},
-            Effect.sync(() => {
-              discoveries.push("discovery")
-            })
-          ),
-          noProcessLayer,
-          Layer.succeed(DependencyInstaller)({
-            addDevDependencies: () => Effect.void,
-            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
-          }),
-        ])
+        Effect.provide(
+          withConfigLoader(
+            Layer.mergeAll(
+              fileSystem,
+              Path.layer,
+              makeModuleResolverLayer(ROOT),
+              noProcessLayer,
+              Digest.layerWebCrypto,
+              NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
+              Layer.succeed(DependencyInstaller)({
+                addDevDependencies: () => Effect.void,
+                detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
+              })
+            )
+          )
+        )
       )
 
       expect(assessment.applicableIntegrations).toStrictEqual([
-        "knip",
-        "oxfmt",
-        "oxlint",
         "oxlint-custom",
         "@effect/tsgo",
         "@shadcn/lint",
-        "sherif",
         "tsrs",
+        "oxlint",
+        "oxfmt",
+        "knip",
+        "sherif",
         "tsconfig",
-        "agents",
         "github",
       ])
       expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
-      // The project reads the root config, and custom rule discovery reads it as an Oxlint config.
+      // The project loads the root config, and custom rule discovery loads it as the config of the
+      // root package.
       expect(reads.filter((path) => path === `${ROOT}/oxlint.config.ts`)).toHaveLength(2)
-      expect(discoveries).toHaveLength(1)
     })
   )
 })

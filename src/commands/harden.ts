@@ -1,61 +1,47 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
-import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
-import * as Console from "effect/Console"
-import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
-import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
-import type { Finding } from "#lib/integrations/base.ts"
+import type { AgentReach, BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
+  HardenContext,
   readHardenContext,
   readHardenReach,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
-import { readOverrides } from "#lib/hardening/overrides.ts"
-import { readSuppressions } from "#lib/hardening/suppressions.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { readWorkspace } from "#lib/project/monorepo.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
 import {
   AdamantiteNotInNodeModules,
   AdamantiteNotInstalled,
   AdamantiteVersionMismatch,
-  CommandFailed,
   FailedToReadFile,
   ScopeOutsideProject,
 } from "#lib/shared/errors.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Toolchain from "#lib/toolchain/index.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { readWorkspace } from "#lib/workspace/monorepo.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { readProject } from "#lib/workspace/project.ts"
-import { printFindings } from "#terminal/findings.ts"
+import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
-import { AgentSessionEnded, chooseResolution } from "#terminal/resolution-menu.ts"
+import * as Resolution from "#terminal/resolution.ts"
 
 const version = getPackageVersion()
 
 /**
- * A reason why the project fails the verification after a harden session.
+ * What `harden --json` prints: the harden context that the prompt is built from.
  */
-type VerificationFailure =
-  | { readonly _tag: "BrokenLink"; readonly link: BrokenLink }
-  | { readonly _tag: "CheckFailed" }
-  | { readonly _tag: "Findings"; readonly findings: readonly Finding[] }
-
-const {
-  $match: matchFailure,
-  BrokenLink: brokenLink,
-  CheckFailed: checkFailed,
-  Findings: doctorFindings,
-} = Data.taggedEnum<VerificationFailure>()
+export const Report = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  ...HardenContext.fields,
+})
 
 function getLinkKey(link: BrokenLink) {
   return `${link.file}\0${link.target}`
@@ -108,53 +94,69 @@ const commits = Flag.Int("commits").pipe(
 )
 
 /**
- * Read the project before the session, and render the prompt. The agent can change the project, so
- * only the prompt and the agent reach leave this function, and the reads after the session read the
- * project again.
+ * What remains after a harden session. The agent verifies custom rules during the session with
+ * temporary cases, and the project must still pass check and Doctor after it. A link that was
+ * broken before the session is a gap that the user may not have approved, so only a link that the
+ * session added remains.
  */
-const preparePrompt = Effect.fn("preparePrompt")(function* (
+const verify = Effect.fn("verify")(function* (
   cwd: string,
-  scopeDirectory: string | undefined,
-  commits: number
+  scope: string,
+  reachBefore: Option.Option<AgentReach>
 ) {
-  // Each step before the session takes this read of the workspace.
-  const workspace = yield* readWorkspace(cwd)
-  const context = yield* readHardenContext(cwd, workspace, scopeDirectory)
+  const CHECK_FAILED = "`adamantite check` failed."
 
-  // These reads change no file in the project, so they run together.
-  const [overrides, suppressions] = yield* Effect.all(
-    [
-      readOverrides(cwd, workspace, context.configs, context.scope),
-      readSuppressions(cwd, context.scope),
-    ],
+  const checkFailures = yield* Toolchain.check({ cwd }).pipe(
+    Effect.as([]),
+    Effect.catchTags({
+      CliNotFound: (error) => Effect.succeed([error.message, CHECK_FAILED]),
+      CommandFailed: () => Effect.succeed([CHECK_FAILED]),
+    })
+  )
+
+  // The session can change the project, so agent reach and assessment share a new read.
+  const project = yield* readProject(cwd)
+
+  const [reachAfter, assessment] = yield* Effect.all(
+    [readHardenReach(cwd, project.workspace, scope), assessProject(project)],
     { concurrency: "unbounded" }
   )
 
+  const brokenBefore = new Set(
+    Option.match(reachBefore, {
+      onNone: () => [],
+      onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
+    })
+  )
+
+  const addedBrokenLinks = Option.match(reachAfter, {
+    onNone: () => [],
+    onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
+  })
+
   return {
-    agentReach: context.agentReach,
-    prompt: renderHardenPrompt(context, {
-      adamantiteVersion: version,
-      commits,
-      overrides,
-      suppressions,
-    }),
-  }
+    failures: [
+      ...checkFailures,
+      ...addedBrokenLinks.map(
+        (link) => `\`${link.file}\` links to \`${link.target}\`, which does not exist.`
+      ),
+    ],
+    findings: assessment.findings,
+    warnings: assessment.warnings,
+  } satisfies Resolution.Remaining
 })
 
-export default Command.make("harden", { commits, scope }).pipe(
+export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   Command.withDescription(
     "Ask a coding agent to turn project standards into custom rules and instructions"
   ),
-  Command.withHandler(({ commits, scope }) =>
+  Command.withHandler(({ commits, json, scope }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
 
-      if (canPrompt) {
-        yield* Output.intro("💠 adamantite harden")
-      }
+      yield* Output.intro("💠 adamantite harden")
 
       const packageJson = yield* readPackageJson(cwd)
 
@@ -188,156 +190,43 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       // The current directory is a real path, so the scope must be one too. A scope through a
       // directory symlink, such as `/var` for `/private/var` on macOS, then stays inside the
-      // project. The flag requires the folder to exist.
+      // project. The flag requires the folder to exist. Without it, the scope is the project.
       const scopeDirectory = Option.isSome(scope)
         ? yield* fs
             .realPath(path.resolve(cwd, scope.value))
             .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: scope.value })))
-        : undefined
+        : cwd
 
-      if (scopeDirectory !== undefined) {
-        const fromRoot = path.relative(cwd, scopeDirectory)
+      const fromRoot = path.relative(cwd, scopeDirectory)
 
-        if (
-          fromRoot === ".."
-          || fromRoot.startsWith(`..${path.sep}`)
-          || path.isAbsolute(fromRoot)
-        ) {
-          return yield* new ScopeOutsideProject({ cwd, scope: scopeDirectory })
-        }
+      if (fromRoot === ".." || fromRoot.startsWith(`..${path.sep}`) || path.isAbsolute(fromRoot)) {
+        return yield* new ScopeOutsideProject({ cwd, scope: scopeDirectory })
       }
 
-      const { agentReach, prompt } = yield* preparePrompt(cwd, scopeDirectory, commits)
-
-      if (!canPrompt) {
-        yield* Console.log(prompt)
-
-        return
-      }
-
-      const resolution = yield* chooseResolution({
-        command: "Harden",
+      // Each step before the session takes this read of the workspace.
+      const context = yield* readHardenContext(
         cwd,
+        yield* readWorkspace(cwd),
+        scopeDirectory,
+        commits
+      )
+
+      const session = yield* Resolution.offer({
+        command: "harden",
+        cwd,
+        document: Output.json(Report, { schemaVersion: 1, ...context }),
         message: "How do you want to harden this project?",
-        prompt,
+        prompt: renderHardenPrompt(context, version),
         subject: "the prompt",
+        verify: verify(cwd, scopeDirectory, context.agentReach),
+        work: Resolution.Task(),
       })
 
-      if (!(resolution instanceof AgentSessionEnded)) {
-        yield* Output.outro("Harden ended without an agent session.")
-
-        return
-      }
-
-      const { agent } = resolution
-
-      // The agent verifies custom rules during the session with temporary cases. The resulting
-      // project must still pass check and Doctor after the session ends.
-      const checkFailures = yield* Toolchain.check({ cwd }).pipe(
-        Effect.as([]),
-        Effect.catchTags({
-          CliNotFound: (error) => Output.error(error.message).pipe(Effect.as([checkFailed()])),
-          CommandFailed: () => Effect.succeed([checkFailed()]),
-        })
+      yield* Output.outro(
+        Option.isSome(session)
+          ? "✅ Harden checks passed."
+          : "Harden ended without an agent session."
       )
-
-      // The session can change the project, so agent reach and assessment share a fresh read.
-      const project = yield* readProject(cwd)
-
-      const [reachAfter, assessment] = yield* Effect.all(
-        [readHardenReach(cwd, project.workspace, scopeDirectory), assessProject(project)],
-        { concurrency: "unbounded" }
-      )
-
-      // A link that was broken before the session is a gap that the user may not have approved, so
-      // only a link that the session added fails the verification.
-      const brokenBefore = new Set(
-        Option.match(agentReach, {
-          onNone: () => [],
-          onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
-        })
-      )
-
-      const addedBrokenLinks = Option.match(reachAfter, {
-        onNone: () => [],
-        onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
-      })
-
-      const failures = [
-        ...checkFailures,
-        ...(assessment.findings.length > 0
-          ? [doctorFindings({ findings: assessment.findings })]
-          : []),
-        ...addedBrokenLinks.map((link) => brokenLink({ link })),
-      ]
-
-      for (const warning of assessment.warnings) {
-        yield* Output.warning(warning)
-      }
-
-      yield* Effect.forEach(
-        failures,
-        matchFailure({
-          BrokenLink: ({ link }) =>
-            Output.error(
-              `\`${link.file}\` links to \`${link.target}\`, which does not exist, after the ${agent.name} session.`
-            ),
-          CheckFailed: () =>
-            Output.error(`\`adamantite check\` failed after the ${agent.name} session.`),
-          Findings: ({ findings }) =>
-            Output.warning(`Doctor found issues after the ${agent.name} session.`).pipe(
-              Effect.andThen(printFindings(findings))
-            ),
-        }),
-        { concurrency: 1, discard: true }
-      )
-
-      if (failures.length > 0) {
-        yield* Output.outro("⚠️ Harden verification failed.")
-
-        return yield* new CommandFailed({
-          command: "harden",
-          exitCode: ChildProcessSpawner.ExitCode(1),
-        })
-      }
-
-      yield* Output.success(`\`adamantite check\` and Doctor pass after the ${agent.name} session.`)
-      yield* Output.outro("✅ Harden checks passed.")
-    }).pipe(
-      Effect.catchTag(
-        [
-          "AdamantiteNotInstalled",
-          "AdamantiteNotInNodeModules",
-          "AdamantiteVersionMismatch",
-          "ScopeOutsideProject",
-        ],
-        (error) =>
-          Effect.gen(function* () {
-            const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
-
-            if (canPrompt) {
-              yield* Output.warning(error.message)
-              yield* Output.outro("⚠️ Harden did not start.")
-            } else {
-              yield* Console.log(error.message)
-            }
-
-            return yield* new CommandFailed({
-              command: "harden",
-              exitCode: ChildProcessSpawner.ExitCode(1),
-            })
-          })
-      ),
-      Effect.catchTag("QuitError", () =>
-        Effect.gen(function* () {
-          yield* Output.cancel("Harden was cancelled.")
-
-          return yield* new CommandFailed({
-            command: "harden",
-            exitCode: ChildProcessSpawner.ExitCode(1),
-          })
-        })
-      )
-    )
+    }).pipe(Mode.provide({ json }))
   )
 )

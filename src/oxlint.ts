@@ -5,14 +5,14 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
-import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/integrations/oxlint/entry.ts"
 import {
   ReplacedPart,
   resolveOxlintRuntime,
   toBackendEnv,
   TsrsBackend,
-} from "#lib/integrations/tooling/oxlint/runtime.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
+} from "#lib/integrations/oxlint/runtime.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.

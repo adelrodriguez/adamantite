@@ -16,22 +16,30 @@ Continue when you have identified the loaded rules folder and its plugin name.
 
 ## Repair an existing rules folder
 
-If Doctor reports the previous API, replace `adamantite/lint/custom` with the default import
-from `adamantite/rules`. Move authoring imports to `adamantite/rules/plugin`.
-Move the old default folder to `.adamantite/lint`, or set its path with `dir`.
+When Doctor reports that Oxlint cannot load a config or a rule file, read the error that it
+names. Load the rules folder with the default import from `adamantite/rules`, and import
+`definePlugin`, `defineRule`, and the authoring types from `adamantite/rules/plugin`. For a name
+that the installed package does not export, use the replacement that the changelog names. A rule
+file must load with type stripping, so replace TypeScript that Node.js cannot erase, such as an
+`enum`.
+
+When Doctor reports a rules folder that no `custom()` call loads, such as the old default folder
+`.adamantite/rules`, move its rules to `.adamantite/lint`, or set its path with `dir`.
 Preserve rule behavior, plugin names, severity, and options.
 
-Continue when Doctor reports no custom-rule wiring findings.
+Continue when Doctor reports no custom-rule findings and no config load failure.
 
 ## Write the rule
 
 For a new rule, run `adamantite rule add <name>`. It writes only a stub.
-Use `adamantite rule ast <file>` on real code to find the node types that visitors receive.
+Use `adamantite rule ast <file>` on real code to find the node types that visitors receive. With
+`--json`, it prints the file and its tree as one JSON document.
 
 Apply these authoring constraints:
 
 - Export the rule as default with `defineRule` from `adamantite/rules/plugin`.
   Import `Context`, `Rule`, `Visitor`, and `ESTree` types from that module when needed.
+  Adamantite ships these types, so do not add `@oxlint/plugins` to the project.
 - Use `createOnce`, which runs once for the lint run. Reset per-file state in `before` and
   report collected results in `after`. Read `context.filename`, `context.sourceCode`, and
   `context.settings` in `before` or a visitor. They are unavailable in the `createOnce` body.

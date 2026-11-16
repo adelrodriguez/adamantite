@@ -102,9 +102,15 @@ export class CliNotFound extends Data.TaggedError("CliNotFound")<{
 export class CommandFailed extends Data.TaggedError("CommandFailed")<{
   command: string
   exitCode: ChildProcessSpawner.ExitCode
+  /**
+   * What the command printed, when the caller captured it instead of showing it.
+   */
+  output?: string
 }> {
   override get message() {
-    return `Command \`${this.command}\` failed with exit code ${this.exitCode}.`
+    const output = this.output?.trim() ?? ""
+
+    return `Command \`${this.command}\` failed with exit code ${this.exitCode}.${output === "" ? "" : `\n${output}`}`
   }
 }
 
@@ -181,6 +187,18 @@ export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDir
   }
 }
 
+/**
+ * The project's Oxfmt failed to format a file that `init` or `update` was about to write.
+ */
+export class FailedToFormatFile extends Data.TaggedError("FailedToFormatFile")<{
+  output: string
+  path: string
+}> {
+  override get message() {
+    return `The project's Oxfmt could not format \`${this.path}\`. Fix the Oxfmt config, then run the command again.${this.output === "" ? "" : `\n${this.output}`}`
+  }
+}
+
 export class FailedToInstallDependency extends Data.TaggedError("FailedToInstallDependency")<{
   packages?: string[]
   cause?: unknown
@@ -192,50 +210,12 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
   }
 }
 
-export class FailedToInstallExtension extends Data.TaggedError("FailedToInstallExtension")<{
-  extension?: string
-  cause?: unknown
-}> {
-  override get message() {
-    const target = this.extension ? `\`${this.extension}\`` : "the target extension"
-
-    if (Predicate.isNumber(this.cause)) {
-      return `Failed to install ${target}. The \`code\` CLI exited with code ${this.cause}.`
-    }
-
-    return `Failed to install ${target}.${formatCauseDetail(this.cause)}`
-  }
-}
-
-export class FailedToMergeConfig extends Data.TaggedError("FailedToMergeConfig")<{
-  cause?: unknown
-}> {
-  override get message() {
-    return `Failed to merge configuration.${formatCauseDetail(this.cause)}`
-  }
-}
-
 export class FailedToParseFile extends Data.TaggedError("FailedToParseFile")<{
   path: string
   cause: unknown
 }> {
   override get message() {
     return `Failed to parse \`${this.path}\`. Fix the JSON or JSONC syntax and run the command again.${formatCauseDetail(this.cause)}`
-  }
-}
-
-/**
- * The file has comments or trailing commas, and a rewrite would delete them.
- */
-export class JsoncNotEditable extends Data.TaggedError("JsoncNotEditable")<{
-  /**
-   * The change to make by hand, as a sentence.
-   */
-  change: string
-  path: string
-}> {
-  override get message() {
-    return `\`${this.path}\` has comments or trailing commas, so Adamantite does not rewrite it. ${this.change}`
   }
 }
 
@@ -312,6 +292,40 @@ export class InvalidPackageJson extends Data.TaggedError("InvalidPackageJson")<{
   }
 }
 
+/**
+ * The lockfile does not decode, such as after a merge conflict. Doctor reports it as a finding, and
+ * the commands that write the lockfile fail, so they do not overwrite it.
+ */
+export class InvalidLockfile extends Data.TaggedError("InvalidLockfile")<{
+  issue: string
+  path: string
+}> {
+  override get message() {
+    return `\`${this.path}\` does not decode as an Adamantite lockfile. Run \`adamantite doctor\` to hand the repair to a coding agent. ${this.issue}`
+  }
+}
+
+/**
+ * The lockfile has a schema version that this Adamantite version cannot read, because a newer
+ * Adamantite wrote it. `version` is the Adamantite version that the file names, when it names one.
+ * Doctor reports it as a finding, and the commands that write the lockfile fail, so they do not
+ * overwrite it.
+ */
+export class UnsupportedLockfile extends Data.TaggedError("UnsupportedLockfile")<{
+  path: string
+  schemaVersion: unknown
+  version: Option.Option<string>
+}> {
+  override get message() {
+    const writer = Option.match(this.version, {
+      onNone: () => "A newer Adamantite version wrote it.",
+      onSome: (version) => `Adamantite ${version} wrote it.`,
+    })
+
+    return `\`${this.path}\` has schema version ${JSON.stringify(this.schemaVersion)}, which this Adamantite version cannot read. ${writer} Run \`adamantite doctor\` to hand the repair to a coding agent.`
+  }
+}
+
 export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptions")<{
   reason: string
 }> {
@@ -373,7 +387,7 @@ export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {
   override get message() {
-    return `No package manager was found. Run this command from a project with a lockfile.${formatCauseDetail(this.cause)}`
+    return `No package manager was found. Run this command from a project with a lockfile or a \`packageManager\` field in \`package.json\`.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -460,6 +474,30 @@ export class TrialConfigNotFound extends Data.TaggedError("TrialConfigNotFound")
 /**
  * Oxlint did not lint the cases, for example because the config does not load.
  */
+/**
+ * Node.js could not load a config of the target project, as the tool that reads the config would
+ * not either.
+ */
+export class ConfigLoadFailed extends Data.TaggedError("ConfigLoadFailed")<{
+  file: string
+  reason: string
+}> {
+  override get message() {
+    return `Node.js cannot load \`${this.file}\`: ${this.reason}`
+  }
+}
+
+/**
+ * Oxlint could not run the probe plugin that reads the comments or the syntax tree of the files.
+ */
+export class OxlintProbeFailed extends Data.TaggedError("OxlintProbeFailed")<{
+  output: string
+}> {
+  override get message() {
+    return `Oxlint could not read the files. Fix the errors below and run the command again.\n${this.output}`
+  }
+}
+
 export class TrialLintFailed extends Data.TaggedError("TrialLintFailed")<{
   output: string
 }> {
@@ -485,13 +523,5 @@ export class TrialRuleNotFound extends Data.TaggedError("TrialRuleNotFound")<{
 }> {
   override get message() {
     return `The rule \`${this.rule}\` is not available. Check that the Oxlint config loads it. Oxlint reports: ${this.detail}`
-  }
-}
-
-export class VscodeCliNotFound extends Data.TaggedError("VscodeCliNotFound")<{
-  cause?: unknown
-}> {
-  override get message() {
-    return `VS Code's \`code\` command was not found on PATH. Add it to PATH to manage extensions.${formatCauseDetail(this.cause)}`
   }
 }

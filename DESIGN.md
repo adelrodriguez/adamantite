@@ -38,7 +38,7 @@ Adamantite presents a sequence of command steps, status lines, and questions in 
 [Output](src/terminal/output.ts) renders the lines through Effect's `Console`, and the questions
 are the prompts of `effect/cli/Prompt`. Both use one style: a symbol at the start of the line, and
 no guide line at the left edge. Plain Markdown reports carry findings and hardening instructions
-when the command runs without interaction.
+when the command runs without interaction, and `--json` prints one JSON document for an agent.
 
 This reference records the existing interface. The [architecture](docs/architecture.md) explains
 command behavior, and [GLOSSARY.md](GLOSSARY.md) defines the terms used in the output.
@@ -67,12 +67,14 @@ fences for reference content. Paths, package names, and commands retain their li
 
 Output follows a vertical sequence. Interactive lifecycle commands start with an intro heading,
 show status lines and findings, ask the next question when needed, and finish with an outro
-heading. Each command owns its exact sequence and messages.
+heading. Only a run in the `Menu` mode prints the headings. Each command owns its exact sequence
+and messages.
 
 A step prints one line when it finishes, such as `✔ Dependencies installed.` No spinner or
 progress line runs while a step works. A step that fails ends the command with a tagged error, and
 the runtime boundary prints that error once, as an `✖` line on standard error. Every other line
-goes to standard output, so the lines and the prompts keep their order.
+goes to standard output, so the lines and the prompts keep their order. With `--json`, standard
+output holds only the JSON document, and every other line goes to standard error.
 
 A status message that spans several lines indents each continuation line by two spaces, under the
 text after the symbol. [Findings](src/terminal/findings.ts) appear as numbered notes: a blank line,
@@ -82,8 +84,27 @@ goal or note has its own bullet.
 
 Plain output, such as a Markdown report, a syntax tree, or a list of rule names, goes through
 `Console.log` without a symbol. Effect's `TerminalCapabilities.canPrompt` treats a session as
-interactive only when both standard input and standard output are terminals. A command can also
-expose its own non-interactive option.
+interactive only when both standard input and standard output are terminals. A command decides its
+[mode](src/terminal/mode.ts) once: `Json` with `--json`, `Menu` in an interactive session, and
+`Plain` otherwise. `init --non-interactive` selects `Plain` in an interactive session too.
+
+`init` and `update` print one status line for each step of the setup, in this order. Before them,
+`init` prints the link of each Zed extension that the setup needs.
+
+1. `Packages installed:`, with one line for each package and the version that it had, such as
+   `oxlint: not installed → 1.93.0`.
+2. One line for each managed script: `` `check` script added: `adamantite check`. ``, a
+   `replaced` line with the command that it ran and the new command, or `` `check` script is up to
+   date. ``
+3. One line for each managed file: `created.`, `replaced with the current version.`, `is up to
+   date.`, `kept, because it has changes that Adamantite did not write.`, or `deleted, because the
+   setup no longer includes it.` Each line starts with the path, and a kept file names
+   `adamantite doctor`.
+4. One line for the lockfile: `written. Commit it with the setup.`, `updated. Commit it.`, or
+   `already records this setup.`
+
+A change prints as a `success` line, and a file or script that stays as it is prints as an `info`
+line. [Setup lines](src/terminal/setup.ts) define the messages.
 
 ## Components
 
@@ -94,14 +115,19 @@ expose its own non-interactive option.
 | Choice          | Effect's `Prompt.Confirm`, `Prompt.Select`, and `Prompt.MultiSelect`. A question shows `? message ›`, and its answer `✔ message … answer`. | `effect/cli/Prompt`                                |
 | Cancel          | Ctrl-C or Esc at a prompt fails it with `QuitError`. The command prints a cancel line, such as `■ Setup was cancelled.`                    | The command                                        |
 | Finding         | A numbered note with the current state, goals, and optional repair reference and notes.                                                    | [Findings](src/terminal/findings.ts)               |
+| Setup line      | A status line for each package install, managed script, managed file, and the lockfile that `init` and `update` handled.                   | [Setup lines](src/terminal/setup.ts)               |
 | Resolution menu | Installed agent handoffs, then prompt copy, then `Finish without an agent`.                                                                | [Resolution menu](src/terminal/resolution-menu.ts) |
-| Prompt copy     | Print the Markdown prompt and send it to the terminal clipboard with OSC 52.                                                               | [Resolution menu](src/terminal/resolution-menu.ts) |
+| Prompt copy     | Print the Markdown prompt and send it to the terminal clipboard with OSC 52. An agent CLI that does not start prints it too.               | [Resolution menu](src/terminal/resolution-menu.ts) |
+| JSON document   | One JSON document with two-space indentation on standard output, which a command's Effect Schema decodes.                                  | [Output](src/terminal/output.ts)                   |
 
 `Prompt.MultiSelect` shows `Select All` and `Inverse Selection` rows above its choices. Effect
 offers no option to hide them.
 
-Doctor prints findings as Markdown when it cannot offer an interactive resolution menu. Its
-healthy non-interactive path is silent unless warnings remain. The
+[`Resolution.offer`](src/terminal/resolution.ts) is the one way that `doctor`, `harden`, `init`,
+and `update` hand a prompt to an agent. It prints the JSON document with `--json`, shows the
+findings and the resolution menu in a terminal, and prints the Markdown prompt otherwise. After an
+agent session, it shows what remains, and offers to copy the repair prompt when findings remain.
+A healthy non-interactive Doctor run is silent unless warnings remain. The
 [warning report](src/lib/assessment/warning-report.md) and
 [repair prompt](src/lib/assessment/repair-prompt.md) define the report headings and context.
 

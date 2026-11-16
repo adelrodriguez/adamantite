@@ -1,6 +1,9 @@
 import type { FormatConfig } from "oxfmt"
+import type { PresetIdentity } from "./identity.ts"
 
 const config: FormatConfig = {
+  // The `PRESET` key of `identity.ts`, which `presets/tsconfig.json` cannot import here.
+  [Symbol.for("adamantite.preset")]: { module: "adamantite/format" } satisfies PresetIdentity,
   arrowParens: "always",
   // Oxfmt formats Astro and Svelte files through bundled Prettier plugins, which import a package
   // from the project: `@astrojs/compiler-rs`, which Astro 7 installs, and the compiler of Svelte 5.

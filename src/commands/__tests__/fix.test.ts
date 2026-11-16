@@ -6,7 +6,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
-import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CommandFailed, InvalidFixOptions } from "#lib/shared/errors.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 

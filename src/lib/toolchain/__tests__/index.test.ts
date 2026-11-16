@@ -66,7 +66,7 @@ const SOURCE_RUNNER = Layer.effect(CommandRunner)(
 
     return CommandRunner.make((options) => runner.exitCode(toSource(options)))
   })
-).pipe(Layer.provide(CommandRunner.layer), Layer.provide(NodeServices.layer))
+).pipe(Layer.provide(CommandRunner.layer), Layer.provideMerge(NodeServices.layer))
 
 interface SecondPass {
   /**

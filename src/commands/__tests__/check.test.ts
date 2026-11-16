@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as Path from "effect/Path"
 import {
   createRunnerTestContext,
   getFailure,
@@ -23,7 +24,7 @@ import {
   ToolNotSelected,
 } from "#lib/shared/errors.ts"
 
-const OXLINT = getOxlintCommand("/project")
+const OXLINT = Effect.runSync(getOxlintCommand("/project").pipe(Effect.provide(Path.layer)))
 
 describe("check", () => {
   describe("stage flags", () => {

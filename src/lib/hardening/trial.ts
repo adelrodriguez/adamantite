@@ -1,4 +1,4 @@
-import { posix, win32 } from "node:path"
+import * as NodePath from "@effect/platform-node/NodePath"
 import * as Array from "effect/Array"
 import * as Brand from "effect/Brand"
 import * as Effect from "effect/Effect"
@@ -115,17 +115,19 @@ const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
  * Parses a case of `rule try`: a project path, or `<path>=<file>` to lint the content of `<file>`
  * at `<path>`. The path must stay inside the project.
  */
-export function parseTrialCase(
+export const parseTrialCase = Effect.fn("parseTrialCase")(function* (
   value: string,
   expected: typeof TrialExpectation.Type
-): Effect.Effect<TrialCase, InvalidTrialCase> {
+) {
+  const posix = yield* Path.Path.pipe(Effect.provide(NodePath.layerPosix))
+  const win32 = yield* Path.Path.pipe(Effect.provide(NodePath.layerWin32))
   const separator = value.indexOf("=")
   const target = separator === -1 ? value : value.slice(0, separator)
   const source = Option.liftPredicate(value.slice(separator + 1), () => separator !== -1)
   const path = posix.normalize(target.replaceAll("\\", "/"))
 
   if (target.length === 0 || Option.exists(source, (file) => file.length === 0)) {
-    return Effect.fail(new InvalidTrialCase({ reason: "Give a path, or `<path>=<file>`.", value }))
+    return yield* new InvalidTrialCase({ reason: "Give a path, or `<path>=<file>`.", value })
   }
 
   // A drive path, such as `C:/src/a.ts`, is absolute only on Windows.
@@ -136,16 +138,14 @@ export function parseTrialCase(
     || path.startsWith("../")
     || path === "."
   ) {
-    return Effect.fail(
-      new InvalidTrialCase({
-        reason: "The path must be a file inside the project, relative to the project root.",
-        value,
-      })
-    )
+    return yield* new InvalidTrialCase({
+      reason: "The path must be a file inside the project, relative to the project root.",
+      value,
+    })
   }
 
-  return Effect.succeed({ expected, path, source })
-}
+  return { expected, path, source } satisfies TrialCase
+})
 
 /**
  * The config that a trial writes in place of the config that lints the cases. An override at the

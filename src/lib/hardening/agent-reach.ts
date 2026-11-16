@@ -1,4 +1,4 @@
-import { posix } from "node:path"
+import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
@@ -66,6 +66,8 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
+  // Git prints the paths with `/` between folders on every platform.
+  const posix = yield* Path.Path.pipe(Effect.provide(NodePath.layerPosix))
   const listed = new Set(files)
 
   const prose = new Map(

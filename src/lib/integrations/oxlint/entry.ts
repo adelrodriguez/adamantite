@@ -1,4 +1,5 @@
-import { fileURLToPath } from "node:url"
+import * as Effect from "effect/Effect"
+import * as Path from "effect/Path"
 
 /**
  * The file name of the entry that runs Oxlint with the project's Oxlint runtime. The build writes
@@ -12,8 +13,6 @@ export const OXLINT_ENTRY_FILE = "oxlint.js"
  */
 export const EDITOR_OXLINT_ENTRY = `node_modules/adamantite/dist/${OXLINT_ENTRY_FILE}`
 
-const OXLINT_ENTRY = fileURLToPath(new URL(OXLINT_ENTRY_FILE, import.meta.url))
-
 /**
  * The variable through which a command names the project that the entry runs Oxlint for.
  */
@@ -24,15 +23,22 @@ export const PROJECT_VARIABLE = "ADAMANTITE_PROJECT"
  * `args`. The command names the project, because the CLI can run from a package runner cache, such
  * as `npm exec` or `pnpm dlx`, outside the project.
  */
-export function getOxlintCommand(project: string) {
+export const getOxlintCommand = Effect.fn("getOxlintCommand")(function* (project: string) {
+  const path = yield* Path.Path
+
+  // The module URL of the bundle and of a source run is a `file:` URL, so a failure is a defect.
+  const entry = yield* path
+    .fromFileUrl(new URL(OXLINT_ENTRY_FILE, import.meta.url))
+    .pipe(Effect.orDie)
+
   return {
-    args: [OXLINT_ENTRY],
+    args: [entry],
     command: "node",
     cwd: project,
     env: { [PROJECT_VARIABLE]: project },
     name: "oxlint",
   } as const
-}
+})
 
 /**
  * The project that the entry runs Oxlint for. A command names it through `PROJECT_VARIABLE`, as

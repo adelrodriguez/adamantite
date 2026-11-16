@@ -29,11 +29,12 @@ const TEST_OXLINT =
 // source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
-  Layer.succeed(OxlintCommand)((project) => ({
-    ...getOxlintCommand(project),
-    args: [join(REPO_ROOT, "src/oxlint/index.ts")],
-  })),
-  Layer.succeed(OxlintProbe)(join(REPO_ROOT, "src/oxlint/probe.ts"))
+  Layer.succeed(OxlintCommand)((project) =>
+    getOxlintCommand(project).pipe(
+      Effect.map((command) => ({ ...command, args: [join(REPO_ROOT, "src/oxlint/index.ts")] }))
+    )
+  ),
+  Layer.succeed(OxlintProbe)(new URL("../../../oxlint/probe.ts", import.meta.url))
 )
 
 describe("readSuppressions", () => {

@@ -69,7 +69,7 @@ export const check = Effect.fn("Toolchain.check")(function* (
       files,
       forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
     }),
-    lint: oxlint.check({
+    lint: yield* oxlint.check({
       allowWarnings,
       cwd,
       files,
@@ -118,7 +118,7 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
       files: targets,
       forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
     }),
-    lint: oxlint.fix({
+    lint: yield* oxlint.fix({
       cwd,
       files: targets,
       forwardedArguments: forwardedStage === "lint" ? forwardedArguments : [],

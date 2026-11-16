@@ -45,7 +45,6 @@ const EXCEPTIONS = {
   "src/commands/__tests__/rule-ast.test.ts": `${PROCESS_TWIN} It runs \`commands/rule.ts\` with real Oxlint.`,
   "src/lib/integrations/oxlint/__tests__/config-load.test.ts": `${PROCESS_TWIN} It loads the configs of \`oxlint/index.ts\` with Node.js.`,
   "src/lib/setup/__tests__/format.test.ts": `${PROCESS_TWIN} It formats the files of \`setup/index.ts\` with real Oxfmt.`,
-  "src/lib/toolchain/__tests__/idioms.test.ts": `${STACK_TEST} It runs \`toolchain/index.ts\` on the idioms tree.`,
 } as const satisfies Readonly<Record<string, string>>
 
 /**

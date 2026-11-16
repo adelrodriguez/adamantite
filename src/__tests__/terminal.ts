@@ -8,7 +8,6 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Queue from "effect/Queue"
 import * as Terminal from "effect/Terminal"
-import { TerminalInput } from "#terminal/input.ts"
 
 /**
  * A key that a test sends to a prompt, such as `down`, `space`, or `enter`. `y` and `n` answer a
@@ -22,15 +21,11 @@ export interface TerminalTestContext {
    * with the other escape codes.
    */
   readonly copied: () => string[]
-  readonly layer: Layer.Layer<Terminal.Terminal | TerminalInput>
+  readonly layer: Layer.Layer<Terminal.Terminal>
   /**
    * Every frame that the prompts displayed, without ANSI escape codes, joined in display order.
    */
   readonly output: () => string
-  /**
-   * How many times a command released the terminal input, such as before an agent handoff.
-   */
-  readonly releases: () => number
 }
 
 // OSC 52 sets the system clipboard to base64 text. A BEL character ends the sequence.
@@ -50,7 +45,6 @@ function toUserInput(key: TestKey): Terminal.UserInput {
  */
 export function createTerminalTestContext(keys: readonly TestKey[] = []): TerminalTestContext {
   const frames: string[] = []
-  let releases = 0
 
   const terminal = Layer.effect(Terminal.Terminal)(
     Effect.gen(function* () {
@@ -83,12 +77,6 @@ export function createTerminalTestContext(keys: readonly TestKey[] = []): Termin
     })
   )
 
-  const input = Layer.succeed(TerminalInput)({
-    release: Effect.sync(() => {
-      releases += 1
-    }),
-  })
-
   return {
     copied: () =>
       frames.flatMap((frame) =>
@@ -96,8 +84,7 @@ export function createTerminalTestContext(keys: readonly TestKey[] = []): Termin
           ? [Buffer.from(frame.slice(CLIPBOARD_PREFIX.length, -1), "base64").toString("utf8")]
           : []
       ),
-    layer: Layer.merge(terminal, input),
+    layer: terminal,
     output: () => stripVTControlCharacters(frames.join("")),
-    releases: () => releases,
   }
 }

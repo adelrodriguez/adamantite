@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto"
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
-import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Fiber from "effect/Fiber"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -12,7 +13,7 @@ import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stdio from "effect/Stdio"
-import { TestConsole } from "effect/testing"
+import { TestClock, TestConsole } from "effect/testing"
 import type { DetectedPackageManager } from "#lib/project/package-manager.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { configLoaderLayer } from "#__tests__/config-loader.ts"
@@ -38,6 +39,7 @@ import {
 import { Cwd } from "#lib/shared/cwd.ts"
 import { CliNotFound, CommandFailed, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
+import { RAW_MODE_RELEASE_WAIT } from "#terminal/resolution-menu.ts"
 
 const LockfileJson = Schema.fromJsonString(Lockfile)
 
@@ -356,7 +358,9 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
       canPrompt: false,
     }),
     Stdio.layerTest({}),
-    Digest.layerWebCrypto,
+    // Synchronous, so the test clock tracks every step before a prompt. A WebCrypto digest resolves
+    // outside the test scheduler, and `TestClock.adjust` would not wait for it.
+    NodeCrypto.layerDigest,
     failingSpawnerLayer,
     unexpectedRunnerLayer,
     // Fresh, so this default does not memoize `CodingAgents` ahead of a test's runner layer.
@@ -369,6 +373,11 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
  * Runs a command against the default test services plus the given layers, which take precedence. A
  * service the command needs that neither provides stays in the returned effect's requirements, so
  * `it.effect` rejects the test at compile time.
+ *
+ * The resolution menu waits before an agent handoff, and the test clock stays paused, so the run
+ * moves the clock past that wait. A command that never reaches the handoff finishes as it would
+ * without the clock change. The run needs the test clock of `it.effect`, because `TestClock.adjust`
+ * fails on the live clock.
  */
 export function runCommand<
   Name extends string,
@@ -404,19 +413,27 @@ export function runCommand<
     )
   )
 
-  return Effect.exit(
-    Command.runWith(command, { version: "test" })(args).pipe(
-      Effect.ensuring(
-        Effect.gen(function* () {
-          options.errorLines?.push(...(yield* TestConsole.errorLines))
-          options.logLines?.push(...(yield* TestConsole.logLines))
-        })
-      ),
-      Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
-      Effect.provideService(Cwd, files.root),
-      Effect.provide(testLayer)
+  return Effect.gen(function* () {
+    const fiber = yield* Effect.forkChild(
+      Effect.exit(
+        Command.runWith(command, { version: "test" })(args).pipe(
+          Effect.ensuring(
+            Effect.gen(function* () {
+              options.errorLines?.push(...(yield* TestConsole.errorLines))
+              options.logLines?.push(...(yield* TestConsole.logLines))
+            })
+          ),
+          Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
+          Effect.provideService(Cwd, files.root),
+          Effect.provide(testLayer)
+        )
+      )
     )
-  )
+
+    yield* TestClock.adjust(RAW_MODE_RELEASE_WAIT)
+
+    return yield* Fiber.join(fiber)
+  })
 }
 
 /**

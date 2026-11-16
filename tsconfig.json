@@ -10,6 +10,7 @@
         "name": "@effect/language-service",
         "allowedUnstableApis": [
           "@effect/platform-node",
+          "@effect/platform-node-shared/NodeCrypto",
           "@effect/vitest",
           "effect/Arbitrary",
           "effect/ByteSize",

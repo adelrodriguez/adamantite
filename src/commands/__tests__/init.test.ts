@@ -1457,7 +1457,7 @@ describe("init", () => {
       })
     )
 
-    it.effect(
+    it.live(
       "hand the findings off after the setup, and succeed when the session resolves them",
       () =>
         Effect.gen(function* () {

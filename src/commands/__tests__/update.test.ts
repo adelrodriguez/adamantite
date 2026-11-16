@@ -377,42 +377,40 @@ describe("update", () => {
     })
   )
 
-  it.effect(
-    "hand the findings off after the setup, and succeed when the session resolves them",
-    () =>
-      Effect.gen(function* () {
-        // Update keeps a `tsconfig.json` that it did not write, so the preset is missing after it.
-        const files = createFileSystemTestContext({
-          files: {
-            ...makeLockfileFile(makeSelection({ typescript: "tsconfig" })),
-            "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
-            "tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
-          },
-        })
-
-        const logLines: unknown[] = []
-
-        const runner = makeHandoffRunner({
-          onAgentRun: () => {
-            files.write("tsconfig.json", '{ "extends": "adamantite/tsconfig" }\n')
-          },
-        })
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [createDependencyInstallerTestContext().layer, runner.layer, promptingLayer],
-          logLines,
-          terminal: createTerminalTestContext(["enter"]),
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(nonProbeInvocations(runner).map(({ command }) => command)).toStrictEqual(["claude"])
-        expect(logLines.slice(-3)).toStrictEqual([
-          "● Handing the terminal to Claude Code. Exit the agent to return to Update.",
-          "✔ Nothing remains to resolve after the Claude Code session.",
-          "✅ Update finished.",
-        ])
+  it.live("hand the findings off after the setup, and succeed when the session resolves them", () =>
+    Effect.gen(function* () {
+      // Update keeps a `tsconfig.json` that it did not write, so the preset is missing after it.
+      const files = createFileSystemTestContext({
+        files: {
+          ...makeLockfileFile(makeSelection({ typescript: "tsconfig" })),
+          "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+          "tsconfig.json": '{ "compilerOptions": { "strict": true } }\n',
+        },
       })
+
+      const logLines: unknown[] = []
+
+      const runner = makeHandoffRunner({
+        onAgentRun: () => {
+          files.write("tsconfig.json", '{ "extends": "adamantite/tsconfig" }\n')
+        },
+      })
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [createDependencyInstallerTestContext().layer, runner.layer, promptingLayer],
+        logLines,
+        terminal: createTerminalTestContext(["enter"]),
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(nonProbeInvocations(runner).map(({ command }) => command)).toStrictEqual(["claude"])
+      expect(logLines.slice(-3)).toStrictEqual([
+        "● Handing the terminal to Claude Code. Exit the agent to return to Update.",
+        "✔ Nothing remains to resolve after the Claude Code session.",
+        "✅ Update finished.",
+      ])
+    })
   )
 
   it.effect("print the setup and the findings as JSON that decodes with the report schema", () =>

@@ -1,10 +1,10 @@
 import * as Prompt from "effect/cli/Prompt"
 import * as Console from "effect/Console"
 import * as Data from "effect/Data"
+import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Terminal from "effect/Terminal"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
-import { TerminalInput } from "#terminal/input.ts"
 import * as Output from "#terminal/output.ts"
 
 interface ResolutionMenuOptions {
@@ -66,6 +66,15 @@ export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: s
 })
 
 /**
+ * How long the menu waits after its prompt before it starts a coding agent. Effect's Node terminal
+ * turns raw mode off 10 ms after the last prompt ends, and it does not wait for that release. A
+ * release after the agent starts would turn off the raw mode that the agent set for itself. Effect
+ * keeps the delay because a quick raw mode toggle between prompts can hang a Windows TTY
+ * (https://github.com/Effect-TS/effect/pull/7106).
+ */
+const RAW_MODE_RELEASE_WAIT = Duration.millis(200)
+
+/**
  * Offers a handoff to each installed coding agent, a copy of the Markdown prompt, or nothing, and
  * runs the choice. When the agent CLI does not start, it prints and copies the prompt instead. It
  * returns the user's choice, and `Resolution.offer` decides what happens next.
@@ -74,7 +83,6 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
 ) {
   const agents = yield* CodingAgents
-  const input = yield* TerminalInput
   const installedAgents = yield* agents.detectInstalled(options.cwd)
 
   // The menu names each installed agent, so only an empty result needs a line.
@@ -111,8 +119,8 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
     `Handing the terminal to ${agent.name}. Exit the agent to return to ${options.command}.`
   )
 
-  // The agent sets its own terminal mode, so the menu's input must close before the agent starts.
-  yield* input.release
+  // The agent sets its own terminal mode, so Effect's late raw mode release must run first.
+  yield* Effect.sleep(RAW_MODE_RELEASE_WAIT)
 
   const started = yield* agents.handoff({ agent, cwd: options.cwd, prompt: options.prompt }).pipe(
     Effect.as(true),

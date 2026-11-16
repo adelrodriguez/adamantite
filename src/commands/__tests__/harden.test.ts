@@ -1334,7 +1334,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("hand off to an agent seeded with the prompt, then verify with check and Doctor", () =>
+  it.live("hand off to an agent seeded with the prompt, then verify with check and Doctor", () =>
     Effect.gen(function* () {
       // The agent's exit code does not decide the result, and a session may change no files.
       const { exit, logLines, runner } = yield* runInteractiveHarden({
@@ -1368,7 +1368,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect(
+  it.live(
     "read the workspace and discover the custom rules one time before and one time after the session",
     () =>
       Effect.gen(function* () {
@@ -1407,7 +1407,7 @@ describe("harden", () => {
       })
   )
 
-  it.effect("verify a project that has no custom rules", () =>
+  it.live("verify a project that has no custom rules", () =>
     Effect.gen(function* () {
       const { exit, logLines, runner } = yield* runInteractiveHarden({ keys: ["enter"] })
 
@@ -1419,7 +1419,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("fail and say so when check fails after the session", () =>
+  it.live("fail and say so when check fails after the session", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         keys: ["enter"],
@@ -1437,7 +1437,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("fail and name the missing tool when check cannot start after the session", () =>
+  it.live("fail and name the missing tool when check cannot start after the session", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         keys: ["enter"],
@@ -1456,7 +1456,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("fail and show the findings when Doctor finds issues after the session", () =>
+  it.live("fail and show the findings when Doctor finds issues after the session", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         // Knip is installed without its managed config, so Doctor reports one finding.
@@ -1485,7 +1485,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("show the Doctor warnings and still pass when Doctor finds no issues", () =>
+  it.live("show the Doctor warnings and still pass when Doctor finds no issues", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         // Doctor cannot load a config that names an undefined variable, so it warns without a finding.
@@ -1508,7 +1508,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("fail and name the link when the session adds a link to a missing file", () =>
+  it.live("fail and name the link when the session adds a link to a missing file", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         // The broken link that the project had before the session does not fail it.

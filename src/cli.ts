@@ -21,7 +21,6 @@ import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
-import * as NodeTerminal from "#terminal/node-terminal.ts"
 
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
@@ -56,8 +55,6 @@ export const makeAppLayer = (
 ) =>
   Layer.mergeAll(
     NodeServices.layer,
-    // Replaces the terminal of `NodeServices` with one whose input closes before an agent handoff.
-    NodeTerminal.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
     ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),

@@ -364,29 +364,7 @@ describe("doctor", () => {
     })
   )
 
-  // The agent sets its own terminal mode, so the menu's input must close before the agent starts.
-  it.effect("release the terminal input before the agent starts", () =>
-    Effect.gen(function* () {
-      const terminal = createTerminalTestContext(["enter", "n"])
-      const releasesAtStart: number[] = []
-
-      const runner = makeHandoffRunner({
-        onAgentRun: () => {
-          releasesAtStart.push(terminal.releases())
-        },
-      })
-
-      yield* runCommand(doctorCommand, [], {
-        files: makeFindingsFixture(),
-        layers: [runner.layer, promptingLayer],
-        terminal,
-      })
-
-      expect(releasesAtStart).toStrictEqual([1])
-    })
-  )
-
-  it.effect("hand off to an agent and succeed when reassessment finds no issues", () =>
+  it.live("hand off to an agent and succeed when reassessment finds no issues", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const logLines: unknown[] = []
@@ -431,7 +409,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("report surviving findings and fail when the agent repairs nothing", () =>
+  it.live("report surviving findings and fail when the agent repairs nothing", () =>
     Effect.gen(function* () {
       const { exit, logLines, terminal } = yield* runResolution(["enter", "n"])
 
@@ -451,7 +429,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("print and copy the prompt when the agent CLI is missing", () =>
+  it.live("print and copy the prompt when the agent CLI is missing", () =>
     Effect.gen(function* () {
       // Installed at menu time, gone at spawn time: the race the fallback covers.
       const { exit, logLines, terminal } = yield* runResolution(
@@ -473,7 +451,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("surface the spawn failure detail and print the prompt", () =>
+  it.live("surface the spawn failure detail and print the prompt", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runResolution(
         ["down", "enter"],
@@ -495,7 +473,7 @@ describe("doctor", () => {
 
   // The session inherits stdin, so a Ctrl-C reaches the agent and Adamantite. Adamantite must not
   // stop the agent mid-edit.
-  it.effect("ignore SIGINT while the agent session runs and restore the listeners after it", () =>
+  it.live("ignore SIGINT while the agent session runs and restore the listeners after it", () =>
     Effect.gen(function* () {
       const listenersBefore = process.listeners("SIGINT")
 
@@ -662,7 +640,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("seed agents that need a flag with their own arguments", () =>
+  it.live("seed agents that need a flag with their own arguments", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const terminal = createTerminalTestContext(["enter"])

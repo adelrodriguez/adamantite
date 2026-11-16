@@ -1339,6 +1339,65 @@ describe("init", () => {
       })
     )
 
+    // Oxlint accepts its `options` only in the root config, so an Oxlint config that init wrote in
+    // a nested folder would stop the lint of the parent project.
+    it.effect.each(["oxlint.config.ts", ".oxlintrc.json"])(
+      "fail before it changes a file when a parent folder has `%s`",
+      (config) =>
+        Effect.gen(function* () {
+          const files = createFileSystemTestContext({
+            files: { [`../../${config}`]: "{}", "package.json": basePackageJson },
+            root: "/repo/packages/app",
+          })
+
+          const before = listHashes(files)
+          const installer = createDependencyInstallerTestContext()
+
+          const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+            files,
+            layers: [installer.layer],
+          })
+
+          const error = Option.getOrThrow(Exit.findErrorOption(exit))
+          expect(error).toHaveProperty("_tag", "ParentOxlintConfig")
+          expect(error).toHaveProperty("path", `../../${config}`)
+          expect(installer.calls).toStrictEqual([])
+          expect(listHashes(files)).toStrictEqual(before)
+        })
+    )
+
+    it.effect.each<{
+      readonly args: readonly string[]
+      readonly files: Record<string, string>
+      readonly name: string
+    }>([
+      {
+        args: ["--script", "check"],
+        files: { "../../oxlint.config.ts": "{}", "../.git/HEAD": "ref: refs/heads/main\n" },
+        name: "an Oxlint config above the repository root",
+      },
+      {
+        args: ["--typescript", "typescript", "--editor", "vscode"],
+        files: { "../../oxlint.config.ts": "{}" },
+        name: "a parent Oxlint config when the selection has no lint script",
+      },
+    ])("set up a nested folder despite $name", ({ args, files: parentFiles }) =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: { ...parentFiles, "package.json": basePackageJson },
+          root: "/repo/packages/app",
+        })
+
+        yield* runCommand(initCommand, ["--non-interactive", ...args], {
+          files,
+          layers: [createDependencyInstallerTestContext().layer],
+        })
+
+        // Setup writes the lockfile last.
+        expect(files.read(LOCKFILE_PATH)).toContain('"schemaVersion": 1')
+      })
+    )
+
     it.effect("create a GitHub Actions workflow for CI-compatible scripts when requested", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

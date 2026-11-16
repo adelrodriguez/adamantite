@@ -451,9 +451,10 @@ try {
     cwd: effectWorkspacePackage,
     env: effectEnv,
   })
+  // Init sets up no Oxlint here, because the fixture's Oxlint config lints this folder.
   run(
     process.execPath,
-    [cliPath, "init", "--non-interactive", "--script", "check", "--editor", "zed"],
+    [cliPath, "init", "--non-interactive", "--typescript", "typescript", "--editor", "zed"],
     { cwd: effectWorkspacePackage, env: effectEnv }
   )
   const ancestorEffectCli = "../../node_modules/@effect/tsgo/dist/effect-tsgo.cjs"
@@ -469,10 +470,6 @@ try {
     ),
     join(effectFixture, "index.ts")
   )
-  // Init in the package wrote a root Oxlint config there. Oxlint rejects the type-aware options of
-  // that config as a nested config of the fixture, so the fixture's lint and Doctor need it gone.
-  rmSync(effectWorkspacePackage, { force: true, recursive: true })
-
   rmSync(sdkDirectory, { force: true, recursive: true })
   assertIncludes(
     runExpectingFailure(process.execPath, [cliPath, "doctor"], {

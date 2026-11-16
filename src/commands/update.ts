@@ -12,7 +12,6 @@ export default Command.make("update", { json: Mode.json }).pipe(
   ),
   Command.withHandler(({ json }) =>
     Effect.gen(function* () {
-      const cwd = yield* Project.Directory
       yield* Output.intro("💠 adamantite update")
 
       const project = yield* Project.read()
@@ -20,7 +19,7 @@ export default Command.make("update", { json: Mode.json }).pipe(
       // Without a lockfile, update has no selection to apply, so the assessment hands off its one
       // finding: run `adamantite init`.
       const changed = yield* Option.match(project.lockfile, {
-        onNone: () => Effect.as(offerRepair("update", cwd, null), false),
+        onNone: () => Effect.as(offerRepair("update", null), false),
         onSome: (lockfile) => applySetup("update", project, lockfile.selection),
       })
 

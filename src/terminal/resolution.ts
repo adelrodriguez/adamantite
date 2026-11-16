@@ -51,7 +51,6 @@ interface Offer<E, R> {
    * to Doctor."
    */
   readonly command: "doctor" | "harden" | "init" | "update"
-  readonly cwd: string
   /**
    * Prints the JSON document of `--json`, such as `Output.json(Report, report)`.
    */
@@ -143,7 +142,6 @@ const resolve = <E, R>(options: Offer<E, R>) => {
 
     const resolution = yield* chooseResolution({
       command: name,
-      cwd: options.cwd,
       message: options.message,
       prompt: options.prompt,
       subject: options.subject,

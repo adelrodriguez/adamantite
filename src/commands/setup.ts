@@ -28,12 +28,11 @@ export const Report = Schema.Struct({
 })
 
 /**
- * Assesses the project at `cwd` after `setup`, and offers the repair of its findings through
+ * Assesses the target project after `setup`, and offers the repair of its findings through
  * `Resolution.offer`. The command fails while findings remain.
  */
 export const offerRepair = Effect.fn("offerRepair")(function* (
   command: "init" | "update",
-  cwd: string,
   setup: Setup.Result | null
 ) {
   // The lockfile decides which integrations apply, so each assessment reads the project again.
@@ -42,7 +41,6 @@ export const offerRepair = Effect.fn("offerRepair")(function* (
 
   yield* Resolution.offer({
     command,
-    cwd,
     document: Output.json(Report, { assessment, schemaVersion: 1, setup }),
     message: "How do you want to resolve these findings?",
     prompt: renderAssessmentMarkdown(assessment, version),
@@ -76,7 +74,7 @@ export const applySetup = Effect.fn("applySetup")(function* (
           : `\`${LOCKFILE_PATH}\` updated. Commit it.`
       )
 
-  yield* offerRepair(command, yield* Project.Directory, setup)
+  yield* offerRepair(command, setup)
 
   return (
     setup.installs.length > 0

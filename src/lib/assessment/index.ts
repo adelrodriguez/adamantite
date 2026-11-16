@@ -195,14 +195,14 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 })
 
 /**
- * The assessment that Doctor reports for the project at `cwd`, from a new read of it. A project
- * that does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so
- * a coding agent can repair it.
+ * The assessment that Doctor reports for the target project, from a new read of it. A project that
+ * does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so a
+ * coding agent can repair it.
  */
-export const readAssessment = Effect.fn("readAssessment")(function* (cwd: string) {
+export const readAssessment = Effect.fn("readAssessment")(function* () {
   // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets
   // the install finding even when its workspace packages do not read.
-  const packageJson = yield* readPackageJson(cwd)
+  const packageJson = yield* readPackageJson(yield* Project.Directory)
 
   if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
     return notInstalled

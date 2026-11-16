@@ -211,7 +211,6 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
 
       const session = yield* Resolution.offer({
         command: "harden",
-        cwd,
         document: Output.json(Report, { schemaVersion: 1, ...context }),
         message: "How do you want to harden this project?",
         prompt: renderHardenPrompt(context, version),

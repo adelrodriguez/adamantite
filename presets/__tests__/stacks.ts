@@ -1,5 +1,4 @@
-import { readdirSync } from "node:fs"
-import { basename, join } from "node:path"
+import { join } from "node:path"
 import type { OxlintConfig } from "oxlint"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
@@ -31,18 +30,6 @@ export const STACK_OPTIONS = {
   typeAware: true,
   typeCheck: true,
 } as const satisfies OxlintConfig["options"]
-
-/**
- * The name of each lint preset module besides core, which the package publishes as
- * `adamantite/lint/<name>`. `src/lib/integrations/oxlint/__tests__/presets.test.ts` checks that the
- * catalog of init lists the same presets.
- */
-export function listLintPresets(): string[] {
-  return readdirSync(LINT_PRESETS_DIR)
-    .filter((file) => file.endsWith(".ts"))
-    .map((file) => basename(file, ".ts"))
-    .filter((name) => name !== "core")
-}
 
 /**
  * The stacks that have the preset.

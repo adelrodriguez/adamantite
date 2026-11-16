@@ -6,9 +6,6 @@ import type { FileSystemTestContext } from "#__tests__/filesystem.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import doctorCommand from "#commands/doctor.ts"
-import initCommand from "#commands/init/index.ts"
-import updateCommand from "#commands/update.ts"
 import {
   EFFECT_COMPILER,
   EFFECT_EDITOR_PACKAGES,
@@ -19,14 +16,13 @@ import {
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import {
-  createDependencyInstallerTestContext,
   findingsLeft,
   getFailure,
   hashContent,
   makeLockfileFile,
   readLockfile,
-  runCommand,
 } from "./command-test-helpers.ts"
+import { listHashes, runLifecycle } from "./lifecycle.ts"
 
 const SETTINGS = ".vscode/settings.json"
 const EXTENSIONS = ".vscode/extensions.json"
@@ -53,48 +49,16 @@ function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { ...files, "package.json": PACKAGE_JSON } })
 }
 
-type RunOptions = Parameters<typeof runCommand>[2]
-
-// One exit type for the three commands, so a test reads each exit the same way.
-const widen = Effect.map((exit: Exit.Exit<unknown, unknown>) => exit)
-
-const COMMANDS = {
-  doctor: (args: readonly string[], options: RunOptions) =>
-    widen(runCommand(doctorCommand, args, options)),
-  init: (args: readonly string[], options: RunOptions) =>
-    widen(runCommand(initCommand, args, options)),
-  update: (args: readonly string[], options: RunOptions) =>
-    widen(runCommand(updateCommand, args, options)),
-}
-
 /**
- * Runs a command in `files` and returns its exit and its output lines. `installed` resolves the
- * Effect packages of `effectEditorFiles()`.
+ * Runs a command in `files`. `installed` resolves the Effect packages of `effectEditorFiles()`.
  */
 function run(
-  command: keyof typeof COMMANDS,
+  command: Parameters<typeof runLifecycle>[0],
   files: FileSystemTestContext,
   args: readonly string[] = [],
   installed = false
 ) {
-  return Effect.gen(function* () {
-    const logLines: unknown[] = []
-
-    const exit = yield* COMMANDS[command](args, {
-      files,
-      layers: [
-        createDependencyInstallerTestContext().layer,
-        effectEditorResolver(files.root, installed),
-      ],
-      logLines,
-    })
-
-    return { exit, output: logLines.join("\n") }
-  })
-}
-
-function listHashes(files: FileSystemTestContext) {
-  return Object.fromEntries(files.list().map((file) => [file, hashContent(files.read(file))]))
+  return runLifecycle(command, files, args, [effectEditorResolver(files.root, installed)])
 }
 
 describe("VS Code setup", () => {
@@ -420,16 +384,12 @@ describe("the Effect editor SDK", () => {
         "node_modules/typescript/package.json": '{ "version": "6.0.3" }',
       })
 
-      const exit = yield* runCommand(initCommand, INIT_ARGS, {
-        files,
-        layers: [
-          createDependencyInstallerTestContext().layer,
-          makeModuleResolverLayer(files.root, {
-            ...EFFECT_EDITOR_PACKAGES,
-            "@typescript/native/package.json": "node_modules/@typescript/native/package.json",
-          }),
-        ],
-      })
+      const { exit } = yield* runLifecycle("init", files, INIT_ARGS, [
+        makeModuleResolverLayer(files.root, {
+          ...EFFECT_EDITOR_PACKAGES,
+          "@typescript/native/package.json": "node_modules/@typescript/native/package.json",
+        }),
+      ])
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(`${EFFECT_SDK}/lib.es5.d.ts`)).toBe("interface String {}")

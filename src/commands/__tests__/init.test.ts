@@ -1,12 +1,18 @@
+import type * as FileSystem from "effect/FileSystem"
+import type * as Path from "effect/Path"
 import type { JsonObject } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import * as Sink from "effect/Sink"
+import * as Stream from "effect/Stream"
 import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
@@ -22,6 +28,7 @@ import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { type Script, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
@@ -37,8 +44,8 @@ import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "m
 import {
   type DependencyInstallerTestContext,
   createDependencyInstallerTestContext,
-  createPackageManagerTestContext,
   createRunnerTestContext,
+  declareDevDependencies,
   findingsLeft,
   getFailure,
   hashContent,
@@ -48,6 +55,64 @@ import {
   readLockfile,
   runCommand,
 } from "./command-test-helpers.ts"
+import { listHashes } from "./lifecycle.ts"
+
+/**
+ * The live `DependencyInstaller`, which detects the package manager from the test filesystem, with
+ * a package manager that records each command line and declares the packages it adds. With
+ * `failure`, the package manager prints its `stderr` and exits 1 instead.
+ */
+function createPackageManagerTestContext(options?: {
+  readonly failure?: { readonly stderr: string }
+}) {
+  const commandLines: string[] = []
+
+  const spawnerLayer = Layer.effect(ChildProcessSpawner.ChildProcessSpawner)(
+    Effect.gen(function* () {
+      const context = yield* Effect.context<FileSystem.FileSystem | Path.Path>()
+
+      return ChildProcessSpawner.make((command) =>
+        Effect.gen(function* () {
+          if (!ChildProcess.isStandardCommand(command)) {
+            return yield* Effect.die("A package manager install runs one command")
+          }
+
+          const args = command.args.map(String)
+          commandLines.push([command.command, ...args].join(" "))
+
+          const packages = args
+            .slice(args.indexOf("-D") + 1)
+            .map((specifier) => specifier.replace(/^npm:/, ""))
+
+          if (options?.failure === undefined) {
+            yield* declareDevDependencies(packages, command.options.cwd ?? "/").pipe(
+              Effect.provideContext(context)
+            )
+          }
+
+          return ChildProcessSpawner.makeHandle({
+            all: Stream.empty,
+            exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(options?.failure ? 1 : 0)),
+            getInputFd: () => Sink.drain,
+            getOutputFd: () => Stream.empty,
+            isRunning: Effect.succeed(false),
+            kill: () => Effect.void,
+            pid: ChildProcessSpawner.ProcessId(1),
+            stderr: Stream.make(new TextEncoder().encode(options?.failure?.stderr ?? "")),
+            stdin: Sink.drain,
+            stdout: Stream.empty,
+            unref: Effect.succeed(Effect.void),
+          })
+        })
+      )
+    })
+  )
+
+  return {
+    commandLines,
+    layer: DependencyInstaller.layer.pipe(Layer.provide(spawnerLayer)),
+  }
+}
 
 const effectTsgo = managedPlugin("@effect/tsgo")
 const shadcnLint = managedPlugin("@shadcn/lint")
@@ -1251,10 +1316,7 @@ describe("init", () => {
           "tsconfig.json": EXISTING_MONOREPO_TSCONFIG,
         })
 
-        const listHashes = () =>
-          Object.fromEntries(files.list().map((file) => [file, hashContent(files.read(file))]))
-
-        const before = listHashes()
+        const before = listHashes(files)
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
@@ -1273,7 +1335,7 @@ describe("init", () => {
 
         expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({ _tag: error })
         expect(installer.calls).toStrictEqual([])
-        expect(listHashes()).toStrictEqual(before)
+        expect(listHashes(files)).toStrictEqual(before)
       })
     )
 

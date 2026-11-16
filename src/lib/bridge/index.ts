@@ -34,9 +34,9 @@ function explainMissingTool(selection: Option.Option<Selection>) {
 }
 
 /**
- * Checks the formatting with Oxfmt, then lints with Oxlint. Both stages run, and the operation
- * fails with the first failure. The forwarded arguments go to the lint stage, or to the stage that
- * `only` selects.
+ * Checks the formatting with Oxfmt and lints with Oxlint at the same time, and prints the format
+ * stage first. Both stages run, and the operation fails with the first failure. The forwarded
+ * arguments go to the lint stage, or to the stage that `only` selects.
  */
 export const check = Effect.fn("Bridge.check")(function* (
   options: {
@@ -77,9 +77,12 @@ export const check = Effect.fn("Bridge.check")(function* (
     }),
   }
 
-  yield* runner
-    .runAll(only === undefined ? [stages.format, stages.lint] : [stages[only]])
-    .pipe(Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())))
+  // The stages read the files and write nothing, so they run at the same time.
+  yield* (
+    only === undefined
+      ? runner.runConcurrently([stages.format, stages.lint])
+      : runner.runAll([stages[only]])
+  ).pipe(Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())))
 })
 
 /**

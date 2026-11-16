@@ -56,7 +56,7 @@ const SOURCE_RUNNER = Layer.effect(CommandRunner)(
   Effect.gen(function* () {
     const runner = yield* CommandRunner
 
-    return CommandRunner.make((options) => runner.exitCode(toSource(options)))
+    return CommandRunner.make((options, output) => runner.exitCode(toSource(options), output))
   })
 ).pipe(Layer.provide(CommandRunner.layer), Layer.provideMerge(NodeServices.layer))
 
@@ -225,7 +225,11 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
           })
 
           expect(readFixable()).toStrictEqual(fixed)
-        }).pipe(Effect.provideService(Project.Directory, project), Effect.provide(SOURCE_RUNNER))
+        }).pipe(
+          Effect.provideService(Project.Directory, project),
+          // `check` prints the output of its stages through `Stdio`.
+          Effect.provide([SOURCE_RUNNER, NodeServices.layer])
+        )
     )
   })
 })

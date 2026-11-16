@@ -11,11 +11,7 @@ import type { FirstPartyPlugin } from "#presets/lint/plugins/entry.ts"
 import type { Replacement } from "#presets/lint/plugins/shared/replacement.d.ts"
 import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import * as Project from "#lib/project/index.ts"
-import {
-  type LintConfig,
-  listJsPluginNames,
-  listProjectOverrides,
-} from "#lib/project/lint-config.ts"
+import { type LintConfig, listJsPluginNames, listOverrides } from "#lib/project/lint-config.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import adamantite from "#presets/lint/plugins/adamantite/index.ts"
 import antislopEffect from "#presets/lint/plugins/antislop-effect/index.ts"
@@ -80,7 +76,7 @@ const isEnabled = Schema.is(
 function countOverrides(config: LintConfig, { option, rules }: Replacement): number {
   const setsOption = Schema.is(Schema.Struct({ [option]: Schema.NonEmptyArray(Schema.Unknown) }))
 
-  return listProjectOverrides(config).filter((override) =>
+  return listOverrides(config).filter((override) =>
     rules.some((name) => {
       const setting = override.rules?.[name]
 

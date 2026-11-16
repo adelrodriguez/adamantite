@@ -91,14 +91,12 @@ export function listAppliedPresetModules(config: LintConfig): readonly string[] 
 }
 
 /**
- * The `overrides` entries of the config objects that the project writes, in the order that Oxlint
- * applies them. An object that holds an Adamantite identity, such as a preset, is not the project's
- * own.
+ * The `overrides` entries of every config object of `config`, in the order that Oxlint applies
+ * them. A config that spreads a preset, such as `{ ...core, overrides }`, keeps the identity of the
+ * preset on its own object, so the identity cannot tell the project's overrides from the preset's.
  */
-export function listProjectOverrides(config: LintConfig): readonly OverrideObject[] {
-  return listConfigObjects(config)
-    .filter((entry) => entry[IDENTITY_KEY] === undefined)
-    .flatMap(({ overrides = [] }) => overrides)
+export function listOverrides(config: LintConfig): readonly OverrideObject[] {
+  return listConfigObjects(config).flatMap(({ overrides = [] }) => overrides)
 }
 
 const isNamedPlugin = Schema.is(Schema.Struct({ name: Schema.String }))

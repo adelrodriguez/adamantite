@@ -21,7 +21,7 @@ const PROCESS_RUN_TESTS = [
   "src/lib/hardening/__tests__/overrides.test.ts",
   "src/lib/hardening/__tests__/suppressions.test.ts",
   "src/lib/hardening/__tests__/trial.test.ts",
-  "src/lib/integrations/oxlint/__tests__/config-load.test.ts",
+  "src/lib/integrations/oxlint/__tests__/index.test.ts",
   "src/lib/project/__tests__/config-loader.test.ts",
   "src/lib/project/custom-rules/__tests__/stub.test.ts",
   "src/lib/setup/__tests__/format.test.ts",

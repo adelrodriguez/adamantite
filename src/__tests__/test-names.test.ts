@@ -42,7 +42,6 @@ const EXCEPTIONS = {
     "Checks the macro cache workaround of `vitest.config.ts`, until unplugin-macros sets the cache key.",
   "src/__tests__/test-names.test.ts": "Checks the names of the test files.",
   "src/commands/__tests__/rule-ast.test.ts": `${PROCESS_TWIN} It runs \`commands/rule.ts\` with real Oxlint.`,
-  "src/lib/integrations/oxlint/__tests__/config-load.test.ts": `${PROCESS_TWIN} It loads the configs of \`oxlint/index.ts\` with Node.js.`,
   "src/lib/setup/__tests__/format.test.ts": `${PROCESS_TWIN} It formats the files of \`setup/index.ts\` with real Oxfmt.`,
 } as const satisfies Readonly<Record<string, string>>
 

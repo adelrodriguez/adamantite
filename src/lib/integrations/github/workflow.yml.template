@@ -28,8 +28,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
 {{setup}}
 
       - name: Run ${{ matrix.name }}
-        run: ${{ matrix.command }}
+        env:
+          COMMAND: ${{ matrix.command }}
+        run: $COMMAND

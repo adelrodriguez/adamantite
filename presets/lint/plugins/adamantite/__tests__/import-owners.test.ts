@@ -102,6 +102,33 @@ tester.run("import-owners", rule, {
       filename: file("apps/mobile/src/app/index.tsx"),
       options: [ALERT],
     },
+    // A CommonJS `require` and a TypeScript import-equals declaration reach the module too, also
+    // when they import only types.
+    ...[
+      'const giget = require("giget")',
+      "const giget = require(`giget`)",
+      'import giget = require("giget")',
+      'export import giget = require("giget")',
+      'import type giget = require("giget")',
+    ].map((code) => ({
+      code,
+      errors: [{ message: MODULE_MESSAGE }],
+      filename: file("src/lib/references/add.ts"),
+      options: [GIGET],
+    })),
+    {
+      // `require` reaches every export, as `import()` does, whatever the code destructures.
+      code: 'const { View } = require("react-native")',
+      errors: [{ column: 25, line: 1, messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    {
+      code: 'import Native = require("react-native")',
+      errors: [{ messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
     {
       code: 'type Result = import("giget").DownloadTemplateResult',
       errors: [{ message: MODULE_MESSAGE }],
@@ -288,6 +315,17 @@ tester.run("import-owners", rule, {
       `const name = "get"\nconst giget = import(\`gi\${name}\`)`,
       'const zod = import("zod", { with: { type: "giget" } })',
     ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
+    // A local function named `require`, or a `require` property, loads no module.
+    ...[
+      'function load(require: (name: string) => unknown) {\n  return require("giget")\n}',
+      'const require = (name: string) => name\nrequire("giget")',
+      'const path = require.resolve("giget")',
+    ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
+    {
+      code: 'const giget = require("giget")\nimport fetch = require("giget")',
+      filename: file("src/lib/sources/repository/fetch.ts"),
+      options: [GIGET],
+    },
     {
       code: 'import * as z from "zod/mini"',
       filename: file("packages/utils/src/schema/mini.ts"),

@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -18,10 +17,11 @@ import { stringifyJson } from "#lib/shared/json.ts"
 export const PROBE_FILE = "probe.js"
 
 /**
- * The file of the probe plugin. A run from source, as in the tests, names `src/oxlint/probe.ts`.
+ * The file URL of the probe plugin. A run from source, as in the tests, names
+ * `src/oxlint/probe.ts`.
  */
-export const OxlintProbe = Context.Reference<string>("adamantite/OxlintProbe", {
-  defaultValue: () => fileURLToPath(new URL(PROBE_FILE, import.meta.url)),
+export const OxlintProbe = Context.Reference<URL>("adamantite/OxlintProbe", {
+  defaultValue: () => new URL(PROBE_FILE, import.meta.url),
 })
 
 /**
@@ -67,7 +67,8 @@ const runProbe = Effect.fn("runProbe")(function* (
 
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const probe = yield* OxlintProbe
+  // The module URL of the bundle and of a source run is a `file:` URL, so a failure is a defect.
+  const probe = yield* path.fromFileUrl(yield* OxlintProbe).pipe(Effect.orDie)
   const folder = yield* fs.makeTempDirectoryScoped({ prefix: "adamantite-probe-" })
   const config = path.join(folder, ".oxlintrc.json")
   const code = `adamantite-probe(${rule})`

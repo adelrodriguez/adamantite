@@ -1,4 +1,6 @@
+import * as NodePath from "@effect/platform-node/NodePath"
 import { describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import { getOxlintCommand, getProjectDirectory } from "#lib/integrations/oxlint/entry.ts"
 
 const CWD = "/somewhere/else"
@@ -48,14 +50,16 @@ describe("oxlint-entry", () => {
   })
 
   describe("getOxlintCommand", () => {
-    it("start the entry beside the CLI module with Node.js, and name the project", () => {
-      expect(getOxlintCommand("/project")).toStrictEqual({
-        args: [expect.stringMatching(/[/\\]oxlint\.js$/u)],
-        command: "node",
-        cwd: "/project",
-        env: { ADAMANTITE_PROJECT: "/project" },
-        name: "oxlint",
-      })
-    })
+    it.effect("start the entry beside the CLI module with Node.js, and name the project", () =>
+      Effect.gen(function* () {
+        expect(yield* getOxlintCommand("/project")).toStrictEqual({
+          args: [expect.stringMatching(/[/\\]oxlint\.js$/u)],
+          command: "node",
+          cwd: "/project",
+          env: { ADAMANTITE_PROJECT: "/project" },
+          name: "oxlint",
+        })
+      }).pipe(Effect.provide(NodePath.layer))
+    )
   })
 })

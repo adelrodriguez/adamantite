@@ -67,7 +67,7 @@ export const OxlintCommand = Context.Reference<typeof getOxlintCommand>(
 export const runOxlint = Effect.fn("runOxlint")(
   function* (cwd: string, args: readonly string[], project: string = cwd) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const command = (yield* OxlintCommand)(project)
+    const command = yield* (yield* OxlintCommand)(project)
 
     // Oxlint loads TypeScript configs through Node, which warns about every typeless
     // `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.

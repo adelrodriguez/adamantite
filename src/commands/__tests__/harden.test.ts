@@ -7,6 +7,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
@@ -34,7 +35,7 @@ import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 
-const OXLINT = getOxlintCommand("/project")
+const OXLINT = Effect.runSync(getOxlintCommand("/project").pipe(Effect.provide(Path.layer)))
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)

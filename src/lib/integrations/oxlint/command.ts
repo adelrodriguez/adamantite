@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect"
 import type { CommandRunOptions } from "#lib/shared/command-runner.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 
@@ -7,8 +8,10 @@ interface Options {
   readonly forwardedArguments: readonly string[]
 }
 
-export function check(options: Options & { readonly allowWarnings: boolean }): CommandRunOptions {
-  const entry = getOxlintCommand(options.cwd)
+export const check = Effect.fn("Oxlint.check")(function* (
+  options: Options & { readonly allowWarnings: boolean }
+) {
+  const entry = yield* getOxlintCommand(options.cwd)
 
   // A forwarded `--deny-warnings` or `--max-warnings` is the project's own warning policy, and
   // Oxlint rejects `--deny-warnings` twice.
@@ -22,8 +25,8 @@ export function check(options: Options & { readonly allowWarnings: boolean }): C
     ...entry,
     args: [...entry.args, ...options.files, ...denyWarnings, ...options.forwardedArguments],
     title: "🔍 Linting",
-  }
-}
+  } satisfies CommandRunOptions
+})
 
 /**
  * The Oxlint fixes to apply on top of the safe fixes: none, the suggested fixes, the dangerous
@@ -38,8 +41,10 @@ const FIX_LEVEL_FLAGS = {
   suggested: ["--fix-suggestions"],
 } as const satisfies Record<FixLevel, readonly string[]>
 
-export function fix(options: Options & { readonly level: FixLevel }): CommandRunOptions {
-  const entry = getOxlintCommand(options.cwd)
+export const fix = Effect.fn("Oxlint.fix")(function* (
+  options: Options & { readonly level: FixLevel }
+) {
+  const entry = yield* getOxlintCommand(options.cwd)
 
   return {
     ...entry,
@@ -51,5 +56,5 @@ export function fix(options: Options & { readonly level: FixLevel }): CommandRun
       ...options.forwardedArguments,
     ],
     title: "🔧 Fixing lint issues",
-  }
-}
+  } satisfies CommandRunOptions
+})

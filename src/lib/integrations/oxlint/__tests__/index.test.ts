@@ -74,10 +74,11 @@ function assess(root: string) {
         NodeServices.layer,
         ModuleResolver.layer,
         ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
-        Layer.succeed(OxlintCommand)((project) => ({
-          ...getOxlintCommand(project),
-          args: [join(REPO, "src/oxlint/index.ts")],
-        })),
+        Layer.succeed(OxlintCommand)((project) =>
+          getOxlintCommand(project).pipe(
+            Effect.map((command) => ({ ...command, args: [join(REPO, "src/oxlint/index.ts")] }))
+          )
+        ),
       ])
     )
   )

@@ -37,15 +37,15 @@ const MISSING_BACKEND = join(REPO_ROOT, "missing-tsrs-lint")
 // The build writes the Oxlint entry beside the CLI, so a run from source starts its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
-  Layer.succeed(OxlintCommand)((project) => {
-    const command = getOxlintCommand(project)
-
-    return {
-      ...command,
-      args: [join(REPO_ROOT, "src/oxlint/index.ts")],
-      env: { ...command.env, OXLINT_TSGOLINT_PATH: MISSING_BACKEND },
-    }
-  })
+  Layer.succeed(OxlintCommand)((project) =>
+    getOxlintCommand(project).pipe(
+      Effect.map((command) => ({
+        ...command,
+        args: [join(REPO_ROOT, "src/oxlint/index.ts")],
+        env: { ...command.env, OXLINT_TSGOLINT_PATH: MISSING_BACKEND },
+      }))
+    )
+  )
 )
 
 const NO_DEBUGGER_RULE = [

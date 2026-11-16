@@ -9,12 +9,19 @@ import {
 /**
  * An entry of `overrides` in a loaded Oxlint config. An entry that spreads a preset names the
  * preset itself, and an entry that spreads the `rules` of a preset, as the documentation comment of
- * the jest and vitest presets shows, names it in `rules`.
+ * the jest and vitest presets shows, names it in `rules`. The setting of each rule stays unknown,
+ * so a setting that Adamantite does not read never fails the decode of a config that Oxlint loads.
  */
 const OverrideObject = Schema.Struct({
   [IDENTITY_KEY]: Schema.optional(PresetIdentity),
-  rules: Schema.optional(Schema.Struct({ [IDENTITY_KEY]: Schema.optional(PresetIdentity) })),
+  rules: Schema.optional(
+    Schema.StructWithRest(Schema.Struct({ [IDENTITY_KEY]: Schema.optional(PresetIdentity) }), [
+      Schema.Record(Schema.String, Schema.Unknown),
+    ])
+  ),
 })
+
+export type OverrideObject = typeof OverrideObject.Type
 
 /**
  * A config object in a loaded Oxlint config: the config itself or an entry of its `extends`.
@@ -22,7 +29,8 @@ const OverrideObject = Schema.Struct({
 interface ConfigObject {
   readonly [IDENTITY_KEY]?: typeof PresetIdentity.Type | RulesFolderIdentity
   readonly extends?: readonly ConfigObject[]
-  readonly overrides?: ReadonlyArray<typeof OverrideObject.Type>
+  readonly jsPlugins?: readonly unknown[]
+  readonly overrides?: readonly OverrideObject[]
 }
 
 const CONFIG_OBJECT_FIELDS = {
@@ -30,6 +38,8 @@ const CONFIG_OBJECT_FIELDS = {
   extends: Schema.optional(
     Schema.Array(Schema.suspend((): Schema.Codec<ConfigObject> => ConfigObject))
   ),
+  // Oxlint checks the shape of each entry, so Adamantite reads only the name of a plugin.
+  jsPlugins: Schema.optional(Schema.Array(Schema.Unknown)),
   overrides: Schema.optional(Schema.Array(OverrideObject)),
 }
 
@@ -78,6 +88,27 @@ export function listAppliedPresetModules(config: LintConfig): readonly string[] 
   )
 
   return [...listPresetModules(config), ...scoped]
+}
+
+/**
+ * The `overrides` entries of every config object of `config`, in the order that Oxlint applies
+ * them. A config that spreads a preset, such as `{ ...core, overrides }`, keeps the identity of the
+ * preset on its own object, so the identity cannot tell the project's overrides from the preset's.
+ */
+export function listOverrides(config: LintConfig): readonly OverrideObject[] {
+  return listConfigObjects(config).flatMap(({ overrides = [] }) => overrides)
+}
+
+const isNamedPlugin = Schema.is(Schema.Struct({ name: Schema.String }))
+
+/**
+ * The names of the `jsPlugins` entries that `config` loads through any config object, such as
+ * `adamantite` for the first-party plugin that a preset loads.
+ */
+export function listJsPluginNames(config: LintConfig): readonly string[] {
+  return listConfigObjects(config).flatMap(({ jsPlugins = [] }) =>
+    jsPlugins.flatMap((entry) => (isNamedPlugin(entry) ? [entry.name] : []))
+  )
 }
 
 /**

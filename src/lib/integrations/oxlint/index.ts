@@ -20,6 +20,7 @@ import {
 import { listLintedFiles } from "#lib/integrations/oxlint/files.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import { findExcludedPresets } from "#lib/integrations/oxlint/presets.ts"
+import { listReplacementWarnings } from "#lib/integrations/oxlint/replacements.ts"
 import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
@@ -213,6 +214,8 @@ export default {
         Option.toArray
       )
 
+      const replacementWarnings = yield* listReplacementWarnings(project)
+
       return {
         findings: [
           ...pkg.findings,
@@ -224,7 +227,7 @@ export default {
           ...configFindings,
         ],
         packageActions: pkg.packageActions,
-        warnings: pkg.warnings,
+        warnings: [...pkg.warnings, ...replacementWarnings],
       }
     }),
   files: (_project: Project.Snapshot, selection: Selection) =>

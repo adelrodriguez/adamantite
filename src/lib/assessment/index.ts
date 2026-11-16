@@ -229,10 +229,18 @@ export function renderAssessmentMarkdown(
     : renderRepairPrompt(assessment.findings, assessment.warnings, adamantiteVersion)
 }
 
+/**
+ * A warning as a Markdown list item. The later lines of a warning, such as its steps, stay inside
+ * the item.
+ */
+function toWarningItem(warning: string): string {
+  return `- ${warning.replaceAll("\n", "\n  ")}`
+}
+
 function renderWarningReport(warnings: readonly string[], adamantiteVersion: string): string {
   return fillTemplate(warningReportTemplate, {
     version: adamantiteVersion,
-    warnings: warnings.map((warning) => `- ${warning}`).join("\n"),
+    warnings: warnings.map((warning) => toWarningItem(warning)).join("\n"),
   })
 }
 
@@ -263,7 +271,7 @@ function renderRepairPrompt(
           "",
           "Review these warnings before making repairs:",
           "",
-          ...warnings.map((warning) => `- ${warning}`),
+          ...warnings.map((warning) => toWarningItem(warning)),
           "",
           "",
         ].join("\n")

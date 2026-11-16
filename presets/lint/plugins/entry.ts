@@ -2,7 +2,7 @@
 // module, and its `index.ts` registers the rules under the same name.
 export const FIRST_PARTY_PLUGINS = ["adamantite", "antislop", "antislop-effect"] as const
 
-type FirstPartyPlugin = (typeof FIRST_PARTY_PLUGINS)[number]
+export type FirstPartyPlugin = (typeof FIRST_PARTY_PLUGINS)[number]
 
 /**
  * A `jsPlugins` entry of an Oxlint config.

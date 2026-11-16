@@ -502,7 +502,15 @@ imported functions, such as `useState` and `React.useState`.
 
 `plugins/shared/` holds the helpers that more than one plugin uses: `options.ts` reads rule
 options, and `ast.ts` holds the AST helpers, such as the key reader. A helper moves there only
-when a second plugin needs it.
+when a second plugin needs it. `replacement.d.ts` holds the `Replacement` type that any rule can
+declare. It is a declaration file, so the build ships no module for it.
+
+A rule that states in its options what projects write by hand in another rule declares that
+config in `meta.docs.replaces`, where Oxlint keeps a rule's own properties. `adamantite/layers`
+declares the `no-restricted-imports` overrides with `patterns` that state a layer map by hand.
+Doctor's `integrations/oxlint/replacements.ts` imports each plugin module, reads every
+declaration, counts the overrides of each loaded config, and warns with the steps of the rule. The Oxlint integration names no rule, so a new declaration needs no change
+outside its rule.
 
 A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
 such as `firstPartyPlugin("antislop")`. The function builds a file URL from its own location.

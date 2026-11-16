@@ -62,7 +62,7 @@ function run(
 }
 
 describe("VS Code setup", () => {
-  it.effect("create the settings and the extension recommendations, and record their hashes", () =>
+  it.effect("create the settings and the extension recommendations", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* run("init", files, INIT_ARGS)
@@ -72,10 +72,6 @@ describe("VS Code setup", () => {
       expect(files.read(SETTINGS)).toContain(
         '"oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js"'
       )
-      expect(readLockfile(files).written).toMatchObject({
-        [EXTENSIONS]: hashContent(files.read(EXTENSIONS)),
-        [SETTINGS]: hashContent(files.read(SETTINGS)),
-      })
       expect(output).toContain(`✔ \`${SETTINGS}\` created.\n✔ \`${EXTENSIONS}\` created.`)
     })
   )

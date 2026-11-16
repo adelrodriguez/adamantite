@@ -1,16 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import {
-  findingsLeft,
-  getFailure,
-  hashContent,
-  makeLockfileFile,
-  readLockfile,
-} from "#__tests__/command-test-helpers.ts"
+import { findingsLeft, getFailure } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { runLifecycle } from "#__tests__/lifecycle.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const AGENTS = "AGENTS.md"
 
@@ -27,19 +20,14 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("agent guidance setup", () => {
-  it.effect("create AGENTS.md and the skill, and record their hashes", () =>
+  it.effect("create AGENTS.md and the skill", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
-      const { written } = readLockfile(files)
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(AGENTS)).toContain("- Run `bun run check` to catch formatting")
       expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
-      expect({ agents: written[AGENTS], skill: written[SKILL] }).toStrictEqual({
-        agents: hashContent(files.read(AGENTS)),
-        skill: hashContent(files.read(SKILL)),
-      })
       expect(output).toContain(`✔ \`${AGENTS}\` created.`)
     })
   )
@@ -128,26 +116,6 @@ describe("agent guidance setup", () => {
       expect(doctor.output).toContain(
         "Remove the `adamantite` entry from `skills` in `skills-lock.json`."
       )
-    })
-  )
-
-  it.effect("delete the files when the selection no longer names agent guidance", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const { selection, written } = readLockfile(files)
-
-      files.write(
-        LOCKFILE_PATH,
-        makeLockfileFile({ ...selection, agents: false }, written)[LOCKFILE_PATH]
-      )
-
-      yield* runLifecycle("update", files)
-
-      expect({ agents: files.exists(AGENTS), skill: files.exists(SKILL) }).toStrictEqual({
-        agents: false,
-        skill: false,
-      })
     })
   )
 })

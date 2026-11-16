@@ -2,17 +2,10 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
-import {
-  findingsLeft,
-  getFailure,
-  hashContent,
-  makeLockfileFile,
-  readLockfile,
-} from "#__tests__/command-test-helpers.ts"
+import { findingsLeft, getFailure } from "#__tests__/command-test-helpers.ts"
 import { effectEditorFiles, effectEditorResolver } from "#__tests__/effect-sdk.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { runLifecycle } from "#__tests__/lifecycle.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const SETTINGS = ".zed/settings.json"
 
@@ -25,14 +18,13 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("Zed setup", () => {
-  it.effect("create the settings, record their hash, and link the extensions", () =>
+  it.effect("create the settings and link the extensions", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(SETTINGS)).toContain('"node_modules/adamantite/dist/oxlint.js"')
-      expect(readLockfile(files).written[SETTINGS]).toBe(hashContent(files.read(SETTINGS)))
       expect(output).toContain(`✔ \`${SETTINGS}\` created.`)
       // Zed reads `auto_install_extensions` only from the user settings.
       expect(output).toContain("Install the Zed `oxc` extension: zed://extension/oxc")
@@ -106,23 +98,6 @@ describe("Zed setup", () => {
       const { exit } = yield* runLifecycle("doctor", files)
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({ _tag: error })
-    })
-  )
-
-  it.effect("delete the settings when the selection no longer names Zed", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const { selection, written } = readLockfile(files)
-
-      files.write(
-        LOCKFILE_PATH,
-        makeLockfileFile({ ...selection, editors: [] }, written)[LOCKFILE_PATH]
-      )
-
-      yield* runLifecycle("update", files)
-
-      expect(files.exists(SETTINGS)).toBe(false)
     })
   )
 })

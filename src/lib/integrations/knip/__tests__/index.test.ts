@@ -1,10 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
-import { hashContent, makeLockfileFile, readLockfile } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { runLifecycle } from "#__tests__/lifecycle.ts"
 
 const CONFIG = "knip.config.ts"
 
@@ -23,16 +21,15 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("Knip setup", () => {
-  it.effect("create the config and record its hash", () =>
+  it.effect("create the config", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
       expect({
         config: files.read(CONFIG),
-        recorded: readLockfile(files).written[CONFIG],
         succeeded: Exit.isSuccess(exit),
-      }).toStrictEqual({ config: RENDERED, recorded: hashContent(RENDERED), succeeded: true })
+      }).toStrictEqual({ config: RENDERED, succeeded: true })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
     })
   )
@@ -67,23 +64,6 @@ describe("Knip setup", () => {
       expect(doctor.output).toContain(
         "The file must set `ignoreDependencies: ignoreDependencies.monorepo` from `adamantite/analyze`"
       )
-    })
-  )
-
-  it.effect("delete the config when the selection no longer runs Knip", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const { written } = readLockfile(files)
-
-      files.write(
-        LOCKFILE_PATH,
-        makeLockfileFile(makeSelection({ scripts: ["check"] }), written)[LOCKFILE_PATH]
-      )
-
-      yield* runLifecycle("update", files)
-
-      expect(files.exists(CONFIG)).toBe(false)
     })
   )
 

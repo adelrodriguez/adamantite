@@ -21,12 +21,14 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from "node:fs"
 import { arch, release, tmpdir, type } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import process from "node:process"
 import { parseArgs } from "node:util"
 import * as EffectArray from "effect/Array"
@@ -67,6 +69,15 @@ const ROOT_PACKAGES = [
 const FINGERPRINT_MARKER = "adamantite-latest-fingerprint"
 
 const ISSUE_LABELS = ["automated", "dependencies", "needs-triage"]
+
+// The time that `run` may take in all. The steps share it, so a step that hangs ends before the job
+// limit in `.github/workflows/latest.yml`, and the run still writes a report for `publish`.
+const RUN_BUDGET = 45 * 60 * 1000
+
+// The files that `run` writes into the output folder. `run` deletes them before it starts, so a
+// reused folder never holds results or a report from an earlier run.
+const RUN_FILES =
+  /^(?:report\.(?:json|md)|issue-body\.md|lockfiles\.diff|[\w-]+\.results\.json|[\w-]+\.log)$/
 
 // GitHub rejects an issue body or a comment longer than 65,536 characters.
 const MAX_BODY = 60_000
@@ -199,7 +210,12 @@ function runStep(
   name: string,
   command: string,
   args: string[],
-  options: { readonly cwd: string; readonly env: Record<string, string>; readonly out: string }
+  options: {
+    readonly cwd: string
+    readonly env: Record<string, string>
+    readonly out: string
+    readonly timeout: number
+  }
 ): Step {
   const start = performance.now()
   // Color codes would fill the logs and the issue. Vitest prints color whenever FORCE_COLOR is set.
@@ -210,7 +226,7 @@ function runStep(
     encoding: "utf8",
     env: { ...env, NO_COLOR: "1", ...options.env },
     maxBuffer: 64 * 1024 * 1024,
-    timeout: 20 * 60 * 1000,
+    timeout: options.timeout,
   })
 
   const log = `${name}.log`
@@ -358,24 +374,30 @@ function toFailure(id: string, status: string, messages: readonly string[]): Fai
   }
 }
 
+// Vitest finishes the test modules in a different order in each run, so the failures sort by ID.
+const byId = Order.mapInput(Order.String, (failure: Failure) => failure.id)
+
 /**
  * The test modules that failed and the tests that failed in a run. A skipped test is not a failure,
  * because the environment can skip a test, such as a Bun test on a machine without Bun.
  */
 function listFailures(run: TestRun): Failure[] {
-  return [
-    ...Array.from(run.failedModules, ([id, errors]) => toFailure(id, "failed", errors)),
-    ...[...run.tests.values()].flatMap((test) =>
-      test.state === "failed" ? [toFailure(test.id, test.state, test.errors)] : []
-    ),
-  ]
+  return EffectArray.sort(
+    [
+      ...Array.from(run.failedModules, ([id, errors]) => toFailure(id, "failed", errors)),
+      ...[...run.tests.values()].flatMap((test) =>
+        test.state === "failed" ? [toFailure(test.id, test.state, test.errors)] : []
+      ),
+    ],
+    byId
+  )
 }
 
 /**
  * The failures of the candidate run, and the tests that pass in the baseline run and skip or do not
  * run in the candidate run. The baseline passed, so a test that only the candidate skips, such as a
- * fixture without its type check, is a failure too. The tests of a module that failed to load are
- * in the failure of the module.
+ * fixture without its type check, is a failure too. The tests of a module that failed to load or
+ * failed in a hook are in the failure of the module.
  */
 function listRegressions(baseline: TestRun, candidate: TestRun): Failure[] {
   const lost = [...baseline.tests.values()].flatMap((test) => {
@@ -389,10 +411,7 @@ function listRegressions(baseline: TestRun, candidate: TestRun): Failure[] {
       : []
   })
 
-  return EffectArray.sort(
-    [...listFailures(candidate), ...lost],
-    Order.mapInput(Order.String, (failure: Failure) => failure.id)
-  )
+  return EffectArray.sort([...listFailures(candidate), ...lost], byId)
 }
 
 function isSkipped(test: ReportedTest | undefined): boolean {
@@ -427,7 +446,10 @@ function toFingerprint(outcome: Outcome, failures: readonly Failure[], logs: str
       ? [outcome, errorCodes]
       : [
           outcome,
-          failures.map((failure) => failure.id),
+          EffectArray.sort(
+            failures.map((failure) => failure.id),
+            Order.String
+          ),
           EffectArray.sort(new Set(failures.flatMap((failure) => failure.rules)), Order.String),
         ]
 
@@ -585,6 +607,14 @@ function toMarkdown(report: Report): string {
 function runLatest(out: string, overrides: readonly string[]): Outcome {
   mkdirSync(out, { recursive: true })
 
+  for (const file of readdirSync(out)) {
+    if (RUN_FILES.test(file)) {
+      rmSync(join(out, file))
+    }
+  }
+
+  const deadline = performance.now() + RUN_BUDGET
+
   const commit = read("git", ["rev-parse", "HEAD"]).trim()
   // The real path, so that each path that a test prints starts with the worktree, also where the
   // temporary folder is a symbolic link, as on macOS.
@@ -597,7 +627,13 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     args: string[],
     env: Record<string, string> = {}
   ) => {
-    const result = runStep(name, command, args, { cwd: worktree, env, out })
+    const result = runStep(name, command, args, {
+      cwd: worktree,
+      env,
+      out,
+      // A timeout of 0 means no limit, so the last step gets at least one second.
+      timeout: Math.max(1000, Math.round(deadline - performance.now())),
+    })
 
     steps.push(result)
 
@@ -659,8 +695,9 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
       baselineVersions,
       candidateVersions,
       commit,
+      // The log explains a failure that no test result explains.
       failedOutput:
-        failures.length === 0 && failedLogs.length > 0
+        failedLogs.length > 0 && failures.every((failure) => failure.diagnostic === "")
           ? (failedLogs.at(-1) ?? "").slice(-MAX_DIAGNOSTIC)
           : null,
       failures,
@@ -782,11 +819,13 @@ const { positionals, values } = parseArgs({
 })
 
 const [command] = positionals
-const out = values.out
 
-if (out === undefined) {
+if (values.out === undefined) {
   throw new Error("Expected --out <folder>.")
 }
+
+// Absolute, because Vitest writes the results from the temporary worktree.
+const out = resolve(values.out)
 
 if (command === "run") {
   process.exitCode = runLatest(out, values.override) === "pass" ? 0 : 1

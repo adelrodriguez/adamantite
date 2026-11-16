@@ -39,9 +39,18 @@ function toText(error: ReportedError): string {
     .join("\n\n")
 }
 
+/**
+ * The errors of a test module, and the errors of its suites. A `beforeAll` or `afterAll` hook of a
+ * suite that fails reports its error on the suite, not on the module, and skips the tests of the
+ * suite without an error of their own.
+ */
 function toModuleResult(testModule: TestModule) {
+  const suiteErrors = Array.from(testModule.children.allSuites(), (suite) =>
+    suite.errors().map((error) => `In the suite "${suite.fullName}":\n\n${toText(error)}`)
+  )
+
   return {
-    errors: testModule.errors().map(toText),
+    errors: [...testModule.errors().map(toText), ...suiteErrors.flat()],
     id: testModule.relativeModuleId,
     state: testModule.state(),
   }

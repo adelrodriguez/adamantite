@@ -27,7 +27,9 @@ jobs:
   latest:
     name: latest
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # `scripts/test-latest.ts run` stops its steps after 45 minutes, so it writes a report before
+    # this limit, also when a step hangs.
+    timeout-minutes: 60
     permissions:
       contents: read
       issues: write

@@ -15,6 +15,7 @@ import oxlint, { PACKAGE } from "#lib/integrations/oxlint/index.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { LINT_PRESETS } from "#lib/project/selection.ts"
 
 const REPO = join(import.meta.dirname, "../../../../..")
 
@@ -385,6 +386,58 @@ describe("hand-written layer maps", () => {
       expect(output).toContain(describeLayerMapWarning(CONFIG, 2))
       expect(output).not.toContain("It loads the `adamantite` plugin.")
       expect(output).toContain("\n  2. Use `ignore`")
+    })
+  )
+
+  // Spreading a preset copies its identity into the project's own object, so the identity cannot
+  // tell the project's overrides apart from the preset's.
+  it.effect("warn about the overrides of a config that spreads a preset", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      files.write(
+        CONFIG,
+        withOverrides(
+          RENDERED.replace(
+            "export default defineConfig({",
+            "export default defineConfig({\n  ...core,"
+          ).replace("[core, vitest, custom()]", "[vitest, custom()]"),
+          [restrict("shared", PATTERNS), restrict("services", PATTERNS)]
+        )
+      )
+
+      const { output } = yield* runLifecycle("doctor", files)
+
+      expect(output).toContain(describeLayerMapWarning(CONFIG, 2))
+    })
+  )
+
+  // Doctor counts the overrides of every config object, so no Adamantite preset may have overrides
+  // that a first-party rule replaces.
+  it.effect("do not warn about a config that extends every preset", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      files.write(
+        CONFIG,
+        [
+          'import core from "adamantite/lint"',
+          ...LINT_PRESETS.map(
+            (preset, index) => `import preset${index} from "adamantite/lint/${preset}"`
+          ),
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          `  extends: [core, ${LINT_PRESETS.map((_preset, index) => `preset${index}`).join(", ")}],`,
+          ...OPTIONS,
+        ].join("\n")
+      )
+
+      const report = yield* readReport(files)
+
+      // Only a loaded config that applies jest and vitest gets `excluded-presets`.
+      expect(report.findings).toContain("excluded-presets")
+      expect(report.warnings).toStrictEqual([])
     })
   )
 

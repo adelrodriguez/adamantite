@@ -34,7 +34,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
-const FIXTURE_PACKAGES = "src/__tests__/presets/fixture-packages"
+const FIXTURE_PACKAGES = "presets/__tests__/fixture-packages"
 
 // The reporter of the checkout that runs this script, not the reporter of the tested commit.
 const REPORTER = join(import.meta.dirname, "latest-reporter.ts")
@@ -55,7 +55,6 @@ const ROOT_PACKAGES = [
   "typescript",
   "effect",
   "@effect/platform-node",
-  "@effect/platform-node-shared",
   "@effect/vitest",
   "vitest",
   "@vitest/coverage-v8",
@@ -105,8 +104,8 @@ const Failure = Schema.Struct({
    */
   fixtures: Schema.Array(Schema.String),
   /**
-   * The test file and the full test name, such as `src/__tests__/presets/stacks.test.ts > strict
-   * stack lint each valid fixture clean`.
+   * The test file and the full test name, such as `presets/__tests__/stacks.test.ts > strict stack
+   * lint each valid fixture clean`.
    */
   id: Schema.String,
   /**

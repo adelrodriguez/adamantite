@@ -46,7 +46,7 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: |
             pnpm-lock.yaml
-            src/__tests__/presets/fixture-packages/pnpm-lock.yaml
+            presets/__tests__/fixture-packages/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

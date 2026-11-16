@@ -8,9 +8,6 @@ const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const STACK_TEST = "A stack test, named after the fixture tree or the preset that it lints."
 
-const PROCESS_TWIN =
-  "The tests of the module that start a real process, apart from its unit tests, so those stay in the unit project."
-
 /**
  * The test files that no module names, each with the reason.
  */
@@ -40,7 +37,6 @@ const EXCEPTIONS = {
   "src/__tests__/macro-cache.test.ts":
     "Checks the macro cache workaround of `vitest.config.ts`, until unplugin-macros sets the cache key.",
   "src/__tests__/test-names.test.ts": "Checks the names of the test files.",
-  "src/lib/setup/__tests__/format.test.ts": `${PROCESS_TWIN} It formats the files of \`setup/index.ts\` with real Oxfmt.`,
 } as const satisfies Readonly<Record<string, string>>
 
 /**

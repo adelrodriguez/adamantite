@@ -24,7 +24,7 @@ const PROCESS_RUN_TESTS = [
   "src/lib/integrations/oxlint/__tests__/index.test.ts",
   "src/lib/project/__tests__/config-loader.test.ts",
   "src/lib/project/custom-rules/__tests__/stub.test.ts",
-  "src/lib/setup/__tests__/format.test.ts",
+  "src/lib/setup/__tests__/index.test.ts",
   "src/lib/toolchain/__tests__/index.test.ts",
 ]
 

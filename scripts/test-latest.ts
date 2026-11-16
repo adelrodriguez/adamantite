@@ -74,10 +74,45 @@ const ISSUE_LABELS = ["automated", "dependencies", "needs-triage"]
 // limit in `.github/workflows/latest.yml`, and the run still writes a report for `publish`.
 const RUN_BUDGET = 45 * 60 * 1000
 
-// The files that `run` writes into the output folder. `run` deletes them before it starts, so a
-// reused folder never holds results or a report from an earlier run.
-const RUN_FILES =
-  /^(?:report\.(?:json|md)|issue-body\.md|lockfiles\.diff|[\w-]+\.results\.json|[\w-]+\.log)$/
+/**
+ * The steps of `run`. Each step writes `<name>.log` into the output folder. An override step is
+ * `override-<n>`, with one step for each `--override`.
+ */
+type StepName =
+  | "baseline-install"
+  | "baseline-install-fixtures"
+  | TestRunName
+  | "update-root"
+  | "update-fixtures"
+  | `override-${number}`
+
+const STEP_NAMES = [
+  "baseline-install",
+  "baseline-install-fixtures",
+  "baseline",
+  "update-root",
+  "update-fixtures",
+  "candidate",
+] as const satisfies readonly StepName[]
+
+type TestRunName = "baseline" | "candidate"
+
+/**
+ * The files that `run` and `publish` write into the output folder, other than the override logs.
+ * `run` deletes them before it starts, so a reused folder never holds results or a report from an
+ * earlier run, and it deletes no other file.
+ */
+const RUN_FILES = new Set([
+  "report.json",
+  "report.md",
+  "issue-body.md",
+  "lockfiles.diff",
+  "baseline.results.json",
+  "candidate.results.json",
+  ...STEP_NAMES.map((name) => `${name}.log`),
+])
+
+const OVERRIDE_LOG = /^override-\d+\.log$/
 
 // GitHub rejects an issue body or a comment longer than 65,536 characters.
 const MAX_BODY = 60_000
@@ -207,7 +242,7 @@ const SUMMARIES: Record<Outcome, string> = {
  * Run a command, write its output to `<out>/<name>.log`, and return the step.
  */
 function runStep(
-  name: string,
+  name: StepName,
   command: string,
   args: string[],
   options: {
@@ -608,7 +643,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
   mkdirSync(out, { recursive: true })
 
   for (const file of readdirSync(out)) {
-    if (RUN_FILES.test(file)) {
+    if (RUN_FILES.has(file) || OVERRIDE_LOG.test(file)) {
       rmSync(join(out, file))
     }
   }
@@ -622,7 +657,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
   const steps: Step[] = []
 
   const step = (
-    name: string,
+    name: StepName,
     command: string,
     args: string[],
     env: Record<string, string> = {}
@@ -640,7 +675,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     return result.exitCode === 0
   }
 
-  const testPresets = (name: "baseline" | "candidate") =>
+  const testPresets = (name: TestRunName) =>
     step(name, "pnpm", ["run", "test:presets", "--reporter=default", `--reporter=${REPORTER}`], {
       ADAMANTITE_LATEST_RESULTS: join(out, `${name}.results.json`),
     })

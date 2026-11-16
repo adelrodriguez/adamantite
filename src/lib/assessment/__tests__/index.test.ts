@@ -154,6 +154,30 @@ describe("renderAssessmentMarkdown", () => {
       ].join("\n")
     )
   })
+
+  // A warning with steps puts each step on its own line, as the terminal shows it.
+  it.each([
+    { findings: [], report: "warning report" },
+    {
+      findings: [
+        {
+          currentState: "`tool.config.ts` is missing.",
+          goal: ["Create `tool.config.ts`."],
+          id: "missing-tool-config",
+          integration: "tool",
+          title: "Missing tool configuration",
+        },
+      ],
+      report: "repair prompt",
+    },
+  ])("indent the lines of a warning under its bullet in the $report", ({ findings }) => {
+    const markdown = renderAssessmentMarkdown(
+      makeAssessment({ findings, warnings: ["The config is old.\n1. Update it.\n2. Run Doctor."] }),
+      "1.2.3"
+    )
+
+    expect(markdown).toContain("- The config is old.\n  1. Update it.\n  2. Run Doctor.\n")
+  })
 })
 
 describe("assessProject", () => {

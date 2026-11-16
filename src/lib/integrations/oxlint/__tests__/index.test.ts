@@ -317,7 +317,7 @@ describe("hand-written layer maps", () => {
       const after = yield* readReport(files)
 
       expect(doctor.output).toContain(describeLayerMapWarning(CONFIG, count))
-      expect(doctor.output).toContain(ARCHITECTURE_STEP)
+      expect(doctor.output).toContain(`\n  2. ${ARCHITECTURE_STEP}`)
       // The overrides add one warning and no finding.
       expect(after).toStrictEqual({
         findings: before.findings,
@@ -380,6 +380,7 @@ describe("hand-written layer maps", () => {
 
       expect(output).toContain(describeLayerMapWarning(CONFIG, 2))
       expect(output).not.toContain(ARCHITECTURE_STEP)
+      expect(output).toContain("\n  2. Use `ignore`")
     })
   )
 

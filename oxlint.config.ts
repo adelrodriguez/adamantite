@@ -1,4 +1,9 @@
 import { defineConfig } from "oxlint"
+// Knip reads each file that the config imports by a relative path for the package names that it
+// spells. `presets/rules/folder.ts` spells `.cache`, so through `./presets/rules/custom.ts` Knip
+// reports the entry module that `custom()` writes to `node_modules/.cache` as the unlisted package
+// `.cache`.
+import custom from "#presets/rules/custom.ts"
 import architecture from "./presets/lint/architecture.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
@@ -7,8 +12,8 @@ import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
 export default defineConfig({
   // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
-  // rule makes some test code impossible to write.
-  extends: [architecture, core, effect, strict, vitest],
+  // rule makes some test code impossible to write. `custom()` loads the rules in `.adamantite/lint`.
+  extends: [architecture, core, effect, strict, vitest, custom()],
   ignorePatterns: [
     ...ignorePatterns,
     // Rule fixtures break rules on purpose; see presets/__tests__/rule-fixtures.ts.

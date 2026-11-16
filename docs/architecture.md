@@ -90,6 +90,12 @@ The folders inside the layers belong to the layer that holds them:
 - Only `src/commands`, `src/terminal`, and the tests import `effect/cli/Prompt`, so lib code never
   asks.
 
+`project/file-writers`, the custom rule in `.adamantite/lint/file-writers.ts`, lets only the file
+writers that it lists change the disk. In the non-test files of `src`, it rejects a call to a
+`FileSystem` method that writes, such as `writeFileString` or `remove`, and an import of
+`ensureDirectory` or `writeFile` from `src/lib/shared/filesystem.ts`. It also rejects `node:fs`
+outside the build-time macros, so no write bypasses `FileSystem`.
+
 ## Integrations
 
 An integration is one folder in `src/lib/integrations/` and one line in the list of
@@ -153,8 +159,8 @@ lockfile, `update` runs no setup and offers the `lockfile-missing` finding. Both
 what it did through `src/terminal/setup.ts`, and offers the repair of the findings that remain
 through `Resolution.offer`. Both exit 1 while findings remain.
 
-`Setup.apply` is the only code that writes target-project files. It takes the integrations that
-the selection includes, and does these steps in order:
+`Setup.apply` is the only code that writes the managed files and the lockfile. It takes the
+integrations that the selection includes, and does these steps in order:
 
 1. Install `adamantite`, when the project does not depend on it, and the packages of every selected
    integration in one install. It installs only the packages that `package.json` does not declare

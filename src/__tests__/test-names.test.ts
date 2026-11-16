@@ -58,7 +58,7 @@ function hasModule(test: string) {
 
 describe("test files", () => {
   it("take the name of the module that they test, or name the reason in the exceptions", () => {
-    const tests = globSync("{presets,src}/**/*.test.ts", {
+    const tests = globSync("{.adamantite,presets,src}/**/*.test.ts", {
       cwd: REPO_ROOT,
       exclude: ["**/node_modules/**", "src/__tests__/presets/fixtures/**"],
     }).map((file) => file.split(sep).join("/"))

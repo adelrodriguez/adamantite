@@ -66,7 +66,13 @@ export default defineConfig({
         extends: true,
         test: {
           exclude: [...configDefaults.exclude, ...PROCESS_RUN_TESTS, FIXTURES],
-          include: ["presets/**/*.test.ts", "src/**/*.test.ts"],
+          // The custom rule tests sit in `__tests__`, where `adamantite rule test`, which runs
+          // `node:test` files, does not look.
+          include: [
+            ".adamantite/lint/__tests__/*.test.ts",
+            "presets/**/*.test.ts",
+            "src/**/*.test.ts",
+          ],
           name: "unit",
         },
       },

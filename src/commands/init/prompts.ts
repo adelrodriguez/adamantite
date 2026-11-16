@@ -70,11 +70,13 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     choices: [
       {
         description: "recommended",
+        selected: true,
         title: "check - find formatting, lint, and type errors",
         value: "check",
       },
       {
         description: "recommended",
+        selected: true,
         title: "fix - apply safe lint fixes and format code",
         value: "fix",
       },

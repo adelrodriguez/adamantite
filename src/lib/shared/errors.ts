@@ -432,6 +432,20 @@ export class PackageNotInstalled extends Data.TaggedError("PackageNotInstalled")
   }
 }
 
+/**
+ * A tool is not installed, and no script of the lockfile selection runs it, so Setup did not
+ * install it and `adamantite update` would not either. `script` is a managed script that runs the
+ * tool.
+ */
+export class ToolNotSelected extends Data.TaggedError("ToolNotSelected")<{
+  script: string
+  tool: string
+}> {
+  override get message() {
+    return `The lockfile selects no script that runs \`${this.tool}\`, so \`${this.tool}\` is not installed. Run \`adamantite init --non-interactive --script ${this.script}\` to add the script and install it.`
+  }
+}
+
 export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSupported")<{
   command: string
 }> {

@@ -7,8 +7,15 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { CommandFailed, InvalidFixOptions } from "#lib/shared/errors.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import { CommandFailed, InvalidFixOptions, ToolNotSelected } from "#lib/shared/errors.ts"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeHandoffRunner,
+  makeLockfileFile,
+  runCommand,
+} from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
 
@@ -174,6 +181,25 @@ describe("fix", () => {
           },
         ])
       })
+    )
+  })
+
+  describe("selection", () => {
+    it.effect(
+      "name the init command that adds check when the lockfile selects no script and Oxfmt is missing",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+
+          const exit = yield* runCommand(fixCommand, [], {
+            files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+            layers: [runner.layer],
+          })
+
+          expect(getFailure(exit)).toStrictEqual(
+            new ToolNotSelected({ script: "check", tool: "oxfmt" })
+          )
+        })
     )
   })
 

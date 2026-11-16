@@ -8,8 +8,21 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { CommandFailed, InvalidCheckOptions } from "#lib/shared/errors.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import {
+  CliNotFound,
+  CommandFailed,
+  InvalidCheckOptions,
+  ToolNotSelected,
+} from "#lib/shared/errors.ts"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeHandoffRunner,
+  makeLockfileFile,
+  runCommand,
+} from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
 
@@ -189,6 +202,76 @@ describe("check", () => {
             title: "🔍 Linting",
           },
         ])
+      })
+    )
+  })
+
+  describe("selection", () => {
+    it.effect(
+      "name the init command that adds check when the lockfile selects no script and Oxfmt is missing",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+
+          const exit = yield* runCommand(checkCommand, [], {
+            files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+            layers: [runner.layer],
+          })
+
+          const error = getFailure(exit)
+
+          expect(error).toStrictEqual(new ToolNotSelected({ script: "check", tool: "oxfmt" }))
+          expect(error?.message).toBe(
+            "The lockfile selects no script that runs `oxfmt`, so `oxfmt` is not installed. Run `adamantite init --non-interactive --script check` to add the script and install it."
+          )
+        })
+    )
+
+    it.effect(
+      "run each stage when the lockfile selects no script and the tools are installed",
+      () =>
+        Effect.gen(function* () {
+          const runner = createRunnerTestContext()
+
+          const exit = yield* runCommand(checkCommand, [], {
+            files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+            layers: [runner.layer],
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(
+            runner.invocations.map((invocation) => invocation.name ?? invocation.command)
+          ).toStrictEqual(["oxfmt", "oxlint"])
+        })
+    )
+
+    // `adamantite update` installs a selected tool, so its own failure stands.
+    it.effect("keep the not-found failure of a tool that the lockfile selects", () =>
+      Effect.gen(function* () {
+        const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: createFileSystemTestContext({
+            files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
+          }),
+          layers: [runner.layer],
+        })
+
+        expect(getFailure(exit)).toStrictEqual(new CliNotFound({ command: "oxfmt" }))
+      })
+    )
+
+    // Doctor reports the lockfile, and the tools fail as without a lockfile.
+    it.effect("keep the not-found failure when the lockfile does not decode", () =>
+      Effect.gen(function* () {
+        const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: createFileSystemTestContext({ files: { [LOCKFILE_PATH]: "<<<<<<< HEAD\n" } }),
+          layers: [runner.layer],
+        })
+
+        expect(getFailure(exit)).toStrictEqual(new CliNotFound({ command: "oxfmt" }))
       })
     )
   })

@@ -10,8 +10,16 @@ import {
   CommandFailed,
   FailedToReadFile,
   InvalidAnalyzeOptions,
+  ToolNotSelected,
 } from "#lib/shared/errors.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeHandoffRunner,
+  makeLockfileFile,
+  runCommand,
+} from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 function createMonorepoFiles() {
   return createFileSystemTestContext({
@@ -205,6 +213,66 @@ describe("analyze", () => {
         expect(error.message).toBe(
           "The command `sherif` was not found on PATH. Run `adamantite update` to install it."
         )
+      })
+    )
+  })
+
+  describe("selection", () => {
+    it.effect(
+      "name the init command that adds analyze when the lockfile does not select it and Knip is missing",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { knip: "not-found" } })
+
+          const exit = yield* runCommand(analyzeCommand, [], {
+            files: createFileSystemTestContext({
+              files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
+            }),
+            layers: [runner.layer],
+          })
+
+          const error = getFailure(exit)
+
+          expect(error).toStrictEqual(new ToolNotSelected({ script: "analyze", tool: "knip" }))
+          expect(error?.message).toBe(
+            "The lockfile selects no script that runs `knip`, so `knip` is not installed. Run `adamantite init --non-interactive --script analyze` to add the script and install it."
+          )
+        })
+    )
+
+    it.effect(
+      "name the init command instead of update when Sherif is missing and not selected",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { sherif: "not-found" } })
+
+          const exit = yield* runCommand(analyzeCommand, [], {
+            files: createFileSystemTestContext({
+              files: {
+                ...makeLockfileFile(makeSelection({})),
+                "package.json": '{ "workspaces": ["packages/*"] }',
+              },
+            }),
+            layers: [runner.layer],
+          })
+
+          expect(getFailure(exit)).toStrictEqual(
+            new ToolNotSelected({ script: "analyze", tool: "sherif" })
+          )
+        })
+    )
+
+    it.effect("run Knip when the lockfile selects no script and Knip is installed", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(analyzeCommand, [], {
+          files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
       })
     )
   })

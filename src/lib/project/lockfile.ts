@@ -85,6 +85,19 @@ export const readLockfile = Effect.fn("readLockfile")(function* (root: string) {
 })
 
 /**
+ * The selection that the lockfile of the project at `root` records. None when the project has no
+ * lockfile, or when its lockfile does not decode, which Doctor reports.
+ */
+export const readSelection = (root: string) =>
+  readLockfile(root).pipe(
+    Effect.catchTags({
+      InvalidLockfile: () => Effect.succeedNone,
+      UnsupportedLockfile: () => Effect.succeedNone,
+    }),
+    Effect.map((lockfile) => Option.map(lockfile, ({ selection }) => selection))
+  )
+
+/**
  * The JSON text of `lockfile`. Only `init` and `update` write the lockfile, through `lib/setup`,
  * which formats it as it formats a managed file.
  */

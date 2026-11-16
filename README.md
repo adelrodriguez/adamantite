@@ -53,7 +53,8 @@ npx adamantite init
 ```
 
 The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
-and coding agent setup with the [Adamantite skill](#agent-skill). After setup, use the scripts written to `package.json`:
+and coding agent setup with the [Adamantite skill](#agent-skill). The scripts prompt starts with
+the recommended `check` and `fix` scripts checked. After setup, use the scripts written to `package.json`:
 
 ```sh
 bun run check
@@ -180,6 +181,11 @@ extension that the setup needs.
 ## Commands
 
 Run `adamantite --help` or `adamantite <command> --help` for the complete CLI reference.
+
+When `check`, `fix`, or `analyze` needs a tool that is not installed and that no script of the
+lockfile selection runs, such as Oxlint without the `check` or `fix` script, the error names the
+command that adds the script and installs the tool, such as
+`adamantite init --non-interactive --script check`.
 
 ### `adamantite check`
 

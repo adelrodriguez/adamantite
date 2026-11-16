@@ -1,5 +1,13 @@
+import * as Array from "effect/Array"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import {
+  checkRunsTool,
+  getScriptsThatRun,
+  MANAGED_TOOLS,
+  SCRIPT_ORDER,
+} from "#lib/project/package-json.ts"
+import { ToolNotSelected } from "#lib/shared/errors.ts"
 
 /**
  * Every lint preset a target project can select besides core, in the order that init offers them.
@@ -52,6 +60,28 @@ export const Selection = Schema.Struct({
 })
 
 export type Selection = typeof Selection.Type
+
+/**
+ * The failure for the missing tool `name` when `selection`, the selection that the lockfile
+ * records, includes no script that runs it. Setup then did not install the tool, so the repair adds
+ * the first managed script that runs it. None without a selection, for a name that is not a managed
+ * tool, and for a tool that a selected script runs, so the failure of the tool stands.
+ */
+export function toToolNotSelected(
+  selection: Option.Option<Selection>,
+  name: string
+): Option.Option<ToolNotSelected> {
+  return Option.flatMap(selection, ({ scripts }) =>
+    Option.flatMap(
+      Array.findFirst(MANAGED_TOOLS, (tool) => tool === name && !checkRunsTool(scripts, tool)),
+      (tool) =>
+        Option.map(
+          Array.head(getScriptsThatRun(tool)),
+          (script) => new ToolNotSelected({ script, tool })
+        )
+    )
+  )
+}
 
 const PRESET_ORDER = ["core", ...LINT_PRESETS] as const
 

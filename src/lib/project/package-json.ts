@@ -98,9 +98,11 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
   })
 
 /**
- * A code-quality tool that a managed script runs.
+ * The code-quality tools that the managed scripts run, by their package and command name.
  */
-export type ManagedTool = "knip" | "oxfmt" | "oxlint" | "sherif"
+export const MANAGED_TOOLS = ["knip", "oxfmt", "oxlint", "sherif"] as const
+
+export type ManagedTool = (typeof MANAGED_TOOLS)[number]
 
 /**
  * The package scripts that Adamantite manages: the command of each, the tools that it runs, and

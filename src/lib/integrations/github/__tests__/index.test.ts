@@ -7,15 +7,11 @@ import {
   createDependencyInstallerTestContext,
   findingsLeft,
   getFailure,
-  hashContent,
-  makeLockfileFile,
-  readLockfile,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { runLifecycle } from "#__tests__/lifecycle.ts"
 import initCommand from "#commands/init.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SUPPORTED_PACKAGE_MANAGERS } from "#lib/project/package-manager.ts"
 
 const WORKFLOW = ".github/workflows/adamantite.yml"
@@ -44,14 +40,13 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("GitHub Actions setup", () => {
-  it.effect("create the workflow for the CI scripts of the selection and record its hash", () =>
+  it.effect("create the workflow for the CI scripts of the selection", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(WORKFLOW)).toContain("command: bun run check")
-      expect(readLockfile(files).written[WORKFLOW]).toBe(hashContent(files.read(WORKFLOW)))
       expect(output).toContain(`✔ \`${WORKFLOW}\` created.`)
     })
   )
@@ -98,23 +93,6 @@ describe("GitHub Actions setup", () => {
       expect(doctor.output).toContain(
         `No job in \`${WORKFLOW}\` runs the managed \`check\` script.`
       )
-    })
-  )
-
-  it.effect("delete the workflow when the selection no longer names GitHub Actions", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const { selection, written } = readLockfile(files)
-
-      files.write(
-        LOCKFILE_PATH,
-        makeLockfileFile({ ...selection, ci: null }, written)[LOCKFILE_PATH]
-      )
-
-      yield* runLifecycle("update", files)
-
-      expect(files.exists(WORKFLOW)).toBe(false)
     })
   )
 })

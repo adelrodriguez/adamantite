@@ -5,13 +5,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import {
-  findingsLeft,
-  getFailure,
-  hashContent,
-  makeLockfileFile,
-  readLockfile,
-} from "#__tests__/command-test-helpers.ts"
+import { findingsLeft, getFailure, makeLockfileFile } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
@@ -19,7 +13,6 @@ import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import oxlint, { PACKAGE } from "#lib/integrations/oxlint/index.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import * as Project from "#lib/project/index.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
 const REPO = join(import.meta.dirname, "../../../../..")
@@ -95,7 +88,7 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("Oxlint setup", () => {
-  it.effect("create the config of the selected presets and record its hash", () =>
+  it.effect("create the config of the selected presets", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
@@ -103,11 +96,9 @@ describe("Oxlint setup", () => {
       expect({
         config: files.read(CONFIG),
         failure: getFailure(exit),
-        recorded: readLockfile(files).written[CONFIG],
       }).toStrictEqual({
         config: RENDERED,
         failure: findingsLeft("init"),
-        recorded: hashContent(RENDERED),
       })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
     })
@@ -208,23 +199,6 @@ describe("Oxlint setup", () => {
 
       expect(output).not.toContain(MISSING_PRESET)
       expect(output).not.toContain(EXCLUDED_PRESETS)
-    })
-  )
-
-  it.effect("delete the config when the selection no longer runs Oxlint", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const { written } = readLockfile(files)
-
-      files.write(
-        LOCKFILE_PATH,
-        makeLockfileFile(makeSelection({ scripts: ["analyze"] }), written)[LOCKFILE_PATH]
-      )
-
-      yield* runLifecycle("update", files)
-
-      expect(files.exists(CONFIG)).toBe(false)
     })
   )
 

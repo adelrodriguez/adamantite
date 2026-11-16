@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "@effect/vitest"
+import * as Schema from "effect/Schema"
 import { globToRegExp } from "#presets/lint/plugins/adamantite/shared/glob.ts"
+
+// A path segment without glob syntax. It holds the characters that a regular expression reads as
+// syntax, so the glob must escape them.
+const segment = Schema.String.check(Schema.isPattern(/^[\w$()+.^|-]{1,6}$/))
+const segments = Schema.Array(segment).check(Schema.isMaxLength(4))
 
 describe("globToRegExp", () => {
   it.each([
@@ -24,10 +30,33 @@ describe("globToRegExp", () => {
     expect(globToRegExp("file-[!0-9].ts").test("file-7.ts")).toBe(false)
   })
 
-  it("keeps a single star inside one path segment", () => {
-    const glob = globToRegExp("src/*.ts")
+  it.prop(
+    "match a path without glob syntax only to itself",
+    { other: segments, path: Schema.NonEmptyArray(segment) },
+    ({ other, path }) => {
+      const glob = globToRegExp(path.join("/"))
 
-    expect(glob.test("src/index.ts")).toBe(true)
-    expect(glob.test("src/nested/index.ts")).toBe(false)
-  })
+      expect(glob.test(path.join("/"))).toBe(true)
+      expect(glob.test(other.join("/"))).toBe(other.join("/") === path.join("/"))
+    }
+  )
+
+  it.prop(
+    "keep a single star inside one path segment",
+    { name: segment, nested: Schema.NonEmptyArray(segment) },
+    ({ name, nested }) => {
+      const glob = globToRegExp("src/*.ts")
+
+      expect(glob.test(`src/${name}.ts`)).toBe(true)
+      expect(glob.test(`src/${[...nested, name].join("/")}.ts`)).toBe(false)
+    }
+  )
+
+  it.prop(
+    "match a leading double star at any depth, including the root",
+    { folders: segments, name: segment },
+    ({ folders, name }) => {
+      expect(globToRegExp(`**/${name}`).test([...folders, name].join("/"))).toBe(true)
+    }
+  )
 })

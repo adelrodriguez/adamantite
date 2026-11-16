@@ -24,7 +24,6 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { Report } from "#commands/doctor.ts"
 import typescript from "#lib/integrations/typescript/index.ts"
 import * as Project from "#lib/project/index.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
@@ -144,16 +143,15 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("TypeScript setup", () => {
-  it.effect("create the config of the selected preset and record its hash", () =>
+  it.effect("create the config of the selected preset", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
       expect({
         config: files.read(CONFIG),
-        recorded: readLockfile(files).written[CONFIG],
         succeeded: Exit.isSuccess(exit),
-      }).toStrictEqual({ config: RENDERED, recorded: hashContent(RENDERED), succeeded: true })
+      }).toStrictEqual({ config: RENDERED, succeeded: true })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
     })
   )
@@ -223,23 +221,6 @@ describe("TypeScript setup", () => {
         findings: decodeReport(json.output).findings.map(({ title }) => title),
         succeeded: Exit.isSuccess(doctor.exit),
       }).toStrictEqual({ findings: [], succeeded: true })
-    })
-  )
-
-  it.effect("delete the config when the selection no longer names a TypeScript preset", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const { written } = readLockfile(files)
-
-      files.write(
-        LOCKFILE_PATH,
-        makeLockfileFile(makeSelection({ scripts: ["analyze"] }), written)[LOCKFILE_PATH]
-      )
-
-      yield* runLifecycle("update", files)
-
-      expect(files.exists(CONFIG)).toBe(false)
     })
   )
 

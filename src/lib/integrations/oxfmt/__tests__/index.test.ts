@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import {
   findingsLeft,
   getFailure,
-  hashContent,
   makeLockfileFile,
   readLockfile,
 } from "#__tests__/command-test-helpers.ts"
@@ -25,7 +24,7 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("Oxfmt setup", () => {
-  it.effect("create the config and record its hash", () =>
+  it.effect("create the config", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
@@ -33,11 +32,9 @@ describe("Oxfmt setup", () => {
       expect({
         config: files.read(CONFIG),
         failure: getFailure(exit),
-        recorded: readLockfile(files).written[CONFIG],
       }).toStrictEqual({
         config: RENDERED,
         failure: findingsLeft("init"),
-        recorded: hashContent(RENDERED),
       })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
     })

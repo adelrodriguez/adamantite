@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { dirname, join, sep } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
-import jest from "#presets/lint/jest.ts"
 import vitest from "#presets/lint/vitest.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
@@ -22,7 +21,7 @@ const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(Ox
  * file, such as `vitest(require-hook)`.
  */
 function lint(config: string, files: Record<string, string>) {
-  const tempDir = mkdtempSync(join(tmpdir(), "adamantite-test-presets-"))
+  const tempDir = mkdtempSync(join(tmpdir(), "adamantite-vitest-preset-"))
 
   try {
     symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
@@ -58,25 +57,15 @@ function lint(config: string, files: Record<string, string>) {
 
 const SCRIPT = "export function run() {\n  return 1\n}\n\nrun()\n"
 
-describe.each([
-  {
-    moduleMock: ['import { vi } from "vitest"', "", 'vi.mock("./load.ts")', ""],
-    name: "vitest",
-    preset: vitest,
-    testImport: 'import { expect, it } from "vitest"',
-  },
-  {
-    moduleMock: [
-      'import { jest } from "@jest/globals"',
-      "",
-      'jest.mock("./load.ts", () => ({}))',
-      "",
-    ],
-    name: "jest",
-    preset: jest,
-    testImport: 'import { expect, it } from "@jest/globals"',
-  },
-])("$name preset", ({ moduleMock, name, preset, testImport }) => {
+const name = "vitest"
+
+const preset = vitest
+
+const testImport = 'import { expect, it } from "vitest"'
+
+const moduleMock = ['import { vi } from "vitest"', "", 'vi.mock("./load.ts")', ""]
+
+describe("vitest preset", () => {
   const presetPath = JSON.stringify(join(REPO_ROOT, `presets/lint/${name}.ts`))
   // `prefer-to-be` reports `toEqual(2)`, so the file has a report that the preset rules make.
   const test = `${testImport}\n\nit("adds", () => {\n  expect(1 + 1).toEqual(2)\n})\n`

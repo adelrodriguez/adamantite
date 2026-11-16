@@ -9,7 +9,7 @@ import { describe, expect, it } from "@effect/vitest"
 const REPO = join(import.meta.dirname, "../..")
 
 function lint(options: Readonly<Options>) {
-  const fixture = mkdtempSync(join(tmpdir(), "adamantite-safety-comment-config-"))
+  const fixture = mkdtempSync(join(tmpdir(), "adamantite-safety-comment-options-"))
 
   try {
     writeFileSync(join(fixture, "package.json"), '{"type":"module"}\n')

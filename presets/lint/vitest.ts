@@ -141,7 +141,7 @@ const config: OxlintConfig = {
 
 // Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties. So a config
 // that extends the preset gets only the override for test files, while a project override can still
-// read `vitest.plugins` and `vitest.rules`. `presets/__tests__/test-presets.test.ts`
+// read `vitest.plugins` and `vitest.rules`. `presets/__tests__/vitest.test.ts`
 // checks both uses.
 Object.defineProperties(config, { plugins: { value: plugins }, rules: { value: rules } })
 

@@ -1,13 +1,17 @@
 import { defineConfig } from "oxlint"
+import architecture from "./presets/lint/architecture.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
 import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
+// Tests may import what a module owns, so they can set up and check it.
+const tests = "**/__tests__/**"
+
 export default defineConfig({
   // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
   // rule makes some test code impossible to write.
-  extends: [core, effect, strict, vitest],
+  extends: [architecture, core, effect, strict, vitest],
   ignorePatterns: [
     ...ignorePatterns,
     // Rule fixtures break rules on purpose; see presets/__tests__/rule-fixtures.ts.
@@ -60,10 +64,7 @@ export default defineConfig({
       "error",
       // Only commands and the terminal ask the user. Lib code returns data, and the command decides
       // whether to ask.
-      {
-        import: "effect/cli/Prompt",
-        owners: ["src/commands", "src/terminal", "src/__tests__"],
-      },
+      { import: "effect/cli/Prompt", owners: ["src/commands", "src/terminal", tests] },
       {
         import: "oxc-resolver",
         owners: [
@@ -71,58 +72,12 @@ export default defineConfig({
           "presets/lint/plugins/adamantite/shared/resolver.ts",
         ],
       },
-      // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
-      // the tooling integrations directly.
+      // Commands reach the integrations through `lib/setup`, the assessment, and Toolchain. The
+      // terminal renders integration types, `init` offers the preset catalog, and the Oxlint entry
+      // and the build check load the Oxlint runtime.
       {
-        import: "#lib/integrations/tooling",
-        owners: ["src/lib"],
-      },
-      {
-        import: "#lib/integrations/oxlint",
-        owners: [
-          "src/lib",
-          // Init offers the lint presets from the preset catalog.
-          "src/commands/init",
-          "src/commands/__tests__",
-          "src/__tests__",
-          "src/oxlint.ts",
-          // The build check reads the file name of the Oxlint entry.
-          "scripts/test-build.ts",
-        ],
-      },
-      // Commands reach an integration that owns a folder through `lib/setup` and the assessment.
-      // Each integration that moves to its own folder adds an entry.
-      {
-        import: "#lib/integrations/knip",
-        owners: ["src/lib", "src/commands/__tests__"],
-      },
-      {
-        import: "#lib/integrations/oxfmt",
-        owners: ["src/lib", "src/commands/__tests__"],
-      },
-      {
-        import: "#lib/integrations/sherif",
-        owners: ["src/lib"],
-      },
-      {
-        import: "#lib/integrations/typescript",
-        owners: ["src/lib"],
-      },
-      {
-        import: "#lib/integrations/vscode",
-        owners: ["src/lib"],
-      },
-      {
-        import: "#lib/integrations/zed",
-        owners: ["src/lib"],
-      },
-      {
-        import: "#lib/integrations/github",
-        owners: ["src/lib"],
-      },
-      {
-        import: "#lib/integrations/agents",
-        owners: ["src/lib", "src/commands/__tests__", "src/__tests__"],
+        import: "#lib/integrations",
+        owners: ["src/lib", "src/terminal", "src/commands/init", "src/oxlint.ts", "scripts", tests],
       },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
@@ -134,15 +89,7 @@ export default defineConfig({
       },
       // Only `init` and `update` write the lockfile and the managed files, through `lib/setup` and
       // the backend that they share. The terminal prints what Setup wrote.
-      {
-        import: "#lib/setup",
-        owners: [
-          "src/commands/setup.ts",
-          "src/commands/__tests__",
-          "src/lib/setup/__tests__",
-          "src/terminal/setup.ts",
-        ],
-      },
+      { import: "#lib/setup", owners: ["src/commands/setup.ts", "src/terminal/setup.ts", tests] },
       // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
       // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
       // `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, a trial writes
@@ -158,7 +105,7 @@ export default defineConfig({
           "src/lib/hardening/trial.ts",
           "src/lib/hardening/oxlint.ts",
           "src/lib/integrations/oxlint/probe.ts",
-          "src/lib/shared/__tests__/filesystem.test.ts",
+          tests,
         ],
       },
       // A command that reads the workspace outside an assessment reads it one time for each phase,
@@ -171,23 +118,16 @@ export default defineConfig({
           "src/lib/project/project.ts",
           "src/commands/harden.ts",
           "src/commands/rule.ts",
-          "src/lib/project/__tests__/monorepo.test.ts",
+          tests,
         ],
       },
       // `Cwd` reads the working directory in one place, so a test provides the folder instead of
       // changing the process. `eslint/no-restricted-properties` rejects `process.cwd` elsewhere.
-      {
-        import: "node:process",
-        names: ["chdir", "cwd"],
-        owners: ["src/lib/shared/cwd.ts"],
-      },
+      { import: "node:process", names: ["chdir", "cwd"], owners: ["src/lib/shared/cwd.ts"] },
       // The package builds the presets apart from the CLI, so no file below `presets/` imports
       // `src/`, tests included. A path module also covers each import that resolves into it, such
       // as `#lib/...`.
-      {
-        import: "./src",
-        owners: ["src", "scripts"],
-      },
+      { import: "./src", owners: ["src", "scripts"] },
     ],
     // Each scope states its dependency graph. Child maps keep their own settings and checks.
     // See "Layers" in docs/architecture.md.

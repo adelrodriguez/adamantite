@@ -87,11 +87,10 @@ The folders inside the layers belong to the layer that holds them:
 
 - Only `src` and `scripts` import a module of `src`, so no preset and no preset test imports the
   CLI code.
-- Only `src/lib` and the tests import an integration folder. `init` also imports
-  `integrations/oxlint` for the preset catalog, and the Oxlint entry imports it for the runtime.
+- Only `src/lib` and the tests import `#lib/integrations`. The terminal imports its types, `init`
+  imports the preset catalog, and the Oxlint entry and the build check load the Oxlint runtime.
   The other commands go through `lib/setup`, the assessment, and Toolchain.
-- Only `src/commands/setup.ts`, `src/commands/update.ts`, and `src/terminal/setup.ts` import
-  `#lib/setup`.
+- Only `src/commands/setup.ts`, `src/terminal/setup.ts`, and the tests import `#lib/setup`.
 - Only `lib/setup` imports the file writers of `src/lib/shared/filesystem.ts`, besides the writers
   of files outside the managed files: `rule add` writes a custom rule stub, the VS Code
   integration's `prepare` writes the Effect SDK copy in `node_modules`, a trial writes in a

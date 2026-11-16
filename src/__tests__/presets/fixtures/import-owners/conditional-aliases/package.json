@@ -1,0 +1,11 @@
+{
+  "name": "fixture-conditional-aliases",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#dual": {
+      "require": "./src/high/api.ts",
+      "default": "./src/low/api.ts"
+    }
+  }
+}

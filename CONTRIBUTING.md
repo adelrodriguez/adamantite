@@ -34,8 +34,8 @@ pnpm run test:unit     # Run only the tests that start no process.
 pnpm run test:presets  # Run only the tests that start real processes, such as Oxlint.
 pnpm run test:build    # Build the package and verify the packaged CLI.
 pnpm run test:watch    # Rerun tests when files change.
-pnpm run check         # Check lint rules and TypeScript types.
-pnpm run fix           # Apply safe lint fixes.
+pnpm run check         # Build the CLI, then check formatting, lint rules, and TypeScript types.
+pnpm run fix           # Build the CLI, then apply safe lint fixes and format files.
 pnpm run format        # Format repository files.
 pnpm run analyze       # Find unused files, exports, and dependencies.
 pnpm run bump:deps     # Select package dependency updates manually.

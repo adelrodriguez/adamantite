@@ -28,15 +28,15 @@ Read [CODING_STANDARDS.md](CODING_STANDARDS.md) for coding choices that require 
 
 ```sh
 pnpm run build         # Bundle the CLI and published presets into dist.
+pnpm run build:missing # Build only when dist has no build.
 pnpm run dev           # Rebuild when source files change.
 pnpm run test          # Run the Vitest suite: the unit and presets projects.
 pnpm run test:unit     # Run only the tests that start no process.
 pnpm run test:presets  # Run only the tests that start real processes, such as Oxlint.
-pnpm run test:build    # Build the package and verify the packaged CLI.
+pnpm run test:build    # Verify the built package and CLI.
 pnpm run test:watch    # Rerun tests when files change.
 pnpm run check         # Check formatting, lint rules, and TypeScript types with the built CLI.
 pnpm run fix           # Apply safe lint fixes and format files with the built CLI.
-pnpm run format        # Format repository files.
 pnpm run analyze       # Find unused files, exports, and dependencies.
 pnpm run bump:deps     # Select package dependency updates manually.
 ```
@@ -49,8 +49,9 @@ node bin/adamantite --help
 node bin/adamantite doctor
 ```
 
-`pnpm run check` and `pnpm run fix` build the CLI only when `dist` has no build. After you change
-the CLI, run `pnpm run build`, or keep `pnpm run dev` running, so that they run your change.
+`check`, `fix`, `test:build`, and `test:smoke` run `build:missing` first, so they build the CLI only
+when `dist` has no build. After you change the CLI, run `pnpm run build`, or keep `pnpm run dev`
+running, so that they run your change.
 
 Build and verify the packaged CLI:
 
@@ -103,7 +104,6 @@ Run the full repository workflow before you open a pull request:
 pnpm run test
 pnpm run check
 pnpm run fix
-pnpm run format
 ```
 
 The first-party rules and the probe plugin must work with each Oxlint version that

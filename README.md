@@ -937,6 +937,11 @@ Each layer's `imports` list names siblings, and permissions are transitive. Put 
 in that layer's `layers` property. Its root derives from the containing folder, and its
 settings remain local. Every containing map checks the file independently.
 
+Doctor warns when an Oxlint config states import layers by hand, in two or more
+`no-restricted-imports` overrides with `patterns`. The warning names the config and gives the
+steps that move those overrides into layer maps. A warning fails no Doctor gate, so Doctor still
+exits 0 when nothing else remains.
+
 You can also select it during setup with
 `adamantite init --non-interactive --script check --preset architecture`.
 

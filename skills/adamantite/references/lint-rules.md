@@ -77,6 +77,9 @@ explicitly when resolution needs them. The rule does not read tsconfig `customCo
 An unresolved import is not checked. A folder missing from the map is reported. Move a
 loose root file into a layer or declare it as an entry.
 
+When Doctor warns that a config states import layers by hand in `no-restricted-imports`
+overrides, follow the steps in the warning to state those layers in layer maps.
+
 Place child settings beside the child's `layers`. Settings do not inherit. A parent's
 `ignore`, `entries`, or `ignoreTypes` does not skip child checks. A child root uses the
 parent's actual matched folder, including when the top root is a glob. Declare each

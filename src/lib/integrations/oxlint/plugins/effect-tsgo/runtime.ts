@@ -10,9 +10,10 @@ import {
   BindingOverride,
   type NativeOverride,
 } from "#lib/integrations/oxlint/plugins/base.ts"
-import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import {
+  EffectBridgeMissing,
   EffectBuildMissing,
   EffectPlatformUnsupported,
   PackageNotInstalled,
@@ -116,9 +117,18 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
     (file) => file.endsWith(".node")
   )
 
+  // The bridge swaps Oxlint's stock binding for the file in `EFFECT_TSGO_OXLINT_BINDING` through
+  // `process.dlopen`, so every other napi-rs binding, such as `oxc-resolver` in a JS plugin, loads
+  // unchanged.
+  const bridge = yield* (yield* ModuleResolver).resolve(project, `${NAME}/oxlint-bridge`)
+
+  if (Option.isNone(bridge)) {
+    return yield* new EffectBridgeMissing({ effectVersion })
+  }
+
   // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.
   return [
-    new BindingOverride({ path: binding }),
+    new BindingOverride({ env: { EFFECT_TSGO_OXLINT_BINDING: binding }, preload: bridge.value }),
     new BackendOverride({
       env: { EFFECT_TSGO_TSGOLINT_MODE: "tsrs", EFFECT_TSGO_TSGOLINT_PATH: backend },
     }),

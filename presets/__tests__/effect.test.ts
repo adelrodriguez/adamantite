@@ -226,9 +226,9 @@ describe("effect preset", () => {
     ])
   })
 
-  // The Effect binding loads through `NAPI_RS_NATIVE_LIBRARY_PATH`, which every napi-rs package
-  // reads. The plugin loads the binding of `oxfmt`, which the entry does not load itself, so the
-  // plugin fails to load when the variable outlives the Oxlint binding.
+  // The Effect bridge swaps only Oxlint's binding. The plugin loads the binding of `oxfmt`, so it
+  // fails to load when the swap also reaches other napi-rs packages, as a lasting
+  // `NAPI_RS_NATIVE_LIBRARY_PATH` does.
   it("load a JS plugin that loads a napi-rs package next to the Effect binding", () => {
     const diagnostics = lint(
       {

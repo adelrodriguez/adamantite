@@ -59,7 +59,6 @@ if (Result.isFailure(result)) {
 }
 
 const { backend, binding, oxlint } = result.success
-const importOxlint = (file: string) => import(pathToFileURL(join(oxlint, "dist", file)).href)
 
 // A tsrs backend owns `OXLINT_TSGOLINT_PATH`. Outside Windows, Oxlint finds the launcher itself, so an
 // inherited path, such as one to an old tsgolint, must not win over that search.
@@ -69,13 +68,10 @@ if (backend instanceof TsrsBackend) {
 
 Object.assign(process.env, toBackendEnv(backend))
 
-// Oxlint loads its binding from `NAPI_RS_NATIVE_LIBRARY_PATH` once, when `bindings.js` loads. Every
-// napi-rs package reads the same variable, such as `oxc-resolver` in a JS plugin, so it must not
-// outlive that load. JS plugins load later, through dynamic imports in `cli.js`.
+// The preload module of a plugin swaps the stock binding for the plugin's build when Oxlint loads it.
 if (binding instanceof ReplacedPart) {
-  process.env["NAPI_RS_NATIVE_LIBRARY_PATH"] = binding.path
-  await importOxlint("bindings.js")
-  delete process.env["NAPI_RS_NATIVE_LIBRARY_PATH"]
+  Object.assign(process.env, binding.env)
+  await import(pathToFileURL(binding.preload).href)
 }
 
-await importOxlint("cli.js")
+await import(pathToFileURL(join(oxlint, "dist", "cli.js")).href)

@@ -466,8 +466,12 @@ the Effect plugin replaces native parts, so no two overrides replace one part. A
 replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
 launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
-runs stock Oxlint. Only the entry `src/oxlint/index.ts` sets the variables and loads the binding and the
-CLI. It clears the temporary binding variable before JavaScript plugins load.
+runs stock Oxlint. Only the entry `src/oxlint/index.ts` sets the variables and loads the CLI. A
+binding override names a preload module and its variables. The Effect plugin names
+`@effect/tsgo/oxlint-bridge`, which swaps the installed `@oxlint/binding-*` file for the Effect build
+through `process.dlopen`, so every other napi-rs binding, such as `oxc-resolver` in a JavaScript
+plugin, loads unchanged. The bridge swaps only that installed file, so Doctor checks for the binding
+package also when a plugin replaces the binding.
 
 ## Type resets
 

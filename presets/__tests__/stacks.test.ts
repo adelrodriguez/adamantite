@@ -1,4 +1,5 @@
-import { join } from "node:path"
+import { readdirSync } from "node:fs"
+import { basename, join } from "node:path"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
@@ -12,14 +13,7 @@ import {
   RULE_FIXTURE_KINDS,
   type RuleFixture,
 } from "./rule-fixtures.ts"
-import {
-  type LintPreset,
-  listLintPresets,
-  listStackPresets,
-  listStacks,
-  STACK_OPTIONS,
-  STACKS,
-} from "./stacks.ts"
+import { type LintPreset, listStackPresets, listStacks, STACK_OPTIONS, STACKS } from "./stacks.ts"
 
 interface KnownReport {
   /**
@@ -136,8 +130,14 @@ function sortUnique(values: readonly string[]): string[] {
 }
 
 describe("stacks", () => {
+  // Each lint preset module besides core is published as `adamantite/lint/<name>`.
   it("have each lint preset in a stack", () => {
-    expect(sortUnique(Object.values(STACKS).flat())).toStrictEqual(sortUnique(listLintPresets()))
+    const presets = readdirSync(join(import.meta.dirname, "../lint"))
+      .filter((file) => file.endsWith(".ts"))
+      .map((file) => basename(file, ".ts"))
+      .filter((name) => name !== "core")
+
+    expect(sortUnique(Object.values(STACKS).flat())).toStrictEqual(sortUnique(presets))
   })
 })
 

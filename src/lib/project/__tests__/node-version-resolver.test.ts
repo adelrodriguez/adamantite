@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import {
   type FileSystemTestContext,
@@ -75,13 +74,10 @@ describe("NodeVersionResolver", () => {
     Effect.gen(function* () {
       const files = makeFiles({ "package.json": "{ not json" })
 
-      const result = yield* Effect.result(runResolve(files))
+      const error = yield* Effect.flip(runResolve(files))
 
-      expect(Result.isFailure(result)).toBe(true)
-
-      if (Result.isFailure(result)) {
-        expect(result.failure).toBeInstanceOf(FailedToParseFile)
-      }
+      expect(error).toBeInstanceOf(FailedToParseFile)
+      expect(error).toMatchObject({ path: `${ROOT}/package.json` })
     })
   )
 
@@ -306,7 +302,7 @@ describe("NodeVersionResolver", () => {
   )
 
   it.effect.prop(
-    "resolve without failing for arbitrary package.json JSON",
+    "resolve arbitrary package.json JSON, which declares no Node.js version, to the current LTS",
     { value: Schema.MutableJson },
     ({ value }) =>
       Effect.gen(function* () {
@@ -314,7 +310,7 @@ describe("NodeVersionResolver", () => {
 
         const source = yield* runResolve(files)
 
-        expect(["File", "Version"]).toContain(source._tag)
+        expect(source).toStrictEqual(new NodeVersion({ value: "lts/*" }))
       }),
     { arbitrary: { runs: 200 } }
   )

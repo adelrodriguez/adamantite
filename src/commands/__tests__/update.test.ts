@@ -4,10 +4,21 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import {
+  createDependencyInstallerTestContext,
+  createRunnerTestContext,
+  findingsLeft,
+  getFailure,
+  makeHandoffRunner,
+  makeLockfileFile,
+  nonProbeInvocations,
+  promptingLayer,
+  runCommand,
+} from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection } from "#__tests__/lifecycle.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
-import initCommand from "#commands/init/index.ts"
 import { Report } from "#commands/setup.ts"
 import updateCommand from "#commands/update.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
@@ -19,20 +30,6 @@ import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { FailedToInstallDependency, UnsupportedLockfile } from "#lib/shared/errors.ts"
-import {
-  createDependencyInstallerTestContext,
-  createRunnerTestContext,
-  findingsLeft,
-  getFailure,
-  hashContent,
-  makeHandoffRunner,
-  makeLockfileFile,
-  nonProbeInvocations,
-  promptingLayer,
-  readLockfile,
-  runCommand,
-} from "./command-test-helpers.ts"
-import { makeSelection } from "./lifecycle.ts"
 
 const effectTsgo = managedPlugin("@effect/tsgo")
 const shadcnLint = managedPlugin("@shadcn/lint")
@@ -47,6 +44,7 @@ function manifest(value: PackageJson): string {
 function makeEffectFiles(oxlintConfig: string) {
   return createFileSystemTestContext({
     files: {
+      ...makeLockfileFile(makeSelection({ presets: ["core", "effect"], scripts: ["check"] })),
       "oxlint.config.ts": oxlintConfig,
       "package.json": manifest({
         devDependencies: { "@effect/tsgo": effectTsgo.version, oxlint: "1.0.0" },
@@ -63,119 +61,60 @@ const CHECK_SELECTION = makeSelection({ presets: ["core"], scripts: ["check"] })
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 describe("update", () => {
-  it.effect(
-    "record the selection that init would record, and the files that equal the current render, in a project without a lockfile",
-    () =>
-      Effect.gen(function* () {
-        const initialized = createFileSystemTestContext({ files: { "package.json": manifest({}) } })
-        const installer = createDependencyInstallerTestContext()
-
-        const init = yield* runCommand(
-          initCommand,
-          [
-            "--non-interactive",
-            "--script",
-            "check",
-            "--script",
-            "analyze",
-            "--preset",
-            "react",
-            "--typescript",
-            "typescript",
-            "--editor",
-            "vscode",
-            "--github-actions",
-            "--agents",
-          ],
-          { files: initialized, layers: [installer.layer] }
-        )
-
-        expect(getFailure(init)).toStrictEqual(findingsLeft("init"))
-
-        // The project as an earlier version left it: no lockfile, and a Knip config that the user
-        // changed.
-        const files = createFileSystemTestContext({
-          files: Object.fromEntries(
-            initialized
-              .list()
-              .filter((file) => file !== LOCKFILE_PATH)
-              .map((file) => [file, initialized.read(file)])
-          ),
-        })
-
-        files.write("knip.config.ts", `${files.read("knip.config.ts")}// Changed by the user.\n`)
-
-        const exit = yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
-
-        expect(getFailure(exit)).toStrictEqual(findingsLeft("update"))
-
-        const recorded = readLockfile(initialized)
-
-        expect(recorded.written["knip.config.ts"]).toBe(
-          hashContent(initialized.read("knip.config.ts"))
-        )
-        expect(readLockfile(files)).toStrictEqual({
-          ...recorded,
-          written: Object.fromEntries(
-            Object.entries(recorded.written).filter(([file]) => file !== "knip.config.ts")
-          ),
-        })
-      })
-  )
-
-  // Inference reads the presets from the lint config, so a lockfile from a failed load would
-  // record a selection without them, and later updates would keep it.
-  it.effect(
-    "record no selection while the lint config fails to load, and infer it after the repair",
-    () =>
-      Effect.gen(function* () {
-        const config = toOxlintTsConfigContent(["vitest"])
-
-        const files = createFileSystemTestContext({
-          files: {
-            "oxlint.config.ts": `import "./missing.ts"\n${config}`,
-            "package.json": manifest({
-              devDependencies: { adamantite: "1.0.0" },
-              scripts: { check: "adamantite check" },
-            }),
-          },
-        })
-
-        const installer = createDependencyInstallerTestContext()
-        const logLines: unknown[] = []
-
-        const failed = yield* runCommand(updateCommand, ["--json"], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
-
-        expect({
-          failure: getFailure(failed),
-          findings: report.assessment.findings.map(({ id }) => id),
-          lockfile: files.exists(LOCKFILE_PATH),
-          setup: report.setup,
-        }).toStrictEqual({
-          failure: findingsLeft("update"),
-          findings: expect.arrayContaining(["invalid-oxlint-config"]),
-          lockfile: false,
-          setup: null,
-        })
-
-        files.write("oxlint.config.ts", config)
-
-        yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
-
-        expect(readLockfile(files).selection.presets).toStrictEqual(["core", "vitest"])
-      })
-  )
-
-  it.effect("change nothing in a project that Adamantite does not manage", () =>
+  // Without a lockfile, update has no selection, so it hands off the one finding.
+  it.effect("set up nothing without a lockfile, and report the finding that names init", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { knip: knip.version } }) },
+        files: {
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0" },
+            scripts: { check: "adamantite check" },
+          }),
+        },
+      })
+
+      const before = files.list()
+      const logLines: unknown[] = []
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = yield* runCommand(updateCommand, ["--json"], {
+        files,
+        layers: [installer.layer],
+        logLines,
+      })
+
+      const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
+
+      expect({
+        failure: getFailure(exit),
+        files: files.list(),
+        findings: report.assessment.findings.map(({ goal, id }) => ({ goal: goal[0], id })),
+        installs: installer.calls,
+        setup: report.setup,
+      }).toStrictEqual({
+        failure: findingsLeft("update"),
+        files: before,
+        findings: [
+          {
+            goal: `Run \`adamantite init\`. It sets up the project and writes \`${LOCKFILE_PATH}\`.`,
+            id: "lockfile-missing",
+          },
+        ],
+        installs: [],
+        setup: null,
+      })
+    })
+  )
+
+  it.effect("change nothing when the lockfile selects nothing", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ...makeLockfileFile(makeSelection({})),
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", knip: knip.version },
+          }),
+        },
       })
 
       const logLines: unknown[] = []
@@ -189,32 +128,40 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      // Without a terminal, update prints the warning report and no headings.
-      expect(logLines).toStrictEqual([
-        expect.stringMatching(
-          /^# Adamantite doctor warnings\n[\s\S]*No Adamantite-managed setup found\. Run `adamantite init`/u
-        ),
-      ])
+      // Without a terminal, update prints no headings.
+      expect(logLines).toStrictEqual(["✔ `.adamantite/adamantite-lock.json` updated. Commit it."])
     })
   )
 
   it.effect("leave a package alone when its range resolves to the managed version", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { knip: `^${knip.version}` } }) },
+        files: {
+          ...makeLockfileFile(makeSelection({ scripts: ["analyze"] })),
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", knip: `^${knip.version}` },
+            scripts: { analyze: "adamantite analyze" },
+          }),
+        },
       })
 
       const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
-      const exit = yield* runCommand(updateCommand, [], {
+      const exit = yield* runCommand(updateCommand, ["--json"], {
         files,
         layers: [installer.layer],
         logLines,
       })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls).toStrictEqual([])
+      const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
+
+      // An unreadable range would also install nothing, but it leaves a warning.
+      expect({
+        calls: installer.calls,
+        succeeded: Exit.isSuccess(exit),
+        warnings: report.assessment.warnings,
+      }).toStrictEqual({ calls: [], succeeded: true, warnings: [] })
     })
   )
 
@@ -222,6 +169,7 @@ describe("update", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          ...makeLockfileFile(makeSelection({ presets: ["core", "react"], scripts: ["check"] })),
           "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
           "package.json": manifest({
             devDependencies: { "@shadcn/lint": "0.1.0" },
@@ -245,6 +193,9 @@ describe("update", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          ...makeLockfileFile(
+            makeSelection({ presets: ["core", plugin.preset], scripts: ["check"] })
+          ),
           "oxlint.config.ts": toOxlintTsConfigContent([plugin.preset]),
           "package.json": manifest({
             devDependencies: { [plugin.name]: "0.1.0" },
@@ -340,13 +291,12 @@ describe("update", () => {
         files: { ...makeLockfileFile(CHECK_SELECTION), "package.json": manifest({}) },
       })
 
-      const installer = createDependencyInstallerTestContext({
-        addDevDependenciesError: new FailedToInstallDependency({ packages: ["oxlint"] }),
-      })
+      const error = new FailedToInstallDependency({ packages: ["oxlint"] })
+      const installer = createDependencyInstallerTestContext({ addDevDependenciesError: error })
 
       const exit = yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
 
-      expect(Exit.isFailure(exit)).toBe(true)
+      expect(getFailure(exit)).toBe(error)
     })
   )
 
@@ -354,6 +304,7 @@ describe("update", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          ...makeLockfileFile(makeSelection({ scripts: ["analyze"] })),
           // Knip loads the JSON config before `knip.config.ts`, so update writes no config.
           "knip.json": "{}\n",
           "package.json": manifest({
@@ -374,12 +325,11 @@ describe("update", () => {
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("update"))
       expect(logLines).toStrictEqual([
-        "● The project has no lockfile, so update records the setup that the project files show.",
         "● `analyze` script is up to date.",
-        "✔ `.adamantite/adamantite-lock.json` written. Commit it with the setup.",
+        "✔ `.adamantite/adamantite-lock.json` updated. Commit it.",
         // The lockfile selects no agent guidance, so Doctor checks no `AGENTS.md`.
         expect.stringMatching(
-          /^# Adamantite doctor findings\n[\s\S]*## 1\. Legacy knip configuration\n/u
+          /^# Adamantite doctor findings\n[\s\S]*## 1\. Conflicting knip configuration\n/u
         ),
       ])
     })
@@ -469,6 +419,7 @@ describe("update", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          ...makeLockfileFile(makeSelection({ scripts: ["analyze"] })),
           // Knip loads the JSON config before `knip.config.ts`, so update writes no config.
           "knip.json": "{}\n",
           "package.json": manifest({
@@ -496,7 +447,7 @@ describe("update", () => {
         lines: logLines.length,
         setup: report.setup,
       }).toStrictEqual({
-        findings: ["legacy-knip-config"],
+        findings: ["conflicting-knip-config"],
         lines: 1,
         setup: {
           files: [],
@@ -506,9 +457,7 @@ describe("update", () => {
         },
       })
       // The lines of the setup go to standard error, so standard output holds only the document.
-      expect(errorLines).toContain(
-        "✔ `.adamantite/adamantite-lock.json` written. Commit it with the setup."
-      )
+      expect(errorLines).toContain("✔ `.adamantite/adamantite-lock.json` updated. Commit it.")
     })
   )
 })

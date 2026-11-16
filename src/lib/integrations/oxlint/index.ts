@@ -23,17 +23,16 @@ import { findExcludedPresets } from "#lib/integrations/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
-import { isDiscoveryComplete } from "#lib/project/custom-rules/discover.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const CONFIG = {
-  legacy: [".oxlintrc.json"],
+  conflicting: [".oxlintrc.json"],
   path: "oxlint.config.ts",
   tool: "oxlint",
-  whyLegacyBlocks: "Oxlint loads no config when it finds both",
+  whyConflicting: "Oxlint loads no config when it finds both",
 } as const satisfies ConfigFile
 
 export const PACKAGE = { name: "oxlint", version: getDependencyVersion("oxlint") }
@@ -175,7 +174,7 @@ export default {
       const applied = listAppliedLintPresets(project)
 
       const missingPresetFindings =
-        Option.isSome(loaded) && isDiscoveryComplete(project.customRules)
+        Option.isSome(loaded) && project.customRules.unloadedConfigs.length === 0
           ? listPresets(selection)
               .filter((preset) => !applied.includes(preset))
               .map((preset) => toMissingPresetFinding(preset))
@@ -213,6 +212,5 @@ export default {
       .filter((plugin) => selection.presets.includes(plugin.preset))
       .map(({ name, version }) => ({ name, version })),
   ],
-  prepare: (_project: Project) => Effect.void,
   selected: ({ scripts }: Selection) => checkRunsTool(scripts, "oxlint"),
 } satisfies Integration

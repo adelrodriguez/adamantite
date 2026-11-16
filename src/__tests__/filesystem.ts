@@ -97,9 +97,12 @@ export function createFileSystemTestContext(options?: {
    * Directory symlinks, from an absolute link path to its target. A target resolves from the root.
    */
   readonly links?: Record<string, string>
+  /**
+   * The folder of the project, `/project` by default. `runCommand` runs a command in it.
+   */
   readonly root?: string
 }): FileSystemTestContext {
-  const root = options?.root ?? process.cwd()
+  const root = options?.root ?? "/project"
   const files = new Map<string, string>()
   const directories = new Set<string>([root])
   const readOnlyPaths = new Set<string>()

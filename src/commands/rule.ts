@@ -1,4 +1,3 @@
-import process from "node:process"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
@@ -18,7 +17,6 @@ import {
   TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
@@ -28,10 +26,12 @@ import {
 import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readProject } from "#lib/project/project.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
+import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -55,8 +55,8 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   ),
   Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const path = yield* Path.Path
-      const cwd = process.cwd()
       const relative = path.relative(cwd, path.resolve(cwd, file))
       const program = yield* Toolchain.ast({ cwd, file: relative })
 
@@ -76,7 +76,7 @@ const ruleName = Argument.String("name").pipe(
 const dir = Flag.String("dir").pipe(
   Flag.optional,
   Flag.withDescription(
-    `The rules folder, relative to the current directory. Default: ${CUSTOM_RULES_DIRECTORY}. Pass the folder that \`custom({ dir })\` loads, such as a rules folder in a monorepo tooling package`
+    `The rules folder, relative to the current directory. Default: ${DEFAULT_DIRECTORY}. Pass the folder that \`custom({ dir })\` loads, such as a rules folder in a monorepo tooling package`
   )
 )
 
@@ -91,8 +91,8 @@ const add = Command.make("add", { dir, name: ruleName }).pipe(
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const path = yield* Path.Path
-      const cwd = process.cwd()
       const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
       yield* Output.success(`Wrote ${path.relative(cwd, rulePath)}.`)
@@ -111,9 +111,9 @@ const addTest = Command.make("add", {
   Command.withDescription("Create a test for an existing rule. Omit the name to choose a rule"),
   Command.withHandler(({ dir, name, path: target }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const path = yield* Path.Path
-      const directory = Option.getOrElse(dir, () => CUSTOM_RULES_DIRECTORY)
-      const cwd = process.cwd()
+      const directory = Option.getOrElse(dir, () => DEFAULT_DIRECTORY)
       let selected = Option.getOrUndefined(name)
 
       if (selected === undefined) {
@@ -175,9 +175,9 @@ const test = Command.make("test", { path: testPath }).pipe(
   ),
   Command.withHandler(({ path: target }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const path = yield* Path.Path
       const runner = yield* CommandRunner
-      const cwd = process.cwd()
 
       if (Option.isSome(target)) {
         return yield* runner.run({
@@ -238,12 +238,6 @@ const current = Flag.Boolean("current").pipe(
   Flag.withDescription("Use the project's current rule setting to see what it reports")
 )
 
-function describeSetting(rule: string, setting: TrialSetting) {
-  return Schema.is(CurrentSetting)(setting)
-    ? `\`${rule}\` as the project config sets it`
-    : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
-}
-
 function isAsExpected(result: TrialCaseResult) {
   return result.diagnostics.length > 0 === (result.case.expected === "reported")
 }
@@ -257,6 +251,10 @@ export function renderTrial(
   results: readonly TrialCaseResult[]
 ): string {
   const configs = [...new Set(results.map((result) => `\`${result.config}\``))].join(", ")
+
+  const described = Schema.is(CurrentSetting)(setting)
+    ? `\`${rule}\` as the project config sets it`
+    : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
 
   const lines = results.map((result) => {
     const name = Option.match(result.case.source, {
@@ -287,13 +285,7 @@ export function renderTrial(
         ? "The case did not produce the expected result."
         : `${failures.toLocaleString("en-US")} of ${results.length.toLocaleString("en-US")} cases ${failures === 1 ? "is" : "are"} different from the expected result.`
 
-  return [
-    `Trial of ${describeSetting(rule, setting)}, in ${configs}.`,
-    "",
-    ...lines,
-    "",
-    summary,
-  ].join("\n")
+  return [`Trial of ${described}, in ${configs}.`, "", ...lines, "", summary].join("\n")
 }
 
 /**
@@ -318,8 +310,9 @@ const trial = Command.make("try", {
   Command.withDescription(
     "Test a rule against cases in a project copy. Exit codes: 0 for expected results, 1 for a mismatch, and 2 if a case could not be checked. Project files stay unchanged"
   ),
-  Command.withHandler((flags) =>
+  Command.withHandler(({ json, ...flags }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const { accept, current, options, report, rule } = flags
 
       const setting = current
@@ -340,8 +333,6 @@ const trial = Command.make("try", {
           ],
           { concurrency: 1 }
         )
-
-        const cwd = process.cwd()
 
         return yield* tryRule({ cases, cwd, rule, setting, workspace: yield* readWorkspace(cwd) })
       }).pipe(
@@ -373,7 +364,7 @@ const trial = Command.make("try", {
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       }
-    }).pipe(Mode.provide({ json: flags.json }))
+    }).pipe(Mode.provide({ json }))
   )
 )
 

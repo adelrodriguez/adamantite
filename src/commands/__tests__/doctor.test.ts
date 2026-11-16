@@ -8,16 +8,6 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import { TestClock } from "effect/testing"
 import type { Selection } from "#lib/project/selection.ts"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
-import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
-import doctorCommand, { Report } from "#commands/doctor.ts"
-import { codingAgents } from "#lib/handoff/coding-agents.ts"
-import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
-import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
-import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   createRunnerTestContext,
   findingsLeft,
@@ -28,7 +18,17 @@ import {
   promptingLayer,
   runCommand,
   SKILL_FILES,
-} from "./command-test-helpers.ts"
+} from "#__tests__/command-test-helpers.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
+import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
+import doctorCommand, { Report } from "#commands/doctor.ts"
+import { codingAgents } from "#lib/handoff/coding-agents.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
+import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -96,11 +96,6 @@ const FINDINGS_MARKDOWN = expect.stringMatching(
 const COPIED = "✔ The agent prompt is printed above and sent to the terminal clipboard."
 const FOUND_ISSUES = "⚠️ Doctor found issues."
 
-// No managed integration applies to a project that has only the adamantite package.
-const NO_INTEGRATION_FILES = {
-  "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
-}
-
 const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
 
 // What Oxlint prints for a config that imports a preset that the package does not export.
@@ -132,26 +127,6 @@ function runtimeListener() {
 
 describe("doctor", () => {
   it.effect.each([
-    {
-      files: NO_INTEGRATION_FILES,
-      layers: [],
-      lines: [
-        expect.stringMatching(
-          /^# Adamantite doctor warnings\n[\s\S]*- No Adamantite-managed setup found\. Run `adamantite init` to configure the project\.\n/u
-        ),
-      ],
-      name: "no managed integration applies in a non-interactive terminal",
-    },
-    {
-      files: NO_INTEGRATION_FILES,
-      layers: [promptingLayer],
-      lines: [
-        INTRO,
-        "▲ No Adamantite-managed setup found. Run `adamantite init` to configure the project.",
-        "✅ Doctor finished.",
-      ],
-      name: "no managed integration applies in an interactive terminal",
-    },
     {
       files: HEALTHY_FILES,
       layers: [],
@@ -272,6 +247,11 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          ...makeLockfileFile({
+            ...ANALYZE_SELECTION,
+            agents: false,
+            scripts: ["analyze", "check"],
+          }),
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: "github:webpro-nl/knip" },
             scripts: { analyze: "adamantite analyze", check: "adamantite check" },
@@ -792,7 +772,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("report the missing lockfile of a managed project", () =>
+  it.effect("report the missing lockfile as the only finding, and name init", () =>
     Effect.gen(function* () {
       const { [LOCKFILE_PATH]: _lockfile, ...files } = HEALTHY_FILES
       const logLines: unknown[] = []
@@ -803,11 +783,15 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        expect.stringMatching(
-          /^# Adamantite doctor findings\n[\s\S]*## 1\. Missing Adamantite lockfile\n[\s\S]*Run `adamantite update`/u
-        ),
+      expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+        [
+          "# Adamantite doctor findings",
+          "## 1. Missing Adamantite lockfile",
+          "## Verify",
+          "## Check the repair",
+        ],
       ])
+      expect(logLines).toStrictEqual([expect.stringContaining("Run `adamantite init`.")])
     })
   )
 

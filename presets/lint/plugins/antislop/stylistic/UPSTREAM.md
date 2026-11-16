@@ -25,7 +25,7 @@ The opinionated policy lives outside this directory in `../../rules/require-read
 
 Fetch an explicit upstream revision, compare the original rule and types against this revision, and port relevant fixes while retaining the adapters above. Update this record and preserve the license. Run `pnpm check` as required by repository guidance.
 
-Focused Oxlint RuleTester cases live in `presets/lint/plugins/antislop/__tests__/require-readable-spacing.test.ts`; they test exact fixes, JSDoc/trailing comments, same-line statements, semicolon-free code, TypeScript exports/overloads, Effect-style generators, and upstream removal behavior. `presets/__tests__/require-readable-spacing.test.ts` verifies the plugin through the Oxlint CLI on multiple files, including rejection, autofix, and repeated-fix stability. The complete upstream JS/TS test suites have not been ported; this is focused compatibility evidence, not a claim of full upstream conformance.
+Focused Oxlint RuleTester cases live in `presets/lint/plugins/antislop/__tests__/require-readable-spacing.test.ts`; they test exact fixes, JSDoc/trailing comments, same-line statements, semicolon-free code, TypeScript exports/overloads, Effect-style generators, and upstream removal behavior. The cases run with `recursive`, so each fixed output must stay the same under a second fix. The complete upstream JS/TS test suites have not been ported; this is focused compatibility evidence, not a claim of full upstream conformance.
 
 ## Adamantite changes
 

@@ -16,16 +16,15 @@ const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 const PROCESS_RUN_TESTS = [
   "presets/__tests__/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",
-  "src/commands/__tests__/formatted.test.ts",
-  "src/commands/__tests__/rule-ast.test.ts",
+  "src/__tests__/oxlint.test.ts",
   "src/__tests__/trial.test.ts",
-  "src/lib/integrations/oxfmt/__tests__/format-preset.test.ts",
+  "src/commands/__tests__/rule-ast.test.ts",
   "src/lib/hardening/__tests__/suppressions.test.ts",
   "src/lib/integrations/oxlint/__tests__/config-load.test.ts",
-  "src/lib/integrations/oxlint/__tests__/entry.test.ts",
   "src/lib/project/__tests__/config-loader.test.ts",
-  "src/lib/toolchain/__tests__/idioms.test.ts",
   "src/lib/project/custom-rules/__tests__/stub.test.ts",
+  "src/lib/setup/__tests__/format.test.ts",
+  "src/lib/toolchain/__tests__/idioms.test.ts",
 ]
 
 // Fixtures are code that the preset tests lint, not tests of this repository. Vitest cannot run some

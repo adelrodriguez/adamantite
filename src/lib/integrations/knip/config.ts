@@ -5,10 +5,11 @@ import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { IDENTITY_KEY, PresetIdentity } from "#lib/project/config-loader.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
+import { ignoreDependencies } from "#presets/analyze.ts"
 
 const ANALYZE_PRESET_MODULE = publicImport("./analyze")
 
-export interface KnipWorkspace {
+interface KnipWorkspace {
   readonly isMonorepo: boolean
   /**
    * Whether the selection includes the `effect` preset, which names the `@effect/language-service`
@@ -21,18 +22,11 @@ export interface KnipWorkspace {
  * The `ignoreDependencies` lists of `adamantite/analyze`, in the order that a generated config
  * spreads them.
  */
-const IGNORE_LISTS = ["monorepo", "effect"] as const
+const IGNORE_LISTS = ["monorepo", "effect"] as const satisfies ReadonlyArray<
+  keyof typeof ignoreDependencies
+>
 
 type IgnoreList = (typeof IGNORE_LISTS)[number]
-
-/**
- * The entries of each list. A test keeps them equal to `ignoreDependencies` in
- * `presets/analyze.ts`.
- */
-export const IGNORED_ENTRIES = {
-  effect: ["@effect/language-service"],
-  monorepo: ["sherif"],
-} as const satisfies Record<IgnoreList, readonly string[]>
 
 const IS_REQUIRED = {
   effect: (workspace) => workspace.usesEffectPreset,
@@ -64,9 +58,9 @@ export const KnipConfig = Schema.Struct({
 
 export type KnipConfig = typeof KnipConfig.Type
 
-function checkIgnoresList({ ignoreDependencies = [] }: KnipConfig, list: IgnoreList) {
-  return IGNORED_ENTRIES[list].every((entry) =>
-    ignoreDependencies.some((ignored) =>
+function checkIgnoresList(config: KnipConfig, list: IgnoreList) {
+  return ignoreDependencies[list].every((entry) =>
+    (config.ignoreDependencies ?? []).some((ignored) =>
       Predicate.isString(ignored)
         ? ignored === entry
         : new RegExp(ignored.$regexp, ignored.flags).test(entry)

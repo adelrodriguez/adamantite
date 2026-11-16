@@ -102,7 +102,7 @@ export default defineConfig({
       },
       {
         import: "#lib/integrations/sherif",
-        owners: ["src/lib", "src/commands/__tests__"],
+        owners: ["src/lib"],
       },
       {
         import: "#lib/integrations/typescript",
@@ -122,7 +122,7 @@ export default defineConfig({
       },
       {
         import: "#lib/integrations/agents",
-        owners: ["src/lib", "src/commands/__tests__"],
+        owners: ["src/lib", "src/commands/__tests__", "src/__tests__"],
       },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
@@ -133,14 +133,13 @@ export default defineConfig({
         owners: ["src/lib/project/project.ts", "src/lib/hardening/index.ts"],
       },
       // Only `init` and `update` write the lockfile and the managed files, through `lib/setup` and
-      // the backend that they share. Update reads the selection that the project files show. The
-      // terminal prints what Setup wrote.
+      // the backend that they share. The terminal prints what Setup wrote.
       {
         import: "#lib/setup",
         owners: [
           "src/commands/setup.ts",
-          "src/commands/update.ts",
           "src/commands/__tests__",
+          "src/lib/setup/__tests__",
           "src/terminal/setup.ts",
         ],
       },
@@ -151,7 +150,7 @@ export default defineConfig({
       // to a temporary folder.
       {
         import: "#lib/shared/filesystem.ts",
-        names: ["ensureDirectory", "writeFile", "writeJsonFile"],
+        names: ["ensureDirectory", "writeFile"],
         owners: [
           "src/lib/setup",
           "src/lib/project/custom-rules/index.ts",
@@ -174,6 +173,13 @@ export default defineConfig({
           "src/commands/rule.ts",
           "src/lib/project/__tests__/monorepo.test.ts",
         ],
+      },
+      // `Cwd` reads the working directory in one place, so a test provides the folder instead of
+      // changing the process. `eslint/no-restricted-properties` rejects `process.cwd` elsewhere.
+      {
+        import: "node:process",
+        names: ["chdir", "cwd"],
+        owners: ["src/lib/shared/cwd.ts"],
       },
       // The package builds the presets apart from the CLI, so no file below `presets/` imports
       // `src/`, tests included. A path module also covers each import that resolves into it, such
@@ -250,6 +256,22 @@ export default defineConfig({
           shared: { imports: [] },
         },
         root: "presets/lint/plugins",
+      },
+    ],
+    // Commands read the working directory with `yield* Cwd`, and tests provide it. `Cwd` takes it
+    // from its named `cwd` import, which `adamantite/import-owners` allows only there.
+    "eslint/no-restricted-properties": [
+      "error",
+      {
+        message: "Read the working directory with `yield* Cwd` from `#lib/shared/cwd.ts`.",
+        object: "process",
+        property: "cwd",
+      },
+      {
+        message:
+          "Provide `Cwd` from `#lib/shared/cwd.ts` instead of changing the working directory.",
+        object: "process",
+        property: "chdir",
       },
     ],
     // A `?raw` import gives the source text of a module, not the module, so a test can import both.

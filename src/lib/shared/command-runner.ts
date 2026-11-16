@@ -67,7 +67,7 @@ const printHeading = (title: string, command: string) =>
  * Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
  * `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
  */
-const quietNodeOptions = () =>
+export const quietNodeOptions = () =>
   [process.env["NODE_OPTIONS"], "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"]
     .filter(Boolean)
     .join(" ")

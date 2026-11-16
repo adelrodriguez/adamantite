@@ -1,4 +1,3 @@
-import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
@@ -7,6 +6,7 @@ import {
   readAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
@@ -26,7 +26,7 @@ export default Command.make("doctor", { json: Mode.json }).pipe(
   Command.withDescription("Check Adamantite setup and report what needs repair"),
   Command.withHandler(({ json }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
 
       yield* Output.intro("💠 adamantite doctor")
 

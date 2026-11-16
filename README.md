@@ -138,8 +138,7 @@ Without one, they print the Markdown repair prompt. `--json` sets up from the fl
 The GitHub Actions workflow, `.github/workflows/adamantite.yml`, runs the `check` and `analyze`
 scripts that you select. It is a managed file: `init` and `update` replace it while it holds what
 Adamantite wrote, and keep it once you change it, such as to add your own jobs. Doctor then checks
-that a job runs each selected script. A workflow that an earlier release wrote and you renamed
-stays as it is, and Adamantite writes no second workflow beside it.
+that a job runs each selected script.
 Agents verify custom rules with temporary cases while they work. CI runs the rules through
 `check` by default. Users can add an explicit `adamantite rule test` step for optional saved tests.
 Init preserves a workflow with an explicit rule-test command, including its setup and other settings.
@@ -169,7 +168,7 @@ breaks the setup, such as a missing extension recommendation. A file that the se
 needs is deleted when nobody changed it.
 
 The `tsconfig.json` extends the selected preset, and adds the Effect language service entry for
-the `effect` preset. A project that keeps a legacy JSON config, such as `.oxlintrc.json`,
+the `effect` preset. A project that keeps a tool's own JSON config, such as `.oxlintrc.json`,
 `.oxfmtrc.json`, or `knip.json`, gets no TypeScript config beside it, because the tool would not
 load both, and Doctor reports the migration. `.vscode/extensions.json` recommends the Oxc
 extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
@@ -271,8 +270,8 @@ adamantite analyze --only monorepo --fix -- --select highest
 Assess every integration of the setup. Doctor is read-only. Each finding describes
 the current state, the goal state, and how to verify the repair. Doctor checks each integration
 that the lockfile selects, so a selected integration whose file is missing or wrong gets a
-finding. A project without a lockfile gets one finding that says to run `adamantite update`, and
-Doctor checks the integrations whose files exist. Doctor also checks that the
+finding. A project without a lockfile gets one finding that says to run `adamantite init`, and
+Doctor checks nothing else. Doctor also checks that the
 installed packages can run Oxlint: each declared package is installed, and `@effect/tsgo` has
 a build for the installed Oxlint, tsrs, and platform. It starts no tool for this check.
 
@@ -349,11 +348,10 @@ from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry
 when findings remain after it, and offers their repair as `init` does.
 It also writes the managed files of the recorded setup, such as the
 [Adamantite skill](#agent-skill), that are missing or unchanged since Adamantite wrote them,
-and writes the lockfile again with the installed version. In a project that an earlier version
-set up, `update` writes the lockfile one time with the setup that the project files show: the
-managed scripts, the presets that `oxlint.config.ts` imports, the TypeScript preset that a
-`tsconfig.json` extends, the editor settings and the workflow that exist, and the Adamantite
-section of `AGENTS.md`.
+and writes the lockfile again with the installed version. A project without a lockfile, such as
+one that an Adamantite version before the lockfile set up, has no recorded setup, so `update`
+changes nothing and reports one finding: run `adamantite init`. `init` keeps each existing file
+that differs from what it writes, and Doctor then reports the changes that break the setup.
 
 ### `adamantite rule`
 
@@ -1143,13 +1141,6 @@ For another rules folder or a custom test `--path`, use its path in the exclusio
 type-check tests that import `.ts` rule files, enable `compilerOptions.allowImportingTsExtensions`
 in `tsconfig.json`. To check the hidden rules folder too, add `.adamantite/lint` to `include`.
 
-To keep an existing `.adamantite/rules` folder, set `custom({ dir: ".adamantite/rules" })`
-and use `rule add --dir .adamantite/rules`. You can instead move the folder to
-`.adamantite/lint`. The previous `adamantite/lint/custom` import and named authoring imports
-from `adamantite/rules` are removed. Import `custom` from `adamantite/rules` and the
-authoring helpers and types from `adamantite/rules/plugin`. Run `adamantite doctor` for
-migration instructions. Doctor reports the old imports and default folder without changing files.
-
 Rule files run with Node.js type stripping, so use erasable TypeScript only: no `enum`,
 `namespace` with values, or parameter properties. Rules get no type information. A rule
 that throws prints an error for each file, and the lint run still exits 0. Adamantite owns
@@ -1160,8 +1151,8 @@ projects, and remove their temporary verification cases and fixtures before hand
 runtime helpers stay in the target project. The "Custom rules" section of the
 [Adamantite skill](#agent-skill) has the command and the full authoring guidance.
 
-`adamantite doctor` reports a rules folder that no `custom()` call loads, also at the previous
-default path `.adamantite/rules`, a `dir` that names a folder that does not exist, and two rules
+`adamantite doctor` reports a rules folder that no `custom()` call loads, a `dir` that names a
+folder that does not exist, and two rules
 folders that use the same plugin name. A rule file that cannot load stops the whole lint run, and
 Doctor reports the error that Oxlint prints. User-owned saved tests and optional CI steps remain
 supported.

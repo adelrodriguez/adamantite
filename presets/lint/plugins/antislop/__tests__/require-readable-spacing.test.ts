@@ -11,7 +11,13 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+// `recursive` fixes each output again until no fix applies, so a case fails when a second fix would
+// change the code that the first fix wrote.
+const tester = new RuleTester({
+  languageOptions: { parserOptions: { lang: "ts" } },
+  recursive: true,
+})
+
 const error = { messageId: "expectedBlankLine" }
 
 /**

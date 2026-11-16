@@ -192,9 +192,9 @@ change that breaks the setup as findings, without changing the project.
 _Avoid_: Fix, update, detect
 
 **Doctor**:
-Assess the target project against the selection in its lockfile, or the one that its files show
-without a lockfile, report the findings, and offer one combined repair prompt through
-`Resolution.offer`.
+Assess the target project against the selection in its lockfile, report the findings, and offer
+one combined repair prompt through `Resolution.offer`. A project without a lockfile gets one
+finding, which says to run `adamantite init`.
 _Avoid_: Check, fix, update
 
 ## Hardening

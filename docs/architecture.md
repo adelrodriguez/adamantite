@@ -10,6 +10,12 @@ domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 options. Command modules validate command-specific input, obtain Effect services, and
 invoke target-project operations.
 
+A command runs in the target project, the folder that `yield* Cwd` gives. `Cwd` in
+`src/lib/shared/cwd.ts` is a `Context.Reference` that reads the working directory of the process,
+and a test provides the folder instead of changing the process. Lib code takes the folder as a
+`cwd` parameter. `eslint/no-restricted-properties` and `adamantite/import-owners` reject every
+other read of the working directory.
+
 `@effect/platform-node` supplies the production filesystem, path, process, and terminal
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
@@ -46,7 +52,7 @@ disagree.
 | `src/lib/integrations` | Hold the `Integration` list and one folder for each integration: its packages, its managed files, its `assess`, and its command builder.                                                     | `handoff`, `project` |
 | `src/lib/handoff`      | Detect the installed coding agent CLIs, and hand the terminal to one of them.                                                                                                                | `shared`             |
 | `src/lib/project`      | Read the target project: `package.json`, the workspace, the lockfile and its selection, the configs through the config loader, and the custom rules. Detect the package manager and install. | `shared`             |
-| `src/lib/shared`       | Define errors, filesystem and JSON helpers, the command runner, the forwarded arguments, the public imports, and templates.                                                                  | None                 |
+| `src/lib/shared`       | Define errors, filesystem and JSON helpers, the command runner, the working directory, the forwarded arguments, the public imports, and templates.                                           | None                 |
 
 `setup`, `assessment`, `toolchain`, and `hardening` are siblings above `integrations`, so none of
 them imports another. `assessment` does not import `hardening`, because harden is not an
@@ -109,7 +115,7 @@ export interface Integration<E = unknown, R = unknown> {
   ) => Effect.Effect<readonly ManagedFile[], E, R>
   readonly name: string
   readonly packages: (project: Project, selection: Selection) => readonly ToolingPackage[]
-  readonly prepare: (project: Project) => Effect.Effect<void, E, R>
+  readonly prepare?: (project: Project) => Effect.Effect<void, E, R>
   readonly selected: (selection: Selection) => boolean
 }
 ```
@@ -119,8 +125,8 @@ export interface Integration<E = unknown, R = unknown> {
 - `packages` lists the packages to install at their managed versions. The Oxlint integration
   installs Oxlint, tsrs, and the managed plugin of each selected preset.
 - `files` renders the managed files whole, such as `.vscode/extensions.json`.
-- `prepare` builds what the integration needs outside the committed files, after the install,
-  such as the Effect SDK copy in `node_modules`.
+- `prepare`, which only `vscode` has, builds what the integration needs outside the committed
+  files, after the install, such as the Effect SDK copy in `node_modules`.
 - `assess` reads the project and returns its findings, warnings, and package actions. It never
   writes. A file that the user changed gets a finding only when the change breaks the setup.
 
@@ -131,7 +137,7 @@ in `oxlint/custom.ts`, the managed plugins in `oxlint/plugins/managed.ts`, and `
 installs their packages.
 
 `config-file.ts` holds the findings of a managed tool config that Oxlint, Oxfmt, and Knip share:
-a legacy JSON config, a missing config, and a config that does not load. `tooling/base.ts` holds the
+a conflicting JSON config, a missing config, and a config that does not load. `tooling/base.ts` holds the
 package checks that several tools share. Helper modules beside an integration, such as
 `knip/config.ts`, hold the logic that only that integration uses. Oxlint, Oxfmt, Knip, and Sherif
 also have command builders in `command.ts`, which return `CommandRunOptions` and start no process.
@@ -152,8 +158,8 @@ files.
 ## Setup and the write rule
 
 `init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
-or the flags and adds it to the recorded selection. `update` takes it from the lockfile, or from
-`inferSelection` in `integrations/selection.ts` once when there is no lockfile. Both hand it to
+or the flags and adds it to the recorded selection. `update` takes it from the lockfile. Without a
+lockfile, `update` runs no setup and offers the `lockfile-missing` finding. Both hand the selection to
 `applySetup` in `src/commands/setup.ts`, which runs `Setup.apply` from `src/lib/setup/`, prints
 what it did through `src/terminal/setup.ts`, and offers the repair of the findings that remain
 through `Resolution.offer`. Both exit 1 while findings remain.
@@ -164,7 +170,7 @@ the selection includes, and does these steps in order:
 1. Install `adamantite`, when the project does not depend on it, and the packages of every selected
    integration in one install. It installs only the packages that `package.json` does not declare
    at the managed version, and leaves a pnpm catalog entry to the integration's finding.
-2. Run each `prepare`.
+2. Run the `prepare` of each integration that has one.
 3. Render the managed files, and format each one with the project's Oxfmt from stdin, with the
    project's Oxfmt config, or with a copy of the format preset in a temporary folder when the
    project has none. A project without Oxfmt gets the file as rendered. A config that Oxfmt cannot
@@ -186,8 +192,8 @@ gets a `FileWrite`:
 - `Deleted` when the selection no longer renders it and its hash still matched.
 
 Formatting makes `adamantite fix` leave each written file unchanged, so its hash still matches on
-the next run. In a project without a lockfile, a file that an earlier version wrote gets a hash
-only when it equals what this version renders.
+the next run. In a project without a lockfile, a file that already exists gets a hash only when it
+equals what this version renders.
 
 A managed script is the one exception to whole files. `apply` sets each selected `check`, `fix`, or
 `analyze` key of the root `package.json` to its command, overwrites what it held, and returns a
@@ -220,14 +226,13 @@ custom rules that the Oxlint configs load, and each integration's `assess` takes
 that reads the workspace outside an assessment, such as `harden` or `rule try`, reads it one time for
 each phase and passes the `Workspace` down.
 
-`assessProject` in `src/lib/assessment/` runs each integration that the selection includes. With a
-lockfile, the selection is the recorded one, so a selected integration whose file is missing gets a
-finding. Without one, it is the selection that `inferSelection` reads from the project files, and
-the assessment adds one `lockfile-missing` finding when any integration applies. Doctor catches
-`UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
+`assessProject` in `src/lib/assessment/` runs each integration that the lockfile's selection
+includes, so a selected integration whose file is missing gets a finding. A project without a
+lockfile gets the `lockfile-missing` finding alone, which says to run `adamantite init`. Doctor
+catches `UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
 `invalid-lockfile` finding alone, because the other assessments need the selection. A project that
-does not declare `adamantite` gets the `adamantite-not-installed` finding alone, and an unmanaged
-project gets a warning, so both go through the same offer.
+does not declare `adamantite` gets the `adamantite-not-installed` finding alone, so each case goes
+through the same offer.
 
 ```mermaid
 flowchart TD
@@ -335,9 +340,9 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   without the section, and a skill copy that differs from the bundled skill.
 - `doctor` assesses the integrations, reports the findings, and offers their repair through
   `Resolution.offer`, which assesses again after a handoff. The Oxlint assessment resolves the
-  same runtime as the entry and reports missing installed packages, unsupported native builds or
-  platforms, and conflicting overrides. Resolution neither launches a tool nor changes files or
-  process variables. Unexpected read and parse failures still propagate.
+  same runtime as the entry and reports missing installed packages, and unsupported native builds
+  or platforms. Resolution neither launches a tool nor changes files or process variables.
+  Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through `Resolution.offer`. Its `verify` runs
   Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
@@ -354,10 +359,8 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   its `readProject` after the session, because the agent can change the project. The functions in
   `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
 - `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
-  project without a lockfile, `inferSelection` reads the selection one time from the same files
-  that Doctor applies the integrations to without one. While the root `oxlint.config.ts` does not
-  load, the selection misses the lint presets, so `update` runs no setup, records no lockfile, and
-  offers the repair of the load finding. `update` does not edit `skills-lock.json`,
+  project without a lockfile, it runs no setup and offers the `lockfile-missing` finding, which
+  says to run `adamantite init`. `update` does not edit `skills-lock.json`,
   which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
   finding.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,
@@ -460,9 +463,9 @@ overrides when the target project installs `@effect/tsgo`. The installed package
 Effect builds on, so nested configs and relative preset imports get them too. The managed
 package requirement depends on the root config import instead.
 
-`oxlint/runtime.ts` resolves the installed Oxlint package and applies the native
-overrides. Two overrides for the same part fail with `NativeRuntimeConflict`. A backend
-override replaces all default backend variables. Without a backend override, Oxlint starts the
+`oxlint/runtime.ts` resolves the installed Oxlint package and applies the native overrides. Only
+the Effect plugin replaces native parts, so no two overrides replace one part. A backend override
+replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
 launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
 runs stock Oxlint. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
@@ -560,8 +563,8 @@ effect.
 The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and the rules in
 `presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Their rules follow the same conventions as the
-`adamantite` rules. `presets/__tests__/require-readable-spacing.test.ts` runs the spacing fix
-through the Oxlint CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
+`adamantite` rules. The RuleTester cases of `require-readable-spacing` fix each output again with
+`recursive`, so a fix that a second run would change fails. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship. Adamantite shipped both plugins as vendored bundles before.
@@ -606,8 +609,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   `adamantite/rules/plugin`, defines `definePlugin` and `defineRule`, which return their
   argument, and re-exports all authoring types from `@oxlint/plugins`. The build inlines those
   types into the published declarations, so `@oxlint/plugins` stays a devDependency. `presets/rules/folder.ts` says what a rules folder
-  holds: the default folder and plugin name, and which files are rules. Both `custom()` and
-  `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
+  holds: the default folder and plugin name, and which files are rules. `custom()`, `loadRules`,
+  and the CLI read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
   `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with
   the test types in its namespace, connected to `node:test`.
 - `src/lib/project/custom-rules/` holds the target project's custom-rules state. `discover.ts`
@@ -616,8 +619,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   folder, the plugin name, and the calling file. A call in a module that the config imports counts,
   and a call that no config reaches loads no rules. A config that does not load leaves the
   discovery incomplete, and Doctor and `rule test` warn about it. `harden` uses it too, to list the
-  configs and rules folders in its prompt. `folder.ts` keeps its own copy of the rule file test and
-  the defaults, and a unit test keeps them equal to `presets/rules/folder.ts`.
+  configs and rules folders in its prompt. The CLI imports the default folder and the rule file
+  test from `presets/rules/folder.ts`.
   `index.ts` writes only the rule stub for `adamantite rule add`, from the template beside it.
   It also lists existing rules for `rule test add`, writes an optional sibling `<name>.test.ts`
   or the file that `--path` names, and finds `.test.*` files in each loaded rules folder for
@@ -625,18 +628,15 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   The shipped skill tells the agent how to run temporary
   RuleTester cases, remove its temporary files, and preserve user-owned tests.
 - The `oxlint-custom` integration in `src/lib/integrations/oxlint/custom.ts` uses
-  that module to report rules folders that no `custom()` call loads, also at the previous
-  default path, a `dir` that names a missing folder, and rules folders that share a plugin name. A
+  that module to report rules folders that no `custom()` call loads, a `dir` that names a missing
+  folder, and rules folders that share a plugin name. A
   rule file that cannot load stops Oxlint, so the `oxlint-config-load-failure` finding reports it.
   Optional saved tests do not produce a finding.
 - The `github` integration in `src/lib/integrations/github/index.ts` renders
   `.github/workflows/adamantite.yml` whole, with a job for each check and analyze script of the
   selection. It does not add or require a rule-test step. Users can add one themselves, and the
   write rule keeps the changed workflow. Doctor then checks that a job of the workflow runs each
-  CI script of the selection. The template keeps the `# ADAMANTITE:START` and `# ADAMANTITE:END`
-  comments of earlier releases as plain text, so a workflow that 0.47.0 wrote equals the render,
-  and the first `update` records its hash. A workflow that an earlier release wrote and the project
-  renamed holds the start comment, so Adamantite writes no second workflow beside it.
+  CI script of the selection.
 
 The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

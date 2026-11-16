@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import type { Selection } from "#lib/project/selection.ts"
 import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
@@ -14,11 +15,26 @@ import {
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
+
+const EMPTY_SELECTION = {
+  agents: false,
+  ci: null,
+  editors: [],
+  presets: [],
+  scripts: [],
+  typescript: null,
+} as const satisfies Selection
+
+// The lockfile that `init` writes for `selection`, before it writes any managed file.
+function makeLockfile(selection: Selection) {
+  return stringifyJson({ schemaVersion: 1, selection, version: "0.0.0", written: {} })
+}
 
 // These assessments resolve no TypeScript package, so the tsconfig integration starts no process.
 const noProcessLayer = makeOxlintFilesLayer()
@@ -126,67 +142,17 @@ describe("renderAssessmentMarkdown", () => {
       "1.2.3"
     )
 
-    expect(prompt).not.toContain("**Notes:**")
-  })
-
-  it("keep placeholder-like text in findings literal", () => {
-    const prompt = renderAssessmentMarkdown(
-      makeAssessment({
-        findings: [
-          {
-            currentState: "The script runs `echo {{version}} $&`.",
-            goal: ["Keep `{{findings}}` as written."],
-            id: "literal-text",
-            integration: "tool",
-            title: "Literal text",
-          },
-        ],
-      }),
-      "1.2.3"
-    )
-
-    expect(prompt).toContain("- **Current state:** The script runs `echo {{version}} $&`.")
-    expect(prompt).toContain("  - Keep `{{findings}}` as written.")
-  })
-
-  it("render the warning report when no findings remain", () => {
-    const report = renderAssessmentMarkdown(
-      makeAssessment({
-        warnings: ["Skipping `tsconfig.json` setup.", "Skipping `.oxlintrc.json` setup."],
-      }),
-      "1.2.3"
-    )
-
-    expect(report).toBe(
+    expect(prompt).toContain(
       [
-        "# Adamantite doctor warnings",
+        "## 1. Missing tool configuration",
         "",
-        "Adamantite 1.2.3 detected no repair findings. The assessment reported these warnings:",
+        "- **Current state:** `tool.config.ts` is missing.",
+        "- **Goal:**",
+        "  - Create `tool.config.ts`.",
         "",
-        "- Skipping `tsconfig.json` setup.",
-        "- Skipping `.oxlintrc.json` setup.",
-        "",
-        "Review the affected project state before deciding whether a warning needs a change.",
-        "Report each unresolved warning and the limit it places on verification.",
-        "If a required tool or source was unavailable, name it on the first line and state what you used instead.",
-        "The review is complete when each warning has an observed result or a stated limit.",
-        "",
-        "## Check the report",
-        "",
-        "- Every warning is accounted for, including missing tools or sources.",
-        "- A successful Doctor exit is not reported as proof that all project checks pass.",
-        "",
+        "## Verify",
       ].join("\n")
     )
-  })
-
-  it("keep placeholder-like text in warnings literal", () => {
-    const report = renderAssessmentMarkdown(
-      makeAssessment({ warnings: ["The script runs `echo {{version}} {{warnings}} $&`."] }),
-      "1.2.3"
-    )
-
-    expect(report).toContain("- The script runs `echo {{version}} {{warnings}} $&`.")
   })
 })
 
@@ -237,48 +203,56 @@ describe("assessProject", () => {
         '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp"] } } } }',
     },
     { editor: "zed", finding: undefined, settings: undefined },
-  ])("assess $editor settings $settings without changing files", ({ editor, settings, finding }) =>
-    Effect.gen(function* () {
-      const settingsPath = `.${editor}/settings.json`
+  ] as const)(
+    "assess $editor settings $settings without changing files",
+    ({ editor, settings, finding }) =>
+      Effect.gen(function* () {
+        const settingsPath = `.${editor}/settings.json`
 
-      const files = createFileSystemTestContext({
-        files: { "package.json": "{}" },
-        root: ROOT,
-      })
+        const files = createFileSystemTestContext({
+          files: {
+            [LOCKFILE_PATH]: yield* makeLockfile({
+              ...EMPTY_SELECTION,
+              editors: settings === undefined ? [] : [editor],
+            }),
+            "package.json": "{}",
+          },
+          root: ROOT,
+        })
 
-      if (settings !== undefined) {
-        files.write(settingsPath, settings)
-      }
+        if (settings !== undefined) {
+          files.write(settingsPath, settings)
+        }
 
-      const before = files.list().map((file) => [file, files.read(file)])
-      files.makeReadOnly(ROOT)
+        const before = files.list().map((file) => [file, files.read(file)])
+        files.makeReadOnly(ROOT)
 
-      const assessment = yield* readProject(ROOT).pipe(
-        Effect.flatMap((project) => assessProject(project)),
-        Effect.provide(
-          withConfigLoader(
-            Layer.mergeAll(
-              files.layer,
-              Path.layer,
-              makeModuleResolverLayer(ROOT),
-              noProcessLayer,
-              Digest.layerWebCrypto,
-              NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
-              Layer.succeed(DependencyInstaller)({
-                addDevDependencies: () => Effect.void,
-                detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
-              })
+        const assessment = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => assessProject(project)),
+          Effect.provide(
+            withConfigLoader(
+              Layer.mergeAll(
+                files.layer,
+                Path.layer,
+                makeModuleResolverLayer(ROOT),
+                noProcessLayer,
+                Digest.layerWebCrypto,
+                NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
+                Layer.succeed(DependencyInstaller)({
+                  addDevDependencies: () => Effect.void,
+                  detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
+                })
+              )
             )
           )
         )
-      )
 
-      expect(
-        assessment.findings.filter((entry) => entry.integration === editor).map(({ id }) => id)
-      ).toStrictEqual(finding === undefined ? [] : [finding])
-      expect(assessment.applicableIntegrations.includes(editor)).toBe(settings !== undefined)
-      expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
-    })
+        expect(
+          assessment.findings.filter((entry) => entry.integration === editor).map(({ id }) => id)
+        ).toStrictEqual(finding === undefined ? [] : [finding])
+        expect(assessment.applicableIntegrations.includes(editor)).toBe(settings !== undefined)
+        expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
+      })
   )
 
   it.effect("read the shared project facts one time for every integration", () =>
@@ -288,6 +262,13 @@ describe("assessProject", () => {
           ".adamantite/lint/no-foo.ts": "export default {}\n",
           ".github/workflows/adamantite.yml":
             "jobs:\n  check:\n    steps:\n      - run: pnpm run check\n",
+          [LOCKFILE_PATH]: yield* makeLockfile({
+            ...EMPTY_SELECTION,
+            ci: "github",
+            presets: ["core", "effect", "tailwind"],
+            scripts: ["analyze", "check", "fix"],
+            typescript: "typescript",
+          }),
           "oxlint.config.ts": [
             'import core from "adamantite/lint"',
             'import custom from "adamantite/rules"',

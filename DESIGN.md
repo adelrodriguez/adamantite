@@ -51,8 +51,8 @@ titles are bold. Colors appear only when Effect's `TerminalCapabilities.canColor
 pipe, `NO_COLOR`, or `TERM=dumb` gets plain text.
 
 Messages state the outcome in words, and the symbol marks the status, so a color is never the
-only explanation of a result. Intro and outro headings keep their own symbols, such as `💠`, `✅`,
-`⚠️`, and `❌`.
+only explanation of a result. An intro heading starts with `💠`. An outro heading starts with `✅`
+when the command finished, and with `⚠️` when issues remain.
 
 ## Typography
 
@@ -77,7 +77,7 @@ goes to standard output, so the lines and the prompts keep their order. With `--
 output holds only the JSON document, and every other line goes to standard error.
 
 A status message that spans several lines indents each continuation line by two spaces, under the
-text after the symbol. [Findings](src/terminal/findings.ts) appear as numbered notes: a blank line,
+text after the symbol. [Findings](src/terminal/resolution.ts) appear as numbered notes: a blank line,
 the bold title, and the body indented by two spaces. The body contains `Current state` and `Goal`,
 followed by `Reference` and `Notes` when present. Blank lines separate those sections, and each
 goal or note has its own bullet.
@@ -113,8 +113,8 @@ line. [Setup lines](src/terminal/setup.ts) define the messages.
 | Intro and outro | A bold heading names the command at the start. A bold heading states the outcome at the end.                                               | [Output](src/terminal/output.ts)                   |
 | Status line     | A symbol and a message for each status: info, success, warning, error, or cancel.                                                          | [Output](src/terminal/output.ts)                   |
 | Choice          | Effect's `Prompt.Confirm`, `Prompt.Select`, and `Prompt.MultiSelect`. A question shows `? message ›`, and its answer `✔ message … answer`. | `effect/cli/Prompt`                                |
-| Cancel          | Ctrl-C or Esc at a prompt fails it with `QuitError`. The command prints a cancel line, such as `■ Setup was cancelled.`                    | The command                                        |
-| Finding         | A numbered note with the current state, goals, and optional repair reference and notes.                                                    | [Findings](src/terminal/findings.ts)               |
+| Cancel          | Ctrl-C or Esc at a prompt fails it with `QuitError`. The command prints a cancel line, such as `■ Setup was cancelled.`, and exits 1.      | The command                                        |
+| Finding         | A numbered note with the current state, goals, and optional repair reference and notes.                                                    | [Findings](src/terminal/resolution.ts)             |
 | Setup line      | A status line for each package install, managed script, managed file, and the lockfile that `init` and `update` handled.                   | [Setup lines](src/terminal/setup.ts)               |
 | Resolution menu | Installed agent handoffs, then prompt copy, then `Finish without an agent`.                                                                | [Resolution menu](src/terminal/resolution-menu.ts) |
 | Prompt copy     | Print the Markdown prompt and send it to the terminal clipboard with OSC 52. An agent CLI that does not start prints it too.               | [Resolution menu](src/terminal/resolution-menu.ts) |

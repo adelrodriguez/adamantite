@@ -22,7 +22,7 @@ import { checkIsJsonArray, checkIsJsonObject, formatJson, stringifyJson } from "
 /**
  * The project settings of Zed.
  */
-export const SETTINGS_PATH = ".zed/settings.json"
+const SETTINGS_PATH = ".zed/settings.json"
 
 /**
  * The settings of a language that Oxfmt formats through its language server.
@@ -112,30 +112,6 @@ const CONFIG = {
     },
   },
 } as const
-
-/**
- * The settings that Adamantite wrote for a plugin language before Oxfmt formatted it. Only Astro
- * had any: Zed's managed Prettier with the Astro plugin.
- */
-const LEGACY_PLUGIN_LANGUAGE_SETTINGS: Partial<
-  Record<(typeof pluginLanguages)[number]["editors"]["zed"], Schema.Json>
-> = {
-  Astro: { format_on_save: "on", prettier: { allowed: true, plugins: ["prettier-plugin-astro"] } },
-}
-
-/**
- * The plugin languages whose entry in `config` keeps the settings that Adamantite wrote before
- * Oxfmt formatted them.
- */
-function findLegacyPluginLanguages(config: Schema.JsonObject) {
-  const languages = checkIsJsonObject(config.languages) ? config.languages : {}
-
-  return pluginLanguages.filter(({ editors }) => {
-    const legacy = LEGACY_PLUGIN_LANGUAGE_SETTINGS[editors.zed]
-
-    return legacy !== undefined && Equal.equals(languages[editors.zed], legacy)
-  })
-}
 
 // Keep the logical node_modules path. The resolver's real path can point into a machine's pnpm
 // store, which must not go into shared editor settings.
@@ -360,25 +336,7 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
           },
         ]
 
-  const legacy = yield* Effect.forEach(
-    findLegacyPluginLanguages(config),
-    ({ editors: { zed }, name, option }) =>
-      formatJson({ languages: { [zed]: OXFMT_LANGUAGE } }).pipe(
-        Effect.map((reference): Finding => ({
-          currentState: `\`${SETTINGS_PATH}\` formats ${name} files with Prettier, as Adamantite set it up before Oxfmt formatted them.`,
-          goal: [
-            `Set \`languages.${zed}.formatter\` to the \`oxfmt\` language server, and set \`languages.${zed}.prettier.allowed\` to \`false\`. Preserve every other setting.`,
-          ],
-          id: `legacy-zed-${option}-formatter`,
-          integration: "zed",
-          reference: { content: `${reference}\n`, language: "json" },
-          title: `Zed formats ${name} files with Prettier`,
-        }))
-      ),
-    { concurrency: 1 }
-  )
-
-  return [...(yield* assessEffectServer(cwd, config)), ...legacy, ...entry]
+  return [...(yield* assessEffectServer(cwd, config)), ...entry]
 })
 
 export default {
@@ -392,6 +350,5 @@ export default {
     }),
   name: "zed",
   packages: (_project: Project, _selection: Selection) => [],
-  prepare: (_project: Project) => Effect.void,
   selected: ({ editors }: Selection) => editors.includes("zed"),
 } satisfies Integration

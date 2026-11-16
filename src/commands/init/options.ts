@@ -1,40 +1,14 @@
 import * as Array from "effect/Array"
-import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import type { SupportedPackageManager } from "#lib/project/package-manager.ts"
+import type { InitEditor, LintPreset, TypeScriptPreset } from "#lib/project/selection.ts"
 import {
   findExcludedPresets,
   findMissingRequiredPresets,
 } from "#lib/integrations/oxlint/presets.ts"
-import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
-import { type Script, SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
-import {
-  type SupportedPackageManager,
-  listSupportedPackageManagers,
-} from "#lib/project/package-manager.ts"
-import {
-  INIT_EDITORS,
-  type InitEditor,
-  LINT_PRESETS,
-  type LintPreset,
-  TYPESCRIPT_PRESET_NAMES,
-  type TypeScriptPreset,
-} from "#lib/project/selection.ts"
+import { type Script, checkRunsTool, hasCICompatibleScripts } from "#lib/project/package-json.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
-
-/**
- * The title and description that the interactive prompt shows for each editor. The `vscode`
- * settings also apply to the editors that read `.vscode/settings.json`, so the prompt calls them
- * universal.
- */
-export const INIT_EDITOR_CHOICES = {
-  vscode: {
-    description:
-      "creates .vscode/settings.json and .vscode/extensions.json for VS Code, Cursor, Windsurf, and more",
-    title: "Universal",
-  },
-  zed: { description: "creates .zed/settings.json", title: "Zed" },
-} as const satisfies Record<InitEditor, { description: string; title: string }>
 
 /**
  * The setup that init applies. Each optional part exists only with the parts that it needs, so the
@@ -139,58 +113,3 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     typescript: options.typescript,
   } satisfies InitOptions
 })
-
-const nonInteractive = Flag.Boolean("non-interactive").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Configure without prompts. Select at least one --script or --typescript")
-)
-
-const scripts = Flag.Literals("script", SCRIPT_ORDER).pipe(
-  Flag.atMost(SCRIPT_ORDER.length),
-  Flag.withDescription(
-    "Set a package script to its Adamantite command, replacing what it ran. Repeat --script to add more"
-  )
-)
-
-const presets = Flag.Literals("preset", LINT_PRESETS).pipe(
-  Flag.atMost(LINT_PRESETS.length),
-  Flag.withDescription(
-    "Select an Oxlint preset. Repeat --preset to add more. Requires --script check or --script fix"
-  )
-)
-
-const editors = Flag.Literals("editor", INIT_EDITORS).pipe(
-  Flag.atMost(INIT_EDITORS.length),
-  Flag.withDescription("Configure an editor. Repeat --editor to add more")
-)
-
-const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
-  Flag.optional,
-  Flag.withDescription(
-    "Use a TypeScript preset: typescript for strict types, tsconfig for strict config"
-  )
-)
-
-const githubActions = Flag.Boolean("github-actions").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription(
-    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${listSupportedPackageManagers("disjunction")}`
-  )
-)
-
-const agents = Flag.Boolean("agents").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription(
-    "Add Adamantite guidance to AGENTS.md and the Adamantite skill to the skill folders of your coding agents"
-  )
-)
-
-export const initCommandOptions = {
-  agents,
-  editors,
-  githubActions,
-  nonInteractive,
-  presets,
-  scripts,
-  typescript,
-}

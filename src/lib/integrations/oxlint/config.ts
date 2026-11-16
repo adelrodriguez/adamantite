@@ -33,7 +33,7 @@ const PRINT_WIDTH = 100
  * an empty config until the project adds a rule to `.adamantite/lint`. `extends` keeps the order of
  * the presets, because a later entry replaces the rules of an earlier one.
  */
-export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
+export function toOxlintTsConfigContent(presets: readonly LintPreset[]) {
   const presetNames = ["core", ...presets] as const
 
   const imports = Array.sort(
@@ -93,14 +93,6 @@ export function listAppliedLintPresets({ customRules }: Project): readonly strin
       module.startsWith(LINT_PRESET_PREFIX) ? [module.slice(LINT_PRESET_PREFIX.length)] : []
     )
   )
-}
-
-/**
- * Whether an Oxlint config of `project` applies the lint preset anywhere, such as `effect` for
- * `adamantite/lint/effect`, as `listAppliedLintPresets` lists them.
- */
-export function checkAppliesLintPreset(project: Project, preset: LintPreset): boolean {
-  return listAppliedLintPresets(project).includes(preset)
 }
 
 /**

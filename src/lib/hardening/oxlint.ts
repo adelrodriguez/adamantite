@@ -38,17 +38,10 @@ export function splitRuleName(rule: string): { readonly name: string; readonly p
  * `typescript/no-restricted-imports` as `eslint(no-restricted-imports)`. A rule of a JS plugin
  * keeps the name that the config gives it.
  */
-export interface ResolvedRule {
+interface ResolvedRule {
   readonly builtIn: boolean
   readonly name: string
   readonly plugin: string
-}
-
-/**
- * Whether a diagnostic `code`, such as `eslint(no-debugger)`, comes from the rule.
- */
-export function isReportOf(code: string, rule: ResolvedRule): boolean {
-  return code === `${rule.plugin}(${rule.name})`
 }
 
 /**

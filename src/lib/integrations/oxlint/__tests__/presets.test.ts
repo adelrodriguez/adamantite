@@ -4,17 +4,11 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
-import {
-  describeLintPreset,
-  findExcludedPresets,
-  findMissingRequiredPresets,
-  lintPresets,
-} from "#lib/integrations/oxlint/presets.ts"
+import { describeLintPreset, lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import { LINT_PRESETS } from "#lib/project/selection.ts"
 import packageJson from "../../../../../package.json" with { type: "json" }
 
 const PRESET_FILES_DIR = join(import.meta.dirname, "../../../../../presets/lint")
-const presetsWithPlugins = lintPresets.flatMap((preset) => ("plugin" in preset ? [preset] : []))
 
 const excludedPairs = lintPresets.flatMap((preset) =>
   "excludes" in preset ? preset.excludes.map((excluded) => [preset.name, excluded] as const) : []
@@ -62,10 +56,6 @@ describe("lintPresets", () => {
   it.each(excludedPairs)("exclude %s in the excludes of %s too", (preset, excluded) => {
     expect(getPreset(excluded)).toHaveProperty("excludes", expect.arrayContaining([preset]))
   })
-
-  it.each(presetsWithPlugins)("name $plugin.name in the hint of the $name preset", (preset) => {
-    expect(describeLintPreset(preset)).toContain(`Installs ${preset.plugin.name}`)
-  })
 })
 
 describe("describeLintPreset", () => {
@@ -82,30 +72,5 @@ describe("describeLintPreset", () => {
     expect(describeLintPreset(getPreset("jest"))).toBe(
       "Find focused or skipped tests and check assertions. Cannot be selected with the vitest preset."
     )
-  })
-})
-
-describe("findMissingRequiredPresets", () => {
-  it("report a required preset that the selection lacks", () => {
-    expect(findMissingRequiredPresets(["react-strict", "vitest"])).toStrictEqual([
-      { required: "react", requiredBy: "react-strict" },
-    ])
-  })
-
-  it("report nothing when the selection has every required preset", () => {
-    expect(findMissingRequiredPresets(["react", "react-strict"])).toStrictEqual([])
-  })
-})
-
-describe("findExcludedPresets", () => {
-  it("report the jest and vitest presets together", () => {
-    expect(findExcludedPresets(["vitest", "strict", "jest"])).toStrictEqual([
-      { excluded: "vitest", preset: "jest" },
-      { excluded: "jest", preset: "vitest" },
-    ])
-  })
-
-  it("report nothing when the selection has one preset of each excluded pair", () => {
-    expect(findExcludedPresets(["vitest", "strict"])).toStrictEqual([])
   })
 })

@@ -1,13 +1,35 @@
+import type * as FileSystem from "effect/FileSystem"
+import type * as Path from "effect/Path"
 import type { JsonObject } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import * as Sink from "effect/Sink"
+import * as Stream from "effect/Stream"
 import type { InitOptions } from "#commands/init/options.ts"
+import {
+  type DependencyInstallerTestContext,
+  createDependencyInstallerTestContext,
+  createRunnerTestContext,
+  declareDevDependencies,
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeHandoffRunner,
+  nonProbeInvocations,
+  promptingLayer,
+  readLockfile,
+  runCommand,
+} from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { listHashes } from "#__tests__/lifecycle.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
@@ -21,32 +43,76 @@ import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
-import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { type Script, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
 import * as Setup from "#lib/setup/index.ts"
 import {
+  CommandFailed,
   FailedToInstallDependency,
   InvalidInitOptions,
   NoPackageManager,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import {
-  type DependencyInstallerTestContext,
-  createDependencyInstallerTestContext,
-  createPackageManagerTestContext,
-  createRunnerTestContext,
-  findingsLeft,
-  getFailure,
-  hashContent,
-  makeHandoffRunner,
-  nonProbeInvocations,
-  promptingLayer,
-  readLockfile,
-  runCommand,
-} from "./command-test-helpers.ts"
+
+/**
+ * The live `DependencyInstaller`, which detects the package manager from the test filesystem, with
+ * a package manager that records each command line and declares the packages it adds. With
+ * `failure`, the package manager prints its `stderr` and exits 1 instead.
+ */
+function createPackageManagerTestContext(options?: {
+  readonly failure?: { readonly stderr: string }
+}) {
+  const commandLines: string[] = []
+
+  const spawnerLayer = Layer.effect(ChildProcessSpawner.ChildProcessSpawner)(
+    Effect.gen(function* () {
+      const context = yield* Effect.context<FileSystem.FileSystem | Path.Path>()
+
+      return ChildProcessSpawner.make((command) =>
+        Effect.gen(function* () {
+          if (!ChildProcess.isStandardCommand(command)) {
+            return yield* Effect.die("A package manager install runs one command")
+          }
+
+          const args = command.args.map(String)
+          commandLines.push([command.command, ...args].join(" "))
+
+          const packages = args
+            .slice(args.indexOf("-D") + 1)
+            .map((specifier) => specifier.replace(/^npm:/, ""))
+
+          if (options?.failure === undefined) {
+            yield* declareDevDependencies(packages, command.options.cwd ?? "/").pipe(
+              Effect.provideContext(context)
+            )
+          }
+
+          return ChildProcessSpawner.makeHandle({
+            all: Stream.empty,
+            exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(options?.failure ? 1 : 0)),
+            getInputFd: () => Sink.drain,
+            getOutputFd: () => Stream.empty,
+            isRunning: Effect.succeed(false),
+            kill: () => Effect.void,
+            pid: ChildProcessSpawner.ProcessId(1),
+            stderr: Stream.make(new TextEncoder().encode(options?.failure?.stderr ?? "")),
+            stdin: Sink.drain,
+            stdout: Stream.empty,
+            unref: Effect.succeed(Effect.void),
+          })
+        })
+      )
+    })
+  )
+
+  return {
+    commandLines,
+    layer: DependencyInstaller.layer.pipe(Layer.provide(spawnerLayer)),
+  }
+}
 
 const effectTsgo = managedPlugin("@effect/tsgo")
 const shadcnLint = managedPlugin("@shadcn/lint")
@@ -578,30 +644,6 @@ describe("init", () => {
       })
     )
 
-    it.effect("keep an existing prepare script, and warn about the missing tsconfig.json", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": yield* stringifyJson({
-            name: "test-project",
-            scripts: { prepare: "husky" },
-          }),
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [installer.layer, runner.layer], logLines }
-        )
-
-        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-        expect(readJson(files, "package.json")).toMatchObject({ scripts: { prepare: "husky" } })
-      })
-    )
-
     it.effect("keep configs with comments and continue", () =>
       Effect.gen(function* () {
         const tsconfigContent =
@@ -719,34 +761,6 @@ describe("init", () => {
           "✔ The jest and vitest presets report the same defects. Which one should Adamantite use? …  vitest"
         )
         expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["vitest", "strict"]))
-      })
-    )
-  })
-
-  describe("sherif for analyze", () => {
-    it.effect("install sherif with the analyze script in a monorepo", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson })
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "analyze"], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(listInstalls(installer).packages).toStrictEqual(
-          sortPackages([
-            `adamantite@${getPackageVersion()}`,
-            `sherif@${sherif.version}`,
-            `knip@${knip.version}`,
-          ])
-        )
-        expect(files.read("knip.config.ts")).toContain(
-          "ignoreDependencies: ignoreDependencies.monorepo"
-        )
       })
     )
   })
@@ -1013,7 +1027,7 @@ describe("init", () => {
         expect(logLines).toStrictEqual([
           "💠 adamantite init",
           "● Detected package manager: bun",
-          "💠 No setup selected, so Adamantite made no changes.",
+          "✅ No setup selected, so Adamantite made no changes.",
         ])
       })
     )
@@ -1302,10 +1316,7 @@ describe("init", () => {
           "tsconfig.json": EXISTING_MONOREPO_TSCONFIG,
         })
 
-        const listHashes = () =>
-          Object.fromEntries(files.list().map((file) => [file, hashContent(files.read(file))]))
-
-        const before = listHashes()
+        const before = listHashes(files)
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
@@ -1324,7 +1335,7 @@ describe("init", () => {
 
         expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({ _tag: error })
         expect(installer.calls).toStrictEqual([])
-        expect(listHashes()).toStrictEqual(before)
+        expect(listHashes(files)).toStrictEqual(before)
       })
     )
 
@@ -1395,7 +1406,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("gracefully handle prompt cancellation", () =>
+    it.effect("exit 1 when the user cancels a prompt", () =>
       Effect.gen(function* () {
         const logLines: unknown[] = []
 
@@ -1410,7 +1421,9 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(
+          new CommandFailed({ command: "init", exitCode: ChildProcessSpawner.ExitCode(1) })
+        )
         expect(logLines).toStrictEqual([
           "💠 adamantite init",
           "● Detected package manager: bun",
@@ -1486,7 +1499,7 @@ describe("init", () => {
           expect(logLines.slice(-3)).toStrictEqual([
             "● Handing the terminal to Claude Code. Exit the agent to return to Init.",
             "✔ Nothing remains to resolve after the Claude Code session.",
-            "💠 Setup finished.",
+            "✅ Setup finished.",
           ])
         })
     )

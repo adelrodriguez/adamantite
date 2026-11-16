@@ -1,4 +1,3 @@
-import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
@@ -7,50 +6,50 @@ import * as Result from "effect/Result"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
-import { readConfig } from "#lib/project/config-loader.ts"
 
 /**
- * A TypeScript config that a tool integration renders whole, and the legacy JSON configs that the
- * tool read before it.
+ * A TypeScript config that a tool integration renders whole, and the tool's own JSON configs, which
+ * conflict with it.
  */
 export interface ConfigFile {
-  readonly legacy: readonly string[]
+  readonly conflicting: readonly string[]
   readonly path: string
   readonly tool: string
   /**
-   * Why the project cannot keep a legacy config beside the managed one, such as "Oxfmt loads no
-   * config when it finds both".
+   * Why the project cannot keep a conflicting config beside the managed one, such as "Oxfmt loads
+   * no config when it finds both".
    */
-  readonly whyLegacyBlocks: string
+  readonly whyConflicting: string
 }
 
 /**
- * The legacy JSON configs of `config` that the project at `cwd` has.
+ * The conflicting JSON configs of `config` that the project at `cwd` has.
  */
-export const findLegacyConfigs = Effect.fn("findLegacyConfigs")(function* (
+const findConflictingConfigs = Effect.fn("findConflictingConfigs")(function* (
   cwd: string,
   config: ConfigFile
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
 
-  return yield* Effect.filter(config.legacy, (file) => fs.exists(path.join(cwd, file)), {
+  return yield* Effect.filter(config.conflicting, (file) => fs.exists(path.join(cwd, file)), {
     concurrency: "unbounded",
   })
 })
 
 /**
- * The managed config of the project at `cwd`, or nothing when a legacy config is there. The tool
- * would not load the managed config beside it, so the project gets the legacy finding instead.
+ * The managed config of the project at `cwd`, or nothing when a conflicting config is there. The
+ * tool would not load the managed config beside it, so the project gets the conflict finding
+ * instead.
  */
 export const renderConfigFile = Effect.fn("renderConfigFile")(function* (
   cwd: string,
   config: ConfigFile,
   content: string
 ) {
-  const legacy = yield* findLegacyConfigs(cwd, config)
+  const conflicting = yield* findConflictingConfigs(cwd, config)
 
-  return legacy.length > 0 ? [] : [{ content, path: config.path }]
+  return conflicting.length > 0 ? [] : [{ content, path: config.path }]
 })
 
 function listFiles(files: readonly string[]) {
@@ -58,21 +57,7 @@ function listFiles(files: readonly string[]) {
 }
 
 /**
- * The managed config of the project at `cwd`, loaded as the tool loads it and decoded with
- * `schema`, or none when it does not exist.
- */
-export const readConfigFile = Effect.fn("readConfigFile")(function* <A>(
-  cwd: string,
-  config: ConfigFile,
-  schema: Schema.Decoder<A>
-) {
-  const path = yield* Path.Path
-
-  return yield* readConfig(cwd, path.join(cwd, config.path), schema)
-})
-
-/**
- * The findings for a managed config, as `readConfigFile` reads it: a legacy JSON config, a missing
+ * The findings for a managed config, as `readConfig` loads it: a conflicting JSON config, a missing
  * config, a config that does not load, and a loaded config that `inspect` rejects. `reference` is
  * what Adamantite writes.
  */
@@ -83,27 +68,27 @@ export const assessConfigFile = Effect.fn("assessConfigFile")(function* <A>(
   reference: string,
   inspect: (config: A) => RequiredConfigInspection
 ) {
-  const legacy = yield* findLegacyConfigs(cwd, config)
+  const conflicting = yield* findConflictingConfigs(cwd, config)
 
   const code = { content: reference, language: "ts" } as const
 
-  if (legacy.length > 0) {
+  if (conflicting.length > 0) {
     return [
       {
         currentState: Option.isNone(content)
-          ? `The project configures ${config.tool} in the legacy ${listFiles(legacy)}, so Adamantite does not write \`${config.path}\`.`
-          : `The project has ${listFiles(legacy)} beside \`${config.path}\`, and ${config.whyLegacyBlocks}.`,
+          ? `The project configures ${config.tool} in ${listFiles(conflicting)}, so Adamantite does not write \`${config.path}\`.`
+          : `The project has ${listFiles(conflicting)} beside \`${config.path}\`, and ${config.whyConflicting}.`,
         goal: [
-          `Move the project settings into \`${config.path}\`, using the reference content as the base, and delete ${listFiles(legacy)}.`,
+          `Move the project settings into \`${config.path}\`, using the reference content as the base, and delete ${listFiles(conflicting)}.`,
           "Run `adamantite update`, then `adamantite doctor`. It must not report this finding.",
         ],
-        id: `legacy-${config.tool}-config`,
+        id: `conflicting-${config.tool}-config`,
         integration: config.tool,
         notes: [
           "Preserve project-specific settings. Do not replace them with the reference defaults.",
         ],
         reference: code,
-        title: `Legacy ${config.tool} configuration`,
+        title: `Conflicting ${config.tool} configuration`,
       },
     ] satisfies readonly Finding[]
   }

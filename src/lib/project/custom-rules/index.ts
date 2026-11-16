@@ -4,13 +4,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { CustomRuleDiscovery } from "#lib/project/custom-rules/discover.ts"
 import type { Project } from "#lib/project/project.ts"
-import {
-  CUSTOM_RULES_DIRECTORY,
-  isRuleFile,
-  isRuleTestFile,
-} from "#lib/project/custom-rules/folder.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,
@@ -23,6 +17,7 @@ import {
 } from "#lib/shared/errors.ts"
 import { ensureDirectory, readDirectoryIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
+import { DEFAULT_DIRECTORY, isRuleFile } from "#presets/rules/folder.ts"
 
 const stubTemplate = getStubTemplate()
 const testStubTemplate = getTestStubTemplate()
@@ -43,7 +38,7 @@ export function toCustomRuleStub(name: string): string {
 export const addCustomRule = Effect.fn("addCustomRule")(function* (
   cwd: string,
   name: string,
-  dir: string = CUSTOM_RULES_DIRECTORY
+  dir: string = DEFAULT_DIRECTORY
 ) {
   if (!RULE_NAME_PATTERN.test(name)) {
     return yield* new InvalidRuleName({ rule: name })
@@ -75,7 +70,7 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
  */
 export const listCustomRules = Effect.fn("listCustomRules")(function* (
   cwd: string,
-  dir: string = CUSTOM_RULES_DIRECTORY
+  dir: string = DEFAULT_DIRECTORY
 ) {
   const path = yield* Path.Path
   const fs = yield* FileSystem.FileSystem
@@ -103,7 +98,7 @@ export const listCustomRules = Effect.fn("listCustomRules")(function* (
 export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
   cwd: string,
   name: string,
-  dir: string = CUSTOM_RULES_DIRECTORY,
+  dir: string = DEFAULT_DIRECTORY,
   target?: string
 ) {
   if (!RULE_NAME_PATTERN.test(name)) {
@@ -155,43 +150,31 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
 })
 
 /**
- * The optional rule tests of each rules folder that a `custom()` call loads, in sorted order. A
- * test is a `.test.*` file beside the rules, so a `_` file is a helper. The tests of the rules
- * folders behind a config that does not load are not in the result.
- */
-export const findCustomRuleTests = Effect.fn("findCustomRuleTests")(function* (
-  customRules: CustomRuleDiscovery
-) {
-  const path = yield* Path.Path
-  const testDirectories = Array.dedupe(customRules.calls.map((call) => call.dir))
-
-  const tests = yield* Effect.forEach(
-    testDirectories,
-    (directory) =>
-      readDirectoryIfExists(directory).pipe(
-        Effect.map((names) =>
-          Option.getOrElse(names, () => [])
-            .filter((name) => isRuleTestFile(name))
-            .map((name) => path.join(directory, name))
-        )
-      ),
-    { concurrency: "unbounded" }
-  )
-
-  return Array.sort(tests.flat(), Order.String)
-})
-
-/**
- * The command that runs the rule tests, with paths relative to the project root, or none when no
- * test exists, and the configs that did not load. `RuleTester` runs only on Node.js, so the tests
- * run under Node.js, also in a Bun project.
+ * The command that runs the optional rule tests of each rules folder that a `custom()` call loads,
+ * with paths relative to the project root, or none when no test exists, and the configs that did
+ * not load. A test is a `.test.*` file beside the rules, so a `_` file is a helper. `RuleTester`
+ * runs only on Node.js, so the tests run under Node.js, also in a Bun project.
  */
 export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* ({
   customRules,
   cwd,
 }: Project) {
   const path = yield* Path.Path
-  const tests = yield* findCustomRuleTests(customRules)
+
+  const found = yield* Effect.forEach(
+    Array.dedupe(customRules.calls.map((call) => call.dir)),
+    (directory) =>
+      readDirectoryIfExists(directory).pipe(
+        Effect.map((names) =>
+          Option.getOrElse(names, () => [])
+            .filter((name) => !name.startsWith("_") && /\.test\.(?:js|mjs|mts|ts)$/.test(name))
+            .map((name) => path.join(directory, name))
+        )
+      ),
+    { concurrency: "unbounded" }
+  )
+
+  const tests = Array.sort(found.flat(), Order.String)
 
   return {
     command:

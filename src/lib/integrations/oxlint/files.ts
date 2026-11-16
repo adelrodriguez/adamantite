@@ -1,4 +1,3 @@
-import process from "node:process"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -8,6 +7,7 @@ import * as Schema from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Stream from "effect/Stream"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
+import { quietNodeOptions } from "#lib/shared/command-runner.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
 
 /**
@@ -59,16 +59,6 @@ export const OxlintCommand = Context.Reference<typeof getOxlintCommand>(
   "adamantite/OxlintCommand",
   { defaultValue: () => getOxlintCommand }
 )
-
-/**
- * Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
- * `package.json` it reparses as ESM.
- */
-function quietNodeOptions() {
-  return [process.env["NODE_OPTIONS"], "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"]
-    .filter(Boolean)
-    .join(" ")
-}
 
 /**
  * Runs Oxlint in `cwd`, with the Oxlint runtime of `project`. `output` has stdout and stderr

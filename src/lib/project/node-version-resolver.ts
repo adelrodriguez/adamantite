@@ -51,10 +51,6 @@ function hasToolVersionsNodeEntry(content: string): boolean {
     .some((line) => /^node(?:js)?\s+\S/.test(line))
 }
 
-function isNodeRuntimeEntry(value: JsonValue | undefined): boolean {
-  return Schema.is(RuntimeEntry)(value) && value.name.toLowerCase() === "node"
-}
-
 /**
  * Recognizes the `package.json` Node.js declarations `actions/setup-node` supports: `volta.node`, a
  * `devEngines.runtime` entry named `node`, and `engines.node`. `actions/setup-node` remains
@@ -69,7 +65,9 @@ function hasNodeDeclaration(packageJson: JsonValue): boolean {
     const runtime = packageJson.devEngines.runtime
     const entries = Array.isArray(runtime) ? runtime : [runtime]
 
-    if (entries.some((entry) => isNodeRuntimeEntry(entry))) {
+    if (
+      entries.some((entry) => Schema.is(RuntimeEntry)(entry) && entry.name.toLowerCase() === "node")
+    ) {
       return true
     }
   }

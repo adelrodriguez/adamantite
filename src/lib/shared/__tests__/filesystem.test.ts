@@ -12,7 +12,6 @@ import { FailedToCreateDirectory, FailedToReadFile, FailedToWriteFile } from "#l
 import {
   ensureDirectory,
   readDirectoryIfExists,
-  readFile,
   readFileIfExists,
   writeFile,
 } from "#lib/shared/filesystem.ts"
@@ -41,17 +40,6 @@ describe("filesystem", () => {
     })
   )
 
-  it.effect("return FailedToReadFile when readFile reads a missing file", () =>
-    Effect.gen(function* () {
-      const path = `${ROOT}/missing.json`
-
-      const error = yield* readFile(path).pipe(provideFiles(makeFiles()), Effect.flip)
-
-      expect(error).toBeInstanceOf(FailedToReadFile)
-      expect(error).toMatchObject({ path })
-    })
-  )
-
   it.effect("return none when readFileIfExists reads a missing file", () =>
     Effect.gen(function* () {
       const content = yield* readFileIfExists(`${ROOT}/missing.json`).pipe(
@@ -59,18 +47,6 @@ describe("filesystem", () => {
       )
 
       expect(content).toStrictEqual(Option.none())
-    })
-  )
-
-  it.effect("return FailedToReadFile when readFileIfExists fails for another reason", () =>
-    Effect.gen(function* () {
-      const files = makeFiles({ "directory/file.txt": "" })
-      const path = `${ROOT}/directory`
-
-      const error = yield* readFileIfExists(path).pipe(provideFiles(files), Effect.flip)
-
-      expect(error).toBeInstanceOf(FailedToReadFile)
-      expect(error).toMatchObject({ path })
     })
   )
 

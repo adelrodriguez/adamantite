@@ -11,7 +11,7 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // The antislop plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
 // access, no module mocking, and readable spacing. Its rules started as a copy of
 // https://github.com/dmmulroy/anti-slop and now live in plugins/antislop/ as first-party code. They
-// use the `antislop` namespace. Doctor reports old rule names for migration.
+// use the `antislop` namespace.
 
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,

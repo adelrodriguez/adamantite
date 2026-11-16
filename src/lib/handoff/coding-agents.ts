@@ -74,7 +74,7 @@ export const codingAgents = [
   },
 ] as const satisfies readonly CodingAgent[]
 
-export interface HandoffOptions {
+interface HandoffOptions {
   readonly agent: CodingAgent
   readonly cwd: string
   /**

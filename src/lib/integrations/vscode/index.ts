@@ -17,7 +17,7 @@ import { checkIsJsonObject, formatJson, stringifyJson } from "#lib/shared/json.t
 /**
  * The settings that VS Code and the editors built on it read, such as Cursor and Windsurf.
  */
-export const SETTINGS_PATH = ".vscode/settings.json"
+const SETTINGS_PATH = ".vscode/settings.json"
 
 const EXTENSIONS_PATH = ".vscode/extensions.json"
 

@@ -1,18 +1,9 @@
 import process from "node:process"
-import { describe, expect, expectTypeOf, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import {
-  BackendOverride,
-  BindingOverride,
-  defineOxlintPlugin,
-  JavaScriptRuntime,
-  type NativeOverride,
-  NativeRuntime,
-  type OxlintPlugin,
-} from "#lib/integrations/oxlint/plugins/base.ts"
 import {
   NoBackend,
   ReplacedBackend,
@@ -21,13 +12,10 @@ import {
   StockPart,
   toBackendEnv,
   TsrsBackend,
-  type OxlintRuntime,
-  type RuntimePart,
 } from "#lib/integrations/oxlint/runtime.ts"
 import {
   EffectBuildMissing,
   EffectPlatformUnsupported,
-  NativeRuntimeConflict,
   PackageNotInstalled,
 } from "#lib/shared/errors.ts"
 
@@ -320,72 +308,6 @@ describe("Oxlint runtime", () => {
   )
 })
 
-describe("native runtime overrides", () => {
-  it.effect.each(["Binding", "Backend"] as const)(
-    "reject two extensions that replace the %s",
-    (part) =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const override: NativeOverride =
-          part === "Binding"
-            ? new BindingOverride({ path: "/native.node" })
-            : new BackendOverride({ env: { NATIVE_BACKEND: "/backend" } })
-
-        const error = yield* resolveOxlintRuntime(ROOT, [
-          {
-            name: "first",
-            runtime: new NativeRuntime({ resolve: () => Effect.succeed([override]) }),
-          },
-          {
-            name: "second",
-            runtime: new NativeRuntime({ resolve: () => Effect.succeed([override]) }),
-          },
-        ]).pipe(
-          Effect.flip,
-          Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
-        )
-
-        expect(error).toBeInstanceOf(NativeRuntimeConflict)
-        expect(error).toMatchObject({
-          part,
-          plugins: ["first", "second"],
-        })
-      })
-  )
-
-  it.effect("combine distinct native parts and replace the whole stock backend", () =>
-    Effect.gen(function* () {
-      const files = makeFiles()
-
-      const runtime = yield* resolveOxlintRuntime(ROOT, [
-        {
-          name: "binding",
-          runtime: new NativeRuntime({
-            resolve: () => Effect.succeed([new BindingOverride({ path: "/binding.node" })]),
-          }),
-        },
-        {
-          name: "backend",
-          runtime: new NativeRuntime({
-            resolve: () =>
-              Effect.succeed([new BackendOverride({ env: { NATIVE_BACKEND: "/backend" } })]),
-          }),
-        },
-        { name: "javascript", runtime: new JavaScriptRuntime() },
-      ]).pipe(
-        Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
-      )
-
-      expect(runtime).toStrictEqual({
-        backend: new ReplacedBackend({ env: { NATIVE_BACKEND: "/backend" } }),
-        binding: new ReplacedPart({ path: "/binding.node" }),
-        oxlint: "/project/node_modules/oxlint",
-      })
-    })
-  )
-})
-
 describe("toBackendEnv", () => {
   it.each([
     { backend: new NoBackend(), env: {} },
@@ -403,19 +325,5 @@ describe("toBackendEnv", () => {
     expect(toBackendEnv(new TsrsBackend({ launcher: "C:/tsrs-lint.cmd" }), "win32")).toStrictEqual({
       OXLINT_TSGOLINT_PATH: "C:/tsrs-lint.cmd",
     })
-  })
-})
-
-describe("runtime types", () => {
-  it("keep plugin capabilities and resolved runtime parts distinct in types", () => {
-    const javascript = defineOxlintPlugin({
-      name: "example",
-      runtime: new JavaScriptRuntime(),
-    })
-
-    expectTypeOf(javascript.name).toEqualTypeOf<"example">()
-    expectTypeOf<OxlintPlugin["runtime"]>().toEqualTypeOf<JavaScriptRuntime | NativeRuntime>()
-    expectTypeOf<NativeOverride>().toEqualTypeOf<BindingOverride | BackendOverride>()
-    expectTypeOf<OxlintRuntime["binding"]>().toEqualTypeOf<RuntimePart>()
   })
 })

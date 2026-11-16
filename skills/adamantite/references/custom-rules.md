@@ -23,8 +23,8 @@ that the installed package does not export, use the replacement that the changel
 file must load with type stripping, so replace TypeScript that Node.js cannot erase, such as an
 `enum`.
 
-When Doctor reports a rules folder that no `custom()` call loads, such as the old default folder
-`.adamantite/rules`, move its rules to `.adamantite/lint`, or set its path with `dir`.
+When Doctor reports a rules folder that no `custom()` call loads, load it with `custom()`, and set
+its path with `dir` when it is not `.adamantite/lint`.
 Preserve rule behavior, plugin names, severity, and options.
 
 Continue when Doctor reports no custom-rule findings and no config load failure.

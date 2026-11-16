@@ -2,104 +2,14 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import {
-  checkIsMonorepo,
-  readPnpmWorkspacePatterns,
-  readWorkspace,
-  workspacePatternToRegExp,
-} from "#lib/project/monorepo.ts"
+import { checkIsMonorepo, readWorkspace } from "#lib/project/monorepo.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
-describe("readPnpmWorkspacePatterns", () => {
-  it.effect.each([
-    {
-      content: [
-        "packages:",
-        "  - packages/* # apps and libraries",
-        '  - "tooling/lint"',
-        "  - '!packages/legacy'",
-        "catalog:",
-        "  effect: 4.0.0",
-      ].join("\n"),
-      expected: ["packages/*", "tooling/lint", "!packages/legacy"],
-      name: "a block list with quotes and comments",
-    },
-    {
-      content: 'packages: [\n  "apps/*",\n  tooling/lint\n]\n',
-      expected: ["apps/*", "tooling/lint"],
-      name: "a flow list over several lines",
-    },
-    {
-      content: 'packages: &workspacePackages ["apps/*"]\n',
-      expected: ["apps/*"],
-      name: "a list after a YAML anchor",
-    },
-    {
-      content:
-        'shared: &workspacePackages ["apps/*", tooling/lint]\npackages: *workspacePackages\n',
-      expected: ["apps/*", "tooling/lint"],
-      name: "an alias to an anchored flow list",
-    },
-    {
-      content:
-        "shared: &workspacePackages\n  - apps/*\n  - tooling/lint\npackages: *workspacePackages\n",
-      expected: ["apps/*", "tooling/lint"],
-      name: "an alias to an anchored block list",
-    },
-    {
-      content: [
-        "workspacePatterns:",
-        "  active: &workspacePackages",
-        "    - apps/*",
-        "  archived:",
-        "    - packages/*",
-        "packages: *workspacePackages",
-      ].join("\n"),
-      expected: ["apps/*"],
-      name: "an alias to a list inside a mapping",
-    },
-    {
-      content: "packages:\n- apps/*\n- tooling/lint\ncatalog:\n  a: 1\n",
-      expected: ["apps/*", "tooling/lint"],
-      name: "a block list whose items are not indented",
-    },
-    {
-      content: "catalog:\n  effect: 4.0.0\n",
-      expected: [],
-      name: "no packages key",
-    },
-    { content: "", expected: [], name: "an empty file" },
-    { content: "packages: apps/*\n", expected: [], name: "packages that are not a list" },
-    {
-      content: "packages:\n  - apps/*\n bad: [\n",
-      expected: [],
-      name: "a file that does not parse",
-    },
-  ])("read $name", ({ content, expected }) =>
-    Effect.gen(function* () {
-      expect(yield* readPnpmWorkspacePatterns(content)).toStrictEqual(expected)
-    })
-  )
-})
-
-describe("workspacePatternToRegExp", () => {
-  it.each([
-    ["packages/*", "packages/web", true],
-    ["packages/*", "packages/group/web", false],
-    ["packages/**", "packages/group/web", true],
-    ["packages/**/web", "packages/web", true],
-    ["packages/**/web", "packages/a/b/web", true],
-    ["**/web", "apps/web", true],
-    ["**/web", "web", true],
-    ["./tooling/lint/", "tooling/lint", true],
-    ["apps/web-*", "apps/web-admin", true],
-    ["apps/web-*", "apps/api", false],
-  ])("match %s against %s: %s", (pattern, directory, expected) => {
-    expect(workspacePatternToRegExp(pattern).test(directory)).toBe(expected)
-  })
-})
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
 
 function readPnpmWorkspace(pnpmWorkspace: string) {
   return readWorkspace(ROOT).pipe(
@@ -114,6 +24,62 @@ function readPnpmWorkspace(pnpmWorkspace: string) {
 }
 
 describe("readWorkspace", () => {
+  // `*` and `?` match inside one folder name, and a `**` segment matches zero or more folders.
+  it.effect.each([
+    { directory: "packages/web", expected: ["/project/packages/web"], pattern: "packages/*" },
+    { directory: "packages/group/web", expected: [], pattern: "packages/*" },
+    {
+      directory: "packages/group/web",
+      expected: ["/project/packages/group/web"],
+      pattern: "packages/**",
+    },
+    { directory: "packages/web", expected: ["/project/packages/web"], pattern: "packages/**/web" },
+    {
+      directory: "packages/a/b/web",
+      expected: ["/project/packages/a/b/web"],
+      pattern: "packages/**/web",
+    },
+    { directory: "apps/web", expected: ["/project/apps/web"], pattern: "**/web" },
+    { directory: "web", expected: ["/project/web"], pattern: "**/web" },
+    { directory: "tooling/lint", expected: ["/project/tooling/lint"], pattern: "./tooling/lint/" },
+    { directory: "apps/web-admin", expected: ["/project/apps/web-admin"], pattern: "apps/web-*" },
+    { directory: "apps/api", expected: [], pattern: "apps/web-*" },
+  ])(
+    "find the package in $directory with the pattern $pattern",
+    ({ directory, expected, pattern }) =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            [`${directory}/package.json`]: "{}",
+            "package.json": yield* stringifyJson({ workspaces: [pattern] }),
+          },
+          root: ROOT,
+        })
+
+        const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+
+        expect(workspace.packageDirectories).toStrictEqual(expected)
+      })
+  )
+
+  // An exclusion matches the whole path, so `*` in it stays inside one folder name.
+  it.effect("leave out only the packages that an exclusion with * names", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": yield* stringifyJson({ workspaces: ["packages/**", "!packages/*"] }),
+          "packages/group/web/package.json": "{}",
+          "packages/web/package.json": "{}",
+        },
+        root: ROOT,
+      })
+
+      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+
+      expect(workspace.packageDirectories).toStrictEqual(["/project/packages/group/web"])
+    })
+  )
+
   it.effect("find nested packages with ** and leave out excluded packages", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -187,13 +153,16 @@ describe("readWorkspace", () => {
     })
   )
 
-  it.effect("read the package.json workspaces when pnpm-workspace.yaml has no packages", () =>
+  it.effect.each([
+    { content: "allowBuilds:\n  msgpackr-extract: false\n", name: "has no packages" },
+    { content: "packages:\n  - apps/*\n bad: [\n", name: "does not parse" },
+  ])("read the package.json workspaces when pnpm-workspace.yaml $name", ({ content }) =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
           "package.json": yield* stringifyJson({ workspaces: ["packages/*"] }),
           "packages/api/package.json": "{}",
-          "pnpm-workspace.yaml": "allowBuilds:\n  msgpackr-extract: false\n",
+          "pnpm-workspace.yaml": content,
         },
         root: ROOT,
       })
@@ -274,6 +243,87 @@ describe("readWorkspace", () => {
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(workspace).toStrictEqual({ catalogs: {}, isMonorepo: false, packageDirectories: [] })
+    })
+  )
+})
+
+describe("checkIsMonorepo", () => {
+  it.effect.each([
+    {
+      content: "packages:\n  - 'packages/*'",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm-workspace.yaml defines packages",
+    },
+    {
+      content: "\uFEFFpackages:\n  - 'packages/*'\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm workspace content starts with a byte-order mark",
+    },
+    {
+      content: "\"packages\":\n  - 'packages/*'\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm quotes the packages key",
+    },
+    {
+      content: "allowBuilds:\n  msgpackr-extract: false\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm-workspace.yaml does not define packages",
+    },
+    {
+      content: "packages: [] # no workspace packages\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares an empty package list with a comment",
+    },
+    {
+      content: "packages: [\n]\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares an empty multiline flow sequence",
+    },
+    {
+      content: JSON.stringify({ workspaces: ["packages/*"] }),
+      expected: true,
+      file: "package.json",
+      name: "package.json has a workspaces field",
+    },
+    {
+      content: JSON.stringify({ workspaces: { packages: ["packages/*"] } }),
+      expected: true,
+      file: "package.json",
+      name: "package.json has workspace packages in object form",
+    },
+    {
+      content: JSON.stringify({ workspaces: { packages: [] } }),
+      expected: false,
+      file: "package.json",
+      name: "package.json has no workspace packages in object form",
+    },
+    {
+      content: JSON.stringify({ workspaces: [] }),
+      expected: false,
+      file: "package.json",
+      name: "package.json has no workspace packages",
+    },
+    {
+      content: JSON.stringify({ name: "test-package", version: "1.0.0" }),
+      expected: false,
+      file: "package.json",
+      name: "neither pnpm-workspace.yaml nor workspaces is present",
+    },
+  ])("return $expected when $name", ({ content, expected, file }) =>
+    Effect.gen(function* () {
+      // A case for `package.json` replaces the default one.
+      const defaults = { "package.json": yield* stringifyJson({ name: "test-package" }) }
+      const files = makeFiles({ ...defaults, [file]: content })
+
+      const result = yield* checkIsMonorepo(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+
+      expect(result).toBe(expected)
     })
   )
 })

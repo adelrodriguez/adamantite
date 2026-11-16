@@ -3,17 +3,35 @@ import * as Array from "effect/Array"
 import * as Prompt from "effect/cli/Prompt"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import type { InitOptionsInput } from "#commands/init/options.ts"
 import {
   describeLintPreset,
   findExcludedPresets,
   findMissingRequiredPresets,
   lintPresets,
 } from "#lib/integrations/oxlint/presets.ts"
-import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
-import { checkRunsTool } from "#lib/project/package-json.ts"
-import { INIT_EDITORS, type LintPreset, type TypeScriptPreset } from "#lib/project/selection.ts"
+import { checkRunsTool, hasCICompatibleScripts } from "#lib/project/package-json.ts"
+import {
+  INIT_EDITORS,
+  type InitEditor,
+  type LintPreset,
+  type TypeScriptPreset,
+} from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
-import { INIT_EDITOR_CHOICES, type InitOptionsInput } from "./options.ts"
+
+/**
+ * The title and description that the interactive prompt shows for each editor. The `vscode`
+ * settings also apply to the editors that read `.vscode/settings.json`, so the prompt calls them
+ * universal.
+ */
+const INIT_EDITOR_CHOICES = {
+  vscode: {
+    description:
+      "creates .vscode/settings.json and .vscode/extensions.json for VS Code, Cursor, Windsurf, and more",
+    title: "Universal",
+  },
+  zed: { description: "creates .zed/settings.json", title: "Zed" },
+} as const satisfies Record<InitEditor, { description: string; title: string }>
 
 /**
  * Asks which preset to keep of each selected pair that excludes each other, and removes the other

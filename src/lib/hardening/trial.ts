@@ -8,13 +8,7 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type { Workspace } from "#lib/project/monorepo.ts"
-import {
-  isReportOf,
-  lintFiles,
-  resolveRule,
-  listLintedFiles,
-  splitRuleName,
-} from "#lib/hardening/oxlint.ts"
+import { lintFiles, resolveRule, listLintedFiles, splitRuleName } from "#lib/hardening/oxlint.ts"
 import { listIgnoredFiles, listProjectFiles } from "#lib/hardening/project-files.ts"
 import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
 import {
@@ -111,10 +105,10 @@ const BASE_CONFIG_NAME = "oxlint.trial-base.config"
 
 /**
  * The `node_modules` entry that the copy does not link to the project. `custom()` writes its entry
- * modules below it, so they stay in the copy. A test keeps it equal to the cache folder in
- * `presets/rules/folder.ts`.
+ * modules below it, in the cache folder of `presets/rules/folder.ts`, so they stay in the copy. The
+ * trial tests in `src/__tests__/trial.test.ts` check that the project's cache stays as it is.
  */
-export const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
+const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
 
 /**
  * Parses a case of `rule try`: a project path, or `<path>=<file>` to lint the content of `<file>`
@@ -190,7 +184,7 @@ export function renderTrialConfig(options: {
  * A temporary copy of the project. Only `makeProjectCopy` makes one, so a trial cannot change the
  * files of the project itself.
  */
-export type ProjectCopy = string & Brand.Brand<"ProjectCopy">
+type ProjectCopy = string & Brand.Brand<"ProjectCopy">
 
 const toProjectCopy = Brand.nominal<ProjectCopy>()
 
@@ -602,9 +596,7 @@ export const tryRule = Effect.fn("tryRule")(
           case: entry.case,
           config: toProjectPath(entry.config),
           diagnostics: reports
-            .filter(
-              (diagnostic) => diagnostic.code !== undefined && isReportOf(diagnostic.code, resolved)
-            )
+            .filter((diagnostic) => diagnostic.code === `${resolved.plugin}(${resolved.name})`)
             .map((diagnostic) => ({
               column: diagnostic.labels[0]?.span.column ?? 1,
               line: diagnostic.labels[0]?.span.line ?? 1,

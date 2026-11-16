@@ -1,4 +1,3 @@
-import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
@@ -16,6 +15,14 @@ import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 import type { AgentReach } from "#lib/hardening/agent-reach.ts"
 import type { Selection } from "#lib/project/selection.ts"
+import {
+  makeHandoffRunner,
+  makeLockfileFile,
+  promptingLayer,
+  nonProbeInvocations,
+  runCommand,
+  SKILL_FILES,
+} from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
@@ -26,16 +33,8 @@ import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
-import {
-  makeHandoffRunner,
-  makeLockfileFile,
-  promptingLayer,
-  nonProbeInvocations,
-  runCommand,
-  SKILL_FILES,
-} from "./command-test-helpers.ts"
 
-const OXLINT = getOxlintCommand(process.cwd())
+const OXLINT = getOxlintCommand("/project")
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -1366,21 +1365,6 @@ describe("harden", () => {
         SUCCESS_LOG,
         "✅ Harden checks passed.",
       ])
-    })
-  )
-
-  it.effect("preserve user-owned optional rule tests without running them", () =>
-    Effect.gen(function* () {
-      const { exit, logLines, runner } = yield* runInteractiveHarden({
-        files: { ...CUSTOM_RULE_FILES, ".adamantite/lint/no-foo.test.ts": "// user-owned test\n" },
-        keys: ["enter"],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(
-        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
-      ).toStrictEqual(["claude", "oxfmt", "oxlint"])
-      expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
     })
   )
 

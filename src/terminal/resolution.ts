@@ -9,7 +9,6 @@ import type { Finding } from "#lib/integrations/base.ts"
 import { renderAssessmentMarkdown } from "#lib/assessment/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { printFindings } from "#terminal/findings.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 import { AgentSessionEnded, chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
@@ -40,15 +39,13 @@ export function fromAssessment({
  * What a command hands to an agent. A `Repair` resolves what remains, and the command fails while
  * something remains. A `Task`, such as harden, is work that the user can decline.
  */
-export type Work =
-  | { readonly _tag: "Repair"; readonly remaining: Remaining }
-  | { readonly _tag: "Task" }
+type Work = { readonly _tag: "Repair"; readonly remaining: Remaining } | { readonly _tag: "Task" }
 
 const Works = Data.taggedEnum<Work>()
 
 export const { Repair, Task } = Works
 
-export interface Offer<E, R> {
+interface Offer<E, R> {
   /**
    * The command, such as `doctor`. The menu and its lines name it, as in "Exit the agent to return
    * to Doctor."
@@ -97,9 +94,29 @@ const printProblems = Effect.fn("printProblems")(function* (remaining: Remaining
   }
 })
 
-function commandFailed(command: string) {
-  return new CommandFailed({ command, exitCode: ChildProcessSpawner.ExitCode(1) })
+function renderFinding(finding: Finding): string {
+  const sections = [
+    `Current state\n${finding.currentState}`,
+    `Goal\n${finding.goal.map((goal) => `• ${goal}`).join("\n")}`,
+  ]
+
+  if (finding.reference) {
+    sections.push(`Reference\n${finding.reference.content.trimEnd()}`)
+  }
+
+  if (finding.notes && finding.notes.length > 0) {
+    sections.push(`Notes\n${finding.notes.map((note) => `• ${note}`).join("\n")}`)
+  }
+
+  return sections.join("\n\n")
 }
+
+// Each finding as a numbered note.
+const printFindings = Effect.fn("printFindings")(function* (findings: readonly Finding[]) {
+  for (const [index, finding] of findings.entries()) {
+    yield* Output.note(`${index + 1}. ${finding.title}`, renderFinding(finding))
+  }
+})
 
 /**
  * The resolution menu, then the handoff and its verification. It returns the agent whose session
@@ -109,7 +126,9 @@ const resolve = <E, R>(options: Offer<E, R>) => {
   const name = String.capitalize(options.command)
 
   const fail = Output.outro(`⚠️ ${name} found issues.`).pipe(
-    Effect.andThen(commandFailed(options.command))
+    Effect.andThen(
+      new CommandFailed({ command: options.command, exitCode: ChildProcessSpawner.ExitCode(1) })
+    )
   )
 
   return Effect.gen(function* () {
@@ -164,7 +183,11 @@ const resolve = <E, R>(options: Offer<E, R>) => {
         isPending(options.work)
           ? `${name} was cancelled. The findings remain.`
           : `${name} was cancelled.`
-      ).pipe(Effect.andThen(commandFailed(options.command)))
+      ).pipe(
+        Effect.andThen(
+          new CommandFailed({ command: options.command, exitCode: ChildProcessSpawner.ExitCode(1) })
+        )
+      )
     )
   )
 }
@@ -188,7 +211,9 @@ function hasPrompt(work: Work) {
 export const offer = <E, R>(options: Offer<E, R>) => {
   // Without a menu, nothing hands off, so the work stays as the command found it.
   const unattended = isPending(options.work)
-    ? Effect.fail(commandFailed(options.command))
+    ? Effect.fail(
+        new CommandFailed({ command: options.command, exitCode: ChildProcessSpawner.ExitCode(1) })
+      )
     : Effect.succeed(Option.none<CodingAgent>())
 
   return Effect.flatMap(Mode.CurrentMode, (mode) =>

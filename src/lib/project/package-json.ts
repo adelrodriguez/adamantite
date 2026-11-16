@@ -1,10 +1,7 @@
-import process from "node:process"
 import type { PackageJson } from "type-fest"
-import * as Array from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Jsonc from "effect/encoding/Jsonc"
-import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
@@ -19,7 +16,7 @@ const CATALOG_PROTOCOL = "catalog:"
 /**
  * What a dependency specifier in `package.json` says about the version of the package.
  */
-export type DeclaredVersion =
+type DeclaredVersion =
   /**
    * A pnpm catalog entry, such as `catalog:` for the default catalog or `catalog:tools`.
    */
@@ -74,7 +71,7 @@ const PackageManifest = Schema.Struct({
   ),
 })
 
-export const readPackageJson = (cwd: string = process.cwd()) =>
+export const readPackageJson = (cwd: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const packagePath = path.join(cwd, "package.json")
@@ -102,7 +99,7 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
  */
 export const MANAGED_TOOLS = ["knip", "oxfmt", "oxlint", "sherif"] as const
 
-export type ManagedTool = (typeof MANAGED_TOOLS)[number]
+type ManagedTool = (typeof MANAGED_TOOLS)[number]
 
 /**
  * The package scripts that Adamantite manages: the command of each, the tools that it runs, and
@@ -134,6 +131,13 @@ export const CI_SCRIPTS: readonly Script[] = SCRIPT_ORDER.filter(
 )
 
 /**
+ * Whether one of `scripts` runs in CI.
+ */
+export function hasCICompatibleScripts(scripts: readonly Script[]): boolean {
+  return CI_SCRIPTS.some((script) => scripts.includes(script))
+}
+
+/**
  * The managed scripts that run `tool`, in `SCRIPT_ORDER`.
  */
 export function getScriptsThatRun(tool: ManagedTool): Script[] {
@@ -149,13 +153,4 @@ export function checkRunsTool(scripts: readonly Script[], tool: ManagedTool): bo
 
     return tools.includes(tool)
   })
-}
-
-export function getManagedScripts(packageJson: PackageJson): Script[] {
-  const scripts = packageJson.scripts ?? {}
-
-  return pipe(
-    Record.keys(MANAGED_SCRIPT_COMMANDS),
-    Array.filter((name) => scripts[name] === MANAGED_SCRIPT_COMMANDS[name])
-  )
 }

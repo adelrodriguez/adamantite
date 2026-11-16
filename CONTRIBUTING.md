@@ -76,9 +76,15 @@ Each kind of test has one place:
 - Tests of the `custom()` helpers and the authoring API go in `presets/rules/__tests__/`.
   `presets/__tests__/custom.test.ts` lints projects that call `custom()` in real Oxlint runs.
 - Command-behavior tests go in `src/commands/__tests__/`. They run a command against an in-memory
-  project, such as `runLifecycle` in `lifecycle.ts` for `init`, `update`, and `doctor`.
-- A test of one `src` module goes in the `__tests__` folder beside it. The helpers that several
-  tests share are in `src/__tests__/`.
+  project with `runCommand` in `src/__tests__/command-test-helpers.ts`.
+- The tests of one integration go in `src/lib/integrations/<name>/__tests__/index.test.ts`, also
+  the tests that run `init`, `update`, and `doctor` through `runLifecycle` in
+  `src/__tests__/lifecycle.ts`.
+- A test of one `src` module goes in the `__tests__` folder beside it. The helpers that tests in
+  several folders share go in `src/__tests__/`.
+
+Name each test file after the module that it tests, as `<folder>/__tests__/<name>.test.ts` for
+`<folder>/<name>.ts`, or list it with a reason in `src/__tests__/test-names.test.ts`.
 
 A test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest, belongs in the
 `PROCESS_RUN_TESTS` list of `vitest.config.ts`. That list is the `presets` Vitest project, which

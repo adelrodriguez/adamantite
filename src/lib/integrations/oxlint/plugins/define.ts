@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect"
 import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
-import { checkAppliesLintPreset } from "#lib/integrations/oxlint/config.ts"
+import { listAppliedLintPresets } from "#lib/integrations/oxlint/config.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
 import { getScriptsThatRun } from "#lib/project/package-json.ts"
 
@@ -39,7 +39,9 @@ export function defineManagedPlugin<
   const { assess: assessMore, name, preset, version, ...extensions } = options
 
   const tooling = definePackageTooling({
-    isRequired: (project) => checkAppliesLintPreset(project, preset),
+    // An Oxlint config of the project applies the preset anywhere, as `listAppliedLintPresets`
+    // lists them.
+    isRequired: (project) => listAppliedLintPresets(project).includes(preset),
     name,
     purpose: `the \`adamantite/lint/${preset}\` preset`,
     scripts: getScriptsThatRun("oxlint"),

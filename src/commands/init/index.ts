@@ -1,14 +1,18 @@
-import process from "node:process"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
+import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import { validateInitOptions } from "#commands/init/options.ts"
+import { collectInteractiveInitOptions } from "#commands/init/prompts.ts"
 import { applySetup } from "#commands/setup.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import { SUPPORTED_PACKAGE_MANAGERS } from "#lib/project/package-manager.ts"
 import { readProject } from "#lib/project/project.ts"
 import {
   addSelection,
@@ -16,16 +20,69 @@ import {
   LINT_PRESETS,
   type LintPreset,
   type Selection,
+  TYPESCRIPT_PRESET_NAMES,
 } from "#lib/project/selection.ts"
-import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
+import { CommandFailed, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
-import { printZedExtensions } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
-import { initCommandOptions, validateInitOptions } from "./options.ts"
-import { collectInteractiveInitOptions } from "./prompts.ts"
 
-export default Command.make("init", { ...initCommandOptions, json: Mode.json }).pipe(
+const nonInteractive = Flag.Boolean("non-interactive").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Configure without prompts. Select at least one --script or --typescript")
+)
+
+const scripts = Flag.Literals("script", SCRIPT_ORDER).pipe(
+  Flag.atMost(SCRIPT_ORDER.length),
+  Flag.withDescription(
+    "Set a package script to its Adamantite command, replacing what it ran. Repeat --script to add more"
+  )
+)
+
+const presets = Flag.Literals("preset", LINT_PRESETS).pipe(
+  Flag.atMost(LINT_PRESETS.length),
+  Flag.withDescription(
+    "Select an Oxlint preset. Repeat --preset to add more. Requires --script check or --script fix"
+  )
+)
+
+const editors = Flag.Literals("editor", INIT_EDITORS).pipe(
+  Flag.atMost(INIT_EDITORS.length),
+  Flag.withDescription("Configure an editor. Repeat --editor to add more")
+)
+
+const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
+  Flag.optional,
+  Flag.withDescription(
+    "Use a TypeScript preset: typescript for strict types, tsconfig for strict config"
+  )
+)
+
+const githubActions = Flag.Boolean("github-actions").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription(
+    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${new Intl.ListFormat("en-US", { type: "disjunction" }).format(SUPPORTED_PACKAGE_MANAGERS)}`
+  )
+)
+
+const agents = Flag.Boolean("agents").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription(
+    "Add Adamantite guidance to AGENTS.md and the Adamantite skill to the skill folders of your coding agents"
+  )
+)
+
+export default Command.make("init", {
+  agents,
+  editors,
+  githubActions,
+  json: Mode.json,
+  nonInteractive,
+  presets,
+  scripts,
+  typescript,
+}).pipe(
   Command.withDescription(
     "Configure Adamantite in the current directory. Use --non-interactive or --json with setup flags and select each optional feature explicitly. Exits 1 when findings remain after setup"
   ),
@@ -45,9 +102,9 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
       description: "Configure analysis, including Sherif checks for a monorepo",
     },
   ]),
-  Command.withHandler(({ json, ...options }) =>
+  Command.withHandler(({ json, nonInteractive, ...setupFlags }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       // Only a terminal that can prompt asks for the selection. With `--json`,
       // `--non-interactive`, or no such terminal, init sets up from the flags.
       const prompts = Mode.is("Menu")(yield* Mode.CurrentMode)
@@ -79,12 +136,12 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
         prompts
         && Array.some(
           [
-            options.scripts.length > 0,
-            options.presets.length > 0,
-            options.editors.length > 0,
-            Option.isSome(options.typescript),
-            options.githubActions,
-            options.agents,
+            setupFlags.scripts.length > 0,
+            setupFlags.presets.length > 0,
+            setupFlags.editors.length > 0,
+            Option.isSome(setupFlags.typescript),
+            setupFlags.githubActions,
+            setupFlags.agents,
           ],
           Predicate.isTruthy
         )
@@ -94,14 +151,14 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
         })
       }
 
-      if (!prompts && options.scripts.length === 0 && Option.isNone(options.typescript)) {
+      if (!prompts && setupFlags.scripts.length === 0 && Option.isNone(setupFlags.typescript)) {
         return yield* new InvalidInitOptions({
           reason:
             "Select at least one script with `--script <name>`, or a TypeScript preset with `--typescript <preset>`.",
         })
       }
 
-      const input = prompts ? yield* collectInteractiveInitOptions(isMonorepo) : options
+      const input = prompts ? yield* collectInteractiveInitOptions(isMonorepo) : setupFlags
 
       const initOptions = yield* validateInitOptions(input, packageManager.name)
 
@@ -113,14 +170,14 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
         && Option.isNone(initOptions.editors)
         && !initOptions.agents
       ) {
-        yield* Output.outro("💠 No setup selected, so Adamantite made no changes.")
+        yield* Output.outro("✅ No setup selected, so Adamantite made no changes.")
 
         return
       }
 
       const { lint } = initOptions
 
-      const presets = Option.match(lint, {
+      const lintPresets = Option.match(lint, {
         onNone: (): readonly LintPreset[] => [],
         onSome: (setup) => setup.presets,
       })
@@ -134,7 +191,7 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
           onSome: (names) => INIT_EDITORS.filter((editor) => names.includes(editor)),
         }),
         presets: Option.isSome(lint)
-          ? ["core", ...LINT_PRESETS.filter((preset) => presets.includes(preset))]
+          ? ["core", ...LINT_PRESETS.filter((preset) => lintPresets.includes(preset))]
           : [],
         scripts: SCRIPT_ORDER.filter((script) => initOptions.scripts.includes(script)),
         typescript: Option.getOrNull(initOptions.typescript),
@@ -147,15 +204,28 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
 
       // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
-        yield* printZedExtensions(presets)
+        yield* Output.info("Install the Zed `oxc` extension: zed://extension/oxc")
+
+        if (lintPresets.includes("effect")) {
+          yield* Output.info(
+            "Install the Zed TypeScript language server extension: zed://extension/tsgo"
+          )
+        }
       }
 
       yield* applySetup("init", yield* readProject(cwd), selection)
 
-      yield* Output.outro("💠 Setup finished.")
+      yield* Output.outro("✅ Setup finished.")
     }).pipe(
-      Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")),
-      Mode.provide({ interactive: !options.nonInteractive, json })
+      // A cancel exits 1, as in the other commands.
+      Effect.catchTag("QuitError", () =>
+        Output.cancel("Setup was cancelled.").pipe(
+          Effect.andThen(
+            new CommandFailed({ command: "init", exitCode: ChildProcessSpawner.ExitCode(1) })
+          )
+        )
+      ),
+      Mode.provide({ interactive: !nonInteractive, json })
     )
   )
 )

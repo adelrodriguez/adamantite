@@ -6,14 +6,13 @@ import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import {
+  BackendOverride,
   BindingOverride,
-  type NativeOverride,
   NativeRuntime,
-  type OxlintPlugin,
 } from "#lib/integrations/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/oxlint/plugins/index.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
-import { NativeRuntimeConflict, PackageNotInstalled } from "#lib/shared/errors.ts"
+import { PackageNotInstalled } from "#lib/shared/errors.ts"
 
 /**
  * Oxlint finds its own file.
@@ -51,7 +50,7 @@ export class ReplacedBackend extends Data.TaggedClass("Replaced")<{
 /**
  * The type-aware backend that Oxlint starts.
  */
-export type RuntimeBackend = NoBackend | ReplacedBackend | TsrsBackend
+type RuntimeBackend = NoBackend | ReplacedBackend | TsrsBackend
 
 /**
  * The variables that make Oxlint start the backend on `platform`.
@@ -122,57 +121,35 @@ const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (proj
 })
 
 /**
- * The Oxlint runtime for the project at `project`. Each Oxlint plugin with a native capability can
- * replace the binding or the backend when the project installs it. Two plugins that replace the
- * same part fail. Without a backend override, Oxlint starts the installed tsrs. The resolution
- * reads files, but it loads no Oxlint module and changes no process variable.
+ * The Oxlint runtime for the project at `project`. An Oxlint plugin with a native capability can
+ * replace the binding or the backend when the project installs it. Only one plugin has one, so no
+ * two overrides replace the same part. Without a backend override, Oxlint starts the installed
+ * tsrs. The resolution reads files, but it loads no Oxlint module and changes no process variable.
  */
-export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* (
-  project: string,
-  plugins: readonly OxlintPlugin[] = oxlintPlugins
-) {
+export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* (project: string) {
   const oxlint = yield* resolvePackageDirectory(project, "oxlint")
 
   if (Option.isNone(oxlint)) {
     return yield* new PackageNotInstalled({ packageName: "oxlint", project })
   }
 
-  let binding: RuntimePart = new StockPart()
-  let backend: RuntimeBackend | undefined
-  const owners = new Map<NativeOverride["_tag"], string>()
+  const overrides = yield* Effect.forEach(
+    oxlintPlugins.flatMap(({ runtime }) => (runtime instanceof NativeRuntime ? [runtime] : [])),
+    (runtime) => runtime.resolve(project, oxlint.value),
+    { concurrency: "unbounded" }
+  )
 
-  for (const plugin of plugins) {
-    if (!(plugin.runtime instanceof NativeRuntime)) {
-      continue
-    }
-
-    const overrides = yield* plugin.runtime.resolve(project, oxlint.value)
-
-    for (const override of overrides) {
-      const owner = owners.get(override._tag)
-
-      if (owner !== undefined) {
-        return yield* new NativeRuntimeConflict({
-          part: override._tag,
-          plugins: [owner, plugin.name],
-        })
-      }
-
-      owners.set(override._tag, plugin.name)
-
-      if (override instanceof BindingOverride) {
-        binding = new ReplacedPart({ path: override.path })
-      } else {
-        // An override replaces the whole backend, so the default and the native backend variables
-        // never mix.
-        backend = new ReplacedBackend({ env: override.env })
-      }
-    }
-  }
+  const binding = overrides.flat().find((override) => override instanceof BindingOverride)
+  const backend = overrides.flat().find((override) => override instanceof BackendOverride)
 
   return {
-    backend: backend ?? (yield* resolveDefaultBackend(project)),
-    binding,
+    // An override replaces the whole backend, so the default and the native backend variables never
+    // mix.
+    backend:
+      backend === undefined
+        ? yield* resolveDefaultBackend(project)
+        : new ReplacedBackend({ env: backend.env }),
+    binding: binding === undefined ? new StockPart() : new ReplacedPart({ path: binding.path }),
     oxlint: oxlint.value,
   } satisfies OxlintRuntime
 })

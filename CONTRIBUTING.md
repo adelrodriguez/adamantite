@@ -113,7 +113,7 @@ its package folder in `ADAMANTITE_TEST_OXLINT`:
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
   presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts \
-  presets/__tests__/effect.test.ts src/commands/__tests__/rule-ast.test.ts \
+  presets/__tests__/effect.test.ts src/commands/__tests__/rule.test.ts \
   src/lib/hardening/__tests__/suppressions.test.ts
 ```
 

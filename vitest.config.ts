@@ -17,7 +17,7 @@ const PROCESS_RUN_TESTS = [
   "presets/__tests__/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",
   "src/__tests__/oxlint.test.ts",
-  "src/commands/__tests__/rule-ast.test.ts",
+  "src/commands/__tests__/rule.test.ts",
   "src/lib/hardening/__tests__/overrides.test.ts",
   "src/lib/hardening/__tests__/suppressions.test.ts",
   "src/lib/hardening/__tests__/trial.test.ts",

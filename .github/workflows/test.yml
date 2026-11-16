@@ -170,7 +170,7 @@ jobs:
               oxlint_dir="${RUNNER_TEMP}/adamantite-minimum-oxlint"
               mkdir "${oxlint_dir}"
               npm install --prefix "${oxlint_dir}" "oxlint@${oxlint_version}"
-              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts presets/__tests__/effect.test.ts src/commands/__tests__/rule-ast.test.ts src/lib/hardening/__tests__/suppressions.test.ts
+              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts presets/__tests__/effect.test.ts src/commands/__tests__/rule.test.ts src/lib/hardening/__tests__/suppressions.test.ts
 
     steps:
       - name: Checkout

@@ -25,6 +25,7 @@ import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
 import * as Project from "#lib/project/index.ts"
+import { countPatternOverrides, type LintConfig } from "#lib/project/lint-config.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
@@ -135,6 +136,37 @@ function toExcludedPresetsFinding({
 }
 
 /**
+ * The warning for a lint config that states import layers by hand, in two or more overrides of
+ * `no-restricted-imports` with `patterns`. Oxlint replaces the options that an earlier override set
+ * for the same files, so each override repeats the patterns of the ones before it. The config is
+ * valid, so the report is a warning and fails no Doctor gate.
+ */
+function toLayerMapWarning(file: string, config: LintConfig): Option.Option<string> {
+  const count = countPatternOverrides(config)
+
+  if (count < 2) {
+    return Option.none()
+  }
+
+  const presets = listLintPresets(config)
+  const architecture = publicImport("./lint/architecture")
+
+  return Option.some(
+    [
+      `\`${file}\` states import layers by hand in ${count} \`no-restricted-imports\` overrides with \`patterns\`.`,
+      "The `adamantite/layers` rule states the layers of one root in one layer map.",
+      "State each root as a layer map in `adamantite/layers`.",
+      ...(presets.includes("architecture") || presets.includes("strict")
+        ? []
+        : [`Import \`${architecture}\` and add it to \`extends\` after the core preset.`]),
+      "Use `ignore` in place of an override that turns the rule off for tests, `entries` in place of a ban on imports of entry files, and `isolate` in place of a ban on imports between the units of one layer.",
+      "Remove each override that a layer map replaces. Keep each override that a layer map cannot state, such as a ban on imports from another workspace package, because a layer map checks only the imports inside one package.",
+      "Then run `adamantite check`.",
+    ].join(" ")
+  )
+}
+
+/**
  * The finding for a lint config that every lint run fails to load. Oxlint loads every config of the
  * project before it lists the files to lint, so a failed list is such a config. A missing package
  * or runtime has its own finding, and Oxlint does not run without it.
@@ -174,6 +206,7 @@ export default {
   assess: (project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
       const cwd = yield* Project.Directory
+      const path = yield* Path.Path
       const { lintConfig } = project
       const runtimeFindings = yield* assessOxlintRuntime(project)
       const loadFindings = yield* assessConfigLoad(project, runtimeFindings)
@@ -213,6 +246,15 @@ export default {
         Option.toArray
       )
 
+      // Oxlint replaces override options within one config, so each config that it loads counts
+      // apart: the root config and the config of each workspace package.
+      const layerMapWarnings = Array.fromIterable(project.customRules.reads).flatMap(
+        ([file, read]) =>
+          Result.isSuccess(read)
+            ? Option.toArray(toLayerMapWarning(path.relative(cwd, file), read.success))
+            : []
+      )
+
       return {
         findings: [
           ...pkg.findings,
@@ -224,7 +266,7 @@ export default {
           ...configFindings,
         ],
         packageActions: pkg.packageActions,
-        warnings: pkg.warnings,
+        warnings: [...pkg.warnings, ...layerMapWarnings],
       }
     }),
   files: (_project: Project.Snapshot, selection: Selection) =>

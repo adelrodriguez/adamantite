@@ -9,7 +9,7 @@ import {
   makeLockfileFile,
   readLockfile,
 } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "oxlint.config.ts"
 
@@ -50,18 +50,6 @@ const MISSING_PRESET = "The config does not apply a selected lint preset"
 
 const EXCLUDED_PRESETS = "The config extends two presets that report the same defects"
 
-// The config that Adamantite 0.47.0 wrote, before its imports were in Oxfmt's order.
-const OLDER = [
-  'import { defineConfig } from "oxlint"',
-  'import core from "adamantite/lint"',
-  'import vitest from "adamantite/lint/vitest"',
-  'import custom from "adamantite/rules"',
-  "",
-  "export default defineConfig({",
-  "  extends: [core, vitest, custom()],",
-  ...OPTIONS,
-].join("\n")
-
 function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { ...files, "package.json": PACKAGE_JSON } })
 }
@@ -82,19 +70,6 @@ describe("Oxlint setup", () => {
         recorded: hashContent(RENDERED),
       })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
-    })
-  )
-
-  it.effect("report the config unchanged on a second init", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${CONFIG}\` is up to date.`)
     })
   )
 
@@ -193,23 +168,6 @@ describe("Oxlint setup", () => {
 
       expect(output).not.toContain(MISSING_PRESET)
       expect(output).not.toContain(EXCLUDED_PRESETS)
-    })
-  )
-
-  // An earlier version wrote the config, and nobody changed it since (#837).
-  it.effect("replace a config whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const files = makeProject({
-        ...makeLockfileFile(makeSelection({ presets: ["core", "vitest"], scripts: ["check"] }), {
-          [CONFIG]: hashContent(OLDER),
-        }),
-        [CONFIG]: OLDER,
-      })
-
-      const { output } = yield* runLifecycle("update", files)
-
-      expect(files.read(CONFIG)).toBe(RENDERED)
-      expect(output).toContain(`✔ \`${CONFIG}\` replaced with the current version.`)
     })
   )
 

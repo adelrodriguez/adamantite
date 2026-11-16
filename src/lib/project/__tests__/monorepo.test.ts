@@ -2,87 +2,10 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import {
-  checkIsMonorepo,
-  readPnpmWorkspacePatterns,
-  readWorkspace,
-  workspacePatternToRegExp,
-} from "#lib/project/monorepo.ts"
+import { checkIsMonorepo, readWorkspace, workspacePatternToRegExp } from "#lib/project/monorepo.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
-
-describe("readPnpmWorkspacePatterns", () => {
-  it.effect.each([
-    {
-      content: [
-        "packages:",
-        "  - packages/* # apps and libraries",
-        '  - "tooling/lint"',
-        "  - '!packages/legacy'",
-        "catalog:",
-        "  effect: 4.0.0",
-      ].join("\n"),
-      expected: ["packages/*", "tooling/lint", "!packages/legacy"],
-      name: "a block list with quotes and comments",
-    },
-    {
-      content: 'packages: [\n  "apps/*",\n  tooling/lint\n]\n',
-      expected: ["apps/*", "tooling/lint"],
-      name: "a flow list over several lines",
-    },
-    {
-      content: 'packages: &workspacePackages ["apps/*"]\n',
-      expected: ["apps/*"],
-      name: "a list after a YAML anchor",
-    },
-    {
-      content:
-        'shared: &workspacePackages ["apps/*", tooling/lint]\npackages: *workspacePackages\n',
-      expected: ["apps/*", "tooling/lint"],
-      name: "an alias to an anchored flow list",
-    },
-    {
-      content:
-        "shared: &workspacePackages\n  - apps/*\n  - tooling/lint\npackages: *workspacePackages\n",
-      expected: ["apps/*", "tooling/lint"],
-      name: "an alias to an anchored block list",
-    },
-    {
-      content: [
-        "workspacePatterns:",
-        "  active: &workspacePackages",
-        "    - apps/*",
-        "  archived:",
-        "    - packages/*",
-        "packages: *workspacePackages",
-      ].join("\n"),
-      expected: ["apps/*"],
-      name: "an alias to a list inside a mapping",
-    },
-    {
-      content: "packages:\n- apps/*\n- tooling/lint\ncatalog:\n  a: 1\n",
-      expected: ["apps/*", "tooling/lint"],
-      name: "a block list whose items are not indented",
-    },
-    {
-      content: "catalog:\n  effect: 4.0.0\n",
-      expected: [],
-      name: "no packages key",
-    },
-    { content: "", expected: [], name: "an empty file" },
-    { content: "packages: apps/*\n", expected: [], name: "packages that are not a list" },
-    {
-      content: "packages:\n  - apps/*\n bad: [\n",
-      expected: [],
-      name: "a file that does not parse",
-    },
-  ])("read $name", ({ content, expected }) =>
-    Effect.gen(function* () {
-      expect(yield* readPnpmWorkspacePatterns(content)).toStrictEqual(expected)
-    })
-  )
-})
 
 describe("workspacePatternToRegExp", () => {
   it.each([

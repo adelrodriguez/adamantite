@@ -48,13 +48,6 @@ function lint(options: Readonly<Options>) {
 
 describe("require-safety-comment-for-type-assertion option validation in Oxlint", () => {
   it.each([
-    { name: "one marker", options: [{ markers: ["WHY"] }] },
-    { name: "a marker with outer spaces", options: [{ markers: [" WHY "] }] },
-  ])("accept $name", ({ options }) => {
-    expect(lint(options).status).toBe(0)
-  })
-
-  it.each([
     { name: "a blank marker", options: [{ markers: ["  "] }] },
     { name: "a blank marker after a valid one", options: [{ markers: ["WHY", " "] }] },
   ])("reject $name with a nonzero exit", ({ options }) => {

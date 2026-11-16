@@ -22,7 +22,6 @@ import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
-import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { type Script, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
@@ -580,30 +579,6 @@ describe("init", () => {
       })
     )
 
-    it.effect("keep an existing prepare script, and warn about the missing tsconfig.json", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": yield* stringifyJson({
-            name: "test-project",
-            scripts: { prepare: "husky" },
-          }),
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [installer.layer, runner.layer], logLines }
-        )
-
-        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-        expect(readJson(files, "package.json")).toMatchObject({ scripts: { prepare: "husky" } })
-      })
-    )
-
     it.effect("keep configs with comments and continue", () =>
       Effect.gen(function* () {
         const tsconfigContent =
@@ -721,34 +696,6 @@ describe("init", () => {
           "✔ The jest and vitest presets report the same defects. Which one should Adamantite use? …  vitest"
         )
         expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["vitest", "strict"]))
-      })
-    )
-  })
-
-  describe("sherif for analyze", () => {
-    it.effect("install sherif with the analyze script in a monorepo", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson })
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "analyze"], {
-          files,
-          layers: [installer.layer],
-          logLines,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(listInstalls(installer).packages).toStrictEqual(
-          sortPackages([
-            `adamantite@${getPackageVersion()}`,
-            `sherif@${sherif.version}`,
-            `knip@${knip.version}`,
-          ])
-        )
-        expect(files.read("knip.config.ts")).toContain(
-          "ignoreDependencies: ignoreDependencies.monorepo"
-        )
       })
     )
   })

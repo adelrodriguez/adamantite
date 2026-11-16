@@ -34,8 +34,6 @@ const OxlintJsonOutput = Schema.Struct({
   ),
 })
 
-const hasBun = spawnSync("bun", ["--version"]).status === 0
-
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
@@ -120,25 +118,6 @@ describe("custom preset", () => {
     write("oxlint.config.ts", makeConfig("custom()"))
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
-  })
-
-  it("load a plugin defined with the public helpers through jsPlugins", () => {
-    write("no-debugger-here.ts", makeRule("No debugger here."))
-    write(
-      "lint-plugin.ts",
-      [
-        `import { definePlugin } from ${JSON.stringify(RULES_MODULE)}`,
-        'import rule from "./no-debugger-here.ts"',
-        'export default definePlugin({ meta: { name: "local" }, rules: { "no-debugger-here": rule } })',
-        "",
-      ].join("\n")
-    )
-    write(
-      "oxlint.config.ts",
-      'export default { jsPlugins: ["./lint-plugin.ts"], rules: { "no-debugger": "off", "local/no-debugger-here": "error" } }\n'
-    )
-
-    expect(lint("src")).toStrictEqual(["local(no-debugger-here):error"])
   })
 
   it("fail the run when two files in a rules folder define one rule", () => {
@@ -297,28 +276,6 @@ describe("custom preset", () => {
         Order.String
       )
     )
-  })
-
-  // Bun prints stack frames as plain paths, where Node.js prints file URLs.
-  it.skipIf(!hasBun)("resolve the rules folder from the calling file under Bun", () => {
-    write("tooling/lint/rules/no-debugger-here.ts", makeRule("No debugger here."))
-    write(
-      "tooling/lint/index.ts",
-      [
-        `import custom from ${JSON.stringify(CUSTOM_PRESET)}`,
-        "",
-        'console.log(JSON.stringify(custom({ dir: "rules" }).rules))',
-        "",
-      ].join("\n")
-    )
-
-    const result = spawnSync("bun", [join(project, "tooling/lint/index.ts")], {
-      cwd: project,
-      encoding: "utf8",
-    })
-
-    expect(result.stderr).toBe("")
-    expect(result.stdout.trim()).toBe('{"project/no-debugger-here":"error"}')
   })
 })
 

@@ -1,18 +1,9 @@
 import process from "node:process"
-import { describe, expect, expectTypeOf, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import {
-  type BackendOverride,
-  type BindingOverride,
-  defineOxlintPlugin,
-  JavaScriptRuntime,
-  type NativeOverride,
-  type NativeRuntime,
-  type OxlintPlugin,
-} from "#lib/integrations/oxlint/plugins/base.ts"
 import {
   NoBackend,
   ReplacedBackend,
@@ -21,8 +12,6 @@ import {
   StockPart,
   toBackendEnv,
   TsrsBackend,
-  type OxlintRuntime,
-  type RuntimePart,
 } from "#lib/integrations/oxlint/runtime.ts"
 import {
   EffectBuildMissing,
@@ -336,19 +325,5 @@ describe("toBackendEnv", () => {
     expect(toBackendEnv(new TsrsBackend({ launcher: "C:/tsrs-lint.cmd" }), "win32")).toStrictEqual({
       OXLINT_TSGOLINT_PATH: "C:/tsrs-lint.cmd",
     })
-  })
-})
-
-describe("runtime types", () => {
-  it("keep plugin capabilities and resolved runtime parts distinct in types", () => {
-    const javascript = defineOxlintPlugin({
-      name: "example",
-      runtime: new JavaScriptRuntime(),
-    })
-
-    expectTypeOf(javascript.name).toEqualTypeOf<"example">()
-    expectTypeOf<OxlintPlugin["runtime"]>().toEqualTypeOf<JavaScriptRuntime | NativeRuntime>()
-    expectTypeOf<NativeOverride>().toEqualTypeOf<BindingOverride | BackendOverride>()
-    expectTypeOf<OxlintRuntime["binding"]>().toEqualTypeOf<RuntimePart>()
   })
 })

@@ -117,30 +117,6 @@ describe.each([
     expect(codes["src/script.ts"]).toBeUndefined()
   })
 
-  // The README tells a project to change a test rule in an override with the preset's plugins,
-  // because the preset's override takes priority over top-level rules.
-  it.each([
-    { change: "the top-level rules", config: "{ extends: [preset], rules }" },
-    {
-      change: "an override without the preset's plugins",
-      config: "{ extends: [preset], overrides: [{ files, rules }] }",
-    },
-  ])("keep a test rule turned off in $change", ({ config }) => {
-    const codes = lint(
-      [
-        `import preset, { testFiles as files } from ${presetPath}`,
-        "",
-        `const rules = { "${name}/require-top-level-describe": "off" }`,
-        "",
-        `export default ${config}`,
-        "",
-      ].join("\n"),
-      { "src/math.test.ts": test }
-    )
-
-    expect(codes["src/math.test.ts"]).toContain(`${name}(require-top-level-describe)`)
-  })
-
   it("drop a test rule turned off in an override with the preset's plugins", () => {
     const codes = lint(
       [

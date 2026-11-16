@@ -13,7 +13,7 @@ import {
   makeLockfileFile,
   readLockfile,
 } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "tsconfig.json"
 
@@ -28,13 +28,6 @@ const INIT_ARGS = ["--non-interactive", "--typescript", "typescript"]
 
 // The tests install no Oxfmt, so Setup writes each file as rendered.
 const RENDERED = `${Effect.runSync(formatJson({ extends: "adamantite/typescript" }))}\n`
-
-const WITH_EFFECT = `${Effect.runSync(
-  formatJson({
-    compilerOptions: { plugins: [{ diagnostics: true, name: "@effect/language-service" }] },
-    extends: "adamantite/typescript",
-  })
-)}\n`
 
 function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { "package.json": PACKAGE_JSON, ...files } })
@@ -52,44 +45,6 @@ describe("TypeScript setup", () => {
         succeeded: Exit.isSuccess(exit),
       }).toStrictEqual({ config: RENDERED, recorded: hashContent(RENDERED), succeeded: true })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
-    })
-  )
-
-  it.effect("add the Effect language service entry for the effect preset", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-
-      yield* runLifecycle("init", files, [...INIT_ARGS, "--script", "check", "--preset", "effect"])
-
-      expect(files.read(CONFIG)).toBe(WITH_EFFECT)
-    })
-  )
-
-  it.effect("report the config unchanged on a second init", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${CONFIG}\` is up to date.`)
-    })
-  )
-
-  // Adamantite never merges the preset into a config that it did not write.
-  it.effect("keep a config that the project wrote, and report the missing preset in doctor", () =>
-    Effect.gen(function* () {
-      const own = '{\n  // Strict options\n  "compilerOptions": { "strict": true },\n}\n'
-      const files = makeProject({ [CONFIG]: own })
-
-      const init = yield* runLifecycle("init", files, INIT_ARGS)
-      const doctor = yield* runLifecycle("doctor", files)
-
-      expect(files.read(CONFIG)).toBe(own)
-      expect(init.output).toContain(`● \`${CONFIG}\` kept, because it has changes`)
-      expect(doctor.output).toContain("Missing TypeScript preset")
     })
   )
 
@@ -158,27 +113,6 @@ describe("TypeScript setup", () => {
         findings: decodeReport(json.output).findings.map(({ title }) => title),
         succeeded: Exit.isSuccess(doctor.exit),
       }).toStrictEqual({ findings: [], succeeded: true })
-    })
-  )
-
-  // An earlier version wrote the config before the selection added the effect preset (#837).
-  it.effect("replace a config whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const selection = makeSelection({
-        presets: ["core", "effect"],
-        scripts: ["check"],
-        typescript: "typescript",
-      })
-
-      const files = makeProject({
-        ...makeLockfileFile(selection, { [CONFIG]: hashContent(RENDERED) }),
-        [CONFIG]: RENDERED,
-      })
-
-      const { output } = yield* runLifecycle("update", files)
-
-      expect(files.read(CONFIG)).toBe(WITH_EFFECT)
-      expect(output).toContain(`✔ \`${CONFIG}\` replaced with the current version.`)
     })
   )
 

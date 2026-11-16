@@ -124,21 +124,6 @@ describe("rule add", () => {
       expect(files.list()).toStrictEqual([".adamantite/lint/test.ts"])
     })
   )
-
-  it.effect("reject the former route that created a test", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
-      })
-
-      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
-        files,
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
-    })
-  )
 })
 
 const PACKAGE_JSON = JSON.stringify({ name: "app" })

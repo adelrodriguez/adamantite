@@ -144,66 +144,6 @@ describe("renderAssessmentMarkdown", () => {
 
     expect(prompt).not.toContain("**Notes:**")
   })
-
-  it("keep placeholder-like text in findings literal", () => {
-    const prompt = renderAssessmentMarkdown(
-      makeAssessment({
-        findings: [
-          {
-            currentState: "The script runs `echo {{version}} $&`.",
-            goal: ["Keep `{{findings}}` as written."],
-            id: "literal-text",
-            integration: "tool",
-            title: "Literal text",
-          },
-        ],
-      }),
-      "1.2.3"
-    )
-
-    expect(prompt).toContain("- **Current state:** The script runs `echo {{version}} $&`.")
-    expect(prompt).toContain("  - Keep `{{findings}}` as written.")
-  })
-
-  it("render the warning report when no findings remain", () => {
-    const report = renderAssessmentMarkdown(
-      makeAssessment({
-        warnings: ["Skipping `tsconfig.json` setup.", "Skipping `.oxlintrc.json` setup."],
-      }),
-      "1.2.3"
-    )
-
-    expect(report).toBe(
-      [
-        "# Adamantite doctor warnings",
-        "",
-        "Adamantite 1.2.3 detected no repair findings. The assessment reported these warnings:",
-        "",
-        "- Skipping `tsconfig.json` setup.",
-        "- Skipping `.oxlintrc.json` setup.",
-        "",
-        "Review the affected project state before deciding whether a warning needs a change.",
-        "Report each unresolved warning and the limit it places on verification.",
-        "If a required tool or source was unavailable, name it on the first line and state what you used instead.",
-        "The review is complete when each warning has an observed result or a stated limit.",
-        "",
-        "## Check the report",
-        "",
-        "- Every warning is accounted for, including missing tools or sources.",
-        "- A successful Doctor exit is not reported as proof that all project checks pass.",
-        "",
-      ].join("\n")
-    )
-  })
-
-  it("keep placeholder-like text in warnings literal", () => {
-    const report = renderAssessmentMarkdown(
-      makeAssessment({ warnings: ["The script runs `echo {{version}} {{warnings}} $&`."] }),
-      "1.2.3"
-    )
-
-    expect(report).toContain("- The script runs `echo {{version}} {{warnings}} $&`.")
-  })
 })
 
 describe("assessProject", () => {

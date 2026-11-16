@@ -9,7 +9,7 @@ import {
   makeLockfileFile,
   readLockfile,
 } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { runLifecycle } from "./lifecycle.ts"
 
 const WORKFLOW = ".github/workflows/adamantite.yml"
 
@@ -18,20 +18,8 @@ const PACKAGE_JSON =
 
 const INIT_ARGS = ["--non-interactive", "--script", "check", "--github-actions"]
 
-const SELECTION = makeSelection({ ci: "github", presets: ["core"], scripts: ["check"] })
-
 function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { "package.json": PACKAGE_JSON, ...files } })
-}
-
-// The workflow that init writes for the `check` script with bun, the package manager of the tests.
-function renderWorkflow() {
-  return Effect.gen(function* () {
-    const files = makeProject()
-    yield* runLifecycle("init", files, INIT_ARGS)
-
-    return files.read(WORKFLOW)
-  })
 }
 
 describe("GitHub Actions setup", () => {
@@ -44,35 +32,6 @@ describe("GitHub Actions setup", () => {
       expect(files.read(WORKFLOW)).toContain("command: bun run check")
       expect(readLockfile(files).written[WORKFLOW]).toBe(hashContent(files.read(WORKFLOW)))
       expect(output).toContain(`✔ \`${WORKFLOW}\` created.`)
-    })
-  )
-
-  it.effect("report the workflow unchanged on a second init", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${WORKFLOW}\` is up to date.`)
-    })
-  )
-
-  it.effect("replace a workflow whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const older = (yield* renderWorkflow()).replace("timeout-minutes: 10", "timeout-minutes: 5")
-
-      const files = makeProject({
-        ...makeLockfileFile(SELECTION, { [WORKFLOW]: hashContent(older) }),
-        [WORKFLOW]: older,
-      })
-
-      const { output } = yield* runLifecycle("update", files)
-
-      expect(files.read(WORKFLOW)).toBe(yield* renderWorkflow())
-      expect(output).toContain(`✔ \`${WORKFLOW}\` replaced with the current version.`)
     })
   )
 

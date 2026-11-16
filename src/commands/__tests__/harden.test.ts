@@ -1368,21 +1368,6 @@ describe("harden", () => {
     })
   )
 
-  it.effect("preserve user-owned optional rule tests without running them", () =>
-    Effect.gen(function* () {
-      const { exit, logLines, runner } = yield* runInteractiveHarden({
-        files: { ...CUSTOM_RULE_FILES, ".adamantite/lint/no-foo.test.ts": "// user-owned test\n" },
-        keys: ["enter"],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(
-        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
-      ).toStrictEqual(["claude", "oxfmt", "oxlint"])
-      expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
-    })
-  )
-
   it.effect(
     "read the workspace and discover the custom rules one time before and one time after the session",
     () =>

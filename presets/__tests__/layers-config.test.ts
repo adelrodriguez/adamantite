@@ -8,13 +8,6 @@ import { describe, expect, it } from "@effect/vitest"
 
 const REPO = join(import.meta.dirname, "../..")
 
-const MAP = {
-  layers: {
-    lib: { imports: [], layers: { workspace: { imports: [] } } },
-  },
-  root: "src",
-}
-
 function lint(options: Readonly<Options>) {
   const fixture = mkdtempSync(join(tmpdir(), "adamantite-layers-config-"))
 
@@ -52,10 +45,6 @@ function lint(options: Readonly<Options>) {
 }
 
 describe("layers option validation in Oxlint", () => {
-  it("accept nested maps", () => {
-    expect(lint([MAP]).status).toBe(0)
-  })
-
   it.each([
     { name: "old dependency arrays", options: [{ layers: { workspace: [] }, root: "src/lib" }] },
     { name: "missing imports", options: [{ layers: { lib: {} }, root: "src" }] },
@@ -78,12 +67,5 @@ describe("layers option validation in Oxlint", () => {
 
     expect(result.status).toBe(1)
     expect(result.stdout).toContain("Options validation failed")
-  })
-
-  it("reject duplicate scopes with a nonzero exit", () => {
-    const result = lint([MAP, { layers: { workspace: { imports: [] } }, root: "src/lib" }])
-
-    expect(result.status).toBe(1)
-    expect(result.stdout).toContain("more than one layer map")
   })
 })

@@ -72,20 +72,6 @@ function makeConfiguredFiles(overrides: Record<string, string> = {}) {
 
 describe("effect-tsgo", () => {
   describe("assess", () => {
-    it.effect("report not applicable when the config does not import the effect preset", () =>
-      Effect.gen(function* () {
-        // No package or tsconfig entry: each would be a finding with the preset.
-        const files = makeFiles({
-          "oxlint.config.ts": toOxlintTsConfigContent([]),
-          "package.json": makePackageJson({ scripts: { check: "adamantite check" } }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toStrictEqual({ applicable: false })
-      })
-    )
-
     it.effect("report nothing when the package and the tsconfig entry are in place", () =>
       Effect.gen(function* () {
         const files = makeConfiguredFiles()

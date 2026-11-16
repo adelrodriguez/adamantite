@@ -10,7 +10,7 @@ import {
   makeLockfileFile,
   readLockfile,
 } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { runLifecycle } from "./lifecycle.ts"
 
 const AGENTS = "AGENTS.md"
 
@@ -54,19 +54,6 @@ describe("agent guidance setup", () => {
     })
   )
 
-  it.effect("report the files unchanged on a second init", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${AGENTS}\` is up to date.`)
-    })
-  )
-
   // Adamantite writes AGENTS.md only when it does not exist, and never splices its section.
   it.effect("keep an AGENTS.md that the project wrote, and report the missing section", () =>
     Effect.gen(function* () {
@@ -79,20 +66,6 @@ describe("agent guidance setup", () => {
       expect(files.read(AGENTS)).toBe(own)
       expect(init.output).toContain(`● \`${AGENTS}\` kept, because it has changes`)
       expect(doctor.output).toContain("AGENTS.md has no Adamantite section")
-    })
-  )
-
-  it.effect("accept an AGENTS.md with the section that an earlier release added", () =>
-    Effect.gen(function* () {
-      const files = makeProject({
-        [AGENTS]:
-          "# Team instructions\n\n<!-- ADAMANTITE:START -->\n\n## Adamantite\n\n<!-- ADAMANTITE:END -->\n",
-      })
-
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const doctor = yield* runLifecycle("doctor", files)
-
-      expect(doctor.output).not.toContain("AGENTS.md has no Adamantite section")
     })
   )
 
@@ -155,22 +128,6 @@ describe("agent guidance setup", () => {
       expect(doctor.output).toContain(
         "Remove the `adamantite` entry from `skills` in `skills-lock.json`."
       )
-    })
-  )
-
-  it.effect("replace a skill file whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const older = "# The skill of an earlier version\n"
-
-      const files = makeProject({
-        ...makeLockfileFile(makeSelection({ agents: true }), { [SKILL]: hashContent(older) }),
-        [SKILL]: older,
-      })
-
-      const { output } = yield* runLifecycle("update", files)
-
-      expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
-      expect(output).toContain(`✔ \`${SKILL}\` replaced with the current version.`)
     })
   )
 

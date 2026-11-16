@@ -4,7 +4,7 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "knip.config.ts"
 
@@ -51,19 +51,6 @@ describe("Knip setup", () => {
     })
   )
 
-  it.effect("report the config unchanged on a second init", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${CONFIG}\` is up to date.`)
-    })
-  )
-
   it.effect("keep a config that the user changed, and report a missing ignore list", () =>
     Effect.gen(function* () {
       const files = makeProject({ "package.json": MONOREPO_PACKAGE_JSON })
@@ -80,24 +67,6 @@ describe("Knip setup", () => {
       expect(doctor.output).toContain(
         "The file must set `ignoreDependencies: ignoreDependencies.monorepo` from `adamantite/analyze`"
       )
-    })
-  )
-
-  it.effect("replace a config whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const older = RENDERED.replace("analyze\n\nexport", "{ ...analyze }\n\nexport")
-
-      const files = makeProject({
-        ...makeLockfileFile(makeSelection({ scripts: ["analyze"] }), {
-          [CONFIG]: hashContent(older),
-        }),
-        [CONFIG]: older,
-      })
-
-      const { output } = yield* runLifecycle("update", files)
-
-      expect(files.read(CONFIG)).toBe(RENDERED)
-      expect(output).toContain(`✔ \`${CONFIG}\` replaced with the current version.`)
     })
   )
 

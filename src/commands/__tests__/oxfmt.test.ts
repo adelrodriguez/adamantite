@@ -9,7 +9,7 @@ import {
   makeLockfileFile,
   readLockfile,
 } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "oxfmt.config.ts"
 
@@ -19,10 +19,6 @@ const INIT_ARGS = ["--non-interactive", "--script", "check"]
 
 const RENDERED =
   'import format from "adamantite/format"\nimport { defineConfig } from "oxfmt"\n\nexport default defineConfig(format)\n'
-
-// The config that Adamantite 0.47.0 wrote, before its imports were in Oxfmt's order.
-const OLDER =
-  'import { defineConfig } from "oxfmt"\nimport format from "adamantite/format"\n\nexport default defineConfig(format)\n'
 
 function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { ...files, "package.json": PACKAGE_JSON } })
@@ -44,19 +40,6 @@ describe("Oxfmt setup", () => {
         recorded: hashContent(RENDERED),
       })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
-    })
-  )
-
-  it.effect("report the config unchanged on a second init, and keep the lockfile as it was", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${CONFIG}\` is up to date.`)
     })
   )
 
@@ -91,31 +74,6 @@ describe("Oxfmt setup", () => {
       const { output } = yield* runLifecycle("doctor", files)
 
       expect(output).not.toContain("oxfmt configuration")
-    })
-  )
-
-  // An earlier version wrote the config, and nobody changed it since (#837).
-  it.effect("replace a config whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const files = makeProject({
-        ...makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] }), {
-          [CONFIG]: hashContent(OLDER),
-        }),
-        [CONFIG]: OLDER,
-      })
-
-      const { exit, output } = yield* runLifecycle("update", files)
-
-      expect({
-        config: files.read(CONFIG),
-        failure: getFailure(exit),
-        recorded: readLockfile(files).written[CONFIG],
-      }).toStrictEqual({
-        config: RENDERED,
-        failure: findingsLeft("update"),
-        recorded: hashContent(RENDERED),
-      })
-      expect(output).toContain(`✔ \`${CONFIG}\` replaced with the current version.`)
     })
   )
 

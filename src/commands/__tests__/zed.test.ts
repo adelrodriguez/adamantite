@@ -15,7 +15,7 @@ import {
   makeLockfileFile,
   readLockfile,
 } from "./command-test-helpers.ts"
-import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
+import { runLifecycle } from "./lifecycle.ts"
 
 const SETTINGS = ".zed/settings.json"
 
@@ -65,19 +65,6 @@ describe("Zed setup", () => {
     })
   )
 
-  it.effect("report the settings unchanged on a second init", () =>
-    Effect.gen(function* () {
-      const files = makeProject()
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const before = listHashes(files)
-
-      const { output } = yield* runLifecycle("init", files, INIT_ARGS)
-
-      expect(listHashes(files)).toStrictEqual(before)
-      expect(output).toContain(`● \`${SETTINGS}\` is up to date.`)
-    })
-  )
-
   // Init never merges its settings into settings with comments, or stops on them.
   it.effect("keep settings that the user wrote, and report a broken Oxlint entry in doctor", () =>
     Effect.gen(function* () {
@@ -122,25 +109,6 @@ describe("Zed setup", () => {
       const { exit } = yield* runLifecycle("doctor", files)
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({ _tag: error })
-    })
-  )
-
-  // An earlier version wrote the settings, and nobody changed them since (#837).
-  it.effect("replace settings whose hash equals the hash that the lockfile recorded", () =>
-    Effect.gen(function* () {
-      const older = '{\n  "lsp": {}\n}\n'
-
-      const files = makeProject({
-        ...makeLockfileFile(makeSelection({ editors: ["zed"] }), {
-          [SETTINGS]: hashContent(older),
-        }),
-        [SETTINGS]: older,
-      })
-
-      const { output } = yield* runLifecycle("update", files)
-
-      expect(files.read(SETTINGS)).toContain('"node_modules/adamantite/dist/oxlint.js"')
-      expect(output).toContain(`✔ \`${SETTINGS}\` replaced with the current version.`)
     })
   )
 

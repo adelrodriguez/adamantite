@@ -13,15 +13,21 @@ import { dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as Arbitrary from "effect/Arbitrary"
 import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import type { Selection } from "#lib/project/selection.ts"
-import { findingsLeft, getFailure, makeLockfileFile } from "#__tests__/command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "#__tests__/command-test-helpers.ts"
 import { effectEditorFiles } from "#__tests__/effect-sdk.ts"
 import { createFileSystemTestContext, type FileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
+import { listHashes, makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
 import agents from "#lib/integrations/agents/index.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { ConfigLoader } from "#lib/project/config-loader.ts"
@@ -30,6 +36,7 @@ import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
+import { addSelection, Selection } from "#lib/project/selection.ts"
 import * as Setup from "#lib/setup/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
@@ -161,6 +168,79 @@ describe("managed scripts", () => {
       expect(readScripts(files)).toStrictEqual({ check: "adamantite check", test: "vitest" })
       expect(output).toContain("✔ `check` script replaced: `tsc && eslint .` → `adamantite check`.")
     })
+  )
+})
+
+// A selection as init records it: each list in the order of its source list, and `core` first
+// when the project lints.
+const recordedSelection = Arbitrary.schema(Selection).pipe(
+  Arbitrary.map((selection) => {
+    const recorded = addSelection(makeSelection({}), selection)
+
+    return recorded.presets.length === 0 || recorded.presets[0] === "core"
+      ? recorded
+      : { ...recorded, presets: ["core" as const, ...recorded.presets] }
+  })
+)
+
+// The write rule holds for every integration, so these properties run update with any selection
+// that init can record. The tests of each integration check what it writes.
+describe("the write rule", () => {
+  it.effect.prop(
+    "record the hash of each file that update writes",
+    { selection: recordedSelection },
+    ({ selection }) =>
+      Effect.gen(function* () {
+        const files = makeProject(makeLockfileFile(selection))
+
+        const { exit } = yield* runLifecycle("update", files)
+
+        // The test installer installs nothing, so a selection that sets up a tool leaves findings.
+        expect([undefined, findingsLeft("update")]).toContainEqual(getFailure(exit))
+        expect(
+          Object.entries(readLockfile(files).written).filter(
+            ([file, hash]) => hashContent(files.read(file)) !== hash
+          )
+        ).toStrictEqual([])
+      }),
+    { arbitrary: { runs: 100 } }
+  )
+
+  it.effect.prop(
+    "change no file on a second update",
+    { selection: recordedSelection },
+    ({ selection }) =>
+      Effect.gen(function* () {
+        const files = makeProject(makeLockfileFile(selection))
+        yield* runLifecycle("update", files)
+        const before = listHashes(files)
+
+        yield* runLifecycle("update", files)
+
+        expect(listHashes(files)).toStrictEqual(before)
+      }),
+    { arbitrary: { runs: 100 } }
+  )
+
+  it.effect.prop(
+    "delete each file that the next selection drops, and keep each file that it still writes",
+    { next: recordedSelection, previous: recordedSelection },
+    ({ next, previous }) =>
+      Effect.gen(function* () {
+        const files = makeProject(makeLockfileFile(previous))
+        yield* runLifecycle("update", files)
+        const { written } = readLockfile(files)
+        files.write(LOCKFILE_PATH, makeLockfileFile(next, written)[LOCKFILE_PATH])
+
+        yield* runLifecycle("update", files)
+
+        const kept = readLockfile(files).written
+
+        expect(
+          Object.keys(written).filter((file) => files.exists(file) !== file in kept)
+        ).toStrictEqual([])
+      }),
+    { arbitrary: { runs: 100 } }
   )
 })
 

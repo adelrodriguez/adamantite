@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
+import type * as Project from "#lib/project/index.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import { listAppliedLintPresets } from "#lib/integrations/oxlint/config.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
@@ -12,7 +12,7 @@ interface ManagedPluginOptions<AssessError, AssessRequirements> {
    * assessed only while the plugin applies.
    */
   readonly assess?: (
-    project: Project
+    project: Project.Snapshot
   ) => Effect.Effect<
     { readonly findings: readonly Finding[]; readonly warnings: readonly string[] },
     AssessError,
@@ -51,7 +51,7 @@ export function defineManagedPlugin<
   return {
     ...extensions,
     ...tooling,
-    assess: (project: Project) =>
+    assess: (project: Project.Snapshot) =>
       Effect.gen(function* () {
         const assessment = yield* tooling.assess(project)
 

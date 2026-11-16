@@ -13,7 +13,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
 import { PACKAGE } from "#lib/integrations/oxfmt/index.ts"
 import { assessPluginLanguages, pluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import formatPreset from "#presets/format.ts"
 
@@ -73,9 +73,10 @@ function assess({ declares, installed }: Fixture) {
       ])
     )
 
-    return yield* readProject(ROOT).pipe(
+    return yield* Project.read().pipe(
       Effect.flatMap(assessPluginLanguages),
       Effect.map((findings) => ({ findings })),
+      Effect.provideService(Project.Directory, ROOT),
       Effect.provide(
         withConfigLoader(
           Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages))

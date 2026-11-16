@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { readDirectoryIfExists } from "#lib/shared/filesystem.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { DEFAULT_DIRECTORY, isRuleFile } from "#presets/rules/folder.ts"
@@ -36,8 +36,9 @@ const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
 })
 
 export default {
-  assess: ({ customRules, cwd, workspace }: Project) =>
+  assess: ({ customRules, workspace }: Project.Snapshot) =>
     Effect.gen(function* () {
+      const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const relative = (target: string) => path.relative(cwd, target) || "."
       const packageDirectories = [cwd, ...workspace.packageDirectories]

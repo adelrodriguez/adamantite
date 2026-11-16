@@ -29,9 +29,9 @@ import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import {
   CommandFailed,
   CustomRuleExists,
@@ -728,7 +728,7 @@ describe("rule try", () => {
           "--accept",
           "src/index.ts",
           "--json",
-        ]).pipe(Effect.exit, Effect.provideService(Cwd, project))
+        ]).pipe(Effect.exit, Effect.provideService(Project.Directory, project))
 
         const logLines = yield* TestConsole.logLines
 
@@ -780,7 +780,7 @@ describe("rule ast", () => {
       Effect.flatMap((exit) =>
         TestConsole.logLines.pipe(Effect.map((logLines) => ({ exit, logLines })))
       ),
-      Effect.provideService(Cwd, project),
+      Effect.provideService(Project.Directory, project),
       Effect.provide(TEST_LAYER)
     )
   }

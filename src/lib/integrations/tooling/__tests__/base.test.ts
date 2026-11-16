@@ -2,10 +2,10 @@ import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Schema from "effect/Schema"
-import type { Catalogs } from "#lib/project/index.ts"
+import type * as Project from "#lib/project/index.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 
-function makeProject(packageJson: PackageJson, catalogs: Catalogs = {}) {
+function makeProject(packageJson: PackageJson, catalogs: Project.Catalogs = {}) {
   return { packageJson, workspace: { catalogs, isMonorepo: false, packageDirectories: [] } }
 }
 

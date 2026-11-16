@@ -103,17 +103,18 @@ export default defineConfig({
         root: "src",
       },
     ],
-    // Commands read the working directory with `yield* Cwd`, and tests provide it.
+    // Code reads the target project folder with `yield* Project.Directory`, and tests provide it.
     "eslint/no-restricted-properties": [
       "error",
       {
-        message: "Read the working directory with `yield* Cwd` from `#lib/shared/cwd.ts`.",
+        message:
+          "Read the target project folder with `yield* Project.Directory` from `#lib/project/index.ts`.",
         object: "process",
         property: "cwd",
       },
       {
         message:
-          "Provide `Cwd` from `#lib/shared/cwd.ts` instead of changing the working directory.",
+          "Provide `Project.Directory` from `#lib/project/index.ts` instead of changing the working directory.",
         object: "process",
         property: "chdir",
       },

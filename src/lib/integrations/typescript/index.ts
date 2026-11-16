@@ -14,8 +14,8 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
 import { LANGUAGE_SERVICE_PLUGIN } from "#lib/integrations/effect-language-service.ts"
+import * as Project from "#lib/project/index.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import {
@@ -253,9 +253,9 @@ function toLibraryFinding(configPath: string): Finding {
  * the chain that its `extends` entries show.
  */
 const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
-  cwd,
   workspace,
-}: Project) {
+}: Project.Snapshot) {
+  const cwd = yield* Project.Directory
   const path = yield* Path.Path
 
   const packages = yield* Effect.forEach(
@@ -349,11 +349,12 @@ function toMismatchedPresetFinding(
  * TypeScript only for the others.
  */
 const assess = Effect.fn("assess")(function* (
-  project: Project,
+  project: Project.Snapshot,
   preset: TypeScriptPreset,
   selection: Selection
 ) {
-  const { cwd, packageJson } = project
+  const cwd = yield* Project.Directory
+  const { packageJson } = project
   const path = yield* Path.Path
   const configured = yield* readConfiguredPackages(project)
 
@@ -404,7 +405,7 @@ const assess = Effect.fn("assess")(function* (
  * asks for the preset in each package. A root config that Adamantite wrote before the project
  * became a monorepo stays managed, because other configs can extend it.
  */
-function checkIsManaged({ lockfile, workspace }: Project) {
+function checkIsManaged({ lockfile, workspace }: Project.Snapshot) {
   return (
     !workspace.isMonorepo
     || Option.exists(lockfile, ({ written }) => Object.hasOwn(written, CONFIG_PATH))
@@ -412,17 +413,17 @@ function checkIsManaged({ lockfile, workspace }: Project) {
 }
 
 export default {
-  assess: (project: Project, selection: Selection) =>
+  assess: (project: Project.Snapshot, selection: Selection) =>
     selection.typescript === null
       ? Effect.succeed({ findings: [], packageActions: [], warnings: [] })
       : assess(project, selection.typescript, selection),
-  files: (project: Project, selection: Selection) =>
+  files: (project: Project.Snapshot, selection: Selection) =>
     selection.typescript === null || !checkIsManaged(project)
       ? Effect.succeed([])
       : Effect.map(render(selection, selection.typescript), (content) => [
           { content, path: CONFIG_PATH },
         ]),
   name: "tsconfig",
-  packages: (_project: Project, _selection: Selection) => [],
+  packages: (_project: Project.Snapshot, _selection: Selection) => [],
   selected: ({ typescript }: Selection) => typescript !== null,
 } satisfies Integration

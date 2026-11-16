@@ -3,8 +3,8 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Project from "#lib/project/index.ts"
 import { readSelection } from "#lib/project/lockfile.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
 
@@ -57,7 +57,7 @@ export default Command.make("fix", { all, dangerous, files, only, suggested }).p
   Command.withDescription("Apply lint fixes and format code"),
   Command.withHandler(({ all, dangerous, files, only, suggested }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
 
       yield* Toolchain.fix({
         cwd,

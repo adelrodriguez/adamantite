@@ -1,6 +1,6 @@
 import type * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import type { Project } from "#lib/project/index.ts"
+import type * as Project from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 
 export interface ToolingPackage {
@@ -93,12 +93,15 @@ export interface Integration<E = unknown, R = unknown> {
    * Reads the project, its configs included, and returns findings. It never writes. A file that the
    * user changed gets a finding only when the change breaks the setup.
    */
-  readonly assess: (project: Project, selection: Selection) => Effect.Effect<AssessmentPart, E, R>
+  readonly assess: (
+    project: Project.Snapshot,
+    selection: Selection
+  ) => Effect.Effect<AssessmentPart, E, R>
   /**
    * The files that Adamantite renders whole for the selection.
    */
   readonly files: (
-    project: Project,
+    project: Project.Snapshot,
     selection: Selection
   ) => Effect.Effect<readonly ManagedFile[], E, R>
   readonly name: string
@@ -106,13 +109,13 @@ export interface Integration<E = unknown, R = unknown> {
    * The packages to install, at the managed versions. The project decides some, such as Sherif,
    * which only a monorepo needs.
    */
-  readonly packages: (project: Project, selection: Selection) => readonly ToolingPackage[]
+  readonly packages: (project: Project.Snapshot, selection: Selection) => readonly ToolingPackage[]
   /**
    * Builds what the integration needs outside the files that the project commits, after the
    * install, such as the Effect editor SDK in `node_modules`. A failure that `assess` reports as a
    * finding does not fail the setup. An integration that needs nothing has none.
    */
-  readonly prepare?: (project: Project) => Effect.Effect<void, E, R>
+  readonly prepare?: (project: Project.Snapshot) => Effect.Effect<void, E, R>
   /**
    * Whether the selection includes this integration.
    */

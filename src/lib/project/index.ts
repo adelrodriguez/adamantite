@@ -1,9 +1,12 @@
 import type * as FileSystem from "effect/FileSystem"
 import type * as Result from "effect/Result"
+import { cwd } from "node:process"
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Yaml from "effect/encoding/Yaml"
+import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
@@ -21,6 +24,21 @@ import {
   type FailedToReadFile,
 } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
+
+/**
+ * The folder of the target project, where a command runs. Code that always acts on the target
+ * project reads it with `yield* Project.Directory`. Code that callers also run on other folders,
+ * such as a trial copy or a workspace package, takes the folder as a parameter.
+ */
+export class Directory extends Context.Service<Directory, string>()(
+  "adamantite/Project/Directory"
+) {
+  /**
+   * The working directory of the process, the one reader of it. A test provides the folder instead
+   * of changing the process.
+   */
+  static readonly layer = Layer.sync(this, cwd)
+}
 
 const PnpmWorkspace = Schema.Struct({ packages: Schema.Array(Schema.String) })
 
@@ -110,8 +128,15 @@ const readWorkspaceDeclarations = (cwd: string) =>
     }
   })
 
-export const checkIsMonorepo = (cwd: string) =>
-  readWorkspaceDeclarations(cwd).pipe(Effect.map(({ patterns }) => patterns.length > 0))
+/**
+ * Whether the target project declares workspace patterns. It reads only the declarations, so it
+ * does not search for the workspace packages.
+ */
+export const checkIsMonorepo = Effect.fn("Project.checkIsMonorepo")(function* () {
+  const { patterns } = yield* readWorkspaceDeclarations(yield* Directory)
+
+  return patterns.length > 0
+})
 
 function escapeRegExp(text: string) {
   return text.replaceAll(/[$()+.[\\\]^{|}]/gu, String.raw`\$&`)
@@ -253,29 +278,28 @@ export interface Workspace {
 /**
  * Reads the workspace patterns one time, and finds the workspace packages that they select.
  */
-export const readWorkspace = (cwd: string) =>
-  Effect.gen(function* () {
-    const { catalogs, patterns } = yield* readWorkspaceDeclarations(cwd)
+export const readWorkspace = Effect.fn("Project.readWorkspace")(function* () {
+  const directory = yield* Directory
+  const { catalogs, patterns } = yield* readWorkspaceDeclarations(directory)
 
-    return {
-      catalogs,
-      isMonorepo: patterns.length > 0,
-      packageDirectories: yield* findPackageDirectories(cwd, patterns),
-    } satisfies Workspace
-  })
+  return {
+    catalogs,
+    isMonorepo: patterns.length > 0,
+    packageDirectories: yield* findPackageDirectories(directory, patterns),
+  } satisfies Workspace
+})
 
 const LINT_CONFIG_FILE = "oxlint.config.ts"
 
 /**
- * The facts about a target project that several assessments share. It is a snapshot: a coding agent
- * or an install can change the project, so each reassessment reads a new one.
+ * The facts about the target project that several assessments share. It is a snapshot: a coding
+ * agent or an install can change the project, so each reassessment reads a new one.
  */
-export interface Project {
+export interface Snapshot {
   /**
    * The `custom()` calls that the Oxlint configs of the root and the workspace packages reach.
    */
   readonly customRules: CustomRuleDiscovery
-  readonly cwd: string
   /**
    * The root `oxlint.config.ts`, loaded as Oxlint loads it, or none when it does not exist.
    */
@@ -289,23 +313,29 @@ export interface Project {
 }
 
 /**
- * Reads the project at `cwd`. Each part comes from this read, so a manifest from before an install
- * or a handoff cannot enter the snapshot.
+ * Reads a snapshot of the target project. Each part comes from this read, so a manifest from before
+ * an install or a handoff cannot enter the snapshot.
  */
-export const readProject = Effect.fn("readProject")(function* (cwd: string) {
+export const read = Effect.fn("Project.read")(function* () {
+  const directory = yield* Directory
   const path = yield* Path.Path
 
   const [packageJson, workspace, lockfile] = yield* Effect.all(
-    [readPackageJson(cwd), readWorkspace(cwd), readLockfile(cwd)],
+    [readPackageJson(directory), readWorkspace(), readLockfile(directory)],
     { concurrency: "unbounded" }
   )
 
-  const customRules = yield* discoverCustomRules(cwd, [cwd, ...workspace.packageDirectories])
+  const customRules = yield* discoverCustomRules(directory, [
+    directory,
+    ...workspace.packageDirectories,
+  ])
 
   // Discovery loads the config that lints the root. `oxlint.config.ts` comes first in its config
   // files, so that load is the root `oxlint.config.ts` when the file exists. Each load starts a
   // Node.js process, so the snapshot takes the read from discovery.
-  const lintConfig = Option.fromUndefinedOr(customRules.reads.get(path.join(cwd, LINT_CONFIG_FILE)))
+  const lintConfig = Option.fromUndefinedOr(
+    customRules.reads.get(path.join(directory, LINT_CONFIG_FILE))
+  )
 
-  return { customRules, cwd, lintConfig, lockfile, packageJson, workspace } satisfies Project
+  return { customRules, lintConfig, lockfile, packageJson, workspace } satisfies Snapshot
 })

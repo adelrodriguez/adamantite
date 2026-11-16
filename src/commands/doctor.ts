@@ -6,7 +6,7 @@ import {
   readAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
+import * as Project from "#lib/project/index.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
@@ -26,7 +26,7 @@ export default Command.make("doctor", { json: Mode.json }).pipe(
   Command.withDescription("Check Adamantite setup and report what needs repair"),
   Command.withHandler(({ json }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
 
       yield* Output.intro("💠 adamantite doctor")
 

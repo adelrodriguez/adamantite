@@ -4,11 +4,11 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Integration, ToolingPackage } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { EFFECT_SDK_PATH, readEffectEditor } from "#lib/integrations/effect-sdk.ts"
 import { pluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/oxlint/entry.ts"
+import * as Project from "#lib/project/index.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { FailedToParseFile, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
@@ -303,18 +303,20 @@ const assessExtensions = Effect.fn("assessExtensions")(function* (
 })
 
 export default {
-  assess: ({ cwd }: Project, selection: Selection) =>
-    Effect.all([assessSettings(cwd), assessExtensions(cwd, selection)], {
-      concurrency: "unbounded",
-    }).pipe(
-      Effect.map(([settings, extensions]) => ({
-        findings: [...settings, ...extensions],
-        packageActions: [],
-        warnings: [],
-      }))
-    ),
-  files: ({ cwd }: Project, selection: Selection) =>
+  assess: (_project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
+      const cwd = yield* Project.Directory
+
+      const [settings, extensions] = yield* Effect.all(
+        [assessSettings(cwd), assessExtensions(cwd, selection)],
+        { concurrency: "unbounded" }
+      )
+
+      return { findings: [...settings, ...extensions], packageActions: [], warnings: [] }
+    }),
+  files: (_project: Project.Snapshot, selection: Selection) =>
+    Effect.gen(function* () {
+      const cwd = yield* Project.Directory
       const recommendations = listRecommendations(selection)
 
       return [
@@ -333,17 +335,17 @@ export default {
       ]
     }),
   name: "vscode",
-  packages: (_project: Project, _selection: Selection): readonly ToolingPackage[] => [],
+  packages: (_project: Project.Snapshot, _selection: Selection): readonly ToolingPackage[] => [],
   // A project without a matching Effect build gets the `vscode-effect-sdk` finding instead.
-  prepare: ({ cwd }: Project) =>
-    readEffectEditor(cwd).pipe(
-      Effect.flatMap((effect) =>
-        Option.match(effect, {
-          onNone: () => Effect.void,
-          onSome: ({ prepareSdk }) =>
-            prepareSdk.pipe(Effect.catchTag("EffectEditorUnavailable", () => Effect.void)),
-        })
-      )
-    ),
+  prepare: (_project: Project.Snapshot) =>
+    Effect.gen(function* () {
+      const effect = yield* readEffectEditor(yield* Project.Directory)
+
+      if (Option.isSome(effect)) {
+        yield* effect.value.prepareSdk.pipe(
+          Effect.catchTag("EffectEditorUnavailable", () => Effect.void)
+        )
+      }
+    }),
   selected: (selection: Selection) => selection.editors.includes("vscode"),
 } satisfies Integration

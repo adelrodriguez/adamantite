@@ -23,10 +23,8 @@ import {
   listCustomRules,
   readCustomRuleTestCommand,
 } from "#lib/project/custom-rules/index.ts"
-import { readWorkspace } from "#lib/project/index.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
@@ -55,7 +53,7 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   ),
   Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const relative = path.relative(cwd, path.resolve(cwd, file))
       const program = yield* Toolchain.ast({ cwd, file: relative })
@@ -91,7 +89,7 @@ const add = Command.make("add", { dir, name: ruleName }).pipe(
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
@@ -111,7 +109,7 @@ const addTest = Command.make("add", {
   Command.withDescription("Create a test for an existing rule. Omit the name to choose a rule"),
   Command.withHandler(({ dir, name, path: target }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const directory = Option.getOrElse(dir, () => DEFAULT_DIRECTORY)
       let selected = Option.getOrUndefined(name)
@@ -175,7 +173,7 @@ const test = Command.make("test", { path: testPath }).pipe(
   ),
   Command.withHandler(({ path: target }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const runner = yield* CommandRunner
 
@@ -187,7 +185,7 @@ const test = Command.make("test", { path: testPath }).pipe(
         })
       }
 
-      const { command, unloadedConfigs } = yield* readCustomRuleTestCommand(yield* readProject(cwd))
+      const { command, unloadedConfigs } = yield* readCustomRuleTestCommand(yield* Project.read())
 
       for (const { file, reason } of unloadedConfigs) {
         yield* Output.warning(
@@ -312,7 +310,7 @@ const trial = Command.make("try", {
   ),
   Command.withHandler(({ json, ...flags }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       const { accept, current, options, report, rule } = flags
 
       const setting = current
@@ -334,7 +332,13 @@ const trial = Command.make("try", {
           { concurrency: 1 }
         )
 
-        return yield* tryRule({ cases, cwd, rule, setting, workspace: yield* readWorkspace(cwd) })
+        return yield* tryRule({
+          cases,
+          cwd,
+          rule,
+          setting,
+          workspace: yield* Project.readWorkspace(),
+        })
       }).pipe(
         // Exit code 1 means that a case differs. A failure before the verdict checked no case, so
         // every failure here exits with 2.

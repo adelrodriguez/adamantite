@@ -5,7 +5,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { FailedToParseFile } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { checkIsJsonArray, checkIsJsonObject, stringifyJson } from "#lib/shared/json.ts"
@@ -37,7 +37,7 @@ function findLanguageServicePlugin(plugins: JsonValue | undefined) {
  * diagnostics. A monorepo gets guidance instead.
  */
 export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* (
-  { cwd, workspace }: Project,
+  { workspace }: Project.Snapshot,
   integration: string
 ) {
   if (workspace.isMonorepo) {
@@ -50,7 +50,7 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
   }
 
   const path = yield* Path.Path
-  const configPath = path.join(cwd, TSCONFIG_FILE)
+  const configPath = path.join(yield* Project.Directory, TSCONFIG_FILE)
   const content = yield* readFileIfExists(configPath)
 
   const plugin = Option.isNone(content)

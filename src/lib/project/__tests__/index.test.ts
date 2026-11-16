@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { checkIsMonorepo, readWorkspace } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
@@ -12,18 +13,19 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function readPnpmWorkspace(pnpmWorkspace: string) {
-  return readWorkspace(ROOT).pipe(
+  return Project.readWorkspace().pipe(
     Effect.provide([
       createFileSystemTestContext({
         files: { "package.json": "{}", "pnpm-workspace.yaml": pnpmWorkspace },
         root: ROOT,
       }).layer,
       Path.layer,
+      Layer.succeed(Project.Directory)(ROOT),
     ])
   )
 }
 
-describe("readWorkspace", () => {
+describe("Project.readWorkspace", () => {
   // `*` and `?` match inside one folder name, and a `**` segment matches zero or more folders.
   it.effect.each([
     { directory: "packages/web", expected: ["/project/packages/web"], pattern: "packages/*" },
@@ -56,7 +58,9 @@ describe("readWorkspace", () => {
           root: ROOT,
         })
 
-        const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+        const workspace = yield* Project.readWorkspace().pipe(
+          Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+        )
 
         expect(workspace.packageDirectories).toStrictEqual(expected)
       })
@@ -74,7 +78,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const workspace = yield* Project.readWorkspace().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(workspace.packageDirectories).toStrictEqual(["/project/packages/group/web"])
     })
@@ -92,7 +98,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const workspace = yield* Project.readWorkspace().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(workspace).toStrictEqual({
         catalogs: {},
@@ -117,7 +125,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const workspace = yield* Project.readWorkspace().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(workspace).toStrictEqual({
         catalogs: {},
@@ -143,7 +153,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const workspace = yield* Project.readWorkspace().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(workspace).toStrictEqual({
         catalogs: {},
@@ -167,9 +179,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const result = yield* Effect.all([checkIsMonorepo(ROOT), readWorkspace(ROOT)], {
+      const result = yield* Effect.all([Project.checkIsMonorepo(), Project.readWorkspace()], {
         concurrency: "unbounded",
-      }).pipe(Effect.provide([files.layer, Path.layer]))
+      }).pipe(Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)]))
 
       expect(result).toStrictEqual([
         true,
@@ -188,7 +200,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const workspace = yield* Project.readWorkspace().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(workspace).toStrictEqual({ catalogs: {}, isMonorepo: true, packageDirectories: [] })
     })
@@ -240,14 +254,16 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const workspace = yield* Project.readWorkspace().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(workspace).toStrictEqual({ catalogs: {}, isMonorepo: false, packageDirectories: [] })
     })
   )
 })
 
-describe("checkIsMonorepo", () => {
+describe("Project.checkIsMonorepo", () => {
   it.effect.each([
     {
       content: "packages:\n  - 'packages/*'",
@@ -321,7 +337,9 @@ describe("checkIsMonorepo", () => {
       const defaults = { "package.json": yield* stringifyJson({ name: "test-package" }) }
       const files = makeFiles({ ...defaults, [file]: content })
 
-      const result = yield* checkIsMonorepo(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+      const result = yield* Project.checkIsMonorepo().pipe(
+        Effect.provide([files.layer, Path.layer, Layer.succeed(Project.Directory)(ROOT)])
+      )
 
       expect(result).toBe(expected)
     })

@@ -9,7 +9,7 @@ import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
 import { probeAst } from "#lib/integrations/oxlint/probe.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
-import { checkIsMonorepo } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { type Selection, toToolNotSelected } from "#lib/project/selection.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
@@ -162,7 +162,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
   const isMonorepo =
     only !== "unused"
     && (yield* checkExists(path.join(cwd, "package.json")))
-    && (yield* checkIsMonorepo(cwd).pipe(
+    && (yield* Project.checkIsMonorepo().pipe(
       Effect.catchTags({
         FailedToParseFile: () => Effect.succeed(false),
         InvalidPackageJson: () => Effect.succeed(false),

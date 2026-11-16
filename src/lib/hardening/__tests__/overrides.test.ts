@@ -10,7 +10,7 @@ import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import type { readSuppressions } from "#lib/hardening/suppressions.ts"
-import type { Workspace } from "#lib/project/index.ts"
+import type * as Project from "#lib/project/index.ts"
 import { LintedOverrides, readOverrides } from "#lib/hardening/overrides.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
 import { toProjectPath } from "#lib/hardening/project-files.ts"
@@ -77,7 +77,7 @@ const VITEST_RULES_CONFIG = [
 ].join("\n")
 
 // The fixtures without a workspace package declare no workspace.
-const NO_WORKSPACE: Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
+const NO_WORKSPACE: Project.Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
 
 describe("hardening paths", () => {
   it("take project paths, not absolute paths, for configs and the scope", () => {

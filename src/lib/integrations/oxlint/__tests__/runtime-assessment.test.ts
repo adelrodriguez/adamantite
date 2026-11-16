@@ -11,7 +11,7 @@ import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { FailedToParseFile } from "#lib/shared/errors.ts"
 
 const ROOT = "/project"
@@ -66,9 +66,10 @@ function runAssess(
   files: ReturnType<typeof makeFiles>,
   packages: Readonly<Record<string, string>> = PACKAGES
 ) {
-  return readProject(ROOT).pipe(
+  return Project.read().pipe(
     Effect.flatMap(assessOxlintRuntime),
     Effect.map((findings) => ({ findings })),
+    Effect.provideService(Project.Directory, ROOT),
     Effect.provide(
       withConfigLoader(
         Layer.mergeAll(
@@ -349,8 +350,9 @@ describe("Oxlint runtime assessment", () => {
     Effect.gen(function* () {
       const files = makeFiles({ "package.json": "{}" })
 
-      const findings = yield* readProject(ROOT).pipe(
+      const findings = yield* Project.read().pipe(
         Effect.flatMap((project) => assessOxlintRuntime(project)),
+        Effect.provideService(Project.Directory, ROOT),
         Effect.provide(
           withConfigLoader(
             Layer.mergeAll(

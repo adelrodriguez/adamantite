@@ -5,7 +5,7 @@ import * as Result from "effect/Result"
 import * as SemVer from "effect/SemVer"
 import * as SemVerRange from "effect/SemVerRange"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 
@@ -69,9 +69,9 @@ export const pluginLanguages = [
  * check skips it.
  */
 export const assessPluginLanguages = Effect.fn("assessPluginLanguages")(function* ({
-  cwd,
   packageJson,
-}: Project) {
+}: Project.Snapshot) {
+  const cwd = yield* Project.Directory
   const oxfmt = yield* resolvePackageDirectory(cwd, "oxfmt")
 
   if (Option.isNone(oxfmt)) {

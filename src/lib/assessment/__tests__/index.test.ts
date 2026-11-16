@@ -15,7 +15,7 @@ import {
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -227,8 +227,9 @@ describe("assessProject", () => {
         const before = files.list().map((file) => [file, files.read(file)])
         files.makeReadOnly(ROOT)
 
-        const assessment = yield* readProject(ROOT).pipe(
+        const assessment = yield* Project.read().pipe(
           Effect.flatMap((project) => assessProject(project)),
+          Effect.provideService(Project.Directory, ROOT),
           Effect.provide(
             withConfigLoader(
               Layer.mergeAll(
@@ -309,8 +310,9 @@ describe("assessProject", () => {
         })
       ).pipe(Layer.provide(files.layer))
 
-      const assessment = yield* readProject(ROOT).pipe(
+      const assessment = yield* Project.read().pipe(
         Effect.flatMap((project) => assessProject(project)),
+        Effect.provideService(Project.Directory, ROOT),
         Effect.provide(
           withConfigLoader(
             Layer.mergeAll(

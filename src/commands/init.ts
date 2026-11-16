@@ -16,8 +16,7 @@ import {
   lintPresets,
 } from "#lib/integrations/oxlint/presets.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
-import { checkIsMonorepo } from "#lib/project/index.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { readLockfile } from "#lib/project/lockfile.ts"
 import {
   checkRunsTool,
@@ -39,7 +38,6 @@ import {
   TYPESCRIPT_PRESET_NAMES,
   type TypeScriptPreset,
 } from "#lib/project/selection.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import {
   CommandFailed,
   InvalidInitOptions,
@@ -376,7 +374,7 @@ export default Command.make("init", {
   ]),
   Command.withHandler(({ json, nonInteractive, ...setupFlags }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       // Only a terminal that can prompt asks for the selection. With `--json`,
       // `--non-interactive`, or no such terminal, init sets up from the flags.
       const prompts = Mode.is("Menu")(yield* Mode.CurrentMode)
@@ -398,7 +396,7 @@ export default Command.make("init", {
 
       yield* Output.info(`Detected package manager: ${packageManager.name}`)
 
-      const isMonorepo = yield* checkIsMonorepo(cwd)
+      const isMonorepo = yield* Project.checkIsMonorepo()
 
       if (isMonorepo) {
         yield* Output.info("This project is a monorepo.")
@@ -495,7 +493,7 @@ export default Command.make("init", {
         }
       }
 
-      yield* applySetup("init", yield* readProject(cwd), selection)
+      yield* applySetup("init", yield* Project.read(), selection)
 
       yield* Output.outro("✅ Setup finished.")
     }).pipe(

@@ -29,6 +29,7 @@ import { CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH, Lockfile } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import {
@@ -36,7 +37,6 @@ import {
   type CommandRunOptions,
   CommandRunner,
 } from "#lib/shared/command-runner.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import { CliNotFound, CommandFailed, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import { RAW_MODE_RELEASE_WAIT } from "#terminal/resolution-menu.ts"
@@ -328,7 +328,8 @@ export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
 
 /**
  * The test filesystem and a `Path` that resolves a relative path from the project root, as the CLI
- * resolves it from the working directory. The command runs in the root, which `Cwd` names.
+ * resolves it from the working directory. The command runs in the root, which `Project.Directory`
+ * names.
  */
 function makePlatformLayer(files: FileSystemTestContext) {
   const path = Layer.effect(Path.Path)(
@@ -424,7 +425,7 @@ export function runCommand<
             })
           ),
           Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
-          Effect.provideService(Cwd, files.root),
+          Effect.provideService(Project.Directory, files.root),
           Effect.provide(testLayer)
         )
       )

@@ -23,7 +23,7 @@ import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { Report } from "#commands/doctor.ts"
 import typescript from "#lib/integrations/typescript/index.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 
@@ -425,10 +425,11 @@ describe("tsconfig", () => {
           "tsconfig.json": yield* stringifyJson({ extends: "adamantite/typescript" }),
         })
 
-        const result = yield* readProject(ROOT).pipe(
+        const result = yield* Project.read().pipe(
           Effect.flatMap((project) =>
             typescript.assess(project, { ...EMPTY_SELECTION, typescript: "typescript" })
           ),
+          Effect.provideService(Project.Directory, ROOT),
           Effect.provide(
             withConfigLoader(
               Layer.mergeAll(

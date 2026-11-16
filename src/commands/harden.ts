@@ -14,11 +14,9 @@ import {
   readHardenReach,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
-import { readWorkspace } from "#lib/project/index.ts"
-import { readProject } from "#lib/project/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import {
   AdamantiteNotInNodeModules,
   AdamantiteNotInstalled,
@@ -115,7 +113,7 @@ const verify = Effect.fn("verify")(function* (
   )
 
   // The session can change the project, so agent reach and assessment share a new read.
-  const project = yield* readProject(cwd)
+  const project = yield* Project.read()
 
   const [reachAfter, assessment] = yield* Effect.all(
     [readHardenReach(cwd, project.workspace, scope), assessProject(project)],
@@ -152,7 +150,7 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   ),
   Command.withHandler(({ commits, json, scope }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
+      const cwd = yield* Project.Directory
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
 
@@ -206,7 +204,7 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
       // Each step before the session takes this read of the workspace.
       const context = yield* readHardenContext(
         cwd,
-        yield* readWorkspace(cwd),
+        yield* Project.readWorkspace(),
         scopeDirectory,
         commits
       )

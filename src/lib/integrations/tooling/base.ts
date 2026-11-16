@@ -6,7 +6,7 @@ import type {
   PackageAction,
   ToolingPackage,
 } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
+import type * as Project from "#lib/project/index.ts"
 import {
   matchDeclaredVersion,
   parseDependencySpecifier,
@@ -39,7 +39,7 @@ const CURRENT: PackageAssessment = { findings: [], packageActions: [], warnings:
  * replaces the `catalog:` specifier.
  */
 export function assessPackage(
-  { packageJson, workspace: { catalogs } }: Pick<Project, "packageJson" | "workspace">,
+  { packageJson, workspace: { catalogs } }: Pick<Project.Snapshot, "packageJson" | "workspace">,
   pkg: ToolingPackage,
   purpose: string,
   integration: string
@@ -154,14 +154,14 @@ export function definePackageTooling(options: {
   /**
    * An extra condition for requiring the package, checked after the managed scripts.
    */
-  readonly isRequired?: (project: Project) => boolean
+  readonly isRequired?: (project: Project.Snapshot) => boolean
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
   readonly version: string
 }) {
   return {
-    assess: (project: Project) =>
+    assess: (project: Project.Snapshot) =>
       Effect.sync((): IntegrationAssessment => {
         // The lockfile selection decides.
         const isApplicable =

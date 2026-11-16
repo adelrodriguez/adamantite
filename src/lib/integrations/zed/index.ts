@@ -6,11 +6,11 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { readEffectEditor } from "#lib/integrations/effect-sdk.ts"
 import { pluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/oxlint/entry.ts"
+import * as Project from "#lib/project/index.ts"
 import {
   EffectEditorUnavailable,
   FailedToParseFile,
@@ -340,15 +340,19 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
 })
 
 export default {
-  assess: ({ cwd }: Project, _selection: Selection) =>
-    Effect.map(assess(cwd), (findings) => ({ findings, packageActions: [], warnings: [] })),
-  files: ({ cwd }: Project, _selection: Selection) =>
+  assess: (_project: Project.Snapshot, _selection: Selection) =>
     Effect.gen(function* () {
-      return [
-        { content: `${yield* formatJson(yield* renderSettings(cwd))}\n`, path: SETTINGS_PATH },
-      ]
+      const findings = yield* assess(yield* Project.Directory)
+
+      return { findings, packageActions: [], warnings: [] }
+    }),
+  files: (_project: Project.Snapshot, _selection: Selection) =>
+    Effect.gen(function* () {
+      const settings = yield* renderSettings(yield* Project.Directory)
+
+      return [{ content: `${yield* formatJson(settings)}\n`, path: SETTINGS_PATH }]
     }),
   name: "zed",
-  packages: (_project: Project, _selection: Selection) => [],
+  packages: (_project: Project.Snapshot, _selection: Selection) => [],
   selected: ({ editors }: Selection) => editors.includes("zed"),
 } satisfies Integration

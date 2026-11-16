@@ -5,6 +5,7 @@ import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { addRootDevDependencies, DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import * as Project from "#lib/project/index.ts"
 
 const ROOT = "/project"
 
@@ -16,7 +17,8 @@ describe("addRootDevDependencies", () => {
 
       // A resolution before the install cached the packages as missing. The install changes
       // node_modules, so a later resolution must not reuse that cache.
-      yield* addRootDevDependencies(ROOT, ["oxlint@1.0.0"]).pipe(
+      yield* addRootDevDependencies(["oxlint@1.0.0"]).pipe(
+        Effect.provideService(Project.Directory, ROOT),
         Effect.provide([
           files.layer,
           Path.layer,

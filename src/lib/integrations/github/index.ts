@@ -6,10 +6,10 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { getWorkflowTemplate } from "#lib/integrations/github/workflow.macro.ts" with { type: "macro" }
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import * as Project from "#lib/project/index.ts"
 import {
   NodeVersionFile,
   NodeVersionResolver,
@@ -298,9 +298,13 @@ const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection)
 })
 
 export default {
-  assess: ({ cwd }: Project, selection: Selection) => assess(cwd, selection),
-  files: ({ cwd }: Project, selection: Selection) =>
+  assess: (_project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
+      return yield* assess(yield* Project.Directory, selection)
+    }),
+  files: (_project: Project.Snapshot, selection: Selection) =>
+    Effect.gen(function* () {
+      const cwd = yield* Project.Directory
       const setup = yield* readWorkflowSetup(cwd, selection)
 
       if (Predicate.isTagged(setup, "Unavailable")) {
@@ -317,6 +321,6 @@ export default {
       ]
     }),
   name: "github",
-  packages: (_project: Project, _selection: Selection) => [],
+  packages: (_project: Project.Snapshot, _selection: Selection) => [],
   selected: ({ ci }: Selection) => ci === "github",
 } satisfies Integration

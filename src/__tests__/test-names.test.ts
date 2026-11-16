@@ -8,9 +8,6 @@ const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const STACK_TEST = "A stack test, named after the fixture tree or the preset that it lints."
 
-const PROCESS_TWIN =
-  "The tests of the module that start a real process, apart from its unit tests, so those stay in the unit project."
-
 /**
  * The test files that no module names, each with the reason.
  */
@@ -36,16 +33,10 @@ const EXCEPTIONS = {
   "presets/__tests__/vitest.test.ts": STACK_TEST,
   "src/__tests__/architecture-doc.test.ts":
     "Checks that `docs/architecture.md` matches the layer map of `oxlint.config.ts`.",
-  "src/__tests__/exports.test.ts":
-    "Checks the `exports` of `package.json` against the README and the preset identities.",
+  "src/__tests__/exports.test.ts": "Checks the `exports` of `package.json` against the README.",
   "src/__tests__/macro-cache.test.ts":
     "Checks the macro cache workaround of `vitest.config.ts`, until unplugin-macros sets the cache key.",
   "src/__tests__/test-names.test.ts": "Checks the names of the test files.",
-  "src/__tests__/trial.test.ts": `${PROCESS_TWIN} It runs \`lib/hardening/trial.ts\` and \`overrides.ts\` through \`rule try\`.`,
-  "src/commands/__tests__/rule-ast.test.ts": `${PROCESS_TWIN} It runs \`commands/rule.ts\` with real Oxlint.`,
-  "src/lib/integrations/oxlint/__tests__/config-load.test.ts": `${PROCESS_TWIN} It loads the configs of \`oxlint/index.ts\` with Node.js.`,
-  "src/lib/setup/__tests__/format.test.ts": `${PROCESS_TWIN} It formats the files of \`setup/index.ts\` with real Oxfmt.`,
-  "src/lib/toolchain/__tests__/idioms.test.ts": `${STACK_TEST} It runs \`toolchain/index.ts\` on the idioms tree.`,
 } as const satisfies Readonly<Record<string, string>>
 
 /**

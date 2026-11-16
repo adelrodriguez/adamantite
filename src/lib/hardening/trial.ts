@@ -106,7 +106,8 @@ const BASE_CONFIG_NAME = "oxlint.trial-base.config"
 /**
  * The `node_modules` entry that the copy does not link to the project. `custom()` writes its entry
  * modules below it, in the cache folder of `presets/rules/folder.ts`, so they stay in the copy. The
- * trial tests in `src/__tests__/trial.test.ts` check that the project's cache stays as it is.
+ * tests in `src/lib/hardening/__tests__/trial.test.ts` check that the project's cache stays as it
+ * is.
  */
 const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
 

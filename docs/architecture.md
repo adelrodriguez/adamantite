@@ -320,7 +320,7 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   `antislop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
   one pass of fixes, so a fix that causes a new fixable report still needs a second `fix`.
-  `src/lib/toolchain/__tests__/idioms.test.ts` lists each such idiom in `secondPasses` and fails
+  `src/lib/toolchain/__tests__/index.test.ts` lists each such idiom in `secondPasses` and fails
   when one fix ends it, so the entry goes when Oxlint repeats its passes
   ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects

@@ -86,10 +86,11 @@ Each kind of test has one place:
 Name each test file after the module that it tests, as `<folder>/__tests__/<name>.test.ts` for
 `<folder>/<name>.ts`, or list it with a reason in `src/__tests__/test-names.test.ts`.
 
-A test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest, belongs in the
-`PROCESS_RUN_TESTS` list of `vitest.config.ts`. That list is the `presets` Vitest project, which
-`pnpm run test:presets` runs. Every other test runs in the `unit` project, which must not touch the
-host filesystem.
+A test file with a test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest,
+belongs in the `PROCESS_RUN_TESTS` list of `vitest.config.ts`. Keep that test in the file of its
+module, beside the unit tests, which then run with it. That list is the `presets` Vitest project,
+which `pnpm run test:presets` runs. Every other test file runs in the `unit` project, which must not
+touch the host filesystem.
 
 ## Validate a change
 

@@ -9,10 +9,10 @@ import { defineConfig } from "vitest/config"
 // `presets/__tests__/rule-fixtures.ts` lints the preset fixtures with it.
 const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 
-// These tests start real processes: Oxlint and Oxfmt runs that lint and format files, rule trials
-// in a copy of a project, Node.js runs that load configs, and Vitest runs that check the module
-// cache. They touch the host
-// filesystem, so they stay out of the unit tests.
+// The test files with tests that start real processes: Oxlint and Oxfmt runs that lint and format
+// files, rule trials in a copy of a project, Node.js runs that load configs, and Vitest runs that
+// check the module cache. They touch the host filesystem, so they stay out of the unit tests. The
+// unit tests in the same file run with them.
 const PROCESS_RUN_TESTS = [
   "presets/__tests__/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",

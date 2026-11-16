@@ -52,6 +52,21 @@ const NODE_FS = new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])
 // `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`.
 const CALLBACK_COMBINATORS = new Set(["andThen", "flatMap", "map", "tap"])
 
+// The pipe steps of Effect 4.1.2 that keep the success value, so the steps after them still receive
+// the service. Each one returns `Effect<A, …>` for its input `Effect<A, …>`. `andThen`, `flatMap`,
+// `map`, and every step that this list does not name may change the value, so the pipe stops there.
+const KEEPS_VALUE = new Set([
+  "annotateLogs",
+  "annotateSpans",
+  "retry",
+  "tap",
+  "tapCause",
+  "tapError",
+  "timeout",
+  "withLogSpan",
+  "withSpan",
+])
+
 const ROOT = join(import.meta.dirname, "../..")
 
 function stringValue(node: ESTree.Node) {
@@ -128,8 +143,7 @@ function callbackParameter(node: ESTree.Node | undefined, index: number) {
     : undefined
 }
 
-// The bindings that receive the service from `tag` in a callback. In a pipe, each callback step
-// counts, also after a step that replaces the value.
+// The bindings that receive the service from `tag` in a callback.
 function findServiceParameters(tag: ESTree.Node) {
   const { parent } = tag
 
@@ -142,9 +156,16 @@ function findServiceParameters(tag: ESTree.Node) {
   const call =
     parent?.type === "MemberExpression" && memberName(parent) === "pipe" ? parent.parent : undefined
 
-  return call?.type === "CallExpression" && call.callee === parent
-    ? call.arguments.map((step) => callbackParameter(step, 0))
-    : []
+  if (call?.type !== "CallExpression" || call.callee !== parent) return []
+
+  // The steps up to and including the first one that may change the value.
+  const steps = call.arguments
+
+  const end = steps.findIndex(
+    (step) => step.type !== "CallExpression" || !KEEPS_VALUE.has(memberName(step.callee) ?? "")
+  )
+
+  return (end === -1 ? steps : steps.slice(0, end + 1)).map((step) => callbackParameter(step, 0))
 }
 
 export default defineRule({

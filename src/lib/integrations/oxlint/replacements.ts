@@ -3,6 +3,7 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Record from "effect/Record"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
@@ -89,22 +90,35 @@ function countOverrides(config: LintConfig, { option, rules }: Replacement): num
 }
 
 /**
- * The step that loads the plugin of a rule, with the presets that load it, or none when `config`
- * loads it already.
+ * The step that loads the plugin of a rule, or none when `config` loads it already. The step names
+ * the presets that load the plugin without turning on rules, such as `architecture`, when there are
+ * any, and places the preset after core, where the `core-preset-order` finding expects it.
  */
-function toPluginStep(config: LintConfig, plugin: FirstPartyPlugin): readonly string[] {
+function toPluginStep(
+  file: string,
+  config: LintConfig,
+  plugin: FirstPartyPlugin
+): readonly string[] {
   if (listJsPluginNames(config).includes(plugin)) {
     return []
   }
 
   const isPlugin = Schema.is(Schema.Struct({ name: Schema.Literal(plugin) }))
 
-  const presets = lintPresets
-    .filter(({ config: preset }) => (preset.jsPlugins ?? []).some((entry) => isPlugin(entry)))
-    .map(({ name }) => `\`${publicImport(`./lint/${name}`)}\``)
+  const loading = lintPresets.filter(({ config: preset }) =>
+    (preset.jsPlugins ?? []).some((entry) => isPlugin(entry))
+  )
+
+  const ruleless = loading.filter(({ config: preset }) =>
+    Record.isEmptyReadonlyRecord(preset.rules ?? {})
+  )
+
+  const presets = (ruleless.length > 0 ? ruleless : loading).map(
+    ({ name }) => `\`${publicImport(`./lint/${name}`)}\``
+  )
 
   return [
-    `Add ${new Intl.ListFormat("en-US", { type: "disjunction" }).format(presets)} to \`extends\` to load the \`${plugin}\` plugin.`,
+    `Import ${new Intl.ListFormat("en-US", { type: "disjunction" }).format(presets)} in \`${file}\`, and add it to \`extends\` after the core preset. It loads the \`${plugin}\` plugin.`,
   ]
 }
 
@@ -124,7 +138,11 @@ function toWarning(
     return Option.none()
   }
 
-  const steps = [...toPluginStep(config, plugin), ...replacement.steps, "Run `adamantite check`."]
+  const steps = [
+    ...toPluginStep(file, config, plugin),
+    ...replacement.steps,
+    "Run `adamantite check`.",
+  ]
 
   return Option.some(
     [

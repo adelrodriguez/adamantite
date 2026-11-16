@@ -54,9 +54,9 @@ npx adamantite init
 
 Oxlint accepts the `options` of a config only in the root config, so `init` makes no changes when
 it would set up Oxlint in a folder that a parent Oxlint config lints. It looks in each parent folder
-up to the repository root, the first folder that holds `.git`. Run `init` at the root of that
-project, or extend the root config in the folder, as
-[Custom rules in a monorepo](#custom-rules-in-a-monorepo) shows.
+up to the filesystem root, also past a folder that holds `.git`, because Oxlint loads the nested
+configs there too. Run `init` at the root of that project, or extend the root config in the folder,
+as [Custom rules in a monorepo](#custom-rules-in-a-monorepo) shows.
 
 The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
 and coding agent setup with the [Adamantite skill](#agent-skill). The scripts prompt starts with

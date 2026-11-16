@@ -41,30 +41,17 @@ const CONFIG = {
 export const PACKAGE = { name: "oxlint", version: getDependencyVersion("oxlint") }
 
 /**
- * The Oxlint config of the nearest parent folder of `cwd`, relative to `cwd`. The search stops at
- * the repository root, the first folder that holds `.git`, or at the filesystem root. Oxlint loads
- * a config in `cwd` as a nested config of that one, and rejects the `options` that only a root
- * config can set.
+ * The Oxlint config of the nearest parent folder of `cwd`, relative to `cwd`, up to the filesystem
+ * root. Oxlint run in that folder loads a config in `cwd` as a nested config, and rejects the
+ * `options` that only a root config can set. A folder that holds `.git` does not stop it.
  */
 export const findParentConfig = Effect.fn("findParentConfig")(function* (cwd: string) {
   const path = yield* Path.Path
-  const folders = [cwd]
+  const parents: string[] = []
 
   for (let folder = cwd; path.dirname(folder) !== folder; folder = path.dirname(folder)) {
-    folders.push(path.dirname(folder))
+    parents.push(path.dirname(folder))
   }
-
-  const repository = yield* Effect.findFirst(folders, (folder) =>
-    checkExists(path.join(folder, ".git"))
-  )
-
-  const parents = folders.slice(
-    1,
-    Option.match(repository, {
-      onNone: () => folders.length,
-      onSome: (root) => folders.indexOf(root) + 1,
-    })
-  )
 
   const config = yield* Effect.findFirst(
     parents.flatMap((folder) =>

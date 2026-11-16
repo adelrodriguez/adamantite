@@ -563,8 +563,8 @@ effect.
 The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and the rules in
 `presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Their rules follow the same conventions as the
-`adamantite` rules. `presets/__tests__/require-readable-spacing.test.ts` runs the spacing fix
-through the Oxlint CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
+`adamantite` rules. The RuleTester cases of `require-readable-spacing` fix each output again with
+`recursive`, so a fix that a second run would change fails. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship. Adamantite shipped both plugins as vendored bundles before.

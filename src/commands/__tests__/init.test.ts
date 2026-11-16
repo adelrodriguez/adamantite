@@ -13,7 +13,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
-import type { InitOptions } from "#commands/init/options.ts"
+import type { InitOptions } from "#commands/init.ts"
 import {
   type DependencyInstallerTestContext,
   createDependencyInstallerTestContext,
@@ -32,7 +32,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { listHashes } from "#__tests__/lifecycle.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
-import initCommand from "#commands/init/index.ts"
+import initCommand from "#commands/init.ts"
 import { Report } from "#commands/setup.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"

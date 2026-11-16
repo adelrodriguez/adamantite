@@ -7,7 +7,7 @@ import {
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
-import initCommand from "#commands/init/index.ts"
+import initCommand from "#commands/init.ts"
 import updateCommand from "#commands/update.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"

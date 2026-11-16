@@ -9,7 +9,7 @@ import {
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import doctorCommand from "#commands/doctor.ts"
-import initCommand from "#commands/init/index.ts"
+import initCommand from "#commands/init.ts"
 import updateCommand from "#commands/update.ts"
 
 type RunOptions = Parameters<typeof runCommand>[2]

@@ -123,6 +123,41 @@ tester.run("file-writers", rule, {
       errors: [write("makeDirectory"), write("remove")],
       filename: READER,
     },
+    // A pipe step counts by the Effect export that it reads, however the import spells it.
+    {
+      code: `${IMPORTS}import { withSpan } from "effect/Effect"
+export const remove = FileSystem.FileSystem.pipe(
+  withSpan("read"),
+  Effect.flatMap((fs) => fs.remove("a"))
+)`,
+      errors: [write("remove")],
+      filename: READER,
+    },
+    {
+      code: `import * as FileSystem from "effect/FileSystem"
+import { flatMap, flatMap as chain } from "effect/Effect"
+export const remove = FileSystem.FileSystem.pipe(flatMap((fs) => fs.remove("a")))
+export const rename = FileSystem.FileSystem.pipe(chain((fs) => fs.rename("a", "b")))`,
+      errors: [write("remove"), write("rename")],
+      filename: READER,
+    },
+    {
+      code: `import * as FileSystem from "effect/FileSystem"
+import { tap } from "effect/Effect"
+export const make = FileSystem.FileSystem.pipe(tap((fs) => fs.makeDirectory("a")))`,
+      errors: [write("makeDirectory")],
+      filename: READER,
+    },
+    {
+      code: `import { Effect, FileSystem } from "effect"
+import * as Fx from "effect"
+export const remove = FileSystem.FileSystem.pipe(
+  Effect.withSpan("read"),
+  Fx.Effect.flatMap((fs) => fs.remove("a"))
+)`,
+      errors: [write("remove")],
+      filename: READER,
+    },
     // A writer goes through `FileSystem` too.
     {
       code: 'import { rmSync } from "node:fs"\nexport { rmSync }',
@@ -147,6 +182,21 @@ export const read = Effect.gen(function* () {
 })
 export const update = Effect.flatMap(Ref.make(0), (fs) => Ref.set(fs, 1))
 `,
+      filename: READER,
+    },
+    // A step that does not come from Effect ends the service, whatever its name.
+    {
+      code: `${IMPORTS}const withSpan = (name: string) => <A>(self: A) => self
+export const remove = FileSystem.FileSystem.pipe(
+  withSpan("read"),
+  Effect.flatMap((fs) => fs.remove("a"))
+)`,
+      filename: READER,
+    },
+    {
+      code: `import * as FileSystem from "effect/FileSystem"
+const Steps = { flatMap: (f: (value: unknown) => unknown) => f }
+export const remove = FileSystem.FileSystem.pipe(Steps.flatMap((fs) => fs.remove("a")))`,
       filename: READER,
     },
     // A pipe step that may change the value ends the service: `map` returns another object, and

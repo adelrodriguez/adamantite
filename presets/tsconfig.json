@@ -1,6 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    // Base options
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "allowJs": true,
     "resolveJsonModule": true,
@@ -10,14 +12,20 @@
     // if you emit output with tsc.
     "noEmit": true,
 
-    // TypeScript 7 turns on `strict` by default. These are the stricter options that it leaves off
-    // and that no lint rule covers.
+    // Strictness and best practices. We only recommend settings that are not
+    // covered by linting rules.
+    "strict": true,
+
     "allowUnreachableCode": false,
     // Node.js type stripping, Bun, and custom rule files run only erasable syntax. Core lint
     // reports namespaces and parameter properties, but no lint rule bans `enum`.
     "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
-    "noUncheckedIndexedAccess": true
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": true,
+    "noUncheckedSideEffectImports": true
   }
 }

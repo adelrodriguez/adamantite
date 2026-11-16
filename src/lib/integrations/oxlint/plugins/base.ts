@@ -4,6 +4,7 @@ import type * as Path from "effect/Path"
 import * as Data from "effect/Data"
 import type { ModuleResolver } from "#lib/project/module-resolver.ts"
 import type {
+  EffectBridgeMissing,
   EffectBuildMissing,
   EffectPlatformUnsupported,
   FailedToParseFile,
@@ -13,9 +14,13 @@ import type {
 } from "#lib/shared/errors.ts"
 
 /**
- * The native binding file that Oxlint loads in place of its own.
+ * The native binding that Oxlint loads in place of its own. The entry sets `env` and loads the
+ * `preload` module before Oxlint loads its binding, and that module swaps the binding.
  */
-export class BindingOverride extends Data.TaggedClass("Binding")<{ readonly path: string }> {}
+export class BindingOverride extends Data.TaggedClass("Binding")<{
+  readonly env: Readonly<Record<string, string>>
+  readonly preload: string
+}> {}
 
 /**
  * The variables that start the type-aware backend in place of the default backend.
@@ -44,6 +49,7 @@ export class NativeRuntime extends Data.TaggedClass("Native")<{
     oxlint: string
   ) => Effect.Effect<
     readonly NativeOverride[],
+    | EffectBridgeMissing
     | EffectBuildMissing
     | EffectPlatformUnsupported
     | PackageNotInstalled

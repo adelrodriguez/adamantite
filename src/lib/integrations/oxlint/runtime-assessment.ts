@@ -12,7 +12,6 @@ import {
   NoBackend,
   ReplacedPart,
   resolveOxlintRuntime,
-  StockPart,
   TsrsBackend,
   type OxlintRuntime,
 } from "#lib/integrations/oxlint/runtime.ts"
@@ -78,11 +77,6 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
       }
     }
 
-    // A plugin that replaces the binding and the backend checks its own builds.
-    if (binding instanceof ReplacedPart && !(backend instanceof TsrsBackend)) {
-      return []
-    }
-
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const resolver = yield* ModuleResolver
@@ -120,43 +114,45 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
 
     const bindingTarget = platform + (suffix[process.platform] ?? "")
 
-    if (binding instanceof StockPart) {
-      const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
-        Config.withDefault("")
-      )
+    const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
+      Config.withDefault("")
+    )
 
-      const targets =
-        process.platform === "darwin" ? ["darwin-universal", bindingTarget] : [bindingTarget]
+    const targets =
+      process.platform === "darwin" ? ["darwin-universal", bindingTarget] : [bindingTarget]
 
-      const nativeCandidates = override
-        ? [override]
-        : targets.flatMap((target) => [`./oxlint.${target}.node`, `@oxlint/binding-${target}`])
+    const nativeCandidates = override
+      ? [override]
+      : targets.flatMap((target) => [`./oxlint.${target}.node`, `@oxlint/binding-${target}`])
 
-      const candidates = [...nativeCandidates, "./oxlint.wasi.cjs", "@oxlint/binding-wasm32-wasi"]
+    // A plugin's preload module swaps the binding of the installed `@oxlint/binding-*` package as
+    // Oxlint loads it, so a replaced binding needs that package. Only a stock binding can come from
+    // a local file, the `NAPI_RS_NATIVE_LIBRARY_PATH` override, or the WASI build.
+    const candidates =
+      binding instanceof ReplacedPart
+        ? targets.map((target) => `@oxlint/binding-${target}`)
+        : [...nativeCandidates, "./oxlint.wasi.cjs", "@oxlint/binding-wasm32-wasi"]
 
-      const binding = yield* Effect.findFirst(candidates, (specifier) =>
-        Effect.gen(function* () {
-          const resolved = yield* resolver.resolve(path.join(runtime.oxlint, "dist"), specifier)
+    const installed = yield* Effect.findFirst(candidates, (specifier) =>
+      Effect.gen(function* () {
+        const resolved = yield* resolver.resolve(path.join(runtime.oxlint, "dist"), specifier)
 
-          if (Option.isNone(resolved) || !(yield* fs.exists(resolved.value))) {
-            return false
-          }
+        if (Option.isNone(resolved) || !(yield* fs.exists(resolved.value))) {
+          return false
+        }
 
-          return (
-            specifier !== "./oxlint.wasi.cjs"
-            || (yield* fs.exists(path.join(runtime.oxlint, "dist", "oxlint.wasm32-wasi.wasm")))
-            || (yield* fs.exists(
-              path.join(runtime.oxlint, "dist", "oxlint.wasm32-wasi.debug.wasm")
-            ))
-          )
-        })
-      )
+        return (
+          specifier !== "./oxlint.wasi.cjs"
+          || (yield* fs.exists(path.join(runtime.oxlint, "dist", "oxlint.wasm32-wasi.wasm")))
+          || (yield* fs.exists(path.join(runtime.oxlint, "dist", "oxlint.wasm32-wasi.debug.wasm")))
+        )
+      })
+    )
 
-      if (Option.isNone(binding)) {
-        return finding("Oxlint cannot resolve its installed native binding.", [
-          "Install the target project's optional dependencies for this platform, or restore its local binding.",
-        ])
-      }
+    if (Option.isNone(installed)) {
+      return finding("Oxlint cannot resolve its installed native binding.", [
+        "Install the target project's optional dependencies for this platform, or restore its local binding.",
+      ])
     }
 
     if (backend instanceof TsrsBackend) {
@@ -190,6 +186,12 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
     return []
   }).pipe(
     Effect.catchTags({
+      EffectBridgeMissing: (error) =>
+        Effect.succeed(
+          finding(error.message, [
+            "Run `adamantite update` to align Oxlint, tsrs, and @effect/tsgo with supported builds.",
+          ])
+        ),
       EffectBuildMissing: (error) =>
         Effect.succeed(
           finding(error.message, [

@@ -20,9 +20,13 @@ import { PackageNotInstalled } from "#lib/shared/errors.ts"
 export class StockPart extends Data.TaggedClass("Stock") {}
 
 /**
- * Oxlint loads the file at `path` in place of its own file.
+ * Oxlint loads a plugin's build in place of its own file, after the entry sets `env` and loads the
+ * `preload` module that swaps the file.
  */
-export class ReplacedPart extends Data.TaggedClass("Replaced")<{ readonly path: string }> {}
+export class ReplacedPart extends Data.TaggedClass("Replaced")<{
+  readonly env: Readonly<Record<string, string>>
+  readonly preload: string
+}> {}
 
 /**
  * A file that Oxlint loads.
@@ -149,7 +153,10 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
       backend === undefined
         ? yield* resolveDefaultBackend(project)
         : new ReplacedBackend({ env: backend.env }),
-    binding: binding === undefined ? new StockPart() : new ReplacedPart({ path: binding.path }),
+    binding:
+      binding === undefined
+        ? new StockPart()
+        : new ReplacedPart({ env: binding.env, preload: binding.preload }),
     oxlint: oxlint.value,
   } satisfies OxlintRuntime
 })

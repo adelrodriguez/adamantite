@@ -35,8 +35,16 @@ const STOCK_PACKAGES = {
   [`${STOCK_TSRS_PACKAGE}/package.json`]: `node_modules/${STOCK_TSRS_PACKAGE}/package.json`,
 }
 
+// The Effect bridge swaps the binding of the installed binding package, so an Effect project needs
+// that package too.
+const STOCK_BINDING_PACKAGE = `@oxlint/binding-${STOCK_TARGET}`
+
+const STOCK_BINDING_PACKAGE_FILE = `node_modules/${STOCK_BINDING_PACKAGE}/oxlint.node`
+
 const PACKAGES = {
+  "@effect/tsgo/oxlint-bridge": "node_modules/@effect/tsgo/lib/oxlint-bridge.cjs",
   "@effect/tsgo/package.json": "node_modules/@effect/tsgo/package.json",
+  [STOCK_BINDING_PACKAGE]: STOCK_BINDING_PACKAGE_FILE,
   [`${PLATFORM_PACKAGE}/package.json`]: `node_modules/${PLATFORM_PACKAGE}/package.json`,
   "oxlint/package.json": "node_modules/oxlint/package.json",
   "tsrs/package.json": "node_modules/tsrs/package.json",
@@ -47,6 +55,7 @@ function makeFiles(overrides: Record<string, string> = {}) {
     files: {
       [`${ARTIFACTS}/oxlint/1.91.0/oxlint.node`]: "",
       [`${ARTIFACTS}/tsrs/${TSRS_VERSION}/${TSRS}`]: "",
+      [STOCK_BINDING_PACKAGE_FILE]: "",
       [`node_modules/${PLATFORM_PACKAGE}/package.json`]: JSON.stringify({ version: "0.67.1" }),
       "node_modules/@effect/tsgo/package.json": JSON.stringify({ version: "0.67.1" }),
       "node_modules/oxlint/package.json": JSON.stringify({ version: "1.91.0" }),
@@ -259,6 +268,34 @@ describe("Oxlint runtime assessment", () => {
       expect(result).toMatchObject({ findings: [] })
       expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
       expect({ ...process.env }).toStrictEqual(environment)
+    })
+  )
+
+  it.effect("report a missing binding package that the Effect build replaces", () =>
+    Effect.gen(function* () {
+      const { [STOCK_BINDING_PACKAGE]: _binding, ...packages } = PACKAGES
+      const result = yield* runAssess(makeFiles(), packages)
+
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "Oxlint cannot resolve its installed native binding.",
+          "Install the target project's optional dependencies for this platform, or restore its local binding."
+        ),
+      ])
+    })
+  )
+
+  it.effect("report an @effect/tsgo without the Oxlint bridge", () =>
+    Effect.gen(function* () {
+      const { "@effect/tsgo/oxlint-bridge": _bridge, ...packages } = PACKAGES
+      const result = yield* runAssess(makeFiles(), packages)
+
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "The effect preset needs `@effect/tsgo/oxlint-bridge`, which @effect/tsgo 0.67.1 does not ship. Run `adamantite update`.",
+          "Run `adamantite update` to align Oxlint, tsrs, and @effect/tsgo with supported builds."
+        ),
+      ])
     })
   )
 

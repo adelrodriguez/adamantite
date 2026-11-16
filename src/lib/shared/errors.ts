@@ -158,6 +158,18 @@ export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
 }
 
 /**
+ * The installed `@effect/tsgo` has no `oxlint-bridge` module, which swaps Oxlint's binding for the
+ * Effect build.
+ */
+export class EffectBridgeMissing extends Data.TaggedError("EffectBridgeMissing")<{
+  effectVersion: string
+}> {
+  override get message() {
+    return `The effect preset needs \`@effect/tsgo/oxlint-bridge\`, which @effect/tsgo ${this.effectVersion} does not ship. Run \`adamantite update\`.`
+  }
+}
+
+/**
  * `@effect/tsgo` publishes no Effect build of Oxlint for this platform, such as Linux with musl.
  */
 export class EffectPlatformUnsupported extends Data.TaggedError("EffectPlatformUnsupported")<{

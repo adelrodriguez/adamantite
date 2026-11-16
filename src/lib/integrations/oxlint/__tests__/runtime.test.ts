@@ -14,6 +14,7 @@ import {
   TsrsBackend,
 } from "#lib/integrations/oxlint/runtime.ts"
 import {
+  EffectBridgeMissing,
   EffectBuildMissing,
   EffectPlatformUnsupported,
   PackageNotInstalled,
@@ -31,8 +32,11 @@ const STOCK_PACKAGES = {
   "tsrs/package.json": "node_modules/tsrs/package.json",
 }
 
+const BRIDGE = "node_modules/@effect/tsgo/lib/oxlint-bridge.cjs"
+
 const EFFECT_PACKAGES = {
   ...STOCK_PACKAGES,
+  "@effect/tsgo/oxlint-bridge": BRIDGE,
   "@effect/tsgo/package.json": "node_modules/@effect/tsgo/package.json",
   [`${PLATFORM_PACKAGE}/package.json`]: `node_modules/${PLATFORM_PACKAGE}/package.json`,
 }
@@ -199,11 +203,26 @@ describe("Oxlint runtime", () => {
             },
           }),
           binding: new ReplacedPart({
-            path: `${ROOT}/${ARTIFACTS}/oxlint/1.88.0/oxlint.${PLATFORM}.node`,
+            env: {
+              EFFECT_TSGO_OXLINT_BINDING: `${ROOT}/${ARTIFACTS}/oxlint/1.88.0/oxlint.${PLATFORM}.node`,
+            },
+            preload: `${ROOT}/${BRIDGE}`,
           }),
           oxlint: `${ROOT}/node_modules/oxlint`,
         })
       })
+  )
+
+  it.effect("name adamantite update when @effect/tsgo has no Oxlint bridge", () =>
+    Effect.gen(function* () {
+      const { "@effect/tsgo/oxlint-bridge": _bridge, ...packages } = EFFECT_PACKAGES
+      const error = yield* runResolve(makeFiles(), packages).pipe(Effect.flip)
+
+      expect(error).toBeInstanceOf(EffectBridgeMissing)
+      expect(error.message).toBe(
+        "The effect preset needs `@effect/tsgo/oxlint-bridge`, which @effect/tsgo 0.67.1 does not ship. Run `adamantite update`."
+      )
+    })
   )
 
   it.effect(

@@ -219,6 +219,10 @@ tester.run("layers", createLayersRule(MODULES), {
       'import base = require("#lib/integrations/base.ts")',
       'export import base = require("#lib/integrations/base.ts")',
       'import type base = require("#lib/integrations/base.ts")',
+      // A type named `require` leaves the runtime `require` in place.
+      'type require = string\nconst base = require("#lib/integrations/base.ts")',
+      'interface require {}\nconst base = require("#lib/integrations/base.ts")',
+      'type require = string\nfunction load() {\n  return require("#lib/integrations/base.ts")\n}',
     ].map((code) => ({
       code,
       errors: [{ messageId: "upward" }],

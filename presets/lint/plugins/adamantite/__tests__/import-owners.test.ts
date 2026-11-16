@@ -110,6 +110,10 @@ tester.run("import-owners", rule, {
       'import giget = require("giget")',
       'export import giget = require("giget")',
       'import type giget = require("giget")',
+      // A type named `require` leaves the runtime `require` in place.
+      'type require = string\nconst giget = require("giget")',
+      'interface require {}\nconst giget = require("giget")',
+      'type require = string\nfunction load() {\n  return require("giget")\n}',
     ].map((code) => ({
       code,
       errors: [{ message: MODULE_MESSAGE }],

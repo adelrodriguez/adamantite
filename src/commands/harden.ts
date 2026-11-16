@@ -104,7 +104,7 @@ const verify = Effect.fn("verify")(function* (
 ) {
   const CHECK_FAILED = "`adamantite check` failed."
 
-  const checkFailures = yield* Toolchain.check({ cwd }).pipe(
+  const checkFailures = yield* Toolchain.check().pipe(
     Effect.as([]),
     Effect.catchTags({
       CliNotFound: (error) => Effect.succeed([error.message, CHECK_FAILED]),

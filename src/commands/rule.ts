@@ -56,7 +56,7 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
       const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const relative = path.relative(cwd, path.resolve(cwd, file))
-      const program = yield* Toolchain.ast({ cwd, file: relative })
+      const program = yield* Toolchain.ast(relative)
 
       yield* Output.result(
         AstReport,

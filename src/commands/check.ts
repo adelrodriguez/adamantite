@@ -29,15 +29,12 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
   Command.withDescription("Check formatting, lint issues, and TypeScript types"),
   Command.withHandler(({ allowWarnings, files, only }) =>
     Effect.gen(function* () {
-      const cwd = yield* Project.Directory
-
       yield* Toolchain.check({
         allowWarnings,
-        cwd,
         files,
         forwardedArguments: yield* ForwardedArguments,
         only: Option.getOrUndefined(only),
-        selection: yield* readSelection(cwd),
+        selection: yield* readSelection(yield* Project.Directory),
       })
     })
   )

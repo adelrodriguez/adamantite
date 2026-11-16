@@ -57,15 +57,12 @@ export default Command.make("fix", { all, dangerous, files, only, suggested }).p
   Command.withDescription("Apply lint fixes and format code"),
   Command.withHandler(({ all, dangerous, files, only, suggested }) =>
     Effect.gen(function* () {
-      const cwd = yield* Project.Directory
-
       yield* Toolchain.fix({
-        cwd,
         files,
         forwardedArguments: yield* ForwardedArguments,
         level: toFixLevel({ all, dangerous, suggested }),
         only: Option.getOrUndefined(only),
-        selection: yield* readSelection(cwd),
+        selection: yield* readSelection(yield* Project.Directory),
       })
     })
   )

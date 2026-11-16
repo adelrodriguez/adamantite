@@ -36,14 +36,11 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
   ]),
   Command.withHandler(({ fix, only, strict }) =>
     Effect.gen(function* () {
-      const cwd = yield* Project.Directory
-
       yield* Toolchain.analyze({
-        cwd,
         fix,
         forwardedArguments: yield* ForwardedArguments,
         only: Option.getOrUndefined(only),
-        selection: yield* readSelection(cwd),
+        selection: yield* readSelection(yield* Project.Directory),
         strict,
       })
     })

@@ -26,6 +26,7 @@ import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
 import { CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
+import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, Lockfile } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
@@ -307,6 +308,10 @@ const unexpectedInstallerLayer = Layer.succeed(DependencyInstaller)({
 })
 
 export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
+  /**
+   * Receives each file that the config loader loads, in the order that the loads start.
+   */
+  readonly configLoads?: string[]
   readonly errorLines?: unknown[]
   readonly files?: FileSystemTestContext
   readonly forwardedArguments?: readonly string[]
@@ -381,9 +386,18 @@ export function runCommand<
 
   const platformLayer = makePlatformLayer(files)
 
-  // The config loader reads the files and resolves imports with the services of the test.
+  // The config loader reads the files and resolves imports with the services of the test, and
+  // records each file that it loads.
   const testLayer = Layer.provideMerge(
-    configLoaderLayer,
+    Layer.effect(
+      ConfigLoader,
+      Effect.map(ConfigLoader, (loader) => ({
+        load: (cwd: string, file: string) =>
+          Effect.sync(() => options.configLoads?.push(file)).pipe(
+            Effect.andThen(loader.load(cwd, file))
+          ),
+      }))
+    ).pipe(Layer.provide(configLoaderLayer)),
     Layer.mergeAll(
       makeDefaultLayer(files, options.terminal ?? createTerminalTestContext()),
       ...(options.layers ?? []).map((layer) => layer.pipe(Layer.provide(platformLayer)))

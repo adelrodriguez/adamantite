@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
 import type { LintPreset } from "#lib/project/selection.ts"
+import * as Project from "#lib/project/index.ts"
 import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
 import {
@@ -284,7 +285,6 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
     it.live("keep each clean idiom unchanged after fix", () =>
       Effect.gen(function* () {
         yield* Toolchain.fix({
-          cwd: project,
           files: [`${FIXTURES_DIRECTORY}/clean`],
           level: FIX_LEVEL,
         })
@@ -292,7 +292,7 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
         expect(readFiles(join(project, FIXTURES_DIRECTORY, "clean"), clean)).toStrictEqual(
           readFiles(join(idiomsDir, "clean"), clean)
         )
-      }).pipe(Effect.provide(SOURCE_RUNNER))
+      }).pipe(Effect.provideService(Project.Directory, project), Effect.provide(SOURCE_RUNNER))
     )
 
     it.live.skipIf(fixable.length === 0)(
@@ -309,7 +309,6 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
           // the test reads the files to see the result.
           yield* Effect.ignore(
             Toolchain.fix({
-              cwd: project,
               files: [`${FIXTURES_DIRECTORY}/fixable`],
               level: FIX_LEVEL,
             })
@@ -325,7 +324,6 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
           if (repeated.size > 0) {
             yield* Effect.ignore(
               Toolchain.fix({
-                cwd: project,
                 files: [...repeated].map((file) => `${FIXTURES_DIRECTORY}/fixable/${file}`),
                 level: FIX_LEVEL,
               })
@@ -335,19 +333,18 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
           expect(readFixable()).toStrictEqual(fixed)
 
           const checked = yield* Effect.exit(
-            Toolchain.check({ cwd: project, files: [`${FIXTURES_DIRECTORY}/fixable`] })
+            Toolchain.check({ files: [`${FIXTURES_DIRECTORY}/fixable`] })
           )
 
           expect(checked).toStrictEqual(Exit.void)
 
           yield* Toolchain.fix({
-            cwd: project,
             files: [`${FIXTURES_DIRECTORY}/fixable`],
             level: FIX_LEVEL,
           })
 
           expect(readFixable()).toStrictEqual(fixed)
-        }).pipe(Effect.provide(SOURCE_RUNNER))
+        }).pipe(Effect.provideService(Project.Directory, project), Effect.provide(SOURCE_RUNNER))
     )
   })
 })

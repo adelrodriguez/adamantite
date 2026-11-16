@@ -1,15 +1,14 @@
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   assessProject,
   ProjectAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
+import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Output from "#terminal/output.ts"
@@ -29,21 +28,19 @@ export const Report = Schema.Struct({
 })
 
 /**
- * Assesses the project at `cwd` after `setup`, and offers the repair of its findings through
+ * Assesses the target project after `setup`, and offers the repair of its findings through
  * `Resolution.offer`. The command fails while findings remain.
  */
 export const offerRepair = Effect.fn("offerRepair")(function* (
   command: "init" | "update",
-  cwd: string,
   setup: Setup.Result | null
 ) {
   // The lockfile decides which integrations apply, so each assessment reads the project again.
-  const assess = readProject(cwd).pipe(Effect.flatMap(assessProject))
+  const assess = Project.read().pipe(Effect.flatMap(assessProject))
   const assessment = yield* assess
 
   yield* Resolution.offer({
     command,
-    cwd,
     document: Output.json(Report, { assessment, schemaVersion: 1, setup }),
     message: "How do you want to resolve these findings?",
     prompt: renderAssessmentMarkdown(assessment, version),
@@ -60,7 +57,7 @@ export const offerRepair = Effect.fn("offerRepair")(function* (
  */
 export const applySetup = Effect.fn("applySetup")(function* (
   command: "init" | "update",
-  project: Project,
+  project: Project.Snapshot,
   selection: Selection
 ) {
   const setup = yield* Setup.apply(project, selection)
@@ -77,7 +74,7 @@ export const applySetup = Effect.fn("applySetup")(function* (
           : `\`${LOCKFILE_PATH}\` updated. Commit it.`
       )
 
-  yield* offerRepair(command, project.cwd, setup)
+  yield* offerRepair(command, setup)
 
   return (
     setup.installs.length > 0

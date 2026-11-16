@@ -4,11 +4,11 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/project/project.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,
 } from "#lib/project/custom-rules/stub.macro.ts" with { type: "macro" }
+import * as Project from "#lib/project/index.ts"
 import {
   CustomRuleExists,
   CustomRuleNotFound,
@@ -157,8 +157,8 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
  */
 export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* ({
   customRules,
-  cwd,
-}: Project) {
+}: Project.Snapshot) {
+  const cwd = yield* Project.Directory
   const path = yield* Path.Path
 
   const found = yield* Effect.forEach(

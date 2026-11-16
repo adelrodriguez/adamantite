@@ -9,7 +9,7 @@ import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
 import { probeAst } from "#lib/integrations/oxlint/probe.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
-import { checkIsMonorepo } from "#lib/project/monorepo.ts"
+import * as Project from "#lib/project/index.ts"
 import { type Selection, toToolNotSelected } from "#lib/project/selection.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
@@ -38,19 +38,20 @@ function explainMissingTool(selection: Option.Option<Selection>) {
  * fails with the first failure. The forwarded arguments go to the lint stage, or to the stage that
  * `only` selects.
  */
-export const check = Effect.fn("Toolchain.check")(function* (options: {
-  readonly allowWarnings?: boolean
-  readonly cwd: string
-  readonly files?: readonly string[]
-  readonly forwardedArguments?: readonly string[]
-  readonly only?: "format" | "lint"
-  /**
-   * The selection that the lockfile records. A tool that is not installed, and that no selected
-   * script runs, fails with `ToolNotSelected`. Without it, a missing tool fails as it reports.
-   */
-  readonly selection?: Option.Option<Selection>
-}) {
-  const { allowWarnings = false, cwd, files = [], forwardedArguments = [], only } = options
+export const check = Effect.fn("Toolchain.check")(function* (
+  options: {
+    readonly allowWarnings?: boolean
+    readonly files?: readonly string[]
+    readonly forwardedArguments?: readonly string[]
+    readonly only?: "format" | "lint"
+    /**
+     * The selection that the lockfile records. A tool that is not installed, and that no selected
+     * script runs, fails with `ToolNotSelected`. Without it, a missing tool fails as it reports.
+     */
+    readonly selection?: Option.Option<Selection>
+  } = {}
+) {
+  const { allowWarnings = false, files = [], forwardedArguments = [], only } = options
 
   if (only === "format" && allowWarnings) {
     return yield* new InvalidCheckOptions({
@@ -58,6 +59,7 @@ export const check = Effect.fn("Toolchain.check")(function* (options: {
     })
   }
 
+  const cwd = yield* Project.Directory
   const runner = yield* CommandRunner
   const forwardedStage = only ?? "lint"
 
@@ -86,7 +88,6 @@ export const check = Effect.fn("Toolchain.check")(function* (options: {
  * selects.
  */
 export const fix = Effect.fn("Toolchain.fix")(function* (options: {
-  readonly cwd: string
   readonly files?: readonly string[]
   readonly forwardedArguments?: readonly string[]
   readonly level?: FixLevel
@@ -97,7 +98,7 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
    */
   readonly selection?: Option.Option<Selection>
 }) {
-  const { cwd, files = [], forwardedArguments = [], level = "safe", only } = options
+  const { files = [], forwardedArguments = [], level = "safe", only } = options
 
   if (only === "format" && level !== "safe") {
     return yield* new InvalidFixOptions({
@@ -106,6 +107,7 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
     })
   }
 
+  const cwd = yield* Project.Directory
   const runner = yield* CommandRunner
   const targets = Array.dedupe(files)
   const forwardedStage = only ?? "lint"
@@ -139,7 +141,6 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
  * the operation stops at the first failure.
  */
 export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
-  readonly cwd: string
   readonly fix?: boolean
   readonly forwardedArguments?: readonly string[]
   readonly only?: "monorepo" | "unused"
@@ -150,10 +151,9 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
   readonly selection?: Option.Option<Selection>
   readonly strict?: boolean
 }) {
-  const { cwd, fix = false, forwardedArguments = [], only, strict = false } = options
-
+  const { fix = false, forwardedArguments = [], only, strict = false } = options
+  const cwd = yield* Project.Directory
   const runner = yield* CommandRunner
-
   const path = yield* Path.Path
 
   // Without a usable manifest there is no monorepo to analyze. Knip reports the manifest. Any other
@@ -162,7 +162,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
   const isMonorepo =
     only !== "unused"
     && (yield* checkExists(path.join(cwd, "package.json")))
-    && (yield* checkIsMonorepo(cwd).pipe(
+    && (yield* Project.checkIsMonorepo().pipe(
       Effect.catchTags({
         FailedToParseFile: () => Effect.succeed(false),
         InvalidPackageJson: () => Effect.succeed(false),
@@ -219,18 +219,12 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
 })
 
 /**
- * The syntax tree that Oxlint gives rules for `file`, relative to `cwd`, from the Oxlint runtime of
- * the project. Fails with the parse errors of a file that does not parse, and for a file that
- * Oxlint does not lint.
+ * The syntax tree that Oxlint gives rules for `file`, relative to the target project, from the
+ * Oxlint runtime of the project. Fails with the parse errors of a file that does not parse, and for
+ * a file that Oxlint does not lint.
  */
-export const ast = Effect.fn("Toolchain.ast")(function* ({
-  cwd,
-  file,
-}: {
-  readonly cwd: string
-  readonly file: string
-}) {
-  const { errors, program } = yield* probeAst(cwd, file)
+export const ast = Effect.fn("Toolchain.ast")(function* (file: string) {
+  const { errors, program } = yield* probeAst(yield* Project.Directory, file)
 
   if (errors.length > 0) {
     return yield* new FailedToParseSource({ errors, path: file })

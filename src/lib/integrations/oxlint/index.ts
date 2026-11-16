@@ -4,7 +4,6 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
 import {
   assessConfigFile,
   type ConfigFile,
@@ -25,6 +24,7 @@ import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
+import * as Project from "#lib/project/index.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
@@ -140,7 +140,7 @@ function toExcludedPresetsFinding({
  * or runtime has its own finding, and Oxlint does not run without it.
  */
 const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
-  project: Project,
+  project: Project.Snapshot,
   runtimeFindings: readonly Finding[]
 ) {
   const declared =
@@ -150,7 +150,7 @@ const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
     return []
   }
 
-  return yield* listLintedFiles(project.cwd).pipe(
+  return yield* listLintedFiles(yield* Project.Directory).pipe(
     Effect.as([]),
     Effect.catchTag("TrialLintFailed", ({ output }) =>
       Effect.succeed([
@@ -171,9 +171,10 @@ const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
 })
 
 export default {
-  assess: (project: Project, selection: Selection) =>
+  assess: (project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
-      const { cwd, lintConfig } = project
+      const cwd = yield* Project.Directory
+      const { lintConfig } = project
       const runtimeFindings = yield* assessOxlintRuntime(project)
       const loadFindings = yield* assessConfigLoad(project, runtimeFindings)
       const pkg = assessPackage(project, PACKAGE, "the managed lint scripts", "oxlint")
@@ -226,12 +227,18 @@ export default {
         warnings: pkg.warnings,
       }
     }),
-  files: ({ cwd }: Project, selection: Selection) =>
-    renderConfigFile(cwd, CONFIG, toOxlintTsConfigContent(listPresets(selection))),
+  files: (_project: Project.Snapshot, selection: Selection) =>
+    Effect.gen(function* () {
+      return yield* renderConfigFile(
+        yield* Project.Directory,
+        CONFIG,
+        toOxlintTsConfigContent(listPresets(selection))
+      )
+    }),
   name: "oxlint",
   // Oxlint runs the type-aware rules on tsrs, and a preset with a managed plugin loads that plugin
   // from the project.
-  packages: (_project: Project, selection: Selection) => [
+  packages: (_project: Project.Snapshot, selection: Selection) => [
     PACKAGE,
     { name: tsrs.name, version: tsrs.version },
     ...managedPlugins

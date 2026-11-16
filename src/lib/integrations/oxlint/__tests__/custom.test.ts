@@ -8,7 +8,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
-import { readProject } from "#lib/project/project.ts"
+import * as Project from "#lib/project/index.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
@@ -46,8 +46,9 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
  * resolver.
  */
 function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
-  return readProject(ROOT).pipe(
+  return Project.read().pipe(
     Effect.flatMap((project) => oxlintCustom.assess(project)),
+    Effect.provideService(Project.Directory, ROOT),
     Effect.provide(
       withConfigLoader(
         Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions))

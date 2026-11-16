@@ -6,7 +6,6 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
 import { NativeRuntime } from "#lib/integrations/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/oxlint/plugins/index.ts"
 import {
@@ -17,6 +16,7 @@ import {
   TsrsBackend,
   type OxlintRuntime,
 } from "#lib/integrations/oxlint/runtime.ts"
+import * as Project from "#lib/project/index.ts"
 import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { PackageNotInstalled } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
@@ -46,7 +46,9 @@ function finding(currentState: string, goal: readonly string[]): readonly Findin
  * the same runtime before it loads Oxlint. Package assessment reports a package that `package.json`
  * does not declare, so this assessment skips it.
  */
-export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (project: Project) {
+export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
+  project: Project.Snapshot
+) {
   const declared = (name: string) =>
     project.packageJson.devDependencies?.[name] ?? project.packageJson.dependencies?.[name]
 
@@ -55,7 +57,8 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
   }
 
   return yield* Effect.gen(function* () {
-    const runtime: OxlintRuntime = yield* resolveOxlintRuntime(project.cwd)
+    const cwd = yield* Project.Directory
+    const runtime: OxlintRuntime = yield* resolveOxlintRuntime(cwd)
 
     const { backend, binding } = runtime
 
@@ -67,10 +70,10 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
 
     for (const plugin of oxlintPlugins) {
       if (plugin.runtime instanceof NativeRuntime && declared(plugin.name)) {
-        const installed = yield* resolvePackageDirectory(project.cwd, plugin.name)
+        const installed = yield* resolvePackageDirectory(cwd, plugin.name)
 
         if (Option.isNone(installed)) {
-          return yield* new PackageNotInstalled({ packageName: plugin.name, project: project.cwd })
+          return yield* new PackageNotInstalled({ packageName: plugin.name, project: cwd })
         }
       }
     }
@@ -157,7 +160,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
     }
 
     if (backend instanceof TsrsBackend) {
-      const tsrs = yield* resolvePackageDirectory(project.cwd, "tsrs")
+      const tsrs = yield* resolvePackageDirectory(cwd, "tsrs")
       const override = yield* Config.String("TSRS_BINARY").pipe(Config.withDefault(""))
       const target = `${platform}${process.platform === "linux" ? `-${libc}` : ""}`
 

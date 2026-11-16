@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import type { Project } from "#lib/project/project.ts"
 import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
@@ -12,9 +11,9 @@ import { integrations } from "#lib/integrations/index.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
+import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
-import { readProject } from "#lib/project/project.ts"
 import { Selection } from "#lib/project/selection.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
@@ -156,7 +155,7 @@ export type ProjectAssessment = typeof ProjectAssessment.Type
  * Assess every managed integration against one read of the project. A reassessment after an agent
  * session or a dependency update reads the project again, so it sees the changes.
  */
-export const assessProject = Effect.fn("assessProject")(function* (project: Project) {
+export const assessProject = Effect.fn("assessProject")(function* (project: Project.Snapshot) {
   if (Option.isNone(project.lockfile)) {
     return lockfileMissing
   }
@@ -196,20 +195,20 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 })
 
 /**
- * The assessment that Doctor reports for the project at `cwd`, from a new read of it. A project
- * that does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so
- * a coding agent can repair it.
+ * The assessment that Doctor reports for the target project, from a new read of it. A project that
+ * does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so a
+ * coding agent can repair it.
  */
-export const readAssessment = Effect.fn("readAssessment")(function* (cwd: string) {
+export const readAssessment = Effect.fn("readAssessment")(function* () {
   // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets
   // the install finding even when its workspace packages do not read.
-  const packageJson = yield* readPackageJson(cwd)
+  const packageJson = yield* readPackageJson(yield* Project.Directory)
 
   if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
     return notInstalled
   }
 
-  return yield* readProject(cwd).pipe(
+  return yield* Project.read().pipe(
     Effect.flatMap(assessProject),
     Effect.catchTag(["InvalidLockfile", "UnsupportedLockfile"], (error) =>
       Effect.succeed(assessUnreadableLockfile(error))

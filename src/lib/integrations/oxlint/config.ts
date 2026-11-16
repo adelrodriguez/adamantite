@@ -2,7 +2,7 @@ import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type * as Project from "#lib/project/index.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import {
   type LintConfig,
@@ -87,7 +87,7 @@ export function listLintPresets(config: LintConfig): string[] {
  * and the config of each workspace package that Oxlint loads, through `extends` or in an override.
  * Core and `custom()` are not listed. A config that does not load applies none.
  */
-export function listAppliedLintPresets({ customRules }: Project): readonly string[] {
+export function listAppliedLintPresets({ customRules }: Project.Snapshot): readonly string[] {
   return customRules.loadedConfigs.flatMap((config) =>
     listAppliedPresetModules(config).flatMap((module) =>
       module.startsWith(LINT_PRESET_PREFIX) ? [module.slice(LINT_PRESET_PREFIX.length)] : []

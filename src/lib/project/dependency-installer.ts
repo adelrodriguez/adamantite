@@ -7,8 +7,8 @@ import * as Option from "effect/Option"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stream from "effect/Stream"
+import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
-import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   type DetectedPackageManager,
   detectPackageManager,
@@ -91,16 +91,17 @@ export class DependencyInstaller extends Context.Service<
 }
 
 /**
- * Install `packages` at the workspace root. An install changes `node_modules`, so the module
- * resolver forgets what earlier resolutions read, also when the install fails part way.
+ * Install `packages` at the workspace root of the target project. An install changes
+ * `node_modules`, so the module resolver forgets what earlier resolutions read, also when the
+ * install fails part way.
  */
-export const addRootDevDependencies = (cwd: string, packages: readonly string[]) =>
+export const addRootDevDependencies = (packages: readonly string[]) =>
   Effect.gen(function* () {
     const dependencyInstaller = yield* DependencyInstaller
     const resolver = yield* ModuleResolver
-    const isMonorepo = yield* checkIsMonorepo(cwd)
+    const isMonorepo = yield* Project.checkIsMonorepo()
 
     yield* dependencyInstaller
-      .addDevDependencies(packages, cwd, { workspace: isMonorepo })
+      .addDevDependencies(packages, yield* Project.Directory, { workspace: isMonorepo })
       .pipe(Effect.ensuring(resolver.clearCache))
   })

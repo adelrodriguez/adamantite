@@ -1,7 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import type { Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   assessConfigFile,
@@ -16,6 +15,7 @@ import {
 } from "#lib/integrations/knip/config.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { readConfig } from "#lib/project/config-loader.ts"
+import * as Project from "#lib/project/index.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
@@ -29,16 +29,17 @@ const CONFIG = {
 export const PACKAGE = { name: "knip", version: getDependencyVersion("knip") }
 
 export default {
-  assess: (project: Project, selection: Selection) =>
+  assess: (project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
+      const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const pkg = assessPackage(project, PACKAGE, "the managed `analyze` script", "knip")
       const workspace = toKnipWorkspace(project, selection)
 
       const config = yield* assessConfigFile(
-        project.cwd,
+        cwd,
         CONFIG,
-        yield* readConfig(project.cwd, path.join(project.cwd, CONFIG.path), KnipConfig),
+        yield* readConfig(cwd, path.join(cwd, CONFIG.path), KnipConfig),
         toKnipTsConfigContent(workspace),
         (content) => inspectRequiredKnipConfig(content, workspace)
       )
@@ -49,13 +50,15 @@ export default {
         warnings: pkg.warnings,
       }
     }),
-  files: (project: Project, selection: Selection) =>
-    renderConfigFile(
-      project.cwd,
-      CONFIG,
-      toKnipTsConfigContent(toKnipWorkspace(project, selection))
-    ),
+  files: (project: Project.Snapshot, selection: Selection) =>
+    Effect.gen(function* () {
+      return yield* renderConfigFile(
+        yield* Project.Directory,
+        CONFIG,
+        toKnipTsConfigContent(toKnipWorkspace(project, selection))
+      )
+    }),
   name: "knip",
-  packages: (_project: Project, _selection: Selection) => [PACKAGE],
+  packages: (_project: Project.Snapshot, _selection: Selection) => [PACKAGE],
   selected: ({ scripts }: Selection) => checkRunsTool(scripts, "knip"),
 } satisfies Integration

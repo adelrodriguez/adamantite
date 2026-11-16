@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
-import type { Workspace } from "#lib/project/monorepo.ts"
+import type * as Project from "#lib/project/index.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
 import {
   type replaceConfigs,
@@ -135,7 +135,7 @@ function makeConfig(body: string) {
 }
 
 // The fixtures without a workspace package declare no workspace.
-const NO_WORKSPACE: Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
+const NO_WORKSPACE: Project.Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
 
 function makeCase(filePath: string, expected: TrialCase["expected"], source?: string): TrialCase {
   return { expected, path: filePath, source: Option.fromUndefinedOr(source) }

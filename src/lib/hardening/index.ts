@@ -4,7 +4,7 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { Workspace } from "#lib/project/monorepo.ts"
+import type * as Project from "#lib/project/index.ts"
 import { AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
@@ -82,7 +82,7 @@ export type HardenContext = typeof HardenContext.Type
  * The packages that a scope selects: the packages inside the scope, or the innermost package that
  * contains it. The root and the selected packages own the files that the scope keeps.
  */
-function selectPackages(path: Path.Path, cwd: string, workspace: Workspace, scope: string) {
+function selectPackages(path: Path.Path, cwd: string, workspace: Project.Workspace, scope: string) {
   const contains = (folder: string, target: string) => {
     const fromFolder = path.relative(folder, target)
 
@@ -123,7 +123,7 @@ function selectPackages(path: Path.Path, cwd: string, workspace: Workspace, scop
  */
 const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
   cwd: string,
-  workspace: Workspace,
+  workspace: Project.Workspace,
   scope: string
 ) {
   const path = yield* Path.Path
@@ -181,7 +181,7 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
  */
 export const readHardenReach = Effect.fn("readHardenReach")(function* (
   cwd: string,
-  workspace: Workspace,
+  workspace: Project.Workspace,
   scope: string = cwd
 ) {
   return (yield* readScopedDocumentation(cwd, workspace, scope)).agentReach
@@ -197,7 +197,7 @@ export const readHardenReach = Effect.fn("readHardenReach")(function* (
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
-  workspace: Workspace,
+  workspace: Project.Workspace,
   scope: string,
   commits: number
 ) {

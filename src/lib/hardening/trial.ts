@@ -7,7 +7,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
-import type { Workspace } from "#lib/project/monorepo.ts"
+import type * as Project from "#lib/project/index.ts"
 import { lintFiles, resolveRule, listLintedFiles, splitRuleName } from "#lib/hardening/oxlint.ts"
 import { listIgnoredFiles, listProjectFiles } from "#lib/hardening/project-files.ts"
 import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
@@ -253,7 +253,7 @@ export function renderOverrideTrialConfig(options: {
  * the copy of the package, so a config that imports the package loads the copy.
  */
 export const makeProjectCopy = Effect.fn("makeProjectCopy")(
-  function* (cwd: string, workspace: Workspace) {
+  function* (cwd: string, workspace: Project.Workspace) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const files = yield* listProjectFiles(cwd)
@@ -444,7 +444,7 @@ export const tryRule = Effect.fn("tryRule")(
     readonly cwd: string
     readonly rule: string
     readonly setting: TrialSetting
-    readonly workspace: Workspace
+    readonly workspace: Project.Workspace
   }) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path

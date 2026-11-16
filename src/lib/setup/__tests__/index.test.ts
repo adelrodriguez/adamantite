@@ -26,10 +26,10 @@ import agents from "#lib/integrations/agents/index.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
-import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
@@ -92,8 +92,9 @@ const layer = Layer.mergeAll(
 )
 
 const apply = (cwd: string) =>
-  readProject(cwd).pipe(
+  Project.read().pipe(
     Effect.flatMap((project) => Setup.apply(project, FULL_SELECTION)),
+    Effect.provideService(Project.Directory, cwd),
     Effect.provide(layer)
   )
 
@@ -272,9 +273,10 @@ describe("the files that Setup writes", () => {
 
       const skill = join(project, ".agents/skills/adamantite/SKILL.md")
 
-      const assessSkill = readProject(project).pipe(
+      const assessSkill = Project.read().pipe(
         Effect.flatMap((current) => agents.assess(current, FULL_SELECTION)),
         Effect.map(({ findings }) => findings.map(({ id }) => id)),
+        Effect.provideService(Project.Directory, project),
         Effect.provide(layer)
       )
 

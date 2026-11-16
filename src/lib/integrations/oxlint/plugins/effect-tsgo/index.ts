@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect"
-import type { Project } from "#lib/project/project.ts"
+import type * as Project from "#lib/project/index.ts"
 import { assessTsconfigPlugin } from "#lib/integrations/effect-language-service.ts"
 import { defineOxlintPlugin, NativeRuntime } from "#lib/integrations/oxlint/plugins/base.ts"
 import { resolveEffectRuntime } from "#lib/integrations/oxlint/plugins/effect-tsgo/runtime.ts"
@@ -7,7 +7,7 @@ import { resolveEffectRuntime } from "#lib/integrations/oxlint/plugins/effect-ts
 const NAME = "@effect/tsgo"
 
 export default defineOxlintPlugin({
-  assess: (project: Project) =>
+  assess: (project: Project.Snapshot) =>
     Effect.gen(function* () {
       const tsconfig = yield* assessTsconfigPlugin(project, NAME)
 

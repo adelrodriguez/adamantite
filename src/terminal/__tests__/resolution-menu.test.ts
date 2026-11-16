@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { TestClock, TestConsole } from "effect/testing"
 import { CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
+import * as Project from "#lib/project/index.ts"
 import { chooseResolution } from "#terminal/resolution-menu.ts"
 
 // Replaces one property for the scope, and restores its descriptor when the scope closes.
@@ -77,11 +78,14 @@ describe("chooseResolution", () => {
 
       const fiber = yield* chooseResolution({
         command: "Doctor",
-        cwd: "/project",
         message: "How do you want to resolve the findings?",
         prompt: "Fix the findings.",
         subject: "findings",
-      }).pipe(Effect.provide(agents), Effect.forkChild)
+      }).pipe(
+        Effect.provide(agents),
+        Effect.provideService(Project.Directory, "/project"),
+        Effect.forkChild
+      )
 
       yield* waitForKeyReader
       process.stdin.emit("keypress", "\r", {

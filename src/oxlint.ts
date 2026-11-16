@@ -13,10 +13,10 @@ import {
   toBackendEnv,
   TsrsBackend,
 } from "#lib/integrations/oxlint/runtime.ts"
+import * as Project from "#lib/project/index.ts"
 import { readSelection } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { toToolNotSelected } from "#lib/project/selection.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.
@@ -26,7 +26,7 @@ const named = process.env[PROJECT_VARIABLE]
 
 const result = await Effect.runPromise(
   Effect.gen(function* () {
-    const project = getProjectDirectory(entry, yield* Cwd, named)
+    const project = getProjectDirectory(entry, yield* Project.Directory, named)
 
     return yield* resolveOxlintRuntime(project).pipe(
       // Without a selected script that runs Oxlint, Setup did not install it, and
@@ -43,7 +43,12 @@ const result = await Effect.runPromise(
     )
   }).pipe(
     Effect.result,
-    Effect.provide([NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer])
+    Effect.provide([
+      NodeFileSystem.layer,
+      NodePath.layer,
+      ModuleResolver.layer,
+      Project.Directory.layer,
+    ])
   )
 )
 

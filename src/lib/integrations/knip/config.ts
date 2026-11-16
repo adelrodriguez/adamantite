@@ -1,7 +1,7 @@
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type * as Project from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { IDENTITY_KEY, PresetIdentity } from "#lib/project/config-loader.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
@@ -76,7 +76,10 @@ function formatIgnoreDependencies(lists: readonly IgnoreList[]) {
     : `[${lists.map((list) => `...ignoreDependencies.${list}`).join(", ")}]`
 }
 
-export function toKnipWorkspace({ workspace }: Project, { presets }: Selection): KnipWorkspace {
+export function toKnipWorkspace(
+  { workspace }: Project.Snapshot,
+  { presets }: Selection
+): KnipWorkspace {
   return {
     isMonorepo: workspace.isMonorepo,
     usesEffectPreset: presets.includes("effect"),

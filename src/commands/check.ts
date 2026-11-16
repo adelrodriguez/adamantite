@@ -3,8 +3,8 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Project from "#lib/project/index.ts"
 import { readSelection } from "#lib/project/lockfile.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
 
@@ -29,15 +29,12 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
   Command.withDescription("Check formatting, lint issues, and TypeScript types"),
   Command.withHandler(({ allowWarnings, files, only }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
-
       yield* Toolchain.check({
         allowWarnings,
-        cwd,
         files,
         forwardedArguments: yield* ForwardedArguments,
         only: Option.getOrUndefined(only),
-        selection: yield* readSelection(cwd),
+        selection: yield* readSelection(yield* Project.Directory),
       })
     })
   )

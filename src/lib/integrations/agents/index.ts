@@ -6,7 +6,6 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as String from "effect/String"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
@@ -16,6 +15,7 @@ import {
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { detectSkillFolders } from "#lib/integrations/agents/skill.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import * as Project from "#lib/project/index.ts"
 import { hashContent } from "#lib/project/lockfile.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
@@ -31,9 +31,10 @@ const shippedSkill = getShippedSkillFiles()
  * package manager. None when Adamantite cannot detect the package manager.
  */
 const readAgentsSection = Effect.fn("readAgentsSection")(function* (
-  { cwd, workspace }: Project,
+  { workspace }: Project.Snapshot,
   { scripts }: Selection
 ) {
+  const cwd = yield* Project.Directory
   const detected = yield* (yield* DependencyInstaller).detectPackageManager(cwd)
 
   return Option.map(detected, ({ name }) =>
@@ -92,10 +93,11 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
  * equals the hash that the lockfile recorded is what Adamantite wrote.
  */
 const readSkillFile = Effect.fn("readSkillFile")(function* (
-  { cwd, lockfile }: Project,
+  { lockfile }: Project.Snapshot,
   file: string,
   shipped: string
 ) {
+  const cwd = yield* Project.Directory
   const path = yield* Path.Path
   const current = yield* readFileIfExists(path.join(cwd, file))
 
@@ -117,8 +119,8 @@ const readSkillFile = Effect.fn("readSkillFile")(function* (
  * changed file. An earlier version wrote that file before the lockfile recorded it, or the project
  * changed it, so `update` keeps it.
  */
-const assessSkill = Effect.fn("assessSkill")(function* (project: Project) {
-  const folders = yield* detectSkillFolders(project.cwd)
+const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapshot) {
+  const folders = yield* detectSkillFolders(yield* Project.Directory)
 
   const copies = yield* Effect.forEach(
     folders,
@@ -219,21 +221,21 @@ const assessSkillsLock = Effect.fn("assessSkillsLock")(function* (cwd: string) {
 })
 
 export default {
-  assess: (project: Project, _selection: Selection) =>
-    Effect.map(
-      Effect.all([assess(project.cwd), assessSkill(project), assessSkillsLock(project.cwd)], {
-        concurrency: "unbounded",
-      }),
-      ([agents, skill, lock]) => ({
-        findings: [...agents, ...skill, ...lock],
-        packageActions: [],
-        warnings: [],
-      })
-    ),
-  // The skill goes to each skill folder of the agents that the project uses.
-  files: (project: Project, selection: Selection) =>
+  assess: (project: Project.Snapshot, _selection: Selection) =>
     Effect.gen(function* () {
-      const folders = yield* detectSkillFolders(project.cwd)
+      const cwd = yield* Project.Directory
+
+      const [agents, skill, lock] = yield* Effect.all(
+        [assess(cwd), assessSkill(project), assessSkillsLock(cwd)],
+        { concurrency: "unbounded" }
+      )
+
+      return { findings: [...agents, ...skill, ...lock], packageActions: [], warnings: [] }
+    }),
+  // The skill goes to each skill folder of the agents that the project uses.
+  files: (project: Project.Snapshot, selection: Selection) =>
+    Effect.gen(function* () {
+      const folders = yield* detectSkillFolders(yield* Project.Directory)
       const section = yield* readAgentsSection(project, selection)
 
       return [
@@ -250,6 +252,6 @@ export default {
       ]
     }),
   name: "agents",
-  packages: (_project: Project, _selection: Selection) => [],
+  packages: (_project: Project.Snapshot, _selection: Selection) => [],
   selected: ({ agents }: Selection) => agents,
 } satisfies Integration

@@ -5,6 +5,7 @@ import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Terminal from "effect/Terminal"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
+import * as Project from "#lib/project/index.ts"
 import * as Output from "#terminal/output.ts"
 
 interface ResolutionMenuOptions {
@@ -12,7 +13,6 @@ interface ResolutionMenuOptions {
    * The command's display name, such as `Doctor`, in "Exit the agent to return to Doctor."
    */
   readonly command: string
-  readonly cwd: string
   /**
    * The question of the resolution menu.
    */
@@ -82,8 +82,9 @@ export const RAW_MODE_RELEASE_WAIT = Duration.millis(200)
 export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
 ) {
+  const cwd = yield* Project.Directory
   const agents = yield* CodingAgents
-  const installedAgents = yield* agents.detectInstalled(options.cwd)
+  const installedAgents = yield* agents.detectInstalled(cwd)
 
   // The menu names each installed agent, so only an empty result needs a line.
   if (installedAgents.length === 0) {
@@ -122,7 +123,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   // The agent sets its own terminal mode, so Effect's late raw mode release must run first.
   yield* Effect.sleep(RAW_MODE_RELEASE_WAIT)
 
-  const started = yield* agents.handoff({ agent, cwd: options.cwd, prompt: options.prompt }).pipe(
+  const started = yield* agents.handoff({ agent, cwd, prompt: options.prompt }).pipe(
     Effect.as(true),
     Effect.catchTag("HandoffFailed", (error) =>
       Output.error(

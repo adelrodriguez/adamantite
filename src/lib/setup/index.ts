@@ -10,13 +10,13 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { ManagedFile } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { PackageAction } from "#lib/integrations/base.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
+import * as Project from "#lib/project/index.ts"
 import { hashContent, LOCKFILE_PATH, renderLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import {
@@ -305,7 +305,7 @@ const writeScripts = Effect.fn("writeScripts")(function* (
  * The install of `adamantite` itself, at the version that runs, when the project does not depend on
  * it. A project that depends on it keeps the version or source that it chose.
  */
-function getAdamantiteInstall({ packageJson }: Project): readonly PackageAction[] {
+function getAdamantiteInstall({ packageJson }: Project.Snapshot): readonly PackageAction[] {
   const declared = packageJson.devDependencies?.adamantite ?? packageJson.dependencies?.adamantite
 
   return Predicate.isUndefined(declared)
@@ -341,9 +341,12 @@ export type Result = typeof Result.Type
  * formatted the same way. Each hash in `written` is the hash of the bytes on disk. Running it twice
  * leaves the project unchanged.
  */
-export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
+export const apply = Effect.fn("Setup.apply")(function* (
+  project: Project.Snapshot,
+  selection: Selection
+) {
   const path = yield* Path.Path
-  const { cwd } = project
+  const cwd = yield* Project.Directory
   const selected = integrations.filter((integration) => integration.selected(selection))
 
   // Only the packages that the project does not declare at the managed version. A version from a
@@ -362,7 +365,6 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
 
   if (installs.length > 0) {
     yield* addRootDevDependencies(
-      cwd,
       installs.map((action) => `${action.package}@${action.targetVersion}`)
     )
   }

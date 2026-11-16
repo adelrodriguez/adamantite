@@ -10,11 +10,13 @@ domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 options. Command modules validate command-specific input, obtain Effect services, and
 invoke target-project operations.
 
-A command runs in the target project, the folder that `yield* Cwd` gives. `Cwd` in
-`src/lib/shared/cwd.ts` is a `Context.Reference` that reads the working directory of the process,
-and a test provides the folder instead of changing the process. Lib code takes the folder as a
-`cwd` parameter. `eslint/no-restricted-properties` rejects every other `process.cwd()` and
-`process.chdir()` call.
+A command runs in the target project, the folder that `yield* Project.Directory` gives.
+`Project.Directory` in `src/lib/project/index.ts` is a required service. `makeAppLayer` provides
+it from the working directory of the process, and a test provides the folder instead of changing
+the process. A function that always acts on the target project reads `Project.Directory`, so the
+folder shows in its requirements. A function that callers also run on other folders, such as a
+trial copy or a workspace package, takes the folder as a parameter.
+`eslint/no-restricted-properties` rejects every `process.cwd()` and `process.chdir()` call.
 
 `@effect/platform-node` supplies the production filesystem, path, process, and terminal
 services. Other external behavior, such as prompts and child commands, is also behind
@@ -205,7 +207,7 @@ formatted like a managed file, and only when its content changes. Each run compu
 again from the files that it created, replaced, or found unchanged, so a file that the user changed
 leaves it.
 
-`readProject` decodes the lockfile once into `project.lockfile`, an `Option`, and the rest of the
+`Project.read` decodes the lockfile once into `project.lockfile`, an `Option`, and the rest of the
 code trusts it. A lockfile with an unknown `schemaVersion` fails with `UnsupportedLockfile`, and one
 that does not decode fails with `InvalidLockfile`. Both name the file. `init` and `update` read the
 lockfile before they change a file, and fail, so they do not overwrite a lockfile that they cannot
@@ -213,10 +215,11 @@ read. The error says to run `adamantite doctor`.
 
 ## Assessment
 
-An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
+An assessment reads the target project one time. `Project.read` in `src/lib/project/index.ts`
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
-custom rules that the Oxlint configs load, and each integration's `assess` takes that `Project`. A
-`Project` is a snapshot, so a reassessment after a handoff or an install reads a new one. A command
+custom rules that the Oxlint configs load, and each integration's `assess` takes that
+`Project.Snapshot`. A snapshot holds facts, not the folder, which `Project.Directory` gives. A
+reassessment after a handoff or an install reads a new snapshot. A command
 that reads the workspace outside an assessment, such as `harden` or `rule try`, reads it one time for
 each phase and passes the `Workspace` down.
 
@@ -350,7 +353,7 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   comments of each rule in the files that Oxlint lints, and `hardening/overrides.ts` marks each file
   of an override that turns a rule off, after a trial that turns the rule on again. The prompt shows
   both as data. `harden` reads the workspace before the session, and takes `project.workspace` from
-  its `readProject` after the session, because the agent can change the project. The functions in
+  its `Project.read` after the session, because the agent can change the project. The functions in
   `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
 - `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
   project without a lockfile, it runs no setup and offers the `lockfile-missing` finding, which

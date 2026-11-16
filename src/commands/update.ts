@@ -2,8 +2,7 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { applySetup, offerRepair } from "#commands/setup.ts"
-import { readProject } from "#lib/project/project.ts"
-import { Cwd } from "#lib/shared/cwd.ts"
+import * as Project from "#lib/project/index.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -13,15 +12,14 @@ export default Command.make("update", { json: Mode.json }).pipe(
   ),
   Command.withHandler(({ json }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
       yield* Output.intro("💠 adamantite update")
 
-      const project = yield* readProject(cwd)
+      const project = yield* Project.read()
 
       // Without a lockfile, update has no selection to apply, so the assessment hands off its one
       // finding: run `adamantite init`.
       const changed = yield* Option.match(project.lockfile, {
-        onNone: () => Effect.as(offerRepair("update", cwd, null), false),
+        onNone: () => Effect.as(offerRepair("update", null), false),
         onSome: (lockfile) => applySetup("update", project, lockfile.selection),
       })
 

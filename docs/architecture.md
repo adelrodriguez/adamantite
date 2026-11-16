@@ -63,7 +63,7 @@ assessment. `project` and `handoff` are siblings too. `project` knows target-pro
 package state, but not integration types such as `Finding`. Lib code returns data, and commands
 render it, so no lib module imports `terminal`.
 
-`cli.ts`, `index.ts`, `oxlint.ts`, and `probe.ts` are entries of the `src` map. An entry imports any
+`cli.ts`, `index.ts`, and the files in `oxlint/` are entries of the `src` map. An entry imports any
 layer, and no layer imports an entry. Tests share the helpers in `src/__tests__`, so the `src` map
 does not check them. That ignore does not exempt tests from the `lib` map.
 

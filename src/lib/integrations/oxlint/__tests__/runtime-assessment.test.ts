@@ -96,17 +96,31 @@ function makeStockFiles(nativeFiles: Record<string, string>) {
   })
 }
 
+/**
+ * The finding of an Oxlint runtime that cannot run, with its one repair step.
+ */
+function unavailable(currentState: string, goal: string) {
+  return {
+    currentState,
+    goal: [goal],
+    id: "unavailable-oxlint-runtime",
+    integration: "oxlint",
+    notes: ["Verification: run `adamantite check --only lint` after the repair."],
+    title: "Oxlint runtime unavailable",
+  }
+}
+
 describe("Oxlint runtime assessment", () => {
   it.effect("report a missing stock native binding although the parent packages resolve", () =>
     Effect.gen(function* () {
       const result = yield* runAssess(makeStockFiles({ [STOCK_BACKEND]: "" }), STOCK_PACKAGES)
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("native binding"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "Oxlint cannot resolve its installed native binding.",
+          "Install the target project's optional dependencies for this platform, or restore its local binding."
+        ),
+      ])
     })
   )
 
@@ -114,12 +128,12 @@ describe("Oxlint runtime assessment", () => {
     Effect.gen(function* () {
       const result = yield* runAssess(makeStockFiles({ [STOCK_BINDING]: "" }), STOCK_PACKAGES)
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("tsrs binary"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "Oxlint cannot resolve the installed tsrs binary or its launcher.",
+          "Install the target project's optional dependencies for this platform, or restore TSRS_BINARY."
+        ),
+      ])
     })
   )
 
@@ -223,12 +237,12 @@ describe("Oxlint runtime assessment", () => {
         )
       )
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("tsrs binary"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "Oxlint cannot resolve the installed tsrs binary or its launcher.",
+          "Install the target project's optional dependencies for this platform, or restore TSRS_BINARY."
+        ),
+      ])
     })
   )
 
@@ -255,12 +269,12 @@ describe("Oxlint runtime assessment", () => {
 
       const result = yield* runAssess(files)
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("build of oxlint 2.0.0"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "The effect preset needs the @effect/tsgo build of oxlint 2.0.0. @effect/tsgo 0.67.1 has builds for oxlint 1.91.0. Run `adamantite update`.",
+          "Run `adamantite update` to align Oxlint, tsrs, and @effect/tsgo with supported builds."
+        ),
+      ])
     })
   )
 
@@ -268,12 +282,12 @@ describe("Oxlint runtime assessment", () => {
     Effect.gen(function* () {
       const result = yield* runAssess(makeFiles(), {})
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("`oxlint` is not installed"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          `\`oxlint\` is not installed in \`${ROOT}\`. Install the dependencies, or run \`adamantite update\`.`,
+          "Install the target project's dependencies, then run Doctor again."
+        ),
+      ])
     })
   )
 
@@ -283,12 +297,12 @@ describe("Oxlint runtime assessment", () => {
         "oxlint/package.json": PACKAGES["oxlint/package.json"],
       })
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: "Oxlint cannot resolve the declared tsrs backend or its launcher.",
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          "Oxlint cannot resolve the declared tsrs backend or its launcher.",
+          "Install the target project's dependencies so that the tsrs-lint launcher is available."
+        ),
+      ])
     })
   )
 
@@ -306,12 +320,12 @@ describe("Oxlint runtime assessment", () => {
         }
       )
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("`@effect/tsgo` is not installed"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          `\`@effect/tsgo\` is not installed in \`${ROOT}\`. Install the dependencies, or run \`adamantite update\`.`,
+          "Install the target project's dependencies, then run Doctor again."
+        ),
+      ])
     })
   )
 
@@ -322,12 +336,12 @@ describe("Oxlint runtime assessment", () => {
         "oxlint/package.json": PACKAGES["oxlint/package.json"],
       })
 
-      expect(result.findings).toContainEqual(
-        expect.objectContaining({
-          currentState: expect.stringContaining("has no Effect build of Oxlint"),
-          id: "unavailable-oxlint-runtime",
-        })
-      )
+      expect(result.findings).toStrictEqual([
+        unavailable(
+          `@effect/tsgo has no Effect build of Oxlint for ${process.platform}-${process.arch}, so Oxlint cannot load the effect preset here.`,
+          "Lint on a platform that `@effect/tsgo` has builds for, or remove `@effect/tsgo` and the effect preset."
+        ),
+      ])
     })
   )
 

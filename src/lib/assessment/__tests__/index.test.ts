@@ -142,7 +142,17 @@ describe("renderAssessmentMarkdown", () => {
       "1.2.3"
     )
 
-    expect(prompt).not.toContain("**Notes:**")
+    expect(prompt).toContain(
+      [
+        "## 1. Missing tool configuration",
+        "",
+        "- **Current state:** `tool.config.ts` is missing.",
+        "- **Goal:**",
+        "  - Create `tool.config.ts`.",
+        "",
+        "## Verify",
+      ].join("\n")
+    )
   })
 })
 

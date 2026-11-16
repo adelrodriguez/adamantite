@@ -44,7 +44,10 @@ describe("findCallerFile", () => {
   })
 
   it("find the caller in the stack of the current runtime", () => {
-    expect(findCallerFile(callFromOwnFile(), import.meta.filename)).not.toBe(import.meta.filename)
+    // The test runner calls this file, so the caller is a file of the runner's package.
+    expect(findCallerFile(callFromOwnFile(), import.meta.filename)).toMatch(
+      /[\\/]node_modules[\\/]/u
+    )
     expect(findCallerFile(callFromOwnFile(), "/elsewhere.ts")).toBe(import.meta.filename)
   })
 

@@ -148,14 +148,20 @@ describe("update", () => {
       const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
-      const exit = yield* runCommand(updateCommand, [], {
+      const exit = yield* runCommand(updateCommand, ["--json"], {
         files,
         layers: [installer.layer],
         logLines,
       })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls).toStrictEqual([])
+      const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
+
+      // An unreadable range would also install nothing, but it leaves a warning.
+      expect({
+        calls: installer.calls,
+        succeeded: Exit.isSuccess(exit),
+        warnings: report.assessment.warnings,
+      }).toStrictEqual({ calls: [], succeeded: true, warnings: [] })
     })
   )
 
@@ -285,13 +291,12 @@ describe("update", () => {
         files: { ...makeLockfileFile(CHECK_SELECTION), "package.json": manifest({}) },
       })
 
-      const installer = createDependencyInstallerTestContext({
-        addDevDependenciesError: new FailedToInstallDependency({ packages: ["oxlint"] }),
-      })
+      const error = new FailedToInstallDependency({ packages: ["oxlint"] })
+      const installer = createDependencyInstallerTestContext({ addDevDependenciesError: error })
 
       const exit = yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
 
-      expect(Exit.isFailure(exit)).toBe(true)
+      expect(getFailure(exit)).toBe(error)
     })
   )
 

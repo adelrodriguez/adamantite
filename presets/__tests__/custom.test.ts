@@ -355,7 +355,7 @@ describe.skipIf(process.platform === "win32")("custom preset without node_module
 
     const result = writeEntryModule()
 
-    expect(result.status).not.toBe(0)
+    expect(result.status).toBe(1)
     expect(result.stderr).toContain("custom() could not write the entry module")
   })
 })

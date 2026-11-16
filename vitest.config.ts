@@ -58,9 +58,6 @@ export default defineConfig({
         : { "oxlint/plugins-dev": join(TEST_OXLINT, "dist/plugins-dev.js") },
   },
   test: {
-    coverage: {
-      provider: "v8",
-    },
     isolate: false,
     // Tests that start real processes are slower, so CI runs them apart from the package's
     // unit tests. `pnpm run test` runs both projects.

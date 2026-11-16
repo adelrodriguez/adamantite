@@ -4,7 +4,19 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import {
+  createDependencyInstallerTestContext,
+  createRunnerTestContext,
+  findingsLeft,
+  getFailure,
+  makeHandoffRunner,
+  makeLockfileFile,
+  nonProbeInvocations,
+  promptingLayer,
+  runCommand,
+} from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection } from "#__tests__/lifecycle.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
 import { Report } from "#commands/setup.ts"
@@ -18,18 +30,6 @@ import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { FailedToInstallDependency, UnsupportedLockfile } from "#lib/shared/errors.ts"
-import {
-  createDependencyInstallerTestContext,
-  createRunnerTestContext,
-  findingsLeft,
-  getFailure,
-  makeHandoffRunner,
-  makeLockfileFile,
-  nonProbeInvocations,
-  promptingLayer,
-  runCommand,
-} from "./command-test-helpers.ts"
-import { makeSelection } from "./lifecycle.ts"
 
 const effectTsgo = managedPlugin("@effect/tsgo")
 const shadcnLint = managedPlugin("@shadcn/lint")

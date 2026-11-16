@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
+import { findingsLeft, getFailure, makeLockfileFile } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext, type FileSystemTestContext } from "#__tests__/filesystem.ts"
-import { findingsLeft, getFailure, makeLockfileFile } from "./command-test-helpers.ts"
-import { makeSelection, runLifecycle } from "./lifecycle.ts"
+import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
 
 const PACKAGE_JSON = `{
   "name": "test-project",

@@ -17,7 +17,7 @@ import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
-import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
+import { effectEditorFiles } from "#__tests__/effect-sdk.ts"
 import agents from "#lib/integrations/agents/index.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { ConfigLoader } from "#lib/project/config-loader.ts"

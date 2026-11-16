@@ -1,16 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   findingsLeft,
   getFailure,
   hashContent,
   makeLockfileFile,
   readLockfile,
-} from "./command-test-helpers.ts"
-import { runLifecycle } from "./lifecycle.ts"
+} from "#__tests__/command-test-helpers.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { runLifecycle } from "#__tests__/lifecycle.ts"
+import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const AGENTS = "AGENTS.md"
 

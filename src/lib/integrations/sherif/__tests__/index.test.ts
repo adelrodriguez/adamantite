@@ -1,16 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import initCommand from "#commands/init/index.ts"
-import updateCommand from "#commands/update.ts"
-import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
-import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
 import {
   createDependencyInstallerTestContext,
   makeLockfileFile,
   runCommand,
-} from "./command-test-helpers.ts"
-import { makeSelection, runLifecycle } from "./lifecycle.ts"
+} from "#__tests__/command-test-helpers.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
+import initCommand from "#commands/init/index.ts"
+import updateCommand from "#commands/update.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
+import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
 
 const MONOREPO_PACKAGE_JSON =
   '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" }, "workspaces": ["packages/*"] }\n'

@@ -14,7 +14,22 @@ import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 import type { InitOptions } from "#commands/init/options.ts"
+import {
+  type DependencyInstallerTestContext,
+  createDependencyInstallerTestContext,
+  createRunnerTestContext,
+  declareDevDependencies,
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeHandoffRunner,
+  nonProbeInvocations,
+  promptingLayer,
+  readLockfile,
+  runCommand,
+} from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { listHashes } from "#__tests__/lifecycle.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
@@ -41,21 +56,6 @@ import {
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import {
-  type DependencyInstallerTestContext,
-  createDependencyInstallerTestContext,
-  createRunnerTestContext,
-  declareDevDependencies,
-  findingsLeft,
-  getFailure,
-  hashContent,
-  makeHandoffRunner,
-  nonProbeInvocations,
-  promptingLayer,
-  readLockfile,
-  runCommand,
-} from "./command-test-helpers.ts"
-import { listHashes } from "./lifecycle.ts"
 
 /**
  * The live `DependencyInstaller`, which detects the package manager from the test filesystem, with

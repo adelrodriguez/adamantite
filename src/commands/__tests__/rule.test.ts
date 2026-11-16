@@ -3,6 +3,11 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import {
+  createRunnerTestContext,
+  promptingLayer,
+  runCommand,
+} from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
@@ -15,7 +20,6 @@ import {
   InvalidRuleName,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { createRunnerTestContext, promptingLayer, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {
   it.effect("write only the rule stub to .adamantite/lint", () =>

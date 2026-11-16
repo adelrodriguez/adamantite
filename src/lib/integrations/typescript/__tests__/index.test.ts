@@ -1,6 +1,7 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as ChildProcess from "effect/process/ChildProcess"
@@ -9,15 +10,22 @@ import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 import type { Selection, TypeScriptPreset } from "#lib/project/selection.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "#__tests__/command-test-helpers.ts"
 import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import { makeLockfileFile } from "#commands/__tests__/command-test-helpers.ts"
-import { makeSelection, runLifecycle } from "#commands/__tests__/lifecycle.ts"
 import { Report } from "#commands/doctor.ts"
 import typescript from "#lib/integrations/typescript/index.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readProject } from "#lib/project/project.ts"
-import { stringifyJson } from "#lib/shared/json.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -118,6 +126,158 @@ function assess(
     return { applicableIntegrations, findings }
   })
 }
+
+const CONFIG = "tsconfig.json"
+
+const PACKAGE_JSON = '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" } }\n'
+
+const MONOREPO_PACKAGE_JSON =
+  '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" }, "workspaces": ["packages/*"] }\n'
+
+const INIT_ARGS = ["--non-interactive", "--typescript", "typescript"]
+
+// The tests install no Oxfmt, so Setup writes each file as rendered.
+const RENDERED = `${Effect.runSync(formatJson({ extends: "adamantite/typescript" }))}\n`
+
+function makeProject(files: Record<string, string> = {}) {
+  return createFileSystemTestContext({ files: { "package.json": PACKAGE_JSON, ...files } })
+}
+
+describe("TypeScript setup", () => {
+  it.effect("create the config of the selected preset and record its hash", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
+
+      expect({
+        config: files.read(CONFIG),
+        recorded: readLockfile(files).written[CONFIG],
+        succeeded: Exit.isSuccess(exit),
+      }).toStrictEqual({ config: RENDERED, recorded: hashContent(RENDERED), succeeded: true })
+      expect(output).toContain(`✔ \`${CONFIG}\` created.`)
+    })
+  )
+
+  // TypeScript follows `extends` through the base config, and so does Doctor.
+  it.effect.each([
+    { finding: undefined, preset: "tsconfig" },
+    { finding: "Mismatched TypeScript preset", preset: "typescript" },
+  ] as const)(
+    "find adamantite/tsconfig through a shared base config when the lockfile selects $preset",
+    ({ finding, preset }) =>
+      Effect.gen(function* () {
+        const files = makeProject({
+          ...makeLockfileFile(makeSelection({ typescript: preset })),
+          [CONFIG]: '{ "extends": "./tsconfig.base.json", "include": ["src"] }\n',
+          "tsconfig.base.json": '{ "extends": "adamantite/tsconfig" }\n',
+        })
+
+        const doctor = yield* runLifecycle("doctor", files, ["--json"])
+        const { findings } = decodeReport(doctor.output)
+
+        expect(findings.map(({ title }) => title)).toStrictEqual(
+          finding === undefined ? [] : [finding]
+        )
+      })
+  )
+
+  // Doctor follows no base config of another package, so it cannot tell which preset the package
+  // uses, and reports neither a missing nor a mismatched preset.
+  it.effect.each([
+    { preset: "tsconfig", specifier: "@company/config" },
+    { preset: "typescript", specifier: "@company/config" },
+    { preset: "tsconfig", specifier: "@company/config/base" },
+    { preset: "typescript", specifier: "@company/config/base" },
+  ] as const)(
+    "check no preset through the package base $specifier when the lockfile selects $preset",
+    ({ preset, specifier }) =>
+      Effect.gen(function* () {
+        const files = makeProject({
+          ...makeLockfileFile(makeSelection({ typescript: preset })),
+          [CONFIG]: `{ "extends": "${specifier}", "include": ["src"] }\n`,
+          "node_modules/@company/config/base.json": '{ "extends": "adamantite/tsconfig" }\n',
+          "node_modules/@company/config/package.json": '{ "name": "@company/config" }\n',
+          "node_modules/@company/config/tsconfig.json": '{ "extends": "adamantite/tsconfig" }\n',
+        })
+
+        const doctor = yield* runLifecycle("doctor", files, ["--json"])
+
+        expect(decodeReport(doctor.output).findings).toStrictEqual([])
+      })
+  )
+
+  // TypeScript adds `.json` to a relative entry that names no file, and a folder is not a file.
+  it.effect("find adamantite/tsconfig through ./base.json beside a base folder", () =>
+    Effect.gen(function* () {
+      const files = makeProject({
+        ...makeLockfileFile(makeSelection({ typescript: "tsconfig" })),
+        [CONFIG]: '{ "extends": "./base", "include": ["src"] }\n',
+        "base.json": '{ "extends": "adamantite/tsconfig" }\n',
+        "base/index.ts": "export {}\n",
+      })
+
+      const doctor = yield* runLifecycle("doctor", files)
+      const json = yield* runLifecycle("doctor", files, ["--json"])
+
+      expect({
+        findings: decodeReport(json.output).findings.map(({ title }) => title),
+        succeeded: Exit.isSuccess(doctor.exit),
+      }).toStrictEqual({ findings: [], succeeded: true })
+    })
+  )
+
+  it.effect("delete the config when the selection no longer names a TypeScript preset", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const { written } = readLockfile(files)
+
+      files.write(
+        LOCKFILE_PATH,
+        makeLockfileFile(makeSelection({ scripts: ["analyze"] }), written)[LOCKFILE_PATH]
+      )
+
+      yield* runLifecycle("update", files)
+
+      expect(files.exists(CONFIG)).toBe(false)
+    })
+  )
+
+  // A root config that extends a preset makes TypeScript treat all packages as one project.
+  it.effect("write no root config in a monorepo, and report the packages in doctor", () =>
+    Effect.gen(function* () {
+      const files = makeProject({ "package.json": MONOREPO_PACKAGE_JSON })
+
+      const init = yield* runLifecycle("init", files, INIT_ARGS)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect({ config: files.exists(CONFIG), failure: getFailure(init.exit) }).toStrictEqual({
+        config: false,
+        failure: findingsLeft("init"),
+      })
+      expect(doctor.output).toContain(
+        "no `tsconfig.json` of the root or the workspace packages extends an Adamantite TypeScript preset."
+      )
+    })
+  )
+
+  // Other configs can extend the root config, so Adamantite keeps it.
+  it.effect("keep managing a root config that it wrote before the project became a monorepo", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      files.write("package.json", MONOREPO_PACKAGE_JSON)
+
+      const { output } = yield* runLifecycle("update", files)
+
+      expect({
+        config: files.read(CONFIG),
+        recorded: readLockfile(files).written[CONFIG],
+      }).toStrictEqual({ config: RENDERED, recorded: hashContent(RENDERED) })
+      expect(output).toContain(`● \`${CONFIG}\` is up to date.`)
+    })
+  )
+})
 
 describe("tsconfig", () => {
   describe("assess", () => {

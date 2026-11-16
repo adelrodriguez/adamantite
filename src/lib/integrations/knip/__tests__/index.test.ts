@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import { hashContent, makeLockfileFile, readLockfile } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
-import { makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "knip.config.ts"
 

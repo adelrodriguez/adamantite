@@ -15,6 +15,14 @@ import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 import type { AgentReach } from "#lib/hardening/agent-reach.ts"
 import type { Selection } from "#lib/project/selection.ts"
+import {
+  makeHandoffRunner,
+  makeLockfileFile,
+  promptingLayer,
+  nonProbeInvocations,
+  runCommand,
+  SKILL_FILES,
+} from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
@@ -25,14 +33,6 @@ import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
-import {
-  makeHandoffRunner,
-  makeLockfileFile,
-  promptingLayer,
-  nonProbeInvocations,
-  runCommand,
-  SKILL_FILES,
-} from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand("/project")
 

@@ -4,25 +4,25 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import type { FileSystemTestContext } from "#__tests__/filesystem.ts"
 import type { Selection } from "#lib/project/selection.ts"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import {
-  EFFECT_COMPILER,
-  EFFECT_EDITOR_PACKAGES,
-  EFFECT_SDK,
-  effectEditorFiles,
-  effectEditorResolver,
-} from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { formatJson } from "#lib/shared/json.ts"
 import {
   findingsLeft,
   getFailure,
   hashContent,
   makeLockfileFile,
   readLockfile,
-} from "./command-test-helpers.ts"
-import { listHashes, runLifecycle } from "./lifecycle.ts"
+} from "#__tests__/command-test-helpers.ts"
+import {
+  EFFECT_COMPILER,
+  EFFECT_EDITOR_PACKAGES,
+  EFFECT_SDK,
+  effectEditorFiles,
+  effectEditorResolver,
+} from "#__tests__/effect-sdk.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { listHashes, runLifecycle } from "#__tests__/lifecycle.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { formatJson } from "#lib/shared/json.ts"
 
 const SETTINGS = ".vscode/settings.json"
 const EXTENSIONS = ".vscode/extensions.json"

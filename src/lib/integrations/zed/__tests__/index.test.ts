@@ -2,20 +2,17 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import {
-  effectEditorFiles,
-  effectEditorResolver,
-} from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   findingsLeft,
   getFailure,
   hashContent,
   makeLockfileFile,
   readLockfile,
-} from "./command-test-helpers.ts"
-import { runLifecycle } from "./lifecycle.ts"
+} from "#__tests__/command-test-helpers.ts"
+import { effectEditorFiles, effectEditorResolver } from "#__tests__/effect-sdk.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { runLifecycle } from "#__tests__/lifecycle.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const SETTINGS = ".zed/settings.json"
 

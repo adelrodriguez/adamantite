@@ -1,15 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   findingsLeft,
   getFailure,
   hashContent,
   makeLockfileFile,
   readLockfile,
-} from "./command-test-helpers.ts"
-import { makeSelection, runLifecycle } from "./lifecycle.ts"
+} from "#__tests__/command-test-helpers.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const CONFIG = "oxfmt.config.ts"
 

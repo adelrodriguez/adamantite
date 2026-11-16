@@ -2,11 +2,8 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import { createRunnerTestContext, type RunnerTestContext } from "#__tests__/command-test-helpers.ts"
 import { makeAppLayer, runCli } from "#cli.ts"
-import {
-  createRunnerTestContext,
-  type RunnerTestContext,
-} from "#commands/__tests__/command-test-helpers.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
   return runCli(args, "test").pipe(Effect.provide(makeAppLayer(runner.layer)), Effect.exit)

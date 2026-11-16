@@ -8,16 +8,6 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import { TestClock } from "effect/testing"
 import type { Selection } from "#lib/project/selection.ts"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
-import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
-import doctorCommand, { Report } from "#commands/doctor.ts"
-import { codingAgents } from "#lib/handoff/coding-agents.ts"
-import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
-import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
-import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   createRunnerTestContext,
   findingsLeft,
@@ -28,7 +18,17 @@ import {
   promptingLayer,
   runCommand,
   SKILL_FILES,
-} from "./command-test-helpers.ts"
+} from "#__tests__/command-test-helpers.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
+import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
+import doctorCommand, { Report } from "#commands/doctor.ts"
+import { codingAgents } from "#lib/handoff/coding-agents.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
+import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)

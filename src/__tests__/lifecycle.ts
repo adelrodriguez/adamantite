@@ -3,14 +3,14 @@ import type * as Layer from "effect/Layer"
 import * as Effect from "effect/Effect"
 import type { FileSystemTestContext } from "#__tests__/filesystem.ts"
 import type { Selection } from "#lib/project/selection.ts"
-import doctorCommand from "#commands/doctor.ts"
-import initCommand from "#commands/init/index.ts"
-import updateCommand from "#commands/update.ts"
 import {
   createDependencyInstallerTestContext,
   hashContent,
   runCommand,
-} from "./command-test-helpers.ts"
+} from "#__tests__/command-test-helpers.ts"
+import doctorCommand from "#commands/doctor.ts"
+import initCommand from "#commands/init/index.ts"
+import updateCommand from "#commands/update.ts"
 
 type RunOptions = Parameters<typeof runCommand>[2]
 

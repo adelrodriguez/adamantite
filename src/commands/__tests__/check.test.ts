@@ -4,7 +4,15 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeHandoffRunner,
+  makeLockfileFile,
+  runCommand,
+} from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection } from "#__tests__/lifecycle.ts"
 import checkCommand from "#commands/check.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
@@ -14,14 +22,6 @@ import {
   InvalidCheckOptions,
   ToolNotSelected,
 } from "#lib/shared/errors.ts"
-import {
-  createRunnerTestContext,
-  getFailure,
-  makeHandoffRunner,
-  makeLockfileFile,
-  runCommand,
-} from "./command-test-helpers.ts"
-import { makeSelection } from "./lifecycle.ts"
 
 const OXLINT = getOxlintCommand("/project")
 

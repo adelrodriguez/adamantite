@@ -49,7 +49,7 @@ const parseYaml = (content: string) =>
  * The package patterns in a `pnpm-workspace.yaml`. A file that does not parse, or that has no
  * `packages` list, declares none.
  */
-export const readPnpmWorkspacePatterns = (content: string) =>
+const readPnpmWorkspacePatterns = (content: string) =>
   parseYaml(content).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmWorkspace)(parsed)),
     Effect.map(({ packages }) => packages),
@@ -109,7 +109,7 @@ function escapeRegExp(text: string) {
  * Convert a workspace pattern to a regular expression that matches a relative directory path. `*`
  * and `?` match inside one path segment, and a `**` segment matches zero or more segments.
  */
-export function workspacePatternToRegExp(pattern: string): RegExp {
+function workspacePatternToRegExp(pattern: string): RegExp {
   const segments = pattern.replace(/^\.\//u, "").replace(/\/+$/u, "").split("/")
   let source = ""
 

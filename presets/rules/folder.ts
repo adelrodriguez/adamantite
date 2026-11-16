@@ -14,8 +14,8 @@ export const DEFAULT_DIRECTORY = ".adamantite/lint"
 
 /**
  * The folder, relative to a project, where `custom()` writes the entry module of each rules folder.
- * A test in the CLI checks that the trial copy of `adamantite rule try` does not link this folder
- * to the project.
+ * The trial copy of `adamantite rule try` does not link the `node_modules/.cache` entry to the
+ * project, and a trial test in the CLI checks it.
  */
 export const CACHE_DIRECTORY: string = join("node_modules", ".cache", "adamantite")
 

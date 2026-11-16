@@ -1,21 +1,27 @@
+import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
-import type { Selection } from "#lib/project/selection.ts"
+import type { Selection, TypeScriptPreset } from "#lib/project/selection.ts"
 import { withConfigLoader } from "#__tests__/config-loader.ts"
-import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import typescript, { detectPreset } from "#lib/integrations/typescript/index.ts"
+import { makeLockfileFile } from "#commands/__tests__/command-test-helpers.ts"
+import { makeSelection, runLifecycle } from "#commands/__tests__/lifecycle.ts"
+import { Report } from "#commands/doctor.ts"
+import typescript from "#lib/integrations/typescript/index.ts"
 import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
+
+const PACKAGE = { name: "project" }
 
 const EMPTY_SELECTION = {
   agents: false,
@@ -77,116 +83,94 @@ const TYPESCRIPT_RESOLUTIONS = {
   "typescript/package.json": "node_modules/typescript/package.json",
 }
 
-function provideFiles(files: FileSystemTestContext, showConfig: ShowConfig = {}) {
-  return Effect.provide(
-    withConfigLoader(
-      Layer.mergeAll(
-        files.layer,
-        Path.layer,
-        makeModuleResolverLayer(ROOT, TYPESCRIPT_RESOLUTIONS),
-        makeShowConfigLayer(showConfig)
-      )
+const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
+
+/**
+ * What Doctor reports for a project whose lockfile selects `preset` and no script, so that only the
+ * TypeScript integration applies. The root `package.json` declares Adamantite and `manifest`.
+ */
+function assess(
+  preset: TypeScriptPreset,
+  manifest: PackageJson,
+  files: Record<string, string> = {},
+  showConfig: ShowConfig = {}
+) {
+  return Effect.gen(function* () {
+    const project = makeFiles({
+      ...TYPESCRIPT_FILES,
+      ...makeLockfileFile(makeSelection({ typescript: preset })),
+      "package.json": yield* stringifyJson({
+        devDependencies: { adamantite: "1.0.0" },
+        ...manifest,
+      }),
+      ...files,
+    })
+
+    const { output } = yield* runLifecycle(
+      "doctor",
+      project,
+      ["--json"],
+      [makeModuleResolverLayer(ROOT, TYPESCRIPT_RESOLUTIONS), makeShowConfigLayer(showConfig)]
     )
-  )
-}
 
-// As the assessment decides: the lockfile selects the preset, or a project without one gets the
-// preset that its configs show.
-function assess(files: Record<string, string>, showConfig: ShowConfig = {}) {
-  return readProject(ROOT).pipe(
-    Effect.flatMap((project) =>
-      Effect.gen(function* () {
-        const preset = Option.isSome(project.lockfile)
-          ? project.lockfile.value.selection.typescript
-          : Option.getOrNull(yield* detectPreset(project))
+    const { applicableIntegrations, findings } = decodeReport(output)
 
-        if (preset === null) {
-          return { applicable: false } as const
-        }
-
-        const selection = { ...EMPTY_SELECTION, typescript: preset }
-
-        return { applicable: true, ...(yield* typescript.assess(project, selection)) } as const
-      })
-    ),
-    provideFiles(makeFiles({ ...TYPESCRIPT_FILES, ...files }), showConfig)
-  )
+    return { applicableIntegrations, findings }
+  })
 }
 
 describe("tsconfig", () => {
   describe("assess", () => {
-    const packageJson = { name: "project" }
-
-    it.effect.each<{ readonly configFiles: Record<string, string>; readonly name: string }>([
-      { configFiles: {}, name: "no tsconfig.json" },
-      {
-        configFiles: { "tsconfig.json": JSON.stringify({ compilerOptions: { strict: true } }) },
-        name: "no extends",
-      },
-      {
-        configFiles: { "tsconfig.json": JSON.stringify({ extends: "@company/tsconfig" }) },
-        name: "another base config",
-      },
-    ])("skip a project with $name, whatever its scripts", ({ configFiles }) =>
-      Effect.gen(function* () {
-        for (const scripts of [undefined, { check: "adamantite check" }]) {
-          const result = yield* assess({
-            "package.json": yield* stringifyJson({ ...packageJson, scripts }),
-            ...configFiles,
-          })
-
-          expect(result).toStrictEqual({ applicable: false })
-        }
-      })
-    )
-
     it.effect("read a tsconfig.json with comments and a trailing comma", () =>
       Effect.gen(function* () {
         const result = yield* assess(
+          "typescript",
+          PACKAGE,
           {
-            "package.json": yield* stringifyJson(packageJson),
             "tsconfig.json":
               '{\n  // Visit https://aka.ms/tsconfig\n  "extends": "adamantite/typescript",\n}\n',
           },
           { "": "resets" }
         )
 
-        expect(result).toStrictEqual({
-          applicable: true,
-          findings: [],
-          packageActions: [],
-          warnings: [],
-        })
+        expect(result).toStrictEqual({ applicableIntegrations: ["tsconfig"], findings: [] })
       })
     )
 
-    it.effect("accept either preset as a string or in an array, without any script", () =>
-      Effect.gen(function* () {
-        for (const preset of [
-          "adamantite/typescript",
-          ["./base.json", "adamantite/typescript"],
-          "adamantite/tsconfig",
-          ["./base.json", "adamantite/tsconfig"],
-        ]) {
+    // Only `adamantite/typescript` loads the type resets.
+    it.effect.each<{
+      readonly extendsEntry: string | readonly string[]
+      readonly preset: TypeScriptPreset
+      readonly showConfig: ShowConfig
+    }>([
+      { extendsEntry: "adamantite/typescript", preset: "typescript", showConfig: { "": "resets" } },
+      {
+        extendsEntry: ["./base.json", "adamantite/typescript"],
+        preset: "typescript",
+        showConfig: { "": "resets" },
+      },
+      { extendsEntry: "adamantite/tsconfig", preset: "tsconfig", showConfig: {} },
+      { extendsEntry: ["./base.json", "adamantite/tsconfig"], preset: "tsconfig", showConfig: {} },
+    ])(
+      "accept the selected $preset preset in extends: $extendsEntry",
+      ({ extendsEntry, preset, showConfig }) =>
+        Effect.gen(function* () {
           const result = yield* assess(
-            {
-              "package.json": yield* stringifyJson(packageJson),
-              "tsconfig.json": yield* stringifyJson({ extends: preset }),
-            },
-            { "": "resets" }
+            preset,
+            PACKAGE,
+            { "tsconfig.json": yield* stringifyJson({ extends: extendsEntry }) },
+            showConfig
           )
 
-          expect(result).toStrictEqual({
-            applicable: true,
-            findings: [],
-            packageActions: [],
-            warnings: [],
-          })
-        }
-      })
+          expect(result).toStrictEqual({ applicableIntegrations: ["tsconfig"], findings: [] })
+        })
     )
 
-    it.effect.each([
+    it.effect.each<{
+      readonly expected: ReadonlyArray<{ readonly id: string }>
+      readonly manifest: PackageJson
+      readonly name: string
+    }>([
       {
         expected: [{ id: "typescript-preset-in-library" }],
         manifest: { exports: "./dist/index.js", name: "library" },
@@ -210,14 +194,13 @@ describe("tsconfig", () => {
     ])("$name whose TypeScript config loads the type resets", ({ expected, manifest }) =>
       Effect.gen(function* () {
         const result = yield* assess(
-          {
-            "package.json": yield* stringifyJson(manifest),
-            "tsconfig.json": yield* stringifyJson({ extends: "adamantite/typescript" }),
-          },
+          "typescript",
+          manifest,
+          { "tsconfig.json": yield* stringifyJson({ extends: "adamantite/typescript" }) },
           { "": "resets" }
         )
 
-        expect(result).toMatchObject({ applicable: true, findings: expected })
+        expect(result).toMatchObject({ applicableIntegrations: ["tsconfig"], findings: expected })
       })
     )
 
@@ -226,8 +209,9 @@ describe("tsconfig", () => {
         const library = { exports: "./dist/index.js" }
 
         const result = yield* assess(
+          "typescript",
+          { name: "root", private: true },
           {
-            "package.json": yield* stringifyJson({ name: "root", private: true }),
             "packages/app/package.json": yield* stringifyJson({ name: "app", private: true }),
             "packages/app/tsconfig.json": yield* stringifyJson({ extends: "../../base.json" }),
             "packages/library/package.json": yield* stringifyJson({ ...library, name: "library" }),
@@ -242,7 +226,7 @@ describe("tsconfig", () => {
         )
 
         expect(result).toMatchObject({
-          applicable: true,
+          applicableIntegrations: ["tsconfig"],
           findings: [
             {
               currentState: expect.stringContaining("`packages/library/tsconfig.json`"),
@@ -259,8 +243,9 @@ describe("tsconfig", () => {
     ])("report no library finding when $name", ({ showConfig }) =>
       Effect.gen(function* () {
         const result = yield* assess(
+          "typescript",
+          { name: "library", types: "./dist/index.d.ts" },
           {
-            "package.json": yield* stringifyJson({ name: "library", types: "./dist/index.d.ts" }),
             "tsconfig.json": yield* stringifyJson({
               extends: "adamantite/typescript",
               files: ["index.ts"],
@@ -269,7 +254,7 @@ describe("tsconfig", () => {
           showConfig
         )
 
-        expect(result).toMatchObject({ applicable: true, findings: [] })
+        expect(result).toStrictEqual({ applicableIntegrations: ["tsconfig"], findings: [] })
       })
     )
 

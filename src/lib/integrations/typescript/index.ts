@@ -204,7 +204,7 @@ type Chain =
    */
   | { readonly _tag: "UnknownBase"; readonly entry: string }
 
-const { $is: isChain, $match: matchChain, NoPreset, Preset, UnknownBase } = Data.taggedEnum<Chain>()
+const { $is: isChain, NoPreset, Preset, UnknownBase } = Data.taggedEnum<Chain>()
 
 /**
  * What the `extends` entries that a chain reaches show. Doctor follows each path entry, so only the
@@ -341,31 +341,6 @@ function toMismatchedPresetFinding(
     title: "Mismatched TypeScript preset",
   }
 }
-
-/**
- * The preset that the project's configs set up: `typescript` when a config loads its type resets or
- * its chain names it, `tsconfig` when a chain names only `tsconfig`. None when each chain is
- * unknown or names no preset, and no config loads the resets. Doctor applies the integration to the
- * same configs.
- */
-export const detectPreset = (project: Project) =>
-  readConfiguredPackages(project).pipe(
-    Effect.map((configured) => {
-      const used = new Set(
-        configured.flatMap(({ chain, loadsResets }) =>
-          loadsResets
-            ? ["typescript"]
-            : matchChain(chain, {
-                NoPreset: () => [],
-                Preset: ({ preset }) => [preset],
-                UnknownBase: () => [],
-              })
-        )
-      )
-
-      return Option.fromUndefinedOr(TYPESCRIPT_PRESET_NAMES.find((name) => used.has(name)))
-    })
-  )
 
 /**
  * Each configured package must use the selected preset. A library uses `adamantite/tsconfig`

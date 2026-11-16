@@ -1,6 +1,6 @@
 import { createRequire } from "node:module"
 import { join, relative, sep } from "node:path"
-// `adamantite/rules/plugin` resolves to `dist`, which `pnpm run check` does not build first.
+// `adamantite/rules/plugin` resolves to `dist`, which the tests and the editor Oxlint do not build first.
 import { type Context, defineRule, type ESTree, type Scope } from "#presets/rules/plugin.ts"
 
 // The modules of `src` that change the disk. A folder covers each file below it. Setup writes the

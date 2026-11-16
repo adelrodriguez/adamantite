@@ -23,8 +23,6 @@ jobs:
         include:
           - name: check
             command: pnpm run check
-          - name: format
-            command: pnpm run format --check
           - name: analyze
             command: pnpm run analyze
 

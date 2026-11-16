@@ -4,7 +4,7 @@ import type * as Path from "effect/Path"
 import * as Data from "effect/Data"
 import type { ModuleResolver } from "#lib/project/module-resolver.ts"
 import type {
-  EffectBridgeMissing,
+  EffectOxlintBridgeMissing,
   EffectBuildMissing,
   EffectPlatformUnsupported,
   FailedToParseFile,
@@ -49,7 +49,7 @@ export class NativeRuntime extends Data.TaggedClass("Native")<{
     oxlint: string
   ) => Effect.Effect<
     readonly NativeOverride[],
-    | EffectBridgeMissing
+    | EffectOxlintBridgeMissing
     | EffectBuildMissing
     | EffectPlatformUnsupported
     | PackageNotInstalled

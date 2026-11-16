@@ -14,7 +14,7 @@ import {
   TsrsBackend,
 } from "#lib/integrations/oxlint/runtime.ts"
 import {
-  EffectBridgeMissing,
+  EffectOxlintBridgeMissing,
   EffectBuildMissing,
   EffectPlatformUnsupported,
   PackageNotInstalled,
@@ -218,7 +218,7 @@ describe("Oxlint runtime", () => {
       const { "@effect/tsgo/oxlint-bridge": _bridge, ...packages } = EFFECT_PACKAGES
       const error = yield* runResolve(makeFiles(), packages).pipe(Effect.flip)
 
-      expect(error).toBeInstanceOf(EffectBridgeMissing)
+      expect(error).toBeInstanceOf(EffectOxlintBridgeMissing)
       expect(error.message).toBe(
         "The effect preset needs `@effect/tsgo/oxlint-bridge`, which @effect/tsgo 0.67.1 does not ship. Run `adamantite update`."
       )

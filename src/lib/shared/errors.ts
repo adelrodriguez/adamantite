@@ -161,7 +161,7 @@ export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
  * The installed `@effect/tsgo` has no `oxlint-bridge` module, which swaps Oxlint's binding for the
  * Effect build.
  */
-export class EffectBridgeMissing extends Data.TaggedError("EffectBridgeMissing")<{
+export class EffectOxlintBridgeMissing extends Data.TaggedError("EffectOxlintBridgeMissing")<{
   effectVersion: string
 }> {
   override get message() {

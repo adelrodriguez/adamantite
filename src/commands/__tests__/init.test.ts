@@ -26,7 +26,6 @@ import {
   nonProbeInvocations,
   promptingLayer,
   readLockfile,
-  passHandoffWait,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -1484,7 +1483,7 @@ describe("init", () => {
               // The resolution menu lists the installed agents first.
               "enter",
             ]),
-          }).pipe(passHandoffWait)
+          })
 
           expect(Exit.isSuccess(exit)).toBe(true)
           expect(nonProbeInvocations(runner)).toStrictEqual([

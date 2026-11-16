@@ -20,7 +20,6 @@ import {
   makeLockfileFile,
   promptingLayer,
   nonProbeInvocations,
-  passHandoffWait,
   runCommand,
   SKILL_FILES,
 } from "#__tests__/command-test-helpers.ts"
@@ -431,7 +430,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
       ],
       logLines,
       terminal,
-    }).pipe(passHandoffWait)
+    })
 
     return {
       copied: terminal.copied(),

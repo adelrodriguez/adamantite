@@ -373,6 +373,11 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
  * Runs a command against the default test services plus the given layers, which take precedence. A
  * service the command needs that neither provides stays in the returned effect's requirements, so
  * `it.effect` rejects the test at compile time.
+ *
+ * The resolution menu waits before an agent handoff, and the test clock stays paused, so the run
+ * moves the clock past that wait. A command that never reaches the handoff finishes as it would
+ * without the clock change. The run needs the test clock of `it.effect`, because `TestClock.adjust`
+ * fails on the live clock.
  */
 export function runCommand<
   Name extends string,
@@ -408,19 +413,27 @@ export function runCommand<
     )
   )
 
-  return Effect.exit(
-    Command.runWith(command, { version: "test" })(args).pipe(
-      Effect.ensuring(
-        Effect.gen(function* () {
-          options.errorLines?.push(...(yield* TestConsole.errorLines))
-          options.logLines?.push(...(yield* TestConsole.logLines))
-        })
-      ),
-      Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
-      Effect.provideService(Cwd, files.root),
-      Effect.provide(testLayer)
+  return Effect.gen(function* () {
+    const fiber = yield* Effect.forkChild(
+      Effect.exit(
+        Command.runWith(command, { version: "test" })(args).pipe(
+          Effect.ensuring(
+            Effect.gen(function* () {
+              options.errorLines?.push(...(yield* TestConsole.errorLines))
+              options.logLines?.push(...(yield* TestConsole.logLines))
+            })
+          ),
+          Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
+          Effect.provideService(Cwd, files.root),
+          Effect.provide(testLayer)
+        )
+      )
     )
-  )
+
+    yield* TestClock.adjust(RAW_MODE_RELEASE_WAIT)
+
+    return yield* Fiber.join(fiber)
+  })
 }
 
 /**
@@ -438,17 +451,3 @@ export function getFailure<E>(exit: Exit.Exit<unknown, E>): E | undefined {
 export function findingsLeft(command: string): CommandFailed {
   return new CommandFailed({ command, exitCode: ChildProcessSpawner.ExitCode(1) })
 }
-
-/**
- * Runs a command that may hand off to a coding agent. The resolution menu waits before the handoff,
- * and the test clock stays paused, so this moves the clock past that wait. A command that never
- * reaches the handoff finishes as it would without the clock change.
- */
-export const passHandoffWait = <A, E, R>(run: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    const fiber = yield* Effect.forkChild(run)
-
-    yield* TestClock.adjust(RAW_MODE_RELEASE_WAIT)
-
-    return yield* Fiber.join(fiber)
-  })

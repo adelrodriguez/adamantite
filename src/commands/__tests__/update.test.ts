@@ -13,7 +13,6 @@ import {
   makeLockfileFile,
   nonProbeInvocations,
   promptingLayer,
-  passHandoffWait,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -404,7 +403,7 @@ describe("update", () => {
           layers: [createDependencyInstallerTestContext().layer, runner.layer, promptingLayer],
           logLines,
           terminal: createTerminalTestContext(["enter"]),
-        }).pipe(passHandoffWait)
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(nonProbeInvocations(runner).map(({ command }) => command)).toStrictEqual(["claude"])

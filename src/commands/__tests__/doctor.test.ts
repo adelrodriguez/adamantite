@@ -17,7 +17,6 @@ import {
   makeHandoffRunner,
   makeLockfileFile,
   nonProbeInvocations,
-  passHandoffWait,
   promptingLayer,
   runCommand,
   SKILL_FILES,
@@ -80,7 +79,7 @@ function runResolution(keys: readonly TestKey[], runner = makeHandoffRunner()) {
       layers: [runner.layer, promptingLayer],
       logLines,
       terminal,
-    }).pipe(passHandoffWait)
+    })
 
     return { exit, files, logLines, runner, terminal }
   })
@@ -383,7 +382,7 @@ describe("doctor", () => {
         layers: [runner.layer, promptingLayer],
         logLines,
         terminal: createTerminalTestContext(["enter"]),
-      }).pipe(passHandoffWait)
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)).toStrictEqual([
@@ -657,7 +656,7 @@ describe("doctor", () => {
         files,
         layers: [runner.layer, promptingLayer],
         terminal,
-      }).pipe(passHandoffWait)
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)[0]).toStrictEqual(

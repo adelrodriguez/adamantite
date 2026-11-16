@@ -1,3 +1,4 @@
+import { createRequire } from "node:module"
 import { join, relative, sep } from "node:path"
 // `adamantite/rules/plugin` resolves to `dist`, which `pnpm run check` does not build first.
 import { type Context, defineRule, type ESTree } from "#presets/rules/plugin.ts"
@@ -43,6 +44,8 @@ const WRITE_METHODS = new Set([
 
 const WRITE_HELPERS = new Set(["ensureDirectory", "writeFile"])
 
+const HELPERS_MODULE = "src/lib/shared/filesystem.ts"
+
 const NODE_FS = new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])
 
 // The Effect combinators whose callback receives the service, as in
@@ -76,20 +79,40 @@ function referencesOf(context: Context, node: ESTree.Node, name?: string) {
     .map((reference) => reference.identifier)
 }
 
-// The expressions that give the `FileSystem` tag: `FileSystem.FileSystem` through a namespace import,
-// and the tag itself through a named import.
-function findTags(context: Context, node: ESTree.ImportDeclaration) {
-  return node.specifiers.flatMap((specifier) => {
+// The member reads of a namespace import, such as `Files.writeFile`.
+function findMembers(context: Context, specifier: ESTree.ImportNamespaceSpecifier) {
+  return referencesOf(context, specifier).flatMap(({ parent }) =>
+    parent.type === "MemberExpression" ? [parent] : []
+  )
+}
+
+// The reads of the `FileSystem` export of the module that `node` imports: `FileSystem` through a
+// named import, also an aliased one, and `FileSystem.FileSystem` or `Fx.FileSystem` through a
+// namespace import.
+function findFileSystemExports(context: Context, node: ESTree.ImportDeclaration) {
+  return node.specifiers.flatMap<ESTree.Node>((specifier) => {
     if (specifier.type === "ImportNamespaceSpecifier") {
-      return referencesOf(context, specifier)
-        .map((identifier) => identifier.parent)
-        .filter((parent) => memberName(parent) === "FileSystem")
+      return findMembers(context, specifier).filter((member) => memberName(member) === "FileSystem")
     }
 
     return specifier.type === "ImportSpecifier" && importedName(specifier) === "FileSystem"
       ? referencesOf(context, specifier)
       : []
   })
+}
+
+// The expressions that give the `FileSystem` tag. The `FileSystem` export of `effect/FileSystem` is
+// the tag, and the `FileSystem` export of `effect` is the `effect/FileSystem` module.
+function findTags(context: Context, node: ESTree.ImportDeclaration) {
+  const exports = findFileSystemExports(context, node)
+
+  if (node.source.value === "effect/FileSystem") return exports
+
+  return node.source.value === "effect"
+    ? exports.flatMap(({ parent }) =>
+        parent !== null && memberName(parent) === "FileSystem" ? [parent] : []
+      )
+    : []
 }
 
 // The first parameter of the callback at `index` of a combinator call, such as `fs` in
@@ -105,22 +128,23 @@ function callbackParameter(node: ESTree.Node | undefined, index: number) {
     : undefined
 }
 
-// The binding that receives the service from `tag` in a callback.
-function findServiceParameter(tag: ESTree.Node) {
+// The bindings that receive the service from `tag` in a callback. In a pipe, each callback step
+// counts, also after a step that replaces the value.
+function findServiceParameters(tag: ESTree.Node) {
   const { parent } = tag
 
   // `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`
   if (parent?.type === "CallExpression" && parent.arguments[0] === tag) {
-    return callbackParameter(parent, 1)
+    return [callbackParameter(parent, 1)]
   }
 
-  // `FileSystem.FileSystem.pipe(Effect.flatMap((fs) => …))`
+  // `FileSystem.FileSystem.pipe(Effect.withSpan("read"), Effect.flatMap((fs) => …))`
   const call =
     parent?.type === "MemberExpression" && memberName(parent) === "pipe" ? parent.parent : undefined
 
   return call?.type === "CallExpression" && call.callee === parent
-    ? callbackParameter(call.arguments[0], 0)
-    : undefined
+    ? call.arguments.map((step) => callbackParameter(step, 0))
+    : []
 }
 
 export default defineRule({
@@ -171,9 +195,27 @@ export default defineRule({
         reportService(parent)
       }
 
-      const parameter = findServiceParameter(tag)
+      for (const parameter of findServiceParameters(tag)) {
+        if (parameter !== undefined) reportBinding(parameter)
+      }
+    }
 
-      if (parameter !== undefined) reportBinding(parameter)
+    function reportHelper(name: string | undefined, node: ESTree.Node) {
+      if (name !== undefined && WRITE_HELPERS.has(name)) {
+        context.report({ data: { name }, messageId: "helper", node })
+      }
+    }
+
+    // The file that a relative or `#` import resolves to, such as `src/lib/shared/filesystem.ts` for
+    // `../shared/filesystem.ts`, or null for a package or a path that does not resolve.
+    function resolveImport(source: string) {
+      if (!source.startsWith(".") && !source.startsWith("#")) return null
+
+      try {
+        return relative(ROOT, createRequire(context.filename).resolve(source)).split(sep).join("/")
+      } catch {
+        return null
+      }
     }
 
     // The build-time macros read their templates with `node:fs`.
@@ -191,17 +233,19 @@ export default defineRule({
 
         if (WRITERS.some((writer) => file === writer || file.startsWith(`${writer}/`))) return
 
-        if (node.source.value === "effect/FileSystem") {
-          for (const tag of findTags(context, node)) reportTag(tag)
-        }
+        for (const tag of findTags(context, node)) reportTag(tag)
 
-        if (node.source.value !== "#lib/shared/filesystem.ts") return
+        if (resolveImport(node.source.value) !== HELPERS_MODULE) return
 
         for (const specifier of node.specifiers) {
-          const name = specifier.type === "ImportSpecifier" ? importedName(specifier) : ""
+          if (specifier.type === "ImportSpecifier") {
+            reportHelper(importedName(specifier), specifier)
+          }
 
-          if (WRITE_HELPERS.has(name)) {
-            context.report({ data: { name }, messageId: "helper", node: specifier })
+          if (specifier.type === "ImportNamespaceSpecifier") {
+            for (const member of findMembers(context, specifier)) {
+              reportHelper(memberName(member), member)
+            }
           }
         }
       },

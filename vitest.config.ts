@@ -1,7 +1,7 @@
 import { join } from "node:path"
 import process from "node:process"
 import { Macros } from "unplugin-macros"
-import { defineConfig } from "vitest/config"
+import { configDefaults, defineConfig } from "vitest/config"
 
 // An Oxlint package folder, such as `<folder>/node_modules/oxlint`, that replaces the Oxlint of the
 // repository. CI sets it to test the rules with the minimum Oxlint version that `peerDependencies`
@@ -68,7 +68,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          exclude: [...PROCESS_RUN_TESTS, FIXTURES],
+          exclude: [...configDefaults.exclude, ...PROCESS_RUN_TESTS, FIXTURES],
           include: ["presets/**/*.test.ts", "src/**/*.test.ts"],
           name: "unit",
         },

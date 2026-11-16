@@ -17,6 +17,7 @@ import {
   makeHandoffRunner,
   makeLockfileFile,
   nonProbeInvocations,
+  passHandoffWait,
   promptingLayer,
   runCommand,
   SKILL_FILES,
@@ -79,7 +80,7 @@ function runResolution(keys: readonly TestKey[], runner = makeHandoffRunner()) {
       layers: [runner.layer, promptingLayer],
       logLines,
       terminal,
-    })
+    }).pipe(passHandoffWait)
 
     return { exit, files, logLines, runner, terminal }
   })
@@ -364,7 +365,7 @@ describe("doctor", () => {
     })
   )
 
-  it.live("hand off to an agent and succeed when reassessment finds no issues", () =>
+  it.effect("hand off to an agent and succeed when reassessment finds no issues", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const logLines: unknown[] = []
@@ -382,7 +383,7 @@ describe("doctor", () => {
         layers: [runner.layer, promptingLayer],
         logLines,
         terminal: createTerminalTestContext(["enter"]),
-      })
+      }).pipe(passHandoffWait)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)).toStrictEqual([
@@ -409,7 +410,7 @@ describe("doctor", () => {
     })
   )
 
-  it.live("report surviving findings and fail when the agent repairs nothing", () =>
+  it.effect("report surviving findings and fail when the agent repairs nothing", () =>
     Effect.gen(function* () {
       const { exit, logLines, terminal } = yield* runResolution(["enter", "n"])
 
@@ -429,7 +430,7 @@ describe("doctor", () => {
     })
   )
 
-  it.live("print and copy the prompt when the agent CLI is missing", () =>
+  it.effect("print and copy the prompt when the agent CLI is missing", () =>
     Effect.gen(function* () {
       // Installed at menu time, gone at spawn time: the race the fallback covers.
       const { exit, logLines, terminal } = yield* runResolution(
@@ -451,7 +452,7 @@ describe("doctor", () => {
     })
   )
 
-  it.live("surface the spawn failure detail and print the prompt", () =>
+  it.effect("surface the spawn failure detail and print the prompt", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runResolution(
         ["down", "enter"],
@@ -473,7 +474,7 @@ describe("doctor", () => {
 
   // The session inherits stdin, so a Ctrl-C reaches the agent and Adamantite. Adamantite must not
   // stop the agent mid-edit.
-  it.live("ignore SIGINT while the agent session runs and restore the listeners after it", () =>
+  it.effect("ignore SIGINT while the agent session runs and restore the listeners after it", () =>
     Effect.gen(function* () {
       const listenersBefore = process.listeners("SIGINT")
 
@@ -640,7 +641,7 @@ describe("doctor", () => {
     })
   )
 
-  it.live("seed agents that need a flag with their own arguments", () =>
+  it.effect("seed agents that need a flag with their own arguments", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const terminal = createTerminalTestContext(["enter"])
@@ -656,7 +657,7 @@ describe("doctor", () => {
         files,
         layers: [runner.layer, promptingLayer],
         terminal,
-      })
+      }).pipe(passHandoffWait)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)[0]).toStrictEqual(

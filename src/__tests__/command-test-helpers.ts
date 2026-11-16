@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto"
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
-import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Fiber from "effect/Fiber"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -12,7 +13,7 @@ import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stdio from "effect/Stdio"
-import { TestConsole } from "effect/testing"
+import { TestClock, TestConsole } from "effect/testing"
 import type { DetectedPackageManager } from "#lib/project/package-manager.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { configLoaderLayer } from "#__tests__/config-loader.ts"
@@ -38,6 +39,7 @@ import {
 import { Cwd } from "#lib/shared/cwd.ts"
 import { CliNotFound, CommandFailed, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
+import { RAW_MODE_RELEASE_WAIT } from "#terminal/resolution-menu.ts"
 
 const LockfileJson = Schema.fromJsonString(Lockfile)
 
@@ -356,7 +358,9 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
       canPrompt: false,
     }),
     Stdio.layerTest({}),
-    Digest.layerWebCrypto,
+    // Synchronous, so the test clock tracks every step before a prompt. A WebCrypto digest resolves
+    // outside the test scheduler, and `TestClock.adjust` would not wait for it.
+    NodeCrypto.layerDigest,
     failingSpawnerLayer,
     unexpectedRunnerLayer,
     // Fresh, so this default does not memoize `CodingAgents` ahead of a test's runner layer.
@@ -434,3 +438,17 @@ export function getFailure<E>(exit: Exit.Exit<unknown, E>): E | undefined {
 export function findingsLeft(command: string): CommandFailed {
   return new CommandFailed({ command, exitCode: ChildProcessSpawner.ExitCode(1) })
 }
+
+/**
+ * Runs a command that may hand off to a coding agent. The resolution menu waits before the handoff,
+ * and the test clock stays paused, so this moves the clock past that wait. A command that never
+ * reaches the handoff finishes as it would without the clock change.
+ */
+export const passHandoffWait = <A, E, R>(run: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const fiber = yield* Effect.forkChild(run)
+
+    yield* TestClock.adjust(RAW_MODE_RELEASE_WAIT)
+
+    return yield* Fiber.join(fiber)
+  })

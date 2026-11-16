@@ -72,7 +72,7 @@ export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: s
  * keeps the delay because a quick raw mode toggle between prompts can hang a Windows TTY
  * (https://github.com/Effect-TS/effect/pull/7106).
  */
-const RAW_MODE_RELEASE_WAIT = Duration.millis(200)
+export const RAW_MODE_RELEASE_WAIT = Duration.millis(200)
 
 /**
  * Offers a handoff to each installed coding agent, a copy of the Markdown prompt, or nothing, and

@@ -82,6 +82,26 @@ tester.run("import-owners", rule, {
       filename: file("src/lib/references/add.ts"),
       options: [GIGET],
     },
+    // A source that the code spells without computing it: a template with no expression, or a
+    // string inside type assertions. The report points to the whole source expression.
+    ...[
+      "import(`giget`)",
+      'import("giget" as string)',
+      'import("giget" satisfies string)',
+      'import("giget"!)',
+      'import(("giget" as const)!)',
+    ].map((code) => ({
+      code,
+      errors: [{ column: 7, line: 1, message: MODULE_MESSAGE }],
+      filename: file("src/lib/references/add.ts"),
+      options: [GIGET],
+    })),
+    {
+      code: "const Native = await import(`react-native`)",
+      errors: [{ messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
     {
       code: 'type Result = import("giget").DownloadTemplateResult',
       errors: [{ message: MODULE_MESSAGE }],
@@ -256,6 +276,18 @@ tester.run("import-owners", rule, {
       filename: file("src/lib/sources/repository/fetch.ts"),
       options: [GIGET],
     },
+    {
+      code: "const giget = await import(`giget`)",
+      filename: file("src/lib/sources/repository/fetch.ts"),
+      options: [GIGET],
+    },
+    // A source that only running the code gives does not match a restricted module.
+    ...[
+      'const name = "giget"\nconst giget = import(name)',
+      'const giget = import("gi" + "get")',
+      'const name = "get"\nconst giget = import(`gi${name}`)',
+      'const zod = import("zod", { with: { type: "giget" } })',
+    ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
     {
       code: 'import * as z from "zod/mini"',
       filename: file("packages/utils/src/schema/mini.ts"),

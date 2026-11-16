@@ -191,6 +191,21 @@ tester.run("layers", createLayersRule(MODULES), {
       filename: lib("workspace/lazy.ts"),
       options: [LIB_OPTIONS],
     },
+    // A source that the code spells without computing it: a template with no expression, or a
+    // string inside type assertions. The report points to the whole source expression.
+    ...[
+      "import(`#lib/integrations/base.ts`)",
+      'import("#lib/integrations/base.ts" as string)',
+      'import("#lib/integrations/base.ts" satisfies string)',
+      'import("#lib/integrations/base.ts"!)',
+      'import(<string>"#lib/integrations/base.ts")',
+      'import(("#lib/integrations/base.ts" as const)!)',
+    ].map((code) => ({
+      code,
+      errors: [{ column: 7, line: 1, messageId: "upward" }],
+      filename: lib("workspace/lazy.ts"),
+      options: [LIB_OPTIONS],
+    })),
     {
       code: 'type Finding = import("#lib/integrations/base.ts").Finding',
       errors: [{ messageId: "upward" }],
@@ -374,6 +389,13 @@ tester.run("layers", createLayersRule(MODULES), {
       filename: lib("workspace/conditional.ts"),
       options: [LIB_OPTIONS],
     },
+    // A source that only running the code gives is outside the map.
+    ...[
+      'const path = "#lib/integrations/base.ts"\nconst base = import(path)',
+      'const base = import("#lib/integrations/" + "base.ts")',
+      'const name = "base"\nconst base = import(`#lib/integrations/${name}.ts`)',
+      'const base = import("#lib/shared/errors.ts", { with: { type: "#lib/integrations/base.ts" } })',
+    ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
     {
       code: 'import { errors } from "#lib/shared/errors.ts"',
       filename: lib("workspace/files.ts"),

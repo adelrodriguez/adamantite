@@ -1,6 +1,7 @@
 import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync } from "node:fs"
 import { posix } from "node:path"
+import type { Replacement } from "../../shared/replacement.ts"
 import { isStringLiteral } from "../../shared/ast.ts"
 import {
   readBooleanOption,
@@ -740,6 +741,24 @@ export function createLayersRule(modules: Modules): Rule {
       docs: {
         description:
           "Enforce one-way imports between the layers of a folder, from one or more layer maps in the rule options.",
+        // Oxlint replaces the options that an earlier override set for the same files, so a layer
+        // map by hand repeats the patterns of each earlier override.
+        replaces: {
+          kind: "overrides",
+          minimum: 2,
+          option: "patterns",
+          rules: [
+            "no-restricted-imports",
+            "eslint/no-restricted-imports",
+            "typescript/no-restricted-imports",
+          ],
+          states: "import layers",
+          steps: [
+            "State each root as a layer map in `adamantite/layers`.",
+            "Use `ignore` in place of an override that turns the rule off for tests, `entries` in place of a ban on imports of entry files, and `isolate` in place of a ban on imports between the units of one layer.",
+            "Remove each override that a layer map replaces. Keep each override that a layer map cannot state, such as a ban on imports from another workspace package, because a layer map checks only the imports inside one package.",
+          ],
+        } satisfies Replacement,
       },
       messages: {
         cycle: `The layer map has a cycle: {{cycle}}. Layers import in one direction. ${LAYER_MAP_HINT}`,

@@ -288,7 +288,9 @@ function readReport(files: ReturnType<typeof makeProject>) {
   )
 }
 
-const ARCHITECTURE_STEP = "Import `adamantite/lint/architecture`"
+// The configs below load no first-party plugin, so the warning starts with the step that loads it.
+const PLUGIN_STEP =
+  "Add `adamantite/lint/react-strict`, `adamantite/lint/tanstack`, `adamantite/lint/architecture`, or `adamantite/lint/strict` to `extends` to load the `adamantite` plugin."
 
 function describeLayerMapWarning(file: string, count: number) {
   return `- \`${file}\` states import layers by hand in ${count} \`no-restricted-imports\` overrides with \`patterns\`.`
@@ -317,7 +319,7 @@ describe("hand-written layer maps", () => {
       const after = yield* readReport(files)
 
       expect(doctor.output).toContain(describeLayerMapWarning(CONFIG, count))
-      expect(doctor.output).toContain(`\n  2. ${ARCHITECTURE_STEP}`)
+      expect(doctor.output).toContain(`\n  1. ${PLUGIN_STEP}`)
       // The overrides add one warning and no finding.
       expect(after).toStrictEqual({
         findings: before.findings,
@@ -361,7 +363,7 @@ describe("hand-written layer maps", () => {
     })
   )
 
-  it.effect("leave out the architecture step when the config extends architecture", () =>
+  it.effect("leave out the plugin step when the config loads the plugin", () =>
     Effect.gen(function* () {
       const files = makeProject()
       yield* runLifecycle("init", files, INIT_ARGS)
@@ -379,7 +381,7 @@ describe("hand-written layer maps", () => {
       const { output } = yield* runLifecycle("doctor", files)
 
       expect(output).toContain(describeLayerMapWarning(CONFIG, 2))
-      expect(output).not.toContain(ARCHITECTURE_STEP)
+      expect(output).not.toContain("to load the `adamantite` plugin")
       expect(output).toContain("\n  2. Use `ignore`")
     })
   )

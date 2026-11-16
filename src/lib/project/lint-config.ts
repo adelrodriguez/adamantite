@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema"
-import * as Struct from "effect/Struct"
 import {
   IDENTITY_KEY,
   PresetIdentity,
@@ -8,30 +7,21 @@ import {
 } from "#lib/project/config-loader.ts"
 
 /**
- * The setting of `no-restricted-imports` under each name that Oxlint accepts for the rule. The
- * value stays unknown, so an option that Adamantite does not read never fails the decode of a
- * config that Oxlint loads.
- */
-const RESTRICTED_IMPORTS_FIELDS = {
-  "eslint/no-restricted-imports": Schema.optional(Schema.Unknown),
-  "no-restricted-imports": Schema.optional(Schema.Unknown),
-  "typescript/no-restricted-imports": Schema.optional(Schema.Unknown),
-}
-
-/**
  * An entry of `overrides` in a loaded Oxlint config. An entry that spreads a preset names the
  * preset itself, and an entry that spreads the `rules` of a preset, as the documentation comment of
- * the jest and vitest presets shows, names it in `rules`.
+ * the jest and vitest presets shows, names it in `rules`. The setting of each rule stays unknown,
+ * so a setting that Adamantite does not read never fails the decode of a config that Oxlint loads.
  */
 const OverrideObject = Schema.Struct({
   [IDENTITY_KEY]: Schema.optional(PresetIdentity),
   rules: Schema.optional(
-    Schema.Struct({
-      [IDENTITY_KEY]: Schema.optional(PresetIdentity),
-      ...RESTRICTED_IMPORTS_FIELDS,
-    })
+    Schema.StructWithRest(Schema.Struct({ [IDENTITY_KEY]: Schema.optional(PresetIdentity) }), [
+      Schema.Record(Schema.String, Schema.Unknown),
+    ])
   ),
 })
+
+export type OverrideObject = typeof OverrideObject.Type
 
 /**
  * A config object in a loaded Oxlint config: the config itself or an entry of its `extends`.
@@ -39,7 +29,8 @@ const OverrideObject = Schema.Struct({
 interface ConfigObject {
   readonly [IDENTITY_KEY]?: typeof PresetIdentity.Type | RulesFolderIdentity
   readonly extends?: readonly ConfigObject[]
-  readonly overrides?: ReadonlyArray<typeof OverrideObject.Type>
+  readonly jsPlugins?: readonly unknown[]
+  readonly overrides?: readonly OverrideObject[]
 }
 
 const CONFIG_OBJECT_FIELDS = {
@@ -47,6 +38,8 @@ const CONFIG_OBJECT_FIELDS = {
   extends: Schema.optional(
     Schema.Array(Schema.suspend((): Schema.Codec<ConfigObject> => ConfigObject))
   ),
+  // Oxlint checks the shape of each entry, so Adamantite reads only the name of a plugin.
+  jsPlugins: Schema.optional(Schema.Array(Schema.Unknown)),
   overrides: Schema.optional(Schema.Array(OverrideObject)),
 }
 
@@ -98,42 +91,26 @@ export function listAppliedPresetModules(config: LintConfig): readonly string[] 
 }
 
 /**
- * A `no-restricted-imports` setting that turns the rule on: a severity other than off, then the
- * options.
+ * The `overrides` entries of the config objects that the project writes, in the order that Oxlint
+ * applies them. An object that holds an Adamantite identity, such as a preset, is not the project's
+ * own.
  */
-const RestrictedImports = Schema.TupleWithRest(
-  Schema.Tuple([Schema.Literals(["deny", "error", "warn", 1, 2])]),
-  [Schema.Unknown]
-)
-
-/**
- * An option of `no-restricted-imports` that bans imports by pattern.
- */
-const PatternsOption = Schema.Struct({ patterns: Schema.NonEmptyArray(Schema.Unknown) })
-
-const isRestrictedImports = Schema.is(RestrictedImports)
-
-const isPatternsOption = Schema.is(PatternsOption)
-
-/**
- * The number of `overrides` entries in the project's own config objects that turn on
- * `no-restricted-imports` with `patterns`, as a hand-written layer map does. An object that holds
- * an Adamantite identity, such as a preset, is not the project's own.
- */
-export function countPatternOverrides(config: LintConfig): number {
+export function listProjectOverrides(config: LintConfig): readonly OverrideObject[] {
   return listConfigObjects(config)
     .filter((entry) => entry[IDENTITY_KEY] === undefined)
     .flatMap(({ overrides = [] }) => overrides)
-    .filter(({ rules }) =>
-      Struct.keys(RESTRICTED_IMPORTS_FIELDS).some((name) => {
-        const setting = rules?.[name]
+}
 
-        return (
-          isRestrictedImports(setting)
-          && setting.slice(1).some((option) => isPatternsOption(option))
-        )
-      })
-    ).length
+const isNamedPlugin = Schema.is(Schema.Struct({ name: Schema.String }))
+
+/**
+ * The names of the `jsPlugins` entries that `config` loads through any config object, such as
+ * `adamantite` for the first-party plugin that a preset loads.
+ */
+export function listJsPluginNames(config: LintConfig): readonly string[] {
+  return listConfigObjects(config).flatMap(({ jsPlugins = [] }) =>
+    jsPlugins.flatMap((entry) => (isNamedPlugin(entry) ? [entry.name] : []))
+  )
 }
 
 /**

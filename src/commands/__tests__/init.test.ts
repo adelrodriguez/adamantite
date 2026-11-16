@@ -1366,36 +1366,50 @@ describe("init", () => {
         })
     )
 
-    it.effect.each<{
-      readonly args: readonly string[]
-      readonly files: Record<string, string>
-      readonly name: string
-    }>([
-      {
-        args: ["--script", "check"],
-        files: { "../../oxlint.config.ts": "{}", "../.git/HEAD": "ref: refs/heads/main\n" },
-        name: "an Oxlint config above the repository root",
-      },
-      {
-        args: ["--typescript", "typescript", "--editor", "vscode"],
-        files: { "../../oxlint.config.ts": "{}" },
-        name: "a parent Oxlint config when the selection has no lint script",
-      },
-    ])("set up a nested folder despite $name", ({ args, files: parentFiles }) =>
-      Effect.gen(function* () {
-        const files = createFileSystemTestContext({
-          files: { ...parentFiles, "package.json": basePackageJson },
-          root: "/repo/packages/app",
-        })
+    // Oxlint loads the nested configs of a folder that holds `.git` too, as of any other folder.
+    it.effect.each([".", ".."])(
+      "fail when a parent folder has an Oxlint config and `%s/.git` exists",
+      (folder) =>
+        Effect.gen(function* () {
+          const files = createFileSystemTestContext({
+            files: {
+              "../../.oxlintrc.json": "{}",
+              [`${folder}/.git/HEAD`]: "ref: refs/heads/main\n",
+              "package.json": basePackageJson,
+            },
+            root: "/repo/packages/app",
+          })
 
-        yield* runCommand(initCommand, ["--non-interactive", ...args], {
-          files,
-          layers: [createDependencyInstallerTestContext().layer],
-        })
+          const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+            files,
+            layers: [createDependencyInstallerTestContext().layer],
+          })
 
-        // Setup writes the lockfile last.
-        expect(files.read(LOCKFILE_PATH)).toContain('"schemaVersion": 1')
-      })
+          const error = Option.getOrThrow(Exit.findErrorOption(exit))
+          expect(error).toHaveProperty("_tag", "ParentOxlintConfig")
+          expect(error).toHaveProperty("path", "../../.oxlintrc.json")
+          expect(files.exists("oxlint.config.ts")).toBe(false)
+        })
+    )
+
+    it.effect(
+      "set up a nested folder despite a parent Oxlint config when the selection has no lint script",
+      () =>
+        Effect.gen(function* () {
+          const files = createFileSystemTestContext({
+            files: { "../../oxlint.config.ts": "{}", "package.json": basePackageJson },
+            root: "/repo/packages/app",
+          })
+
+          yield* runCommand(
+            initCommand,
+            ["--non-interactive", "--typescript", "typescript", "--editor", "vscode"],
+            { files, layers: [createDependencyInstallerTestContext().layer] }
+          )
+
+          // Setup writes the lockfile last.
+          expect(files.read(LOCKFILE_PATH)).toContain('"schemaVersion": 1')
+        })
     )
 
     it.effect("create a GitHub Actions workflow for CI-compatible scripts when requested", () =>

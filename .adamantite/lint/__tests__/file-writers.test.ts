@@ -149,6 +149,24 @@ export const update = Effect.flatMap(Ref.make(0), (fs) => Ref.set(fs, 1))
 `,
       filename: READER,
     },
+    // A pipe step that may change the value ends the service: `map` returns another object, and
+    // `Effect.as` is a step that the rule does not know.
+    {
+      code: `${IMPORTS}export const clear = FileSystem.FileSystem.pipe(
+  Effect.map(() => ({ remove: () => Effect.succeed("memory only") })),
+  Effect.flatMap((collection) => collection.remove())
+)
+`,
+      filename: READER,
+    },
+    {
+      code: `${IMPORTS}export const reset = FileSystem.FileSystem.pipe(
+  Effect.as({ remove: () => Effect.void }),
+  Effect.flatMap((cache) => cache.remove())
+)
+`,
+      filename: READER,
+    },
     {
       code: 'import { Effect, FileSystem } from "effect"\nexport const read = Effect.gen(function* () {\n  const fs = yield* FileSystem.FileSystem\n  return yield* fs.readFileString("a")\n})',
       filename: READER,

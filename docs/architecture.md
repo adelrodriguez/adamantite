@@ -99,7 +99,9 @@ The folders inside the layers belong to the layer that holds them:
   and the rule list of `harden` write their Oxlint configs to a temporary folder. Only these
   writers import `ensureDirectory` and `writeFile` from `src/lib/shared/filesystem.ts`, and
   `eslint/no-restricted-properties` rejects a call to a `FileSystem` method that writes, such as
-  `writeFileString` or `remove`, in any other non-test file of `src`.
+  `writeFileString` or `remove`, in any other non-test file of `src`. `eslint/no-restricted-imports`
+  rejects `node:fs` and `node:fs/promises` in the non-test files of `src` other than the build-time
+  macros, so a write cannot bypass `FileSystem`.
 - Only `src/commands` and `src/terminal` import `effect/cli/Prompt`, so lib code never asks.
 - Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` import `readWorkspace`, and only
   `project.ts` and `hardening/index.ts` import `discoverCustomRules`.

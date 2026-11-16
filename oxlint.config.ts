@@ -114,6 +114,24 @@ export default defineConfig({
         ],
       },
     },
+    // Lib and command code reaches the disk through Effect's `FileSystem`, so the rule above sees
+    // every write. Only the macros read with `node:fs`, at build time.
+    {
+      excludeFiles: ["**/*.macro.ts", "**/__tests__/**"],
+      files: ["src/**"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            paths: ["fs", "fs/promises", "node:fs", "node:fs/promises"].map((name) => ({
+              message:
+                "Use `FileSystem` from `effect/FileSystem`, so the file writer rule applies.",
+              name,
+            })),
+          },
+        ],
+      },
+    },
     // The eval() reset redeclares `eval` to merge an overload into the built-in function. Core lint
     // reports eval() calls, but `adamantite/typescript` also works without the lint presets.
     {

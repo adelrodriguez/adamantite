@@ -143,7 +143,7 @@ function lint(
     const result = spawnSync(
       process.execPath,
       [
-        join(REPO_ROOT, "src/oxlint.ts"),
+        join(REPO_ROOT, "src/oxlint/index.ts"),
         "-c",
         "oxlint.config.ts",
         "-f",

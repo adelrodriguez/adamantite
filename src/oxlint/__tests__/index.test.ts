@@ -8,7 +8,7 @@ import type { Selection } from "#lib/project/selection.ts"
 import { PROJECT_VARIABLE } from "#lib/integrations/oxlint/entry.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
-const ENTRY = join(import.meta.dirname, "../oxlint.ts")
+const ENTRY = join(import.meta.dirname, "../index.ts")
 
 /**
  * What the entry prints to standard error, and its exit code, in a project without Oxlint whose

@@ -50,7 +50,7 @@ const CANARY = {
 // starts from this repository's install.
 function toSource(options: CommandRunOptions): CommandRunOptions {
   if (options.name === "oxlint") {
-    return { ...options, args: [join(REPO_ROOT, "src/oxlint.ts"), ...options.args.slice(1)] }
+    return { ...options, args: [join(REPO_ROOT, "src/oxlint/index.ts"), ...options.args.slice(1)] }
   }
 
   if (options.command === "oxfmt") {

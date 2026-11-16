@@ -47,7 +47,7 @@ function lint(file: string, source: string) {
 
     const result = spawnSync(
       process.execPath,
-      [join(REPO_ROOT, "src/oxlint.ts"), "-c", "oxlint.config.ts", "-f", "json", file],
+      [join(REPO_ROOT, "src/oxlint/index.ts"), "-c", "oxlint.config.ts", "-f", "json", file],
       { cwd: project, encoding: "utf8" }
     )
 

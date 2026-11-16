@@ -164,7 +164,7 @@
     },
     "oxlint": {
       "binary": {
-        "arguments": ["src/oxlint.ts", "--lsp"],
+        "arguments": ["src/oxlint/index.ts", "--lsp"],
         "path": "node"
       },
       "initialization_options": {

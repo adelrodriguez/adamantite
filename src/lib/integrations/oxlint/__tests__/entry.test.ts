@@ -43,7 +43,7 @@ describe("oxlint-entry", () => {
     })
 
     it("take the working directory for an entry outside node_modules", () => {
-      expect(getProjectDirectory("/adamantite/src/oxlint.ts", CWD)).toBe(CWD)
+      expect(getProjectDirectory("/adamantite/src/oxlint/index.ts", CWD)).toBe(CWD)
     })
   })
 

@@ -83,7 +83,7 @@ function assess(root: string) {
         ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
         Layer.succeed(OxlintCommand)((project) => ({
           ...getOxlintCommand(project),
-          args: [join(REPO, "src/oxlint.ts")],
+          args: [join(REPO, "src/oxlint/index.ts")],
         })),
       ])
     )

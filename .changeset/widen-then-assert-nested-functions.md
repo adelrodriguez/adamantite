@@ -2,6 +2,8 @@
 "adamantite": minor
 ---
 
-Report assertions in nested functions in `antislop/no-widen-then-assert`
+Report more assertion chains, and name `@ts-expect-error` for test input, in the strict preset's assertion rules
 
-The rule used to report an assertion of a widened binding only in the function that declares the binding. An assertion in a test callback inside `describe`, or in a function that reads a module binding, was not reported. The binding is a `const` with no writes, so a nested function sees the same value. The rule now reports an assertion anywhere after the declaration in the declaring function, including in the functions nested in it.
+- `antislop/no-widen-then-assert` reports an assertion of a widened binding anywhere after the declaration in the declaring function, including in the functions nested in it, such as a test callback inside `describe`. The binding is a `const` with no writes, so a nested function sees the same value.
+- `antislop/no-chained-type-assertions` looks through a `satisfies` expression between two assertions, such as `(value as unknown satisfies unknown) as number`, as it looks through parentheses, because `satisfies` keeps the type of its operand.
+- The messages of both rules now tell you to pass input of the wrong type without an assertion and put `// @ts-expect-error -- reason` above the call. A test that passes such input on purpose, such as `parsePort("abc" as unknown as number)`, had no form that both rules accept.

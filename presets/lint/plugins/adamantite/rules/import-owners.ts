@@ -10,7 +10,7 @@ import {
   readRequireSource,
   readStaticSource,
 } from "../shared/imports.ts"
-import { type ResolutionMode, resolveImport } from "../shared/resolver.ts"
+import { identifyPath, type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
@@ -103,6 +103,11 @@ export interface Project {
    * The root that owner paths are relative to for `file`.
    */
   readonly findRoot: (file: string) => Root | undefined
+  /**
+   * The path that identifies the file or folder at `path`, so the rule compares a resolved file
+   * with an owned module and the root by the same kind of path.
+   */
+  readonly identify: (path: string) => string
   /**
    * The file that `specifier` in `importer` resolves to in `mode`, with `/` between folders, or
    * undefined when it does not resolve.
@@ -259,7 +264,7 @@ function findRoot(file: string): Root | undefined {
   return found === undefined ? undefined : { kind: "package", path: found }
 }
 
-const project: Project = { findRoot, resolve: resolveImport }
+const project: Project = { findRoot, identify: identifyPath, resolve: resolveImport }
 
 /**
  * The names that an alias can give the file at `path`: the path itself, the path without its
@@ -299,12 +304,16 @@ export function createImportOwnersRule(project: Project): Rule {
     }
 
     const anchor = posix.join(root, "package.json")
-    const segments = posix.relative(root, file).split("/")
+    const segments = posix.relative(project.identify(root), file).split("/")
     const tails = segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
 
-    const result =
-      project.resolve(anchor, entry.import, mode) === file
-      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`, mode) === file)
+    function reaches(specifier: string) {
+      const resolved = project.resolve(anchor, specifier, mode)
+
+      return resolved !== undefined && project.identify(resolved) === file
+    }
+
+    const result = reaches(entry.import) || tails.some((tail) => reaches(`${entry.import}/${tail}`))
 
     coverage.set(key, result)
 
@@ -372,12 +381,14 @@ export function createImportOwnersRule(project: Project): Rule {
       const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
 
       function findRestricted(source: ModuleSource) {
-        // A project module can match only an import that resolves to a file of the project.
+        // A project module can match only an import that resolves to a file of the project. A link
+        // cannot hide an owned module, because the file and the module are both identified.
         const resolved = matchesFile
           ? project.resolve(importer, source.specifier, source.mode)
           : undefined
 
-        const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
+        const file =
+          resolved?.includes("/node_modules/") === false ? project.identify(resolved) : undefined
 
         return restricted.filter((entry) => {
           const matches = MODULE_MATCHES[entry.kind]

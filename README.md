@@ -942,6 +942,10 @@ Doctor warns when an Oxlint config states import layers by hand, in two or more
 steps that move those overrides into layer maps. A warning fails no Doctor gate, so Doctor still
 exits 0 when nothing else remains.
 
+Both rules find an imported file by its real path, so a symlink cannot reach a higher layer or an
+owned module by another path. A path through `node_modules` keeps its package, so a bare import of
+a linked workspace package matches the package name, and stays outside every layer map.
+
 You can also select it during setup with
 `adamantite init --non-interactive --script check --preset architecture`.
 

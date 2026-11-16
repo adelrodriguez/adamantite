@@ -1,4 +1,4 @@
-import { constUndefined } from "effect/Function"
+import { constUndefined, identity } from "effect/Function"
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, expect, it } from "vitest"
 import {
@@ -17,6 +17,7 @@ RuleTester.itOnly = it.only
 // real workspace lookup and the resolution of project modules.
 const rule = createImportOwnersRule({
   findRoot: () => ({ kind: "workspace", path: "/project" }),
+  identify: identity,
   resolve: constUndefined,
 })
 

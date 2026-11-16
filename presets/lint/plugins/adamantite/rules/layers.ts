@@ -16,7 +16,7 @@ import {
   readRequireSource,
   readStaticSource,
 } from "../shared/imports.ts"
-import { type ResolutionMode, resolveImport } from "../shared/resolver.ts"
+import { identifyPath, type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver, which ships
@@ -72,6 +72,11 @@ export interface Modules {
    * The nearest folder above `file` that holds a `package.json`.
    */
   readonly findPackage: (file: string) => string | undefined
+  /**
+   * The path that identifies the file or folder at `path`, so the rule compares a resolved file
+   * with a layer root by the same kind of path.
+   */
+  readonly identify: (path: string) => string
   /**
    * The file that `specifier` in `importer` resolves to in `mode`, or undefined when it does not
    * resolve.
@@ -445,6 +450,7 @@ function findPackage(dir: string): string | undefined {
 
 const modules: Modules = {
   findPackage: (file) => findPackage(posix.dirname(file)),
+  identify: identifyPath,
   resolve: resolveImport,
 }
 
@@ -572,10 +578,14 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
     options.conditions
   )
 
+  // A link cannot move a file into another layer, because both paths are identified.
   const relative =
     target === undefined
       ? undefined
-      : posix.relative(posix.join(file.packageDir, file.root), target)
+      : posix.relative(
+          file.modules.identify(posix.join(file.packageDir, file.root)),
+          file.modules.identify(target)
+        )
 
   // A dependency, or a file outside the package, is outside the map, even below a `.` root.
   if (

@@ -49,9 +49,9 @@ node bin/adamantite --help
 node bin/adamantite doctor
 ```
 
-`check`, `fix`, `test:build`, and `test:smoke` run `build:missing` first, so they build the CLI only
-when `dist` has no build. After you change the CLI, run `pnpm run build`, or keep `pnpm run dev`
-running, so that they run your change.
+`check` and `fix` run `build:missing` first, so they build the CLI only when `dist` has no build.
+After you change the CLI, run `pnpm run build`, or keep `pnpm run dev` running, so that they run
+your change.
 
 Build and verify the packaged CLI:
 

@@ -95,6 +95,34 @@ tester.run("file-writers", rule, {
       ],
       filename: READER,
     },
+    // The root `effect` export is the same module as `effect/FileSystem`.
+    {
+      code: 'import { Effect, FileSystem as Files } from "effect"\nexport const remove = Effect.gen(function* () {\n  const fs = yield* Files.FileSystem\n  yield* fs.remove("a")\n})',
+      errors: [write("remove")],
+      filename: READER,
+    },
+    {
+      code: 'import * as Fx from "effect"\nexport const copy = Fx.Effect.flatMap(Fx.FileSystem.FileSystem, (fs) => fs.copy("a", "b"))',
+      errors: [write("copy")],
+      filename: READER,
+    },
+    // A relative path and a namespace reach the same helpers.
+    {
+      code: 'import { writeFile } from "../shared/filesystem.ts"\nexport const write = writeFile("a", "b")',
+      errors: [{ data: { name: "writeFile" }, messageId: "helper" }],
+      filename: READER,
+    },
+    {
+      code: 'import * as Files from "#lib/shared/filesystem.ts"\nexport const write = Files.writeFile("a", "b")\nexport const read = Files.readFile("a")',
+      errors: [{ data: { name: "writeFile" }, messageId: "helper" }],
+      filename: READER,
+    },
+    // A step before the write keeps the service.
+    {
+      code: `${IMPORTS}export const remove = FileSystem.FileSystem.pipe(\n  Effect.withSpan("remove"),\n  Effect.tap((fs) => fs.makeDirectory("a")),\n  Effect.flatMap((fs) => fs.remove("a"))\n)`,
+      errors: [write("makeDirectory"), write("remove")],
+      filename: READER,
+    },
     // A writer goes through `FileSystem` too.
     {
       code: 'import { rmSync } from "node:fs"\nexport { rmSync }',
@@ -119,6 +147,10 @@ export const read = Effect.gen(function* () {
 })
 export const update = Effect.flatMap(Ref.make(0), (fs) => Ref.set(fs, 1))
 `,
+      filename: READER,
+    },
+    {
+      code: 'import { Effect, FileSystem } from "effect"\nexport const read = Effect.gen(function* () {\n  const fs = yield* FileSystem.FileSystem\n  return yield* fs.readFileString("a")\n})',
       filename: READER,
     },
     {

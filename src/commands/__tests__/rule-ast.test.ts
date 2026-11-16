@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -13,11 +14,13 @@ import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { TestConsole } from "effect/testing"
-import ruleCommand, { AstReport } from "#commands/rule.ts"
+import ruleCommand, { AstReport, TrialReport } from "#commands/rule.ts"
+import { ErrorSetting } from "#lib/hardening/trial.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { Cwd } from "#lib/shared/cwd.ts"
 import { FailedToParseSource } from "#lib/shared/errors.ts"
@@ -142,5 +145,76 @@ describe("rule ast", () => {
       expect(failure).toMatchObject({ path: "src/broken.ts" })
       expect(logLines).toStrictEqual([])
     })
+  )
+})
+
+describe("rule try", () => {
+  let project: string
+  let cases: string
+
+  beforeEach(() => {
+    project = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-rule-try-")))
+    cases = mkdtempSync(join(tmpdir(), "adamantite-rule-try-cases-"))
+    mkdirSync(join(project, "src"), { recursive: true })
+    mkdirSync(join(project, "node_modules"))
+    symlinkSync(TEST_OXLINT, join(project, "node_modules/oxlint"))
+    writeFileSync(join(project, ".gitignore"), "node_modules\n")
+    writeFileSync(join(project, "package.json"), JSON.stringify({ name: "app", type: "module" }))
+    writeFileSync(join(project, "oxlint.config.ts"), "export default {}\n")
+    writeFileSync(join(project, "src/index.ts"), "export const value = 1\n")
+    // The trial copies the files that git lists.
+    spawnSync("git", ["init", "-q"], { cwd: project })
+  })
+
+  afterEach(() => {
+    rmSync(project, { force: true, recursive: true })
+    rmSync(cases, { force: true, recursive: true })
+  })
+
+  it.live("print the trial as JSON that decodes with the report schema with --json", () =>
+    Effect.gen(function* () {
+      const before = join(cases, "before.ts")
+
+      writeFileSync(before, 'import fs from "node:fs"\nexport const cart = fs\n')
+
+      // `rule try` runs in the project, as the CLI does from the project folder.
+      const exit = yield* Command.runWith(ruleCommand, { version: "test" })([
+        "try",
+        "no-restricted-imports",
+        "--options",
+        '[{"paths":["node:fs"]}]',
+        "--report",
+        `src/cart.ts=${before}`,
+        "--accept",
+        "src/index.ts",
+        "--json",
+      ]).pipe(Effect.exit, Effect.provideService(Cwd, project))
+
+      const logLines = yield* TestConsole.logLines
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(logLines).toHaveLength(1)
+      expect(
+        yield* Schema.decodeUnknownEffect(Schema.fromJsonString(TrialReport))(logLines[0])
+      ).toStrictEqual({
+        results: [
+          {
+            case: { expected: "reported", path: "src/cart.ts", source: Option.some(before) },
+            config: "oxlint.config.ts",
+            diagnostics: [
+              { column: 1, line: 1, message: "'node:fs' import is restricted from being used." },
+            ],
+          },
+          {
+            case: { expected: "accepted", path: "src/index.ts", source: Option.none() },
+            config: "oxlint.config.ts",
+            diagnostics: [],
+          },
+        ],
+        rule: "no-restricted-imports",
+        schemaVersion: 1,
+        setting: new ErrorSetting({ options: [{ paths: ["node:fs"] }] }),
+      })
+    }).pipe(Effect.provide([TEST_LAYER, ModuleResolver.layer]))
   )
 })

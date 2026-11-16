@@ -63,20 +63,6 @@ interface CommandRunnerService {
 const printHeading = (title: string, command: string) =>
   Console.log(`${styleText("bold", title)} ${styleText("dim", `· adamantite (${command})`)}`)
 
-/**
- * Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
- * `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
- */
-export const quietNodeOptions = Config.String("NODE_OPTIONS").pipe(
-  Config.withDefault(""),
-  Config.map((options) =>
-    [options, "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"].filter(Boolean).join(" ")
-  ),
-  // Any string decodes, and the default covers a missing variable, so only a provider that cannot
-  // read its source fails. That failure is a defect.
-  Effect.orDie
-)
-
 const exitCode = Effect.fn("CommandRunner.exitCode")(function* (
   options: CommandRunOptions,
   nodeOptions: string
@@ -140,7 +126,18 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
   static readonly layer = Layer.effect(this)(
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      const nodeOptions = yield* quietNodeOptions
+
+      // Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
+      // `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
+      // Any string decodes, and the default covers a missing variable, so only a provider that
+      // cannot read its source fails. That failure is a defect.
+      const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
+        Config.withDefault(""),
+        Config.map((options) =>
+          [options, "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"].filter(Boolean).join(" ")
+        ),
+        Effect.orDie
+      )
 
       return CommandRunner.make((options) =>
         exitCode(options, nodeOptions).pipe(

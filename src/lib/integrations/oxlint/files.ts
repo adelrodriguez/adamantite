@@ -1,3 +1,4 @@
+import * as Config from "effect/Config"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -7,7 +8,6 @@ import * as Schema from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Stream from "effect/Stream"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { quietNodeOptions } from "#lib/shared/command-runner.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
 
 /**
@@ -68,7 +68,18 @@ export const runOxlint = Effect.fn("runOxlint")(
   function* (cwd: string, args: readonly string[], project: string = cwd) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const command = (yield* OxlintCommand)(project)
-    const nodeOptions = yield* quietNodeOptions
+
+    // Oxlint loads TypeScript configs through Node, which warns about every typeless
+    // `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
+    // Any string decodes, and the default covers a missing variable, so only a provider that
+    // cannot read its source fails. That failure is a defect.
+    const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
+      Config.withDefault(""),
+      Config.map((options) =>
+        [options, "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"].filter(Boolean).join(" ")
+      ),
+      Effect.orDie
+    )
 
     const handle = yield* spawner.spawn(
       ChildProcess.make(command.command, [...command.args, ...args], {

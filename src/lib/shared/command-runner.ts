@@ -60,41 +60,17 @@ interface CommandRunnerService {
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
 }
 
-const printHeading = (title: string, command: string) =>
-  Console.log(`${styleText("bold", title)} ${styleText("dim", `· adamantite (${command})`)}`)
-
-const exitCode = Effect.fn("CommandRunner.exitCode")(function* (
-  options: CommandRunOptions,
-  nodeOptions: string
-) {
-  const { command } = options
-
-  return yield* Effect.scoped(
-    Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, options.args, {
-        cwd: options.cwd,
-        detached: options.stdin === "inherit" ? false : undefined,
-        env: { ...options.env, NODE_OPTIONS: nodeOptions },
-        extendEnv: true,
-        stderr: options.stderr ?? "inherit",
-        stdin: options.stdin ?? "ignore",
-        stdout: options.stdout ?? "inherit",
-      })
-
-      return yield* handle.exitCode
-    })
-  ).pipe(
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new CliNotFound({ command })))
-  )
-})
-
 export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerService>()(
   "CommandRunner"
 ) {
   static make(exitCode: CommandRunnerService["exitCode"]): CommandRunnerService {
     const run = Effect.fn("CommandRunner.run")(function* (options: CommandRunOptions) {
       if (options.title !== undefined) {
-        yield* printHeading(options.title, options.name ?? options.command)
+        const command = options.name ?? options.command
+
+        yield* Console.log(
+          `${styleText("bold", options.title)} ${styleText("dim", `· adamantite (${command})`)}`
+        )
       }
 
       const code = yield* exitCode(options)
@@ -139,10 +115,32 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
         Effect.orDie
       )
 
-      return CommandRunner.make((options) =>
-        exitCode(options, nodeOptions).pipe(
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
-        )
+      return CommandRunner.make(
+        Effect.fn("CommandRunner.exitCode")(function* (options: CommandRunOptions) {
+          const { command } = options
+
+          return yield* Effect.scoped(
+            Effect.gen(function* () {
+              const handle = yield* spawner.spawn(
+                ChildProcess.make(command, options.args, {
+                  cwd: options.cwd,
+                  detached: options.stdin === "inherit" ? false : undefined,
+                  env: { ...options.env, NODE_OPTIONS: nodeOptions },
+                  extendEnv: true,
+                  stderr: options.stderr ?? "inherit",
+                  stdin: options.stdin ?? "ignore",
+                  stdout: options.stdout ?? "inherit",
+                })
+              )
+
+              return yield* handle.exitCode
+            })
+          ).pipe(
+            Effect.catchReason("PlatformError", "NotFound", () =>
+              Effect.fail(new CliNotFound({ command }))
+            )
+          )
+        })
       )
     })
   )

@@ -1,3 +1,4 @@
+import type { Plugin } from "@oxlint/plugins"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -6,7 +7,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
 import type { FirstPartyPlugin } from "#presets/lint/plugins/entry.ts"
-import type { Replacement } from "#presets/lint/plugins/shared/replacement.ts"
+import type { Replacement } from "#presets/lint/plugins/shared/replacement.d.ts"
 import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
 import * as Project from "#lib/project/index.ts"
 import {
@@ -15,7 +16,17 @@ import {
   listProjectOverrides,
 } from "#lib/project/lint-config.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
-import { plugins } from "#presets/lint/plugins/catalog.ts"
+import adamantite from "#presets/lint/plugins/adamantite/index.ts"
+import antislopEffect from "#presets/lint/plugins/antislop-effect/index.ts"
+import antislop from "#presets/lint/plugins/antislop/index.ts"
+
+// Each first-party plugin by its name. Presets load a plugin by file URL through `entry.ts`, so the
+// CLI imports the plugin modules here to read the metadata of their rules.
+const plugins: Readonly<Record<FirstPartyPlugin, Plugin>> = {
+  adamantite,
+  antislop,
+  "antislop-effect": antislopEffect,
+}
 
 // The type of the declaration checks this Schema, so the two cannot drift apart.
 const ReplacementSchema: Schema.Codec<Replacement> = Schema.Struct({

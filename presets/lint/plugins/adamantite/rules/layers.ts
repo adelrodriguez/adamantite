@@ -1,7 +1,7 @@
 import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync } from "node:fs"
 import { posix } from "node:path"
-import type { Replacement } from "../../shared/replacement.ts"
+import type { Replacement } from "../../shared/replacement.d.ts"
 import { isStringLiteral } from "../../shared/ast.ts"
 import {
   readBooleanOption,

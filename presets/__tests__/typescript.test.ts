@@ -44,15 +44,27 @@ const INCLUDE_INDEX: ProjectConfig = { include: ["index.ts"] }
 
 /**
  * Type check one file in a project that extends a TypeScript preset, and return the TypeScript
- * output.
+ * output. A `base` config goes into `base.json`, which the project extends before the preset.
  */
-function check(preset: keyof typeof PRESETS, source: string, config = INCLUDE_INDEX) {
+function check(
+  preset: keyof typeof PRESETS,
+  source: string,
+  config = INCLUDE_INDEX,
+  base?: { readonly compilerOptions: Readonly<Record<string, boolean>> }
+) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-typescript-preset-"))
 
   try {
+    if (base !== undefined) {
+      writeFileSync(join(tempDir, "base.json"), JSON.stringify(base))
+    }
+
     writeFileSync(
       join(tempDir, "tsconfig.json"),
-      JSON.stringify({ extends: PRESETS[preset], ...config })
+      JSON.stringify({
+        extends: base === undefined ? PRESETS[preset] : ["./base.json", PRESETS[preset]],
+        ...config,
+      })
     )
     writeFileSync(join(tempDir, "index.ts"), source)
 
@@ -84,6 +96,17 @@ const PARSED_JSON_ERROR = {
 describe.each(["tsconfig", "typescript"] as const)("the %s preset", (preset) => {
   it("accept erasable syntax", () => {
     expect(check(preset, 'export const Kind = { A: "a" } as const\n')).toStrictEqual(PASSED)
+  })
+
+  it("turn strict checks back on after a base that turns them off", () => {
+    const base = { compilerOptions: { strict: false } }
+
+    expect(
+      check(preset, "export const identity = (value) => value\n", INCLUDE_INDEX, base)
+    ).toStrictEqual({
+      output: "index.ts(1,26): error TS7006: Parameter 'value' implicitly has an 'any' type.\n",
+      status: 1,
+    })
   })
 
   it("report an enum, because the preset allows only erasable syntax", () => {

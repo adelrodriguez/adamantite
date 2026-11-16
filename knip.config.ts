@@ -9,6 +9,5 @@ export default {
   rules: {
     ...analyze.rules,
     devDependencies: "off",
-    optionalPeerDependencies: "off",
   },
 } satisfies KnipConfig

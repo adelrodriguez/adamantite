@@ -3,15 +3,11 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "esnext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
     "types": ["node"],
     "plugins": [
       {
         "name": "@effect/language-service",
-        // The Effect server supplies editor quick fixes; editor settings hide duplicate Oxlint reports.
-        "diagnostics": true,
         "allowedUnstableApis": [
           "@effect/platform-node",
           "@effect/vitest",
@@ -37,11 +33,5 @@
   },
   "include": ["src", "presets/**/*.ts", "scripts", "*.config.ts"],
   // Adamantite publishes declaration files, so it extends the plain preset without the type resets.
-  "exclude": [
-    ".packref",
-    "dist",
-    "node_modules",
-    "presets/typescript/resets",
-    "src/__tests__/presets/fixtures"
-  ]
+  "exclude": ["presets/typescript/resets", "src/__tests__/presets/fixtures"]
 }

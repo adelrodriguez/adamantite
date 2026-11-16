@@ -136,7 +136,12 @@ export default defineConfig({
       // the backend that they share. The terminal prints what Setup wrote.
       {
         import: "#lib/setup",
-        owners: ["src/commands/setup.ts", "src/commands/__tests__", "src/terminal/setup.ts"],
+        owners: [
+          "src/commands/setup.ts",
+          "src/commands/__tests__",
+          "src/lib/setup/__tests__",
+          "src/terminal/setup.ts",
+        ],
       },
       // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
       // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's

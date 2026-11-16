@@ -7,6 +7,10 @@ import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
+
 function readPnpmWorkspace(pnpmWorkspace: string) {
   return readWorkspace(ROOT).pipe(
     Effect.provide([
@@ -239,6 +243,87 @@ describe("readWorkspace", () => {
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(workspace).toStrictEqual({ catalogs: {}, isMonorepo: false, packageDirectories: [] })
+    })
+  )
+})
+
+describe("checkIsMonorepo", () => {
+  it.effect.each([
+    {
+      content: "packages:\n  - 'packages/*'",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm-workspace.yaml defines packages",
+    },
+    {
+      content: "\uFEFFpackages:\n  - 'packages/*'\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm workspace content starts with a byte-order mark",
+    },
+    {
+      content: "\"packages\":\n  - 'packages/*'\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm quotes the packages key",
+    },
+    {
+      content: "allowBuilds:\n  msgpackr-extract: false\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm-workspace.yaml does not define packages",
+    },
+    {
+      content: "packages: [] # no workspace packages\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares an empty package list with a comment",
+    },
+    {
+      content: "packages: [\n]\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares an empty multiline flow sequence",
+    },
+    {
+      content: JSON.stringify({ workspaces: ["packages/*"] }),
+      expected: true,
+      file: "package.json",
+      name: "package.json has a workspaces field",
+    },
+    {
+      content: JSON.stringify({ workspaces: { packages: ["packages/*"] } }),
+      expected: true,
+      file: "package.json",
+      name: "package.json has workspace packages in object form",
+    },
+    {
+      content: JSON.stringify({ workspaces: { packages: [] } }),
+      expected: false,
+      file: "package.json",
+      name: "package.json has no workspace packages in object form",
+    },
+    {
+      content: JSON.stringify({ workspaces: [] }),
+      expected: false,
+      file: "package.json",
+      name: "package.json has no workspace packages",
+    },
+    {
+      content: JSON.stringify({ name: "test-package", version: "1.0.0" }),
+      expected: false,
+      file: "package.json",
+      name: "neither pnpm-workspace.yaml nor workspaces is present",
+    },
+  ])("return $expected when $name", ({ content, expected, file }) =>
+    Effect.gen(function* () {
+      // A case for `package.json` replaces the default one.
+      const defaults = { "package.json": yield* stringifyJson({ name: "test-package" }) }
+      const files = makeFiles({ ...defaults, [file]: content })
+
+      const result = yield* checkIsMonorepo(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+
+      expect(result).toBe(expected)
     })
   )
 })

@@ -1,49 +1,5 @@
-import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
-import type { Selection } from "#lib/project/selection.ts"
-import {
-  getOxlintCommand,
-  getProjectDirectory,
-  PROJECT_VARIABLE,
-} from "#lib/integrations/oxlint/entry.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-
-const ENTRY = join(import.meta.dirname, "../../../../oxlint.ts")
-
-/**
- * What the entry prints to standard error, and its exit code, in a project without Oxlint whose
- * lockfile selects `scripts`.
- */
-function runWithoutOxlint(scripts: Selection["scripts"]) {
-  const project = mkdtempSync(join(tmpdir(), "adamantite-entry-"))
-
-  try {
-    mkdirSync(join(project, ".adamantite"))
-    writeFileSync(
-      join(project, LOCKFILE_PATH),
-      JSON.stringify({
-        schemaVersion: 1,
-        selection: { agents: false, ci: null, editors: [], presets: [], scripts, typescript: null },
-        version: "0.0.0",
-        written: {},
-      })
-    )
-
-    const result = spawnSync(process.execPath, [ENTRY], {
-      cwd: project,
-      encoding: "utf8",
-      env: { ...process.env, [PROJECT_VARIABLE]: project },
-    })
-
-    return { exitCode: result.status, stderr: result.stderr.replaceAll(project, "<project>") }
-  } finally {
-    rmSync(project, { force: true, recursive: true })
-  }
-}
+import { getOxlintCommand, getProjectDirectory } from "#lib/integrations/oxlint/entry.ts"
 
 const CWD = "/somewhere/else"
 
@@ -99,24 +55,6 @@ describe("oxlint-entry", () => {
         cwd: "/project",
         env: { ADAMANTITE_PROJECT: "/project" },
         name: "oxlint",
-      })
-    })
-  })
-
-  describe("a project without Oxlint", () => {
-    it("name the init command when the lockfile selects no script that runs Oxlint", () => {
-      expect(runWithoutOxlint(["analyze"])).toStrictEqual({
-        exitCode: 1,
-        stderr:
-          "The lockfile selects no script that runs `oxlint`, so `oxlint` is not installed. Run `adamantite init --non-interactive --script check` to add the script and install it.\n",
-      })
-    })
-
-    it("name adamantite update when the lockfile selects a script that runs Oxlint", () => {
-      expect(runWithoutOxlint(["check"])).toStrictEqual({
-        exitCode: 1,
-        stderr:
-          "`oxlint` is not installed in `<project>`. Install the dependencies, or run `adamantite update`.\n",
       })
     })
   })

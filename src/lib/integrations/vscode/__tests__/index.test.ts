@@ -41,8 +41,8 @@ const INIT_ARGS = [
   "vscode",
 ]
 
-// The tests install no Oxfmt, so Setup writes each file as rendered. `formatted.test.ts` covers the
-// layout that the project's Oxfmt gives it.
+// The tests install no Oxfmt, so Setup writes each file as rendered.
+// `src/lib/setup/__tests__/format.test.ts` covers the layout that the project's Oxfmt gives it.
 const RECOMMENDATIONS = `${Effect.runSync(formatJson({ recommendations: ["oxc.oxc-vscode", "webpro.vscode-knip"] }))}\n`
 
 function makeProject(files: Record<string, string> = {}) {

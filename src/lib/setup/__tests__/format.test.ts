@@ -28,7 +28,7 @@ import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../../../..")
 
 // The test folder does not install `adamantite/format`, so the check loads the preset from the
 // repository.

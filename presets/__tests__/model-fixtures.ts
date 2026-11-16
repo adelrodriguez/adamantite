@@ -1,7 +1,16 @@
 import { spawnSync } from "node:child_process"
-import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
-import { join, relative, sep } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
@@ -57,6 +66,44 @@ export interface ModelReport {
 }
 
 /**
+ * Run Oxlint in `cwd` with the config and folders as paths relative to `cwd`, and return the
+ * reports with `ruleCode`, with each file relative to `cwd`.
+ */
+function runOxlint(
+  cwd: string,
+  config: string,
+  targets: readonly string[],
+  ruleCode: string
+): ModelReport[] {
+  const result = spawnSync(
+    join(REPO_ROOT, "node_modules/.bin/oxlint"),
+    ["-c", config, "-f", "json", ...targets],
+    { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+  )
+
+  if (result.error) {
+    throw result.error
+  }
+
+  let output: typeof OxlintJsonOutput.Type
+
+  try {
+    output = decodeOxlintJsonOutput(result.stdout)
+  } catch (error) {
+    throw new Error(`Oxlint did not print JSON diagnostics.\n${result.stdout}${result.stderr}`, {
+      cause: error,
+    })
+  }
+
+  return output.diagnostics
+    .filter((diagnostic) => diagnostic.code === ruleCode)
+    .map((diagnostic) => ({
+      filename: diagnostic.filename.split(sep).join("/"),
+      message: diagnostic.message,
+    }))
+}
+
+/**
  * Lint one model in a real Oxlint run through the architecture preset, from a copy in `tempDir`,
  * and return the reports of the rule.
  */
@@ -86,32 +133,83 @@ export function lintModel(
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
 
-  const result = spawnSync(
-    join(REPO_ROOT, "node_modules/.bin/oxlint"),
-    ["-c", "oxlint.config.ts", "-f", "json", ...sourceDirs],
-    { cwd: projectDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
-  )
+  return runOxlint(projectDir, "oxlint.config.ts", sourceDirs, options.ruleCode)
+}
 
-  if (result.error) {
-    throw result.error
-  }
+/**
+ * A project that a test writes, for a case that a committed fixture cannot hold, such as a symlink.
+ */
+export interface ProjectFixture {
+  /**
+   * The Oxlint config that the project adds to the architecture preset, such as its `rules`.
+   */
+  readonly config: object
+  /**
+   * The content of each file, by its path in the project.
+   */
+  readonly files: Readonly<Record<string, string>>
+  /**
+   * The target of each symlink as `ln -s` takes it, by the path of the link in the project.
+   */
+  readonly links: Readonly<Record<string, string>>
+  /**
+   * The folders that Oxlint lints, relative to the project.
+   */
+  readonly targets: readonly string[]
+}
 
-  let output: typeof OxlintJsonOutput.Type
+/**
+ * Write the project in a temporary folder, lint it in a real Oxlint run through the architecture
+ * preset, and return the reports of `ruleCode`, with each file relative to the project. With
+ * `throughLink`, Oxlint reaches the project through a linked folder, so the paths that it lints are
+ * not the real paths of the files.
+ */
+export function lintProject(
+  ruleCode: string,
+  fixture: ProjectFixture,
+  { throughLink = false } = {}
+): ModelReport[] {
+  // The real path, so the folder that Oxlint reaches the project through is the only link above it.
+  const tempDir = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-project-")))
 
   try {
-    output = decodeOxlintJsonOutput(result.stdout)
-  } catch (error) {
-    throw new Error(`Oxlint did not print JSON diagnostics.\n${result.stdout}${result.stderr}`, {
-      cause: error,
-    })
-  }
+    const projectDir = join(tempDir, "project")
 
-  return output.diagnostics
-    .filter((diagnostic) => diagnostic.code === options.ruleCode)
-    .map((diagnostic) => ({
-      filename: diagnostic.filename.split(sep).join("/"),
-      message: diagnostic.message,
-    }))
+    for (const [path, content] of Object.entries(fixture.files)) {
+      mkdirSync(dirname(join(projectDir, path)), { recursive: true })
+      writeFileSync(join(projectDir, path), content)
+    }
+
+    for (const [path, target] of Object.entries(fixture.links)) {
+      mkdirSync(dirname(join(projectDir, path)), { recursive: true })
+      symlinkSync(target, join(projectDir, path))
+    }
+
+    writeFileSync(
+      join(projectDir, "oxlint.config.ts"),
+      [
+        `import architecture from ${JSON.stringify(join(REPO_ROOT, "presets/lint/architecture.ts"))}`,
+        "",
+        `export default { extends: [architecture], ...${JSON.stringify(fixture.config)} }`,
+        "",
+      ].join("\n")
+    )
+
+    const folder = throughLink ? "linked" : "project"
+
+    if (throughLink) {
+      symlinkSync(projectDir, join(tempDir, folder))
+    }
+
+    return runOxlint(
+      tempDir,
+      `${folder}/oxlint.config.ts`,
+      fixture.targets.map((target) => `${folder}/${target}`),
+      ruleCode
+    ).map((report) => ({ ...report, filename: report.filename.slice(`${folder}/`.length) }))
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true })
+  }
 }
 
 /**

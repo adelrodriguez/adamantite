@@ -102,7 +102,7 @@ when Doctor reports no finding for it.
 _Avoid_: Managed ideal, managed state, supported state
 
 **Bridge**:
-The layer between the commands and the integrations, in `src/lib/toolchain`. `check`, `fix`, and
+The layer between the commands and the integrations, in `src/lib/bridge`. `check`, `fix`, and
 `analyze` call it with the user's options. The lockfile selection decides which tools it runs, such
 as Oxfmt, Oxlint, Sherif, and Knip. The bridge runs them in order and decides when the command
 fails. Plugins extend an integration, such as the Effect build of Oxlint, so the bridge calls them

@@ -2,10 +2,10 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
 import { readSelection } from "#lib/project/lockfile.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
 
 const fix = Flag.Boolean("fix").pipe(
   Flag.withDefault(false),
@@ -36,7 +36,7 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
   ]),
   Command.withHandler(({ fix, only, strict }) =>
     Effect.gen(function* () {
-      yield* Toolchain.analyze({
+      yield* Bridge.analyze({
         fix,
         forwardedArguments: yield* ForwardedArguments,
         only: Option.getOrUndefined(only),

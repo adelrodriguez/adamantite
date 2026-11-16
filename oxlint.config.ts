@@ -85,6 +85,7 @@ export default defineConfig({
             imports: [],
             layers: {
               assessment: { imports: ["integrations"] },
+              bridge: { imports: ["integrations"] },
               handoff: { imports: ["shared"] },
               // These layers independently compose integrations.
               hardening: { imports: ["integrations"] },
@@ -92,7 +93,6 @@ export default defineConfig({
               project: { imports: ["shared"] },
               setup: { imports: ["integrations"] },
               shared: { imports: [] },
-              toolchain: { imports: ["integrations"] },
             },
           },
 

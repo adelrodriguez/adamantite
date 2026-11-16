@@ -7,6 +7,7 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { AgentReach, BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
+import * as Bridge from "#lib/bridge/index.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   HardenContext,
@@ -26,7 +27,6 @@ import {
 } from "#lib/shared/errors.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import * as Toolchain from "#lib/toolchain/index.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 import * as Resolution from "#terminal/resolution.ts"
@@ -104,7 +104,7 @@ const verify = Effect.fn("verify")(function* (
 ) {
   const CHECK_FAILED = "`adamantite check` failed."
 
-  const checkFailures = yield* Toolchain.check().pipe(
+  const checkFailures = yield* Bridge.check().pipe(
     Effect.as([]),
     Effect.catchTags({
       CliNotFound: (error) => Effect.succeed([error.message, CHECK_FAILED]),

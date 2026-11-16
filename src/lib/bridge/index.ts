@@ -38,7 +38,7 @@ function explainMissingTool(selection: Option.Option<Selection>) {
  * fails with the first failure. The forwarded arguments go to the lint stage, or to the stage that
  * `only` selects.
  */
-export const check = Effect.fn("Toolchain.check")(function* (
+export const check = Effect.fn("Bridge.check")(function* (
   options: {
     readonly allowWarnings?: boolean
     readonly files?: readonly string[]
@@ -87,7 +87,7 @@ export const check = Effect.fn("Toolchain.check")(function* (
  * with the first failure. The forwarded arguments go to the lint stage, or to the stage that `only`
  * selects.
  */
-export const fix = Effect.fn("Toolchain.fix")(function* (options: {
+export const fix = Effect.fn("Bridge.fix")(function* (options: {
   readonly files?: readonly string[]
   readonly forwardedArguments?: readonly string[]
   readonly level?: FixLevel
@@ -140,7 +140,7 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
  * The forwarded arguments go to the unused stage, or to the stage that `only` selects. With `fix`,
  * the operation stops at the first failure.
  */
-export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
+export const analyze = Effect.fn("Bridge.analyze")(function* (options: {
   readonly fix?: boolean
   readonly forwardedArguments?: readonly string[]
   readonly only?: "monorepo" | "unused"
@@ -223,7 +223,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
  * Oxlint runtime of the project. Fails with the parse errors of a file that does not parse, and for
  * a file that Oxlint does not lint.
  */
-export const ast = Effect.fn("Toolchain.ast")(function* (file: string) {
+export const ast = Effect.fn("Bridge.ast")(function* (file: string) {
   const { errors, program } = yield* probeAst(yield* Project.Directory, file)
 
   if (errors.length > 0) {

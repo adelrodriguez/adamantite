@@ -192,16 +192,19 @@ describe("the write rule", () => {
     ({ selection }) =>
       Effect.gen(function* () {
         const files = makeProject(makeLockfileFile(selection))
+        const before = files.list()
 
         const { exit } = yield* runLifecycle("update", files)
 
+        // Each file that update created in the fresh project is a managed file, so the lockfile
+        // records exactly those files, each with the hash of its content.
+        const created = files.list().filter((file) => !before.includes(file))
+
         // The test installer installs nothing, so a selection that sets up a tool leaves findings.
         expect([undefined, findingsLeft("update")]).toContainEqual(getFailure(exit))
-        expect(
-          Object.entries(readLockfile(files).written).filter(
-            ([file, hash]) => hashContent(files.read(file)) !== hash
-          )
-        ).toStrictEqual([])
+        expect(readLockfile(files).written).toStrictEqual(
+          Object.fromEntries(created.map((file) => [file, hashContent(files.read(file))]))
+        )
       }),
     { arbitrary: { runs: 100 } }
   )

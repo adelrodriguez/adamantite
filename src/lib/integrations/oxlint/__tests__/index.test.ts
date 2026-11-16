@@ -289,8 +289,10 @@ function readReport(files: ReturnType<typeof makeProject>) {
 }
 
 // The configs below load no first-party plugin, so the warning starts with the step that loads it.
+// It names the one preset that loads the plugin without turning on rules, and places it after core,
+// where the `core-preset-order` finding expects it.
 const PLUGIN_STEP =
-  "Add `adamantite/lint/react-strict`, `adamantite/lint/tanstack`, `adamantite/lint/architecture`, or `adamantite/lint/strict` to `extends` to load the `adamantite` plugin."
+  "Import `adamantite/lint/architecture` in `oxlint.config.ts`, and add it to `extends` after the core preset. It loads the `adamantite` plugin."
 
 function describeLayerMapWarning(file: string, count: number) {
   return `- \`${file}\` states import layers by hand in ${count} \`no-restricted-imports\` overrides with \`patterns\`.`
@@ -381,7 +383,7 @@ describe("hand-written layer maps", () => {
       const { output } = yield* runLifecycle("doctor", files)
 
       expect(output).toContain(describeLayerMapWarning(CONFIG, 2))
-      expect(output).not.toContain("to load the `adamantite` plugin")
+      expect(output).not.toContain("It loads the `adamantite` plugin.")
       expect(output).toContain("\n  2. Use `ignore`")
     })
   )

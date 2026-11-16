@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ChildProcess from "effect/process/ChildProcess"
@@ -46,6 +47,29 @@ describe("CommandRunner", () => {
       }).pipe(Effect.provide(CommandRunner.layer.pipe(Layer.provide(makeSpawnerLayer(spawned)))))
 
       expect(spawned.map((options) => options.detached)).toStrictEqual([false, undefined])
+    })
+  )
+
+  it.effect("keep the NODE_OPTIONS of the environment and quiet the typeless package warning", () =>
+    Effect.gen(function* () {
+      const spawned: ChildProcess.CommandOptions[] = []
+
+      const runWith = (env: Record<string, string>) =>
+        Effect.gen(function* () {
+          const runner = yield* CommandRunner
+          yield* runner.exitCode({ args: [], command: "oxfmt" })
+        }).pipe(
+          Effect.provide(CommandRunner.layer.pipe(Layer.provide(makeSpawnerLayer(spawned)))),
+          Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown(env))
+        )
+
+      yield* runWith({ NODE_OPTIONS: "--max-old-space-size=4096" })
+      yield* runWith({})
+
+      expect(spawned.map((options) => options.env?.["NODE_OPTIONS"])).toStrictEqual([
+        "--max-old-space-size=4096 --disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+        "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+      ])
     })
   )
 })

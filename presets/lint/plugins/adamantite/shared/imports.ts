@@ -41,9 +41,20 @@ export function readDynamicSource(node: ESTree.ImportExpression): ModuleSource |
   return specifier === null ? undefined : { mode: "import", node: node.source, specifier }
 }
 
+const TYPE_DECLARATIONS: ReadonlySet<string> = new Set([
+  "TSInterfaceDeclaration",
+  "TSTypeAliasDeclaration",
+])
+
+/**
+ * Whether code in `scope` sees a `require` that the file declares as a value. A type alias or an
+ * interface named `require` leaves the runtime `require` in place.
+ */
 function declaresRequire(scope: Scope) {
   for (let current: Scope | null = scope; current !== null; current = current.upper) {
-    if ((current.set.get("require")?.defs.length ?? 0) > 0) {
+    const defs = current.set.get("require")?.defs ?? []
+
+    if (defs.some((def) => !TYPE_DECLARATIONS.has(def.node.type))) {
       return true
     }
   }

@@ -5,6 +5,7 @@ node_modules
 
 # output
 out
+bench-results
 dist
 *.tgz
 

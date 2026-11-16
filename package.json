@@ -110,6 +110,7 @@
   },
   "scripts": {
     "analyze": "knip",
+    "bench": "pnpm run build && vitest bench --run --reporter=default --reporter=./scripts/bench-reporter.ts",
     "build": "tsdown",
     "build:missing": "test -f dist/index.js || pnpm run build",
     "build:verify": "pnpm run build && pnpm run test:build",

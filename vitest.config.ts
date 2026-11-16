@@ -65,12 +65,16 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          // `pnpm run bench` runs the benchmarks in the presets project, which installs the fixture
+          // packages.
+          benchmark: { include: [] },
           exclude: [...configDefaults.exclude, ...PROCESS_RUN_TESTS, FIXTURES],
           // The custom rule tests sit in `__tests__`, where `adamantite rule test`, which runs
           // `node:test` files, does not look.
           include: [
             ".adamantite/lint/__tests__/*.test.ts",
             "presets/**/*.test.ts",
+            "scripts/__tests__/*.test.ts",
             "src/**/*.test.ts",
           ],
           name: "unit",
@@ -79,6 +83,9 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          // The benchmarks start real processes, and `vitest bench` runs them one at a time, after
+          // no test. `scripts/bench-reporter.ts` keeps the duration of each run.
+          benchmark: { include: ["src/**/*.bench.ts"], retainSamples: true },
           // The fixture projects link the fixture packages, which have their own lockfile.
           globalSetup: ["presets/__tests__/fixture-packages.ts"],
           // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds

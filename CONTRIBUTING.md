@@ -83,6 +83,9 @@ Each kind of test has one place:
 - A test of one `src` module goes in the `__tests__` folder beside it. The helpers that tests in
   several folders share go in `src/__tests__/`.
 
+Name each test file after the module that it tests, as `<folder>/__tests__/<name>.test.ts` for
+`<folder>/<name>.ts`, or list it with a reason in `src/__tests__/test-names.test.ts`.
+
 A test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest, belongs in the
 `PROCESS_RUN_TESTS` list of `vitest.config.ts`. That list is the `presets` Vitest project, which
 `pnpm run test:presets` runs. Every other test runs in the `unit` project, which must not touch the

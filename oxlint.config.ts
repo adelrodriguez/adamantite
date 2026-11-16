@@ -4,6 +4,63 @@ import effect from "./presets/lint/effect.ts"
 import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
+// Commands read the working directory with `yield* Cwd`, and tests provide it. `Cwd` takes it from
+// its named `cwd` import, which `adamantite/import-owners` allows only there.
+const workingDirectoryProperties = [
+  {
+    message: "Read the working directory with `yield* Cwd` from `#lib/shared/cwd.ts`.",
+    object: "process",
+    property: "cwd",
+  },
+  {
+    message: "Provide `Cwd` from `#lib/shared/cwd.ts` instead of changing the working directory.",
+    object: "process",
+    property: "chdir",
+  },
+]
+
+// Only Setup writes target-project files and the lockfile. Each other owner writes outside the
+// managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
+// `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, a trial writes cases
+// and configs in a temporary copy of the project, and the Oxlint probe and the rule list of
+// `harden` write their Oxlint configs to a temporary folder.
+const fileWriters = [
+  "src/lib/setup/**",
+  "src/lib/project/custom-rules/index.ts",
+  "src/lib/integrations/effect-sdk.ts",
+  "src/lib/hardening/trial.ts",
+  "src/lib/hardening/oxlint.ts",
+  "src/lib/integrations/oxlint/probe.ts",
+]
+
+// The methods of Effect's `FileSystem` that change the disk. A writer calls them directly or through
+// `ensureDirectory` and `writeFile` from `#lib/shared/filesystem.ts`.
+const fileSystemWriteProperties = [
+  "chmod",
+  "chown",
+  "copy",
+  "copyFile",
+  "link",
+  "makeDirectory",
+  "makeTempDirectory",
+  "makeTempDirectoryScoped",
+  "makeTempFile",
+  "makeTempFileScoped",
+  "open",
+  "remove",
+  "rename",
+  "sink",
+  "symlink",
+  "truncate",
+  "utimes",
+  "writeFile",
+  "writeFileString",
+].map((property) => ({
+  message:
+    "Only the `fileWriters` of `oxlint.config.ts` change the disk. Write a target-project file through `Setup.apply` in `src/lib/setup`.",
+  property,
+}))
+
 export default defineConfig({
   // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
   // rule makes some test code impossible to write.
@@ -42,6 +99,19 @@ export default defineConfig({
         "typescript/no-unsafe-function-type": "off",
         "typescript/prefer-function-type": "off",
         "typescript/triple-slash-reference": ["error", { path: "always" }],
+      },
+    },
+    // Lib and command code reads the disk, and only the file writers change it. The helpers of
+    // `#lib/shared/filesystem.ts` wrap the methods, and tests write their fixtures.
+    {
+      excludeFiles: [...fileWriters, "src/lib/shared/filesystem.ts", "**/__tests__/**"],
+      files: ["src/**"],
+      rules: {
+        "eslint/no-restricted-properties": [
+          "error",
+          ...workingDirectoryProperties,
+          ...fileSystemWriteProperties,
+        ],
       },
     },
     // The eval() reset redeclares `eval` to merge an overload into the built-in function. Core lint
@@ -143,23 +213,12 @@ export default defineConfig({
           "src/terminal/setup.ts",
         ],
       },
-      // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
-      // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
-      // `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, a trial writes
-      // cases and configs in a temporary copy of the project, and the Oxlint probe writes its config
-      // to a temporary folder.
+      // Only the file writers import the writing helpers. `eslint/no-restricted-properties` rejects
+      // the `FileSystem` methods that write elsewhere.
       {
         import: "#lib/shared/filesystem.ts",
         names: ["ensureDirectory", "writeFile"],
-        owners: [
-          "src/lib/setup",
-          "src/lib/project/custom-rules/index.ts",
-          "src/lib/integrations/effect-sdk.ts",
-          "src/lib/hardening/trial.ts",
-          "src/lib/hardening/oxlint.ts",
-          "src/lib/integrations/oxlint/probe.ts",
-          "src/lib/shared/__tests__/filesystem.test.ts",
-        ],
+        owners: [...fileWriters, "src/lib/shared/__tests__/filesystem.test.ts"],
       },
       // A command that reads the workspace outside an assessment reads it one time for each phase,
       // and passes the `Workspace` down. Harden reads again after the session, because the agent
@@ -258,22 +317,7 @@ export default defineConfig({
         root: "presets/lint/plugins",
       },
     ],
-    // Commands read the working directory with `yield* Cwd`, and tests provide it. `Cwd` takes it
-    // from its named `cwd` import, which `adamantite/import-owners` allows only there.
-    "eslint/no-restricted-properties": [
-      "error",
-      {
-        message: "Read the working directory with `yield* Cwd` from `#lib/shared/cwd.ts`.",
-        object: "process",
-        property: "cwd",
-      },
-      {
-        message:
-          "Provide `Cwd` from `#lib/shared/cwd.ts` instead of changing the working directory.",
-        object: "process",
-        property: "chdir",
-      },
-    ],
+    "eslint/no-restricted-properties": ["error", ...workingDirectoryProperties],
     // A `?raw` import gives the source text of a module, not the module, so a test can import both.
     "import/no-duplicates": ["error", { considerQueryString: true }],
     // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.

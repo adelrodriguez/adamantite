@@ -92,11 +92,14 @@ The folders inside the layers belong to the layer that holds them:
   The other commands go through `lib/setup`, the assessment, and Toolchain.
 - Only `src/commands/setup.ts`, `src/commands/update.ts`, and `src/terminal/setup.ts` import
   `#lib/setup`.
-- Only `lib/setup` imports the file writers of `src/lib/shared/filesystem.ts`, besides the writers
-  of files outside the managed files: `rule add` writes a custom rule stub, the VS Code
-  integration's `prepare` writes the Effect SDK copy in `node_modules`, a trial writes in a
-  temporary copy of the project, and the Oxlint probe and the rule list of `harden` write their
-  Oxlint configs to a temporary folder.
+- Only the file writers in `fileWriters` of `oxlint.config.ts` change the disk. `lib/setup` writes
+  the managed files and the lockfile. The other writers write outside the managed files:
+  `rule add` writes a custom rule stub, the VS Code integration's `prepare` writes the Effect SDK
+  copy in `node_modules`, a trial writes in a temporary copy of the project, and the Oxlint probe
+  and the rule list of `harden` write their Oxlint configs to a temporary folder. Only these
+  writers import `ensureDirectory` and `writeFile` from `src/lib/shared/filesystem.ts`, and
+  `eslint/no-restricted-properties` rejects a call to a `FileSystem` method that writes, such as
+  `writeFileString` or `remove`, in any other non-test file of `src`.
 - Only `src/commands` and `src/terminal` import `effect/cli/Prompt`, so lib code never asks.
 - Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` import `readWorkspace`, and only
   `project.ts` and `hardening/index.ts` import `discoverCustomRules`.
@@ -164,7 +167,8 @@ lockfile, `update` runs no setup and offers the `lockfile-missing` finding. Both
 what it did through `src/terminal/setup.ts`, and offers the repair of the findings that remain
 through `Resolution.offer`. Both exit 1 while findings remain.
 
-`Setup.apply` is the only code that writes target-project files. It takes the integrations that
+`Setup.apply` is the only code that writes the managed files and the lockfile. The other file
+writers that `oxlint.config.ts` names write outside them. `Setup.apply` takes the integrations that
 the selection includes, and does these steps in order:
 
 1. Install `adamantite`, when the project does not depend on it, and the packages of every selected

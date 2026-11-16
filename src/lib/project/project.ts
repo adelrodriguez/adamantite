@@ -1,14 +1,14 @@
-import type * as Option from "effect/Option"
 import type * as Result from "effect/Result"
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { LintConfig } from "#lib/project/lint-config.ts"
 import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
 import {
   type CustomRuleDiscovery,
   discoverCustomRules,
 } from "#lib/project/custom-rules/discover.ts"
-import { type LintConfig, readLintConfig } from "#lib/project/lint-config.ts"
 import { type Lockfile, readLockfile } from "#lib/project/lockfile.ts"
 import { readWorkspace, type Workspace } from "#lib/project/monorepo.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
@@ -44,17 +44,17 @@ export interface Project {
 export const readProject = Effect.fn("readProject")(function* (cwd: string) {
   const path = yield* Path.Path
 
-  const [packageJson, workspace, lintConfig, lockfile] = yield* Effect.all(
-    [
-      readPackageJson(cwd),
-      readWorkspace(cwd),
-      readLintConfig(cwd, path.join(cwd, LINT_CONFIG_FILE)),
-      readLockfile(cwd),
-    ],
+  const [packageJson, workspace, lockfile] = yield* Effect.all(
+    [readPackageJson(cwd), readWorkspace(cwd), readLockfile(cwd)],
     { concurrency: "unbounded" }
   )
 
   const customRules = yield* discoverCustomRules(cwd, [cwd, ...workspace.packageDirectories])
+
+  // Discovery loads the config that lints the root. `oxlint.config.ts` comes first in its config
+  // files, so that load is the root `oxlint.config.ts` when the file exists. Each load starts a
+  // Node.js process, so the snapshot takes the read from discovery.
+  const lintConfig = Option.fromUndefinedOr(customRules.reads.get(path.join(cwd, LINT_CONFIG_FILE)))
 
   return { customRules, cwd, lintConfig, lockfile, packageJson, workspace } satisfies Project
 })

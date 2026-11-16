@@ -104,6 +104,12 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     loadedConfigs: loaded.flatMap(({ read }) =>
       read !== undefined && Result.isSuccess(read) ? [read.success] : []
     ),
+    /**
+     * The read of each config, by file.
+     */
+    reads: new Map(
+      loaded.flatMap(({ config, read }) => (read === undefined ? [] : [[config, read] as const]))
+    ),
     unloadedConfigs: loaded.flatMap(({ config, read }) =>
       read !== undefined && Result.isFailure(read)
         ? [{ file: config, reason: read.failure.reason }]

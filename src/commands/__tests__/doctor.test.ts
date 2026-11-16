@@ -1,9 +1,11 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
+import * as Order from "effect/Order"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import { TestClock } from "effect/testing"
@@ -239,6 +241,23 @@ describe("doctor", () => {
           "## Verify",
           "## Check the repair",
         ],
+      ])
+    })
+  )
+
+  it.effect("load the root Oxlint config once", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ...HEALTHY_FILES, "oxlint.config.ts": "export default {}\n" },
+      })
+
+      const configLoads: string[] = []
+
+      yield* runCommand(doctorCommand, [], { configLoads, files })
+
+      expect(Array.sort(configLoads, Order.String)).toStrictEqual([
+        `${files.root}/knip.config.ts`,
+        `${files.root}/oxlint.config.ts`,
       ])
     })
   )

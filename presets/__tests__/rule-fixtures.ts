@@ -243,7 +243,14 @@ export function removeFixtureProject(project: string): void {
 export function lintFixtureProject(project: string): FixtureLint {
   const result = spawnSync(
     process.execPath,
-    [join(REPO_ROOT, "src/oxlint.ts"), "-c", "oxlint.config.ts", "-f", "json", FIXTURES_DIRECTORY],
+    [
+      join(REPO_ROOT, "src/oxlint/index.ts"),
+      "-c",
+      "oxlint.config.ts",
+      "-f",
+      "json",
+      FIXTURES_DIRECTORY,
+    ],
     { cwd: project, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
   )
 

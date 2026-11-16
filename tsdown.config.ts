@@ -11,7 +11,13 @@ export default defineConfig([
       onlyImport: Object.keys(packageJson.dependencies),
     },
     dts: false,
-    entry: ["src/index.ts", "src/oxlint.ts", "src/probe.ts"],
+    // The Oxlint entry and the probe plugin run in Oxlint's process, so they live in `src/oxlint`.
+    // Each one still builds beside the CLI bundle, where `OxlintProbe` and the entry path look.
+    entry: {
+      index: "src/index.ts",
+      oxlint: "src/oxlint/index.ts",
+      probe: "src/oxlint/probe.ts",
+    },
     fixedExtension: false,
     minify: true,
     plugins: [Macros.rolldown()],

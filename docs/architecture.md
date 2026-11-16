@@ -24,11 +24,12 @@ services so command behavior can be tested without changing a real project.
 
 Tsdown bundles the CLI, the Oxlint entry, the probe plugin, and the presets into `dist`. Unplugin
 macros expands compile-time package metadata and terminal-title values during builds and Vitest
-source transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint.ts` builds to
-`dist/oxlint.js`, beside the CLI bundle, and runs Oxlint with the project's Oxlint runtime. The
-entry imports no macro module, so this repository runs it from source with
-`node src/oxlint.ts`. `src/probe.ts` builds to `dist/probe.js`, the Oxlint plugin that
-"Reading configs, comments, and syntax trees" describes. Repository tests run with Vitest
+source transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint` holds the
+two entries that run in Oxlint's process, and each builds beside the CLI bundle.
+`src/oxlint/index.ts` builds to `dist/oxlint.js` and runs Oxlint with the project's Oxlint
+runtime. The entry imports no macro module, so this repository runs it from source with
+`node src/oxlint/index.ts`. `src/oxlint/probe.ts` builds to `dist/probe.js`, the Oxlint plugin
+that "Reading configs, comments, and syntax trees" describes. Repository tests run with Vitest
 under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Layers
@@ -303,7 +304,7 @@ tests evaluate the in-memory configs in process with `src/__tests__/config-loade
 process tests run the real loader.
 
 The disable comments of a file and its syntax tree come from Oxlint itself, because only the parser
-knows them. `src/probe.ts`, built as `dist/probe.js`, is the probe plugin: a small JS plugin whose
+knows them. `src/oxlint/probe.ts`, built as `dist/probe.js`, is the probe plugin: a small JS plugin whose
 rules report the comments or the tree of each source that Oxlint parses, as JSON.
 `integrations/oxlint/probe.ts` runs Oxlint with a config that loads only that plugin, and decodes
 the reports. `harden` counts the suppressions from them, and `rule ast` prints the tree.
@@ -465,7 +466,7 @@ the Effect plugin replaces native parts, so no two overrides replace one part. A
 replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
 launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
-runs stock Oxlint. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
+runs stock Oxlint. Only the entry `src/oxlint/index.ts` sets the variables and loads the binding and the
 CLI. It clears the temporary binding variable before JavaScript plugins load.
 
 ## Type resets
@@ -523,7 +524,7 @@ Oxlint run. The fixtures stay below `src/`: below `presets/`, the published `pre
 would include them, and the Oxlint type check of `presets/analyze.ts` reports each file of that
 project, also a file that `ignorePatterns` ignores. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one
 preset hold fixtures for several plugins. The harness in `presets/__tests__/rule-fixtures.ts`
-starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the effect preset loads the
+starts the Oxlint entry `src/oxlint/index.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.
 
 A valid fixture is code that a target project can keep. `presets/__tests__/stacks.ts` lists the

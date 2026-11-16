@@ -78,7 +78,7 @@ export default defineConfig({
       // Terminal interaction belongs to `commands` and the entries. Lib code returns data for
       // commands to render. Tests share the helpers in `src/__tests__`, so this map skips them.
       {
-        entries: ["cli.ts", "index.ts", "oxlint.ts", "probe.ts"],
+        entries: ["cli.ts", "index.ts", "oxlint/**"],
         ignore: ["**/__tests__/**"],
         layers: {
           lib: {

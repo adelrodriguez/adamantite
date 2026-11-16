@@ -12,13 +12,13 @@ import { writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 /**
- * The file name of the probe plugin, `src/probe.ts`, which the build writes beside the CLI bundle,
- * as `dist/probe.js`. `scripts/test-build.ts` checks that the build writes it.
+ * The file name of the probe plugin, `src/oxlint/probe.ts`, which the build writes beside the CLI
+ * bundle, as `dist/probe.js`. `scripts/test-build.ts` checks that the build writes it.
  */
 export const PROBE_FILE = "probe.js"
 
 /**
- * The file of the probe plugin. A run from source, as in the tests, names `src/probe.ts`.
+ * The file of the probe plugin. A run from source, as in the tests, names `src/oxlint/probe.ts`.
  */
 export const OxlintProbe = Context.Reference<string>("adamantite/OxlintProbe", {
   defaultValue: () => fileURLToPath(new URL(PROBE_FILE, import.meta.url)),

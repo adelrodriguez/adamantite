@@ -39,8 +39,8 @@ export function getOxlintCommand(project: string) {
  * `named`. An editor names no project and starts the entry from the project's `node_modules`, so
  * the project is the folder above the first `node_modules` folder in the entry path. The first
  * `node_modules` also covers a package manager store inside the project, such as
- * `node_modules/.pnpm/`. The Adamantite repository starts the entry as `src/oxlint.ts`, outside
- * `node_modules`, so there the project is `cwd`.
+ * `node_modules/.pnpm/`. The Adamantite repository starts the entry as `src/oxlint/index.ts`,
+ * outside `node_modules`, so there the project is `cwd`.
  */
 export function getProjectDirectory(entry: string, cwd: string, named?: string): string {
   if (named !== undefined && named !== "") {

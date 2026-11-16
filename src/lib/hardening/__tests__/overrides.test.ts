@@ -36,7 +36,7 @@ const TEST_LAYER = Layer.mergeAll(
 
     return {
       ...command,
-      args: [join(REPO_ROOT, "src/oxlint.ts")],
+      args: [join(REPO_ROOT, "src/oxlint/index.ts")],
       env: { ...command.env, OXLINT_TSGOLINT_PATH: MISSING_BACKEND },
     }
   })

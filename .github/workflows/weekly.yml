@@ -1,9 +1,14 @@
-name: latest
+name: weekly
 
-# Test the presets with the newest versions of Oxlint, the managed plugins, the type-aware backend,
-# and the libraries that the fixtures import. Dependabot does not update pnpm 12 dependencies, so
-# without this run the presets meet a new release only when someone updates the dependencies.
-# `scripts/test-latest.ts` updates the packages in a temporary worktree. The run makes no commit.
+# The weekly runs that no pull request triggers. Neither run makes a commit.
+#
+# `latest` tests the presets with the newest versions of Oxlint, the managed plugins, the type-aware
+# backend, and the libraries that the fixtures import. Dependabot does not update pnpm 12
+# dependencies, so without this run the presets meet a new release only when someone updates the
+# dependencies. `scripts/test-latest.ts` updates the packages in a temporary worktree.
+#
+# `bench` times `adamantite check` and `adamantite fix` in a target project of each stack, with the
+# locked versions. See `docs/benchmarks.md`. It sets no performance gate.
 
 on:
   schedule:
@@ -12,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       overrides:
-        description: "Packages to test at a chosen version instead of the newest, such as `@tanstack/react-query@4.36.1`, separated by spaces"
+        description: "Packages for the latest job to test at a chosen version instead of the newest, such as `@tanstack/react-query@4.36.1`, separated by spaces"
         required: false
         default: ""
 
@@ -79,3 +84,46 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/test-latest.ts publish --out "${RUNNER_TEMP}/latest" --repo "${GITHUB_REPOSITORY}"
+
+  bench:
+    name: bench
+    runs-on: ubuntu-latest
+    # The bench runs each command 21 times in each stack.
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+          cache: "pnpm"
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            presets/__tests__/fixture-packages/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Time the toolchain in each stack
+        run: pnpm run bench
+
+      # The report lists the invalid benchmarks too, so it uploads when the bench fails.
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-report
+          path: bench-results
+          if-no-files-found: error
+          # A quarter of weekly reports, to compare the timings of one runner over time.
+          retention-days: 90
+
+      - name: Publish the report in the run summary
+        if: always() && hashFiles('bench-results/report.md') != ''
+        run: cat bench-results/report.md >> "${GITHUB_STEP_SUMMARY}"

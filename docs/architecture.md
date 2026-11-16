@@ -13,8 +13,8 @@ invoke target-project operations.
 A command runs in the target project, the folder that `yield* Cwd` gives. `Cwd` in
 `src/lib/shared/cwd.ts` is a `Context.Reference` that reads the working directory of the process,
 and a test provides the folder instead of changing the process. Lib code takes the folder as a
-`cwd` parameter. `eslint/no-restricted-properties` and `adamantite/import-owners` reject every
-other read of the working directory.
+`cwd` parameter. `eslint/no-restricted-properties` rejects every other `process.cwd()` and
+`process.chdir()` call.
 
 `@effect/platform-node` supplies the production filesystem, path, process, and terminal
 services. Other external behavior, such as prompts and child commands, is also behind
@@ -83,22 +83,12 @@ The folders inside the layers belong to the layer that holds them:
 | `src/lib/integrations/zed`                        | The `zed` integration: `.zed/settings.json`.                                                                                                                                                         |
 | `src/lib/project/custom-rules`                    | The rules folders, the `custom()` calls that the loaded configs reach, and the rule stubs of `rule add`.                                                                                             |
 
-`adamantite/import-owners` in `oxlint.config.ts` narrows these imports further:
+`adamantite/import-owners` in `oxlint.config.ts` adds two boundaries that the layers cannot state:
 
 - Only `src` and `scripts` import a module of `src`, so no preset and no preset test imports the
   CLI code.
-- Only `src/lib` and the tests import `#lib/integrations`. The terminal imports its types, `init`
-  imports the preset catalog, and the Oxlint entry and the build check load the Oxlint runtime.
-  The other commands go through `lib/setup`, the assessment, and Toolchain.
-- Only `src/commands/setup.ts`, `src/terminal/setup.ts`, and the tests import `#lib/setup`.
-- Only `lib/setup` imports the file writers of `src/lib/shared/filesystem.ts`, besides the writers
-  of files outside the managed files: `rule add` writes a custom rule stub, the VS Code
-  integration's `prepare` writes the Effect SDK copy in `node_modules`, a trial writes in a
-  temporary copy of the project, and the Oxlint probe and the rule list of `harden` write their
-  Oxlint configs to a temporary folder.
-- Only `src/commands` and `src/terminal` import `effect/cli/Prompt`, so lib code never asks.
-- Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` import `readWorkspace`, and only
-  `project.ts` and `hardening/index.ts` import `discoverCustomRules`.
+- Only `src/commands`, `src/terminal`, and the tests import `effect/cli/Prompt`, so lib code never
+  asks.
 
 ## Integrations
 
@@ -500,12 +490,6 @@ imported functions, such as `useState` and `React.useState`.
 `plugins/shared/` holds the helpers that more than one plugin uses: `options.ts` reads rule
 options, and `ast.ts` holds the AST helpers, such as the key reader. A helper moves there only
 when a second plugin needs it.
-
-The layer map for `presets/lint/plugins` in the repository's `oxlint.config.ts` lets each plugin
-import `plugins/shared`, and rejects an import of another plugin's code. Each plugin has its own
-map below it: `index.ts` is the entry, and `rules` imports `shared`. In `antislop`, `rules` also
-imports `stylistic`. The tests in each `__tests__` folder are entries of their map, so a test can
-load a plugin through its entry, and no rule can import a test.
 
 A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
 such as `firstPartyPlugin("antislop")`. The function builds a file URL from its own location.

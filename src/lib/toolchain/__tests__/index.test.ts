@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { join, relative, sep } from "node:path"
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
@@ -8,10 +8,10 @@ import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
-import type { LintPreset } from "#lib/project/selection.ts"
 import * as Project from "#lib/project/index.ts"
 import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
+import { IDIOM_TREES, IDIOMS_DIR, listFiles, listTreeStacks } from "#presets/__tests__/idioms.ts"
 import {
   createFixtureProject,
   type FixtureLint,
@@ -19,17 +19,9 @@ import {
   lintFixtureProject,
   removeFixtureProject,
 } from "#presets/__tests__/rule-fixtures.ts"
-import {
-  listStackPresets,
-  listStacks,
-  type Stack,
-  STACK_OPTIONS,
-  STACKS,
-} from "#presets/__tests__/stacks.ts"
+import { listStackPresets, type Stack, STACK_OPTIONS, STACKS } from "#presets/__tests__/stacks.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
-const IDIOMS_DIR = join(REPO_ROOT, "src/__tests__/presets/fixtures/idioms")
-const ONE_FIX_PASS = "https://github.com/oxc-project/oxc/issues/16118"
 
 // Several fixes that the idioms show are suggestions, such as `eslint/no-useless-constructor` and
 // `effecttsgo/map-const-to-as`, so the test fixes as `adamantite fix --suggested` does.
@@ -68,119 +60,8 @@ const SOURCE_RUNNER = Layer.effect(CommandRunner)(
   })
 ).pipe(Layer.provide(CommandRunner.layer), Layer.provide(NodeServices.layer))
 
-interface SecondPass {
-  /**
-   * Path of the idiom relative to `fixable/`.
-   */
-  readonly file: string
-  /**
-   * The upstream issue that makes the second fix necessary.
-   */
-  readonly issue: string
-}
-
-interface IdiomTree {
-  /**
-   * The unstable Effect modules that the idioms use, which a target project must allow. See
-   * "Effect" in the README.
-   */
-  readonly allowedUnstableApis?: readonly string[]
-  /**
-   * The preset that the idioms need. Their files are in `fixtures/idioms/<preset>`. Core idioms run
-   * with every stack.
-   */
-  readonly preset: "core" | LintPreset
-  /**
-   * Each fixable idiom that one fix does not end, because a fix causes a new report. The test runs
-   * a second fix for these idioms only. It fails when one fix ends a listed idiom, so the
-   * correction upstream removes its entry.
-   */
-  readonly secondPasses: readonly SecondPass[]
-}
-
-const TREES: readonly IdiomTree[] = [
-  {
-    preset: "core",
-    // `no-else-return` moves a statement, and the blank line that the spacing rule then needs
-    // comes in the next pass.
-    secondPasses: [{ file: "moved.ts", issue: ONE_FIX_PASS }],
-  },
-  {
-    allowedUnstableApis: [
-      "@effect/platform-node/NodeRuntime",
-      "@effect/platform-node/NodeServices",
-      "@effect/vitest",
-      "effect/cli",
-      "effect/FileSystem",
-      "effect/Path",
-    ],
-    preset: "effect",
-    secondPasses: [],
-  },
-  {
-    // `react/jsx-fragments` writes `<>`, and `eslint/no-unused-vars` then reports the import of
-    // `Fragment`, which the next pass removes.
-    preset: "react",
-    secondPasses: [{ file: "fragment.tsx", issue: ONE_FIX_PASS }],
-  },
-  {
-    preset: "react-strict",
-    secondPasses: [],
-  },
-  {
-    preset: "nextjs",
-    secondPasses: [],
-  },
-  {
-    preset: "tanstack",
-    secondPasses: [],
-  },
-  {
-    preset: "tailwind",
-    secondPasses: [],
-  },
-  {
-    preset: "vitest",
-    secondPasses: [],
-  },
-  {
-    // `jest/prefer-strict-equal` writes `toStrictEqual(3)`, and `jest/prefer-to-be` then writes
-    // `toBe(3)` in the next pass.
-    preset: "jest",
-    secondPasses: [{ file: "equal.test.ts", issue: ONE_FIX_PASS }],
-  },
-  {
-    // Oxlint lints the script of a `.vue` file, and Oxfmt formats the whole file. No rule reads a
-    // template, and the type check skips `.vue` scripts, so these idioms prove neither.
-    preset: "vue",
-    secondPasses: [],
-  },
-]
-
-/**
- * The files below the folder, relative to it, with forward slashes, in sorted order. A tree without
- * the folder has no files in it.
- */
-function listFiles(folder: string): string[] {
-  if (!existsSync(folder)) {
-    return []
-  }
-
-  const files = readdirSync(folder, { recursive: true, withFileTypes: true }).flatMap((entry) =>
-    entry.isFile()
-      ? [relative(folder, join(entry.parentPath, entry.name)).split(sep).join("/")]
-      : []
-  )
-
-  return EffectArray.sort(files, Order.String)
-}
-
 function readFiles(folder: string, files: readonly string[]): Record<string, string> {
   return Object.fromEntries(files.map((file) => [file, readFileSync(join(folder, file), "utf8")]))
-}
-
-function listTreeStacks(preset: IdiomTree["preset"]): Stack[] {
-  return preset === "core" ? EffectRecord.keys(STACKS) : listStacks(preset)
 }
 
 /**
@@ -198,7 +79,7 @@ function listTreeFolders(): string[] {
  * The number of files in the folder of each tree that runs with the stack.
  */
 function countStackFiles(stack: Stack, folder: "clean" | "fixable"): number {
-  return TREES.filter((tree) => listTreeStacks(tree.preset).includes(stack)).flatMap((tree) =>
+  return IDIOM_TREES.filter((tree) => listTreeStacks(tree.preset).includes(stack)).flatMap((tree) =>
     listFiles(join(IDIOMS_DIR, tree.preset, folder))
   ).length
 }
@@ -207,7 +88,7 @@ describe("idiom trees", () => {
   it("have one tree for each folder of idioms", () => {
     expect(listTreeFolders()).toStrictEqual(
       EffectArray.sort(
-        TREES.map((tree) => tree.preset),
+        IDIOM_TREES.map((tree) => tree.preset),
         Order.String
       )
     )
@@ -222,7 +103,7 @@ describe("idiom trees", () => {
   )
 })
 
-describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPasses }) => {
+describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPasses }) => {
   const idiomsDir = join(IDIOMS_DIR, preset)
   const clean = listFiles(join(idiomsDir, "clean"))
   const fixable = listFiles(join(idiomsDir, "fixable"))

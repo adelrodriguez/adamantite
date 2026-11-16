@@ -1341,7 +1341,7 @@ describe("init", () => {
 
     // Oxlint accepts its `options` only in the root config, so an Oxlint config that init wrote in
     // a nested folder would stop the lint of the parent project.
-    it.effect.each(["oxlint.config.ts", ".oxlintrc.json"])(
+    it.effect.each(["oxlint.config.ts", ".oxlintrc.json", ".oxlintrc.jsonc"])(
       "fail before it changes a file when a parent folder has `%s`",
       (config) =>
         Effect.gen(function* () {

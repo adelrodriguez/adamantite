@@ -227,26 +227,28 @@ describe("Oxlint setup", () => {
     })
   )
 
-  // Oxlint loads no config when it finds both, so Doctor hands the migration to an agent.
-  it.effect("write no config beside a conflicting .oxlintrc.json, and report it", () =>
-    Effect.gen(function* () {
-      const conflicting = '{ "rules": { "semi": "error" } }\n'
-      const files = makeProject({ ".oxlintrc.json": conflicting })
+  // Oxlint fails when it finds both in one folder, so Doctor hands the migration to an agent.
+  it.effect.each([".oxlintrc.json", ".oxlintrc.jsonc"])(
+    "write no config beside a conflicting %s, and report it",
+    (file) =>
+      Effect.gen(function* () {
+        const conflicting = '{ "rules": { "semi": "error" } }\n'
+        const files = makeProject({ [file]: conflicting })
 
-      yield* runLifecycle("init", files, INIT_ARGS)
-      const doctor = yield* runLifecycle("doctor", files)
+        yield* runLifecycle("init", files, INIT_ARGS)
+        const doctor = yield* runLifecycle("doctor", files)
 
-      expect({
-        config: files.exists(CONFIG),
-        conflicting: files.read(".oxlintrc.json"),
-      }).toStrictEqual({
-        config: false,
-        conflicting,
+        expect({
+          config: files.exists(CONFIG),
+          conflicting: files.read(file),
+        }).toStrictEqual({
+          config: false,
+          conflicting,
+        })
+        expect(doctor.output).toContain(
+          `The project configures oxlint in \`${file}\`, so Adamantite does not write \`oxlint.config.ts\`.`
+        )
       })
-      expect(doctor.output).toContain(
-        "The project configures oxlint in `.oxlintrc.json`, so Adamantite does not write `oxlint.config.ts`."
-      )
-    })
   )
 })
 

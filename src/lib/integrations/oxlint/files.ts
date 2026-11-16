@@ -68,11 +68,12 @@ export const runOxlint = Effect.fn("runOxlint")(
   function* (cwd: string, args: readonly string[], project: string = cwd) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const command = (yield* OxlintCommand)(project)
+    const nodeOptions = yield* quietNodeOptions
 
     const handle = yield* spawner.spawn(
       ChildProcess.make(command.command, [...command.args, ...args], {
         cwd,
-        env: { ...command.env, NODE_OPTIONS: quietNodeOptions() },
+        env: { ...command.env, NODE_OPTIONS: nodeOptions },
         extendEnv: true,
         stdin: "ignore",
       })

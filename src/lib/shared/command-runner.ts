@@ -1,6 +1,6 @@
 import type * as PlatformError from "effect/PlatformError"
-import process from "node:process"
 import { styleText } from "node:util"
+import * as Config from "effect/Config"
 import * as Console from "effect/Console"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -67,12 +67,20 @@ const printHeading = (title: string, command: string) =>
  * Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
  * `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
  */
-export const quietNodeOptions = () =>
-  [process.env["NODE_OPTIONS"], "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"]
-    .filter(Boolean)
-    .join(" ")
+export const quietNodeOptions = Config.String("NODE_OPTIONS").pipe(
+  Config.withDefault(""),
+  Config.map((options) =>
+    [options, "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"].filter(Boolean).join(" ")
+  ),
+  // Any string decodes, and the default covers a missing variable, so only a provider that cannot
+  // read its source fails. That failure is a defect.
+  Effect.orDie
+)
 
-const exitCode = Effect.fn("CommandRunner.exitCode")(function* (options: CommandRunOptions) {
+const exitCode = Effect.fn("CommandRunner.exitCode")(function* (
+  options: CommandRunOptions,
+  nodeOptions: string
+) {
   const { command } = options
 
   return yield* Effect.scoped(
@@ -80,7 +88,7 @@ const exitCode = Effect.fn("CommandRunner.exitCode")(function* (options: Command
       const handle = yield* ChildProcess.make(command, options.args, {
         cwd: options.cwd,
         detached: options.stdin === "inherit" ? false : undefined,
-        env: { ...options.env, NODE_OPTIONS: quietNodeOptions() },
+        env: { ...options.env, NODE_OPTIONS: nodeOptions },
         extendEnv: true,
         stderr: options.stderr ?? "inherit",
         stdin: options.stdin ?? "ignore",
@@ -132,9 +140,10 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
   static readonly layer = Layer.effect(this)(
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const nodeOptions = yield* quietNodeOptions
 
       return CommandRunner.make((options) =>
-        exitCode(options).pipe(
+        exitCode(options, nodeOptions).pipe(
           Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
         )
       )

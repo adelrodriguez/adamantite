@@ -3,6 +3,7 @@ import process from "node:process"
 import { pathToFileURL } from "node:url"
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import * as NodePath from "@effect/platform-node/NodePath"
+import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
@@ -22,10 +23,10 @@ import { toToolNotSelected } from "#lib/project/selection.ts"
 // `adamantite check` start this file in place of `oxlint`.
 
 const entry = process.argv[1] ?? ""
-const named = process.env[PROJECT_VARIABLE]
 
 const result = await Effect.runPromise(
   Effect.gen(function* () {
+    const named = yield* Config.String(PROJECT_VARIABLE).pipe(Config.withDefault(""))
     const project = getProjectDirectory(entry, yield* Project.Directory, named)
 
     return yield* resolveOxlintRuntime(project).pipe(

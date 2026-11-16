@@ -13,7 +13,7 @@ import {
 import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import {
-  EffectBridgeMissing,
+  EffectOxlintBridgeMissing,
   EffectBuildMissing,
   EffectPlatformUnsupported,
   PackageNotInstalled,
@@ -123,7 +123,7 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
   const bridge = yield* (yield* ModuleResolver).resolve(project, `${NAME}/oxlint-bridge`)
 
   if (Option.isNone(bridge)) {
-    return yield* new EffectBridgeMissing({ effectVersion })
+    return yield* new EffectOxlintBridgeMissing({ effectVersion })
   }
 
   // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.

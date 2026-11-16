@@ -186,13 +186,13 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
     return []
   }).pipe(
     Effect.catchTags({
-      EffectBridgeMissing: (error) =>
+      EffectBuildMissing: (error) =>
         Effect.succeed(
           finding(error.message, [
             "Run `adamantite update` to align Oxlint, tsrs, and @effect/tsgo with supported builds.",
           ])
         ),
-      EffectBuildMissing: (error) =>
+      EffectOxlintBridgeMissing: (error) =>
         Effect.succeed(
           finding(error.message, [
             "Run `adamantite update` to align Oxlint, tsrs, and @effect/tsgo with supported builds.",

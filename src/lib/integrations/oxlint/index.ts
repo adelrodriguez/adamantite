@@ -1,6 +1,7 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
@@ -23,19 +24,44 @@ import { findExcludedPresets } from "#lib/integrations/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
+import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
+import { checkExists } from "#lib/shared/filesystem.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const CONFIG = {
-  conflicting: [".oxlintrc.json"],
+  conflicting: [".oxlintrc.json", ".oxlintrc.jsonc"],
   path: "oxlint.config.ts",
   tool: "oxlint",
-  whyConflicting: "Oxlint loads no config when it finds both",
+  whyConflicting: "Oxlint fails when it finds both in one folder",
 } as const satisfies ConfigFile
 
 export const PACKAGE = { name: "oxlint", version: getDependencyVersion("oxlint") }
+
+/**
+ * The Oxlint config of the nearest parent folder of `cwd`, relative to `cwd`, up to the filesystem
+ * root. Oxlint run in that folder loads a config in `cwd` as a nested config, and rejects the
+ * `options` that only a root config can set. A folder that holds `.git` does not stop it.
+ */
+export const findParentConfig = Effect.fn("findParentConfig")(function* (cwd: string) {
+  const path = yield* Path.Path
+  const parents: string[] = []
+
+  for (let folder = cwd; path.dirname(folder) !== folder; folder = path.dirname(folder)) {
+    parents.push(path.dirname(folder))
+  }
+
+  const config = yield* Effect.findFirst(
+    parents.flatMap((folder) =>
+      [...CONFIG_FILES, ...CONFIG.conflicting].map((name) => path.join(folder, name))
+    ),
+    (file) => checkExists(file)
+  )
+
+  return Option.map(config, (file) => path.relative(cwd, file))
+})
 
 /**
  * The selected lint presets besides core, in the order of `LINT_PRESETS`.

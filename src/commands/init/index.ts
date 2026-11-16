@@ -8,6 +8,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { validateInitOptions } from "#commands/init/options.ts"
 import { collectInteractiveInitOptions } from "#commands/init/prompts.ts"
 import { applySetup } from "#commands/setup.ts"
+import oxlint, { findParentConfig } from "#lib/integrations/oxlint/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
@@ -23,7 +24,12 @@ import {
   TYPESCRIPT_PRESET_NAMES,
 } from "#lib/project/selection.ts"
 import { Cwd } from "#lib/shared/cwd.ts"
-import { CommandFailed, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
+import {
+  CommandFailed,
+  InvalidInitOptions,
+  NoPackageManager,
+  ParentOxlintConfig,
+} from "#lib/shared/errors.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -201,6 +207,16 @@ export default Command.make("init", {
         onNone: () => asked,
         onSome: (lockfile) => addSelection(lockfile.selection, asked),
       })
+
+      // Oxlint would load the config that init writes as a nested config of a parent project, and
+      // reject its `options`, which stops the lint of that project.
+      if (oxlint.selected(selection)) {
+        const parent = yield* findParentConfig(cwd)
+
+        if (Option.isSome(parent)) {
+          return yield* new ParentOxlintConfig({ path: parent.value })
+        }
+      }
 
       // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {

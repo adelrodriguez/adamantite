@@ -326,6 +326,19 @@ export class UnsupportedLockfile extends Data.TaggedError("UnsupportedLockfile")
   }
 }
 
+/**
+ * A parent folder of the project has an Oxlint config, so Oxlint would load the config that `init`
+ * writes as a nested config, and reject its `options`. `path` is the parent config, relative to the
+ * project.
+ */
+export class ParentOxlintConfig extends Data.TaggedError("ParentOxlintConfig")<{
+  path: string
+}> {
+  override get message() {
+    return `Init made no changes, because \`${this.path}\` lints this folder, and Oxlint accepts \`options\` only in the root config. Run \`adamantite init\` at the root of that project, or extend the root config in this folder, as "Custom rules in a monorepo" in the Adamantite README shows.`
+  }
+}
+
 export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptions")<{
   reason: string
 }> {

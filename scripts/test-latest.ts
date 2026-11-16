@@ -1,7 +1,7 @@
 /**
  * Test the presets with the newest versions of Oxlint, the managed plugins, the type-aware backend,
- * and the libraries that the fixtures import. The weekly workflow `.github/workflows/latest.yml`
- * runs it.
+ * and the libraries that the fixtures import. The `latest` job of the weekly workflow
+ * `.github/workflows/weekly.yml` runs it.
  *
  * `run` makes a temporary git worktree of `HEAD`, so it changes no file of the checkout and makes
  * no commit. It runs `pnpm run test:presets` with the locked versions, updates the packages, runs
@@ -71,7 +71,7 @@ const FINGERPRINT_MARKER = "adamantite-latest-fingerprint"
 const ISSUE_LABELS = ["automated", "dependencies", "needs-triage"]
 
 // The time that `run` may take in all. The steps share it, so a step that hangs ends before the job
-// limit in `.github/workflows/latest.yml`, and the run still writes a report for `publish`.
+// limit in `.github/workflows/weekly.yml`, and the run still writes a report for `publish`.
 const RUN_BUDGET = 45 * 60 * 1000
 
 /**
@@ -817,7 +817,7 @@ function publishLatest(out: string, repo: string, dryRun: boolean): void {
       [
         marker,
         "",
-        `The weekly run of \`.github/workflows/latest.yml\` found a failure. The workflow comments here when the same failure repeats.`,
+        `The weekly run of \`.github/workflows/weekly.yml\` found a failure. The workflow comments here when the same failure repeats.`,
         "",
         markdown,
       ].join("\n")

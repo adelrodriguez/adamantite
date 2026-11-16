@@ -38,6 +38,7 @@ pnpm run test:watch    # Rerun tests when files change.
 pnpm run check         # Check formatting, lint rules, and TypeScript types with the built CLI.
 pnpm run fix           # Apply safe lint fixes and format files with the built CLI.
 pnpm run analyze       # Find unused files, exports, and dependencies.
+pnpm run bench         # Time check and fix in a target project of each stack.
 pnpm run bump:deps     # Select package dependency updates manually.
 ```
 
@@ -86,6 +87,9 @@ Each kind of test has one place:
   `src/__tests__/lifecycle.ts`.
 - A test of one `src` module goes in the `__tests__` folder beside it. The helpers that tests in
   several folders share go in `src/__tests__/`.
+- Tests of a script in `scripts/` go in `scripts/__tests__/<script>.test.ts`.
+- Benchmarks go in a `<name>.bench.ts` file beside the test of the module that they time, such as
+  `src/lib/toolchain/__tests__/index.bench.ts`.
 
 Name each test file after the module that it tests, as `<folder>/__tests__/<name>.test.ts` for
 `<folder>/<name>.ts`, or list it with a reason in `src/__tests__/test-names.test.ts`.
@@ -134,9 +138,9 @@ exports. Review all automatic fixes before you commit them.
 
 ### Test the presets with the newest versions
 
-Each Monday, the `latest` workflow runs `pnpm run test:presets` with the locked versions and
-then with the newest versions of Oxlint, the managed plugins, the type-aware backend, and the
-packages that the fixtures import. When the newest versions fail, the workflow opens an issue
+Each Monday, the `latest` job of the `weekly` workflow runs `pnpm run test:presets` with the
+locked versions and then with the newest versions of Oxlint, the managed plugins, the type-aware
+backend, and the packages that the fixtures import. When the newest versions fail, the workflow opens an issue
 with the `automated` label, or comments on the open issue that has the same failure. The script
 works in a temporary worktree of `HEAD`, so it changes no file of your checkout. To run it
 locally, name a folder for the report:
@@ -147,6 +151,20 @@ node scripts/test-latest.ts run --out /tmp/latest
 
 To test a chosen version instead of the newest, add `--override <package>@<version>`. A manual
 run of the workflow takes the same values in its `overrides` input.
+
+### Time the toolchain
+
+Run the benchmarks after a change that can slow `adamantite check` or `adamantite fix`, such as a
+change to the CLI startup, the Oxlint entry, or a preset:
+
+1. Close other programs that use the CPU.
+2. Run `pnpm run bench`.
+3. Read `bench-results/report.md`. It lists each invalid benchmark with its reason.
+4. Compare the medians with a run on `main` from the same machine.
+
+Each Monday, the `bench` job of the `weekly` workflow runs the same command and uploads the
+report. [docs/benchmarks.md](docs/benchmarks.md) describes what the bench measures and when a
+benchmark is valid.
 
 ## Changesets
 

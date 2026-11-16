@@ -1,8 +1,40 @@
 import type { Context, ESTree } from "@oxlint/plugins"
-import { staticKeyName } from "../../shared/ast.ts"
+import { staticKeyName, staticString } from "../../shared/ast.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs and imports only types from packages.
+
+/**
+ * The module that an import names, such as `../high/api.ts` in ``import(`../high/api.ts`)``.
+ */
+export interface ModuleSource {
+  /**
+   * The source expression, where a report points.
+   */
+  readonly node: ESTree.Node
+  /**
+   * The specifier that the source spells.
+   */
+  readonly specifier: string
+}
+
+/**
+ * Read the source of a static import or export, such as `"./api.ts"` in `export * from "./api.ts"`.
+ */
+export function readStaticSource(node: ESTree.StringLiteral): ModuleSource {
+  return { node, specifier: node.value }
+}
+
+/**
+ * Read the source of `import()` when the code spells it without computing it, as a string, a
+ * template with no expression, or either inside type assertions. Return undefined for a source that
+ * only running the code gives.
+ */
+export function readDynamicSource(node: ESTree.ImportExpression): ModuleSource | undefined {
+  const specifier = staticString(node.source)
+
+  return specifier === null ? undefined : { node: node.source, specifier }
+}
 
 /**
  * A call of a module export, such as `useState(0)` or `React.useState(0)`.

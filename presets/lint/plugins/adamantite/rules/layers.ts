@@ -2,7 +2,6 @@ import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync } from "node:fs"
 import { posix } from "node:path"
 import type { Replacement } from "../../shared/replacement.d.ts"
-import { isStringLiteral } from "../../shared/ast.ts"
 import {
   readBooleanOption,
   readObjectOption,
@@ -10,6 +9,7 @@ import {
   readStringOption,
 } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
+import { type ModuleSource, readDynamicSource, readStaticSource } from "../shared/imports.ts"
 import { resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
@@ -495,7 +495,7 @@ function formatCycle(cycle: readonly string[]) {
 
 function reportUnmapped(
   context: Context,
-  node: ESTree.Program | ESTree.StringLiteral,
+  node: ESTree.Node,
   location: UnmappedLocation,
   root: string,
   configPath: string
@@ -548,12 +548,7 @@ function reportFile(context: Context, node: ESTree.Program, file: ReportedFile) 
   }
 }
 
-function checkImport(
-  context: Context,
-  file: LintedFile,
-  source: ESTree.StringLiteral,
-  typeOnly: boolean
-) {
+function checkImport(context: Context, file: LintedFile, source: ModuleSource, typeOnly: boolean) {
   const { from, options } = file
   const root = file.root || "."
 
@@ -562,7 +557,7 @@ function checkImport(
   }
 
   // An import that does not resolve is outside the map. TypeScript reports it.
-  const target = file.modules.resolve(file.importer, source.value, options.conditions)
+  const target = file.modules.resolve(file.importer, source.specifier, options.conditions)
 
   const relative =
     target === undefined
@@ -586,14 +581,14 @@ function checkImport(
     context.report({
       data: { configPath: options.configPath, from: describeLayer(from), root, to: to.path },
       messageId: "entry",
-      node: source,
+      node: source.node,
     })
 
     return
   }
 
   if (to.kind !== "layer") {
-    reportUnmapped(context, source, to, root, options.configPath)
+    reportUnmapped(context, source.node, to, root, options.configPath)
 
     return
   }
@@ -618,7 +613,7 @@ function checkImport(
       to: describeLayer(to),
     },
     messageId: violation,
-    node: source,
+    node: source.node,
   })
 }
 
@@ -693,7 +688,7 @@ export function createLayersRule(modules: Modules): Rule {
         return {}
       }
 
-      function check(source: ESTree.StringLiteral, typeOnly: boolean) {
+      function check(source: ModuleSource, typeOnly: boolean) {
         for (const file of linted) {
           checkImport(context, file, source, typeOnly)
         }
@@ -701,19 +696,21 @@ export function createLayersRule(modules: Modules): Rule {
 
       return {
         ExportAllDeclaration(node) {
-          check(node.source, node.exportKind === "type")
+          check(readStaticSource(node.source), node.exportKind === "type")
         },
         ExportNamedDeclaration(node) {
           if (node.source !== null) {
-            check(node.source, isTypeOnlyExport(node))
+            check(readStaticSource(node.source), isTypeOnlyExport(node))
           }
         },
         ImportDeclaration(node) {
-          check(node.source, isTypeOnlyImport(node))
+          check(readStaticSource(node.source), isTypeOnlyImport(node))
         },
         ImportExpression(node) {
-          if (isStringLiteral(node.source)) {
-            check(node.source, false)
+          const source = readDynamicSource(node)
+
+          if (source !== undefined) {
+            check(source, false)
           }
         },
         Program(node) {
@@ -733,7 +730,7 @@ export function createLayersRule(modules: Modules): Rule {
           }
         },
         TSImportType(node) {
-          check(node.source, true)
+          check(readStaticSource(node.source), true)
         },
       }
     },

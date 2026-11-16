@@ -285,7 +285,7 @@ tester.run("import-owners", rule, {
     ...[
       'const name = "giget"\nconst giget = import(name)',
       'const giget = import("gi" + "get")',
-      'const name = "get"\nconst giget = import(`gi${name}`)',
+      `const name = "get"\nconst giget = import(\`gi\${name}\`)`,
       'const zod = import("zod", { with: { type: "giget" } })',
     ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
     {

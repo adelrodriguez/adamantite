@@ -1,9 +1,9 @@
 import type { ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync, readFileSync } from "node:fs"
 import { posix } from "node:path"
-import { isStringLiteral } from "../../shared/ast.ts"
 import { readStringArrayOption, readStringOption } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
+import { type ModuleSource, readDynamicSource, readStaticSource } from "../shared/imports.ts"
 import { resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
@@ -360,16 +360,16 @@ export function createImportOwnersRule(project: Project): Rule {
 
       const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
 
-      function findRestricted(source: ESTree.StringLiteral) {
+      function findRestricted(source: ModuleSource) {
         // A project module can match only an import that resolves to a file of the project.
-        const resolved = matchesFile ? project.resolve(importer, source.value) : undefined
+        const resolved = matchesFile ? project.resolve(importer, source.specifier) : undefined
         const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
 
         return restricted.filter((entry) => {
           const matches = MODULE_MATCHES[entry.kind]
 
           return (
-            (matches.text && isImportOf(entry.import, source.value))
+            (matches.text && isImportOf(entry.import, source.specifier))
             || (matches.file && file !== undefined && covers(entry, projectRoot, file))
           )
         })
@@ -379,10 +379,10 @@ export function createImportOwnersRule(project: Project): Rule {
        * Check an import that reaches every export of the module, such as `import()`. A plain
        * `export * from` reaches every export except the default export.
        */
-      function checkWhole(source: ESTree.StringLiteral, withDefault = true) {
+      function checkWhole(source: ModuleSource, withDefault = true) {
         for (const entry of findRestricted(source)) {
           if (entry.names === undefined) {
-            reportModule(entry, source)
+            reportModule(entry, source.node)
             continue
           }
 
@@ -391,7 +391,7 @@ export function createImportOwnersRule(project: Project): Rule {
           )
 
           if (reached.size > 0) {
-            reportNamespace(entry, source, reached)
+            reportNamespace(entry, source.node, reached)
           }
         }
       }
@@ -402,7 +402,7 @@ export function createImportOwnersRule(project: Project): Rule {
        */
       function checkImportType(node: ESTree.TSImportType) {
         if (node.qualifier === null) {
-          checkWhole(node.source)
+          checkWhole(readStaticSource(node.source))
 
           return
         }
@@ -413,7 +413,7 @@ export function createImportOwnersRule(project: Project): Rule {
           first = first.left
         }
 
-        for (const entry of findRestricted(node.source)) {
+        for (const entry of findRestricted(readStaticSource(node.source))) {
           if (entry.names === undefined) {
             reportModule(entry, node.source)
           } else if (entry.names.has(first.name)) {
@@ -423,7 +423,7 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       function checkImport(node: ESTree.ImportDeclaration) {
-        for (const entry of findRestricted(node.source)) {
+        for (const entry of findRestricted(readStaticSource(node.source))) {
           const { names } = entry
 
           if (names === undefined) {
@@ -446,7 +446,7 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       function checkExport(node: ESTree.ExportNamedDeclaration, source: ESTree.StringLiteral) {
-        for (const entry of findRestricted(source)) {
+        for (const entry of findRestricted(readStaticSource(source))) {
           const { names } = entry
 
           if (names === undefined) {
@@ -464,7 +464,7 @@ export function createImportOwnersRule(project: Project): Rule {
 
       return {
         ExportAllDeclaration(node) {
-          checkWhole(node.source, node.exported !== null)
+          checkWhole(readStaticSource(node.source), node.exported !== null)
         },
         ExportNamedDeclaration(node) {
           if (node.source !== null) {
@@ -473,8 +473,10 @@ export function createImportOwnersRule(project: Project): Rule {
         },
         ImportDeclaration: checkImport,
         ImportExpression(node) {
-          if (isStringLiteral(node.source)) {
-            checkWhole(node.source)
+          const source = readDynamicSource(node)
+
+          if (source !== undefined) {
+            checkWhole(source)
           }
         },
         TSImportType: checkImportType,

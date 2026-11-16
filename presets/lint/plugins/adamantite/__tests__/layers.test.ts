@@ -393,7 +393,7 @@ tester.run("layers", createLayersRule(MODULES), {
     ...[
       'const path = "#lib/integrations/base.ts"\nconst base = import(path)',
       'const base = import("#lib/integrations/" + "base.ts")',
-      'const name = "base"\nconst base = import(`#lib/integrations/${name}.ts`)',
+      `const name = "base"\nconst base = import(\`#lib/integrations/\${name}.ts\`)`,
       'const base = import("#lib/shared/errors.ts", { with: { type: "#lib/integrations/base.ts" } })',
     ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
     {

@@ -18,9 +18,9 @@ import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import oxlint, { PACKAGE } from "#lib/integrations/oxlint/index.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
+import { readProject } from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
-import { readProject } from "#lib/project/project.ts"
 
 const REPO = join(import.meta.dirname, "../../../../..")
 

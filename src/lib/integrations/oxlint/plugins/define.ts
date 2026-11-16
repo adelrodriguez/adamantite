@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import { listAppliedLintPresets } from "#lib/integrations/oxlint/config.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"

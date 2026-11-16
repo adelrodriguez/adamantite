@@ -4,7 +4,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,

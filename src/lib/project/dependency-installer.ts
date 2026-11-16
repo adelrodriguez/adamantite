@@ -7,8 +7,8 @@ import * as Option from "effect/Option"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stream from "effect/Stream"
+import { checkIsMonorepo } from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
-import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   type DetectedPackageManager,
   detectPackageManager,

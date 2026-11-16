@@ -16,8 +16,9 @@ import {
   lintPresets,
 } from "#lib/integrations/oxlint/presets.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { checkIsMonorepo } from "#lib/project/index.ts"
+import { readProject } from "#lib/project/index.ts"
 import { readLockfile } from "#lib/project/lockfile.ts"
-import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   checkRunsTool,
   hasCICompatibleScripts,
@@ -28,7 +29,6 @@ import {
   SUPPORTED_PACKAGE_MANAGERS,
   type SupportedPackageManager,
 } from "#lib/project/package-manager.ts"
-import { readProject } from "#lib/project/project.ts"
 import {
   addSelection,
   INIT_EDITORS,

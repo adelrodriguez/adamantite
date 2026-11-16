@@ -6,7 +6,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import { NativeRuntime } from "#lib/integrations/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/oxlint/plugins/index.ts"
 import {

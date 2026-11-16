@@ -26,10 +26,10 @@ import agents from "#lib/integrations/agents/index.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { readProject } from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
-import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")

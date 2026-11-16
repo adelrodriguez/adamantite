@@ -15,9 +15,9 @@ import {
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { readProject } from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
-import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"

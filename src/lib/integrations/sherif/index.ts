@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"

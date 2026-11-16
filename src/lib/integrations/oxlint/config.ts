@@ -2,7 +2,7 @@ import * as Array from "effect/Array"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import {
   type LintConfig,

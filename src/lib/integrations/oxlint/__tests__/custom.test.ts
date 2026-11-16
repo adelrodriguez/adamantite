@@ -8,7 +8,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
-import { readProject } from "#lib/project/project.ts"
+import { readProject } from "#lib/project/index.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 

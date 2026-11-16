@@ -10,8 +10,8 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
+import { readProject } from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
 const effectTsgo = managedPlugin("@effect/tsgo")

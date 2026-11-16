@@ -23,8 +23,8 @@ import {
   listCustomRules,
   readCustomRuleTestCommand,
 } from "#lib/project/custom-rules/index.ts"
-import { readWorkspace } from "#lib/project/monorepo.ts"
-import { readProject } from "#lib/project/project.ts"
+import { readWorkspace } from "#lib/project/index.ts"
+import { readProject } from "#lib/project/index.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { Cwd } from "#lib/shared/cwd.ts"
 import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"

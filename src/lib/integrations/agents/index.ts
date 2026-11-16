@@ -6,7 +6,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as String from "effect/String"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,

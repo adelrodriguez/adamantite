@@ -6,7 +6,7 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { getWorkflowTemplate } from "#lib/integrations/github/workflow.macro.ts" with { type: "macro" }
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"

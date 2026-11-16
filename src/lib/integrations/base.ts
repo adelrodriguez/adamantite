@@ -1,6 +1,6 @@
 import type * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 
 export interface ToolingPackage {

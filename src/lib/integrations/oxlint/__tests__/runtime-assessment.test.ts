@@ -11,7 +11,7 @@ import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment.ts"
-import { readProject } from "#lib/project/project.ts"
+import { readProject } from "#lib/project/index.ts"
 import { FailedToParseFile } from "#lib/shared/errors.ts"
 
 const ROOT = "/project"

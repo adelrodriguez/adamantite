@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
-import type { Workspace } from "#lib/project/monorepo.ts"
+import type { Workspace } from "#lib/project/index.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
 import {
   type replaceConfigs,

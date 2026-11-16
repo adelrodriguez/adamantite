@@ -14,10 +14,10 @@ import {
   readHardenReach,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
+import { readWorkspace } from "#lib/project/index.ts"
+import { readProject } from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
-import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
-import { readProject } from "#lib/project/project.ts"
 import { Cwd } from "#lib/shared/cwd.ts"
 import {
   AdamantiteNotInNodeModules,

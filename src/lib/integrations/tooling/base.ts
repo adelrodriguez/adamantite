@@ -6,7 +6,7 @@ import type {
   PackageAction,
   ToolingPackage,
 } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import {
   matchDeclaredVersion,
   parseDependencySpecifier,

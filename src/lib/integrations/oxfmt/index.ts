@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import type { Integration } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   assessConfigFile,

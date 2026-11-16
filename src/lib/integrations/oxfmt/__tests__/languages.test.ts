@@ -13,7 +13,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
 import { PACKAGE } from "#lib/integrations/oxfmt/index.ts"
 import { assessPluginLanguages, pluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
-import { readProject } from "#lib/project/project.ts"
+import { readProject } from "#lib/project/index.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import formatPreset from "#presets/format.ts"
 

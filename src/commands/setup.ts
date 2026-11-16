@@ -1,15 +1,15 @@
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import type { Project } from "#lib/project/project.ts"
+import type { Project } from "#lib/project/index.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   assessProject,
   ProjectAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
+import { readProject } from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Output from "#terminal/output.ts"

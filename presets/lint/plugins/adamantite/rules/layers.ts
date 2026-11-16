@@ -9,8 +9,14 @@ import {
   readStringOption,
 } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
-import { type ModuleSource, readDynamicSource, readStaticSource } from "../shared/imports.ts"
-import { resolveImport } from "../shared/resolver.ts"
+import {
+  type ModuleSource,
+  readDynamicSource,
+  readImportEqualsSource,
+  readRequireSource,
+  readStaticSource,
+} from "../shared/imports.ts"
+import { type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver, which ships
@@ -67,11 +73,13 @@ export interface Modules {
    */
   readonly findPackage: (file: string) => string | undefined
   /**
-   * The file that `specifier` in `importer` resolves to, or undefined when it does not resolve.
+   * The file that `specifier` in `importer` resolves to in `mode`, or undefined when it does not
+   * resolve.
    */
   readonly resolve: (
     importer: string,
     specifier: string,
+    mode: ResolutionMode,
     conditions: readonly string[]
   ) => string | undefined
 }
@@ -557,7 +565,12 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
   }
 
   // An import that does not resolve is outside the map. TypeScript reports it.
-  const target = file.modules.resolve(file.importer, source.specifier, options.conditions)
+  const target = file.modules.resolve(
+    file.importer,
+    source.specifier,
+    source.mode,
+    options.conditions
+  )
 
   const relative =
     target === undefined
@@ -695,6 +708,13 @@ export function createLayersRule(modules: Modules): Rule {
       }
 
       return {
+        CallExpression(node) {
+          const source = readRequireSource(context, node)
+
+          if (source !== undefined) {
+            check(source, false)
+          }
+        },
         ExportAllDeclaration(node) {
           check(readStaticSource(node.source), node.exportKind === "type")
         },
@@ -727,6 +747,13 @@ export function createLayersRule(modules: Modules): Rule {
 
           for (const file of reported) {
             reportFile(context, node, file)
+          }
+        },
+        TSImportEqualsDeclaration(node) {
+          const source = readImportEqualsSource(node)
+
+          if (source !== undefined) {
+            check(source, node.importKind === "type")
           }
         },
         TSImportType(node) {

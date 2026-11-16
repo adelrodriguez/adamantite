@@ -1,4 +1,5 @@
-import type { Context, ESTree } from "@oxlint/plugins"
+import type { Context, ESTree, Scope } from "@oxlint/plugins"
+import type { ResolutionMode } from "./resolver.ts"
 import { staticKeyName, staticString } from "../../shared/ast.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
@@ -8,6 +9,10 @@ import { staticKeyName, staticString } from "../../shared/ast.ts"
  * The module that an import names, such as `../high/api.ts` in ``import(`../high/api.ts`)``.
  */
 export interface ModuleSource {
+  /**
+   * How the import loads the module: `require` for `require()` and `import x = require()`.
+   */
+  readonly mode: ResolutionMode
   /**
    * The source expression, where a report points.
    */
@@ -22,7 +27,7 @@ export interface ModuleSource {
  * Read the source of a static import or export, such as `"./api.ts"` in `export * from "./api.ts"`.
  */
 export function readStaticSource(node: ESTree.StringLiteral): ModuleSource {
-  return { node, specifier: node.value }
+  return { mode: "import", node, specifier: node.value }
 }
 
 /**
@@ -33,7 +38,58 @@ export function readStaticSource(node: ESTree.StringLiteral): ModuleSource {
 export function readDynamicSource(node: ESTree.ImportExpression): ModuleSource | undefined {
   const specifier = staticString(node.source)
 
-  return specifier === null ? undefined : { node: node.source, specifier }
+  return specifier === null ? undefined : { mode: "import", node: node.source, specifier }
+}
+
+function declaresRequire(scope: Scope) {
+  for (let current: Scope | null = scope; current !== null; current = current.upper) {
+    if ((current.set.get("require")?.defs.length ?? 0) > 0) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Read the source of a CommonJS `require()` call, such as `require("./api.ts")`, when the code
+ * spells it without computing it. Return undefined for any other call, and for a call of a function
+ * that the file declares as `require`.
+ */
+export function readRequireSource(
+  context: Context,
+  node: ESTree.CallExpression
+): ModuleSource | undefined {
+  const [argument] = node.arguments
+
+  if (
+    node.callee.type !== "Identifier"
+    || node.callee.name !== "require"
+    || argument === undefined
+    || argument.type === "SpreadElement"
+    || declaresRequire(context.sourceCode.getScope(node))
+  ) {
+    return undefined
+  }
+
+  const specifier = staticString(argument)
+
+  return specifier === null ? undefined : { mode: "require", node: argument, specifier }
+}
+
+/**
+ * Read the module of a TypeScript import-equals declaration, such as `"./api.ts"` in `import api =
+ * require("./api.ts")`. Return undefined for an alias of a namespace, such as `import Base =
+ * Integrations.Base`.
+ */
+export function readImportEqualsSource(
+  node: ESTree.TSImportEqualsDeclaration
+): ModuleSource | undefined {
+  const reference = node.moduleReference
+
+  return reference.type === "TSExternalModuleReference"
+    ? { mode: "require", node: reference.expression, specifier: reference.expression.value }
+    : undefined
 }
 
 /**

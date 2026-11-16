@@ -3,8 +3,14 @@ import { existsSync, readFileSync } from "node:fs"
 import { posix } from "node:path"
 import { readStringArrayOption, readStringOption } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
-import { type ModuleSource, readDynamicSource, readStaticSource } from "../shared/imports.ts"
-import { resolveImport } from "../shared/resolver.ts"
+import {
+  type ModuleSource,
+  readDynamicSource,
+  readImportEqualsSource,
+  readRequireSource,
+  readStaticSource,
+} from "../shared/imports.ts"
+import { type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
@@ -98,10 +104,14 @@ export interface Project {
    */
   readonly findRoot: (file: string) => Root | undefined
   /**
-   * The file that `specifier` in `importer` resolves to, with `/` between folders, or undefined
-   * when it does not resolve.
+   * The file that `specifier` in `importer` resolves to in `mode`, with `/` between folders, or
+   * undefined when it does not resolve.
    */
-  readonly resolve: (importer: string, specifier: string) => string | undefined
+  readonly resolve: (
+    importer: string,
+    specifier: string,
+    mode: ResolutionMode
+  ) => string | undefined
 }
 
 const OWNERS_HINT =
@@ -292,8 +302,8 @@ export function createImportOwnersRule(project: Project): Rule {
     const tails = segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
 
     const result =
-      project.resolve(anchor, entry.import) === file
-      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`) === file)
+      project.resolve(anchor, entry.import, "import") === file
+      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`, "import") === file)
 
     coverage.set(key, result)
 
@@ -362,7 +372,10 @@ export function createImportOwnersRule(project: Project): Rule {
 
       function findRestricted(source: ModuleSource) {
         // A project module can match only an import that resolves to a file of the project.
-        const resolved = matchesFile ? project.resolve(importer, source.specifier) : undefined
+        const resolved = matchesFile
+          ? project.resolve(importer, source.specifier, source.mode)
+          : undefined
+
         const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
 
         return restricted.filter((entry) => {
@@ -463,6 +476,13 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       return {
+        CallExpression(node) {
+          const source = readRequireSource(context, node)
+
+          if (source !== undefined) {
+            checkWhole(source)
+          }
+        },
         ExportAllDeclaration(node) {
           checkWhole(readStaticSource(node.source), node.exported !== null)
         },
@@ -474,6 +494,13 @@ export function createImportOwnersRule(project: Project): Rule {
         ImportDeclaration: checkImport,
         ImportExpression(node) {
           const source = readDynamicSource(node)
+
+          if (source !== undefined) {
+            checkWhole(source)
+          }
+        },
+        TSImportEqualsDeclaration(node) {
+          const source = readImportEqualsSource(node)
 
           if (source !== undefined) {
             checkWhole(source)

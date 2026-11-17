@@ -25,16 +25,6 @@
       "version": "3.0.3"
     },
     {
-      "name": "oxc-parser",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.154.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "0.154.0"
-    },
-    {
       "name": "tsdown",
       "registry": "npm",
       "source": {
@@ -117,40 +107,6 @@
       "version": "0.9.18"
     },
     {
-      "name": "@clack/prompts",
-      "registry": "npm",
-      "source": {
-        "directory": "packages/prompts",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/bombshell-dev/clack"
-      },
-      "tracking": "dependency",
-      "version": "1.9.0"
-    },
-    {
-      "name": "@effect/tsgo",
-      "registry": "npm",
-      "source": {
-        "directory": "_packages/tsgo",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/Effect-TS/tsgo"
-      },
-      "tracking": "dependency",
-      "version": "0.69.0"
-    },
-    {
-      "name": "@oxlint/plugins",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/@oxlint/plugins/-/plugins-1.93.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "1.93.0"
-    },
-    {
       "name": "knip",
       "registry": "npm",
       "source": {
@@ -163,16 +119,6 @@
       "version": "6.45.1"
     },
     {
-      "name": "oxlint",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/oxlint/-/oxlint-1.93.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "1.93.0"
-    },
-    {
       "name": "tsrs",
       "registry": "npm",
       "source": {
@@ -181,6 +127,38 @@
       },
       "tracking": "dependency",
       "version": "0.25.0-ts7.1.0-beta"
+    },
+    {
+      "name": "@effect/tsgo",
+      "registry": "npm",
+      "source": {
+        "directory": "_packages/tsgo",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/tsgo"
+      },
+      "tracking": "dependency",
+      "version": "0.70.0"
+    },
+    {
+      "name": "@oxlint/plugins",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/@oxlint/plugins/-/plugins-1.94.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "1.94.0"
+    },
+    {
+      "name": "oxlint",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxlint/-/oxlint-1.94.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "1.94.0"
     }
   ]
 }

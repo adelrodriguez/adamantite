@@ -65,6 +65,12 @@ in the root `package.json`, or pass `--select highest` to the monorepo stage.
 Keep permanent Sherif settings in that `sherif` object, with camelCase option names.
 Sherif refuses fixes when `CI` is set. Use `analyze --only unused --fix` to run only Knip fixes there.
 
+When `adamantite check` stops with Oxlint's `Cannot find native binding` error, read its `cause`
+chain, which lists each binding file and package that Oxlint tried. When it stops with
+`tsrs: Cannot find the optional dependency`, the message names the missing `@tsrs/*` package. Both
+mean that the install left out the optional dependency for this platform. Reinstall the
+dependencies with optional dependencies for this platform, then run the check again.
+
 The task is complete when the affected checks exit 0 and you have read their output.
 
 ## Repair managed setup

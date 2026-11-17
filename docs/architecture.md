@@ -470,8 +470,13 @@ runs stock Oxlint. Only the entry `src/oxlint/index.ts` sets the variables and l
 binding override names a preload module and its variables. The Effect plugin names
 `@effect/tsgo/oxlint-bridge`, which swaps the installed `@oxlint/binding-*` file for the Effect build
 through `process.dlopen`, so every other napi-rs binding, such as `oxc-resolver` in a JavaScript
-plugin, loads unchanged. The bridge swaps only that installed file, so Doctor checks for the binding
-package also when a plugin replaces the binding.
+plugin, loads unchanged.
+
+Doctor's `oxlint/runtime-assessment.ts` reports what the same resolver finds: a missing declared
+package, a missing `tsrs-lint` launcher, and an `@effect/tsgo` without a build or the bridge for
+the installed versions. It does not predict which platform package Oxlint's binding loader or the
+tsrs launcher picks. When that package is missing, the loader lists each file it tried, and the
+launcher names the missing `@tsrs/*` package, as soon as `adamantite check` runs.
 
 ## Type resets
 

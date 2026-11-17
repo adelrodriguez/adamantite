@@ -201,6 +201,8 @@ adamantite check
 adamantite check src
 ```
 
+`check` runs Oxfmt and Oxlint at the same time, and prints the output of Oxfmt first.
+
 `check` fails when Oxlint reports a warning, because a warning that passes is a pattern that
 agents copy. Use `--allow-warnings` to pass with warnings. A forwarded `--max-warnings` or
 `--deny-warnings`, such as `adamantite check -- --max-warnings 10`, replaces this default. To keep existing violations of a

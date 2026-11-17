@@ -1,31 +1,12 @@
-import process from "node:process"
-import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
-import * as Path from "effect/Path"
-import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
 import { NativeRuntime } from "#lib/integrations/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/oxlint/plugins/index.ts"
-import {
-  NoBackend,
-  ReplacedPart,
-  resolveOxlintRuntime,
-  TsrsBackend,
-  type OxlintRuntime,
-} from "#lib/integrations/oxlint/runtime.ts"
+import { NoBackend, resolveOxlintRuntime } from "#lib/integrations/oxlint/runtime.ts"
 import * as Project from "#lib/project/index.ts"
-import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { PackageNotInstalled } from "#lib/shared/errors.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
-
-const decodeReport = Schema.decodeUnknownOption(
-  Schema.Struct({
-    header: Schema.Struct({ glibcVersionRuntime: Schema.optional(Schema.String) }),
-    sharedObjects: Schema.Array(Schema.String),
-  })
-)
 
 function finding(currentState: string, goal: readonly string[]): readonly Finding[] {
   return [
@@ -41,9 +22,11 @@ function finding(currentState: string, goal: readonly string[]): readonly Findin
 }
 
 /**
- * The findings for an Oxlint runtime that the installed packages cannot supply. The entry resolves
- * the same runtime before it loads Oxlint. Package assessment reports a package that `package.json`
- * does not declare, so this assessment skips it.
+ * The findings for an Oxlint runtime that the installed packages cannot supply, from the resolver
+ * that the entry runs before it loads Oxlint. Package assessment reports a package that
+ * `package.json` does not declare, so this assessment skips it. It does not predict which platform
+ * binding Oxlint or tsrs loads, because their loaders name a missing platform package when the
+ * check runs.
  */
 export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
   project: Project.Snapshot
@@ -57,9 +40,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
 
   return yield* Effect.gen(function* () {
     const cwd = yield* Project.Directory
-    const runtime: OxlintRuntime = yield* resolveOxlintRuntime(cwd)
-
-    const { backend, binding } = runtime
+    const { backend } = yield* resolveOxlintRuntime(cwd)
 
     if (declared("tsrs") && backend instanceof NoBackend) {
       return finding("Oxlint cannot resolve the declared tsrs backend or its launcher.", [
@@ -74,112 +55,6 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
         if (Option.isNone(installed)) {
           return yield* new PackageNotInstalled({ packageName: plugin.name, project: cwd })
         }
-      }
-    }
-
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const resolver = yield* ModuleResolver
-    const platform = `${process.platform}-${process.arch}`
-    let libc = "gnu"
-
-    // Follow the pinned loaders' filesystem/report probes, without their child-process fallback.
-    if (process.platform === "linux") {
-      const ldd = yield* readFileIfExists("/usr/bin/ldd")
-      const report = Option.isNone(ldd) ? decodeReport(process.report.getReport()) : Option.none()
-
-      const musl = Option.isSome(ldd)
-        ? ldd.value.includes("musl")
-        : Option.isSome(report)
-          && !report.value.header.glibcVersionRuntime
-          && report.value.sharedObjects.some(
-            (file) => file.includes("libc.musl-") || file.includes("ld-musl-")
-          )
-
-      libc = musl ? "musl" : "gnu"
-    }
-
-    const suffix: Partial<Record<NodeJS.Platform, string>> = {
-      android: process.arch === "arm" ? "-eabi" : "",
-      linux: `-${libc}${process.arch === "arm" ? "eabihf" : ""}`,
-      win32:
-        process.arch === "x64"
-        && (("shlib_suffix" in process.config.variables
-          && process.config.variables.shlib_suffix === "dll.a")
-          || ("node_target_type" in process.config.variables
-            && process.config.variables.node_target_type === "shared_library"))
-          ? "-gnu"
-          : "-msvc",
-    }
-
-    const bindingTarget = platform + (suffix[process.platform] ?? "")
-
-    const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
-      Config.withDefault("")
-    )
-
-    const targets =
-      process.platform === "darwin" ? ["darwin-universal", bindingTarget] : [bindingTarget]
-
-    const nativeCandidates = override
-      ? [override]
-      : targets.flatMap((target) => [`./oxlint.${target}.node`, `@oxlint/binding-${target}`])
-
-    // A plugin's preload module swaps the binding of the installed `@oxlint/binding-*` package as
-    // Oxlint loads it, so a replaced binding needs that package. Only a stock binding can come from
-    // a local file, the `NAPI_RS_NATIVE_LIBRARY_PATH` override, or the WASI build.
-    const candidates =
-      binding instanceof ReplacedPart
-        ? targets.map((target) => `@oxlint/binding-${target}`)
-        : [...nativeCandidates, "./oxlint.wasi.cjs", "@oxlint/binding-wasm32-wasi"]
-
-    const installed = yield* Effect.findFirst(candidates, (specifier) =>
-      Effect.gen(function* () {
-        const resolved = yield* resolver.resolve(path.join(runtime.oxlint, "dist"), specifier)
-
-        if (Option.isNone(resolved) || !(yield* fs.exists(resolved.value))) {
-          return false
-        }
-
-        return (
-          specifier !== "./oxlint.wasi.cjs"
-          || (yield* fs.exists(path.join(runtime.oxlint, "dist", "oxlint.wasm32-wasi.wasm")))
-          || (yield* fs.exists(path.join(runtime.oxlint, "dist", "oxlint.wasm32-wasi.debug.wasm")))
-        )
-      })
-    )
-
-    if (Option.isNone(installed)) {
-      return finding("Oxlint cannot resolve its installed native binding.", [
-        "Install the target project's optional dependencies for this platform, or restore its local binding.",
-      ])
-    }
-
-    if (backend instanceof TsrsBackend) {
-      const tsrs = yield* resolvePackageDirectory(cwd, "tsrs")
-      const override = yield* Config.String("TSRS_BINARY").pipe(Config.withDefault(""))
-      const target = `${platform}${process.platform === "linux" ? `-${libc}` : ""}`
-
-      const installed =
-        Option.isSome(tsrs) && !override
-          ? yield* resolvePackageDirectory(tsrs.value, `@tsrs/${target}`)
-          : Option.none<string>()
-
-      const binary =
-        override === ""
-          ? Option.isSome(installed)
-            ? path.join(installed.value, process.platform === "win32" ? "tsrs.exe" : "tsrs")
-            : undefined
-          : override
-
-      if (
-        !(yield* fs.exists(backend.launcher))
-        || binary === undefined
-        || !(yield* fs.exists(binary))
-      ) {
-        return finding("Oxlint cannot resolve the installed tsrs binary or its launcher.", [
-          "Install the target project's optional dependencies for this platform, or restore TSRS_BINARY.",
-        ])
       }
     }
 

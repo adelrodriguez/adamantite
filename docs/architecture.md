@@ -246,9 +246,10 @@ flowchart TD
 criteria, and optional reference content or notes. A coding agent or the user changes the target
 project, and a later assessment confirms whether the project reached the latest supported state.
 
-Doctor also asks Oxlint to list the files that it lints. Oxlint loads every config of the project
-first, so a config that fails to load fails the list, and Doctor reports the error that Oxlint
-printed as the `oxlint-config-load-failure` finding. The shared Oxlint process operations are in
+Doctor also asks Oxlint to list the files that it lints. Oxlint loads its native binding and every
+config of the project first, so a config that fails to load, or a binding that the install left out,
+fails the list. Doctor reports the error that Oxlint printed as the `oxlint-config-load-failure`
+finding, which gives the repair of each cause. The shared Oxlint process operations are in
 `integrations/oxlint/files.ts`.
 
 Runtime findings check the installed packages. Package findings check the declarations and
@@ -470,8 +471,13 @@ runs stock Oxlint. Only the entry `src/oxlint/index.ts` sets the variables and l
 binding override names a preload module and its variables. The Effect plugin names
 `@effect/tsgo/oxlint-bridge`, which swaps the installed `@oxlint/binding-*` file for the Effect build
 through `process.dlopen`, so every other napi-rs binding, such as `oxc-resolver` in a JavaScript
-plugin, loads unchanged. The bridge swaps only that installed file, so Doctor checks for the binding
-package also when a plugin replaces the binding.
+plugin, loads unchanged.
+
+Doctor's `oxlint/runtime-assessment.ts` reports what the same resolver finds: a missing declared
+package, a missing `tsrs-lint` launcher, and an `@effect/tsgo` without a build or the bridge for
+the installed versions. It does not predict which platform package Oxlint's binding loader or the
+tsrs launcher picks. When that package is missing, the loader lists each file it tried, and the
+launcher names the missing `@tsrs/*` package, as soon as `adamantite check` runs.
 
 ## Type resets
 

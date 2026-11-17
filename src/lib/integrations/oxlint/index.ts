@@ -136,9 +136,11 @@ function toExcludedPresetsFinding({
 }
 
 /**
- * The finding for a lint config that every lint run fails to load. Oxlint loads every config of the
- * project before it lists the files to lint, so a failed list is such a config. A missing package
- * or runtime has its own finding, and Oxlint does not run without it.
+ * The finding for an Oxlint that stops before it lints a file. Oxlint loads its native binding and
+ * every config of the project before it lists the files to lint, so a failed list is a config that
+ * fails to load, or a binding that the install left out. The finding passes Oxlint's error, which
+ * names the cause, and gives the repair of each. A missing declared package or backend has its own
+ * finding, and Oxlint does not run without it.
  */
 const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
   project: Project.Snapshot,
@@ -156,15 +158,16 @@ const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
     Effect.catchTag("TrialLintFailed", ({ output }) =>
       Effect.succeed([
         {
-          currentState: `Oxlint fails to load the lint config, so \`adamantite check\` and \`adamantite fix\` stop before they lint a file. Oxlint printed:\n\n\`\`\`text\n${output}\n\`\`\``,
+          currentState: `Oxlint stops before it lints a file, so \`adamantite check\` and \`adamantite fix\` stop too. Oxlint printed:\n\n\`\`\`text\n${output}\n\`\`\``,
           goal: [
-            "Repair the config that the error names. Keep its rules and all other project settings.",
+            "When the error says `Cannot find native binding`, the install left out Oxlint's binding for this platform. Reinstall the dependencies with the optional dependencies for this platform, and keep the config unchanged.",
+            "Otherwise, repair the config or the rule file that the error names. Keep its rules and all other project settings.",
             "When the config imports an Adamantite preset that the installed package does not export, replace the import with the preset that the changelog at https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md names for it.",
             "Run `adamantite check --only lint`, then run `adamantite doctor` again.",
           ],
           id: "oxlint-config-load-failure",
           integration: "oxlint",
-          title: "Oxlint cannot load the lint config",
+          title: "Oxlint stops before it lints a file",
         } satisfies Finding,
       ])
     )

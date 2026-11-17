@@ -1,5 +1,9 @@
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import { resolveOxlintRuntime, toLaunch } from "#lib/integrations/oxlint/runtime.ts"
+import { readSelection } from "#lib/project/lockfile.ts"
+import { toToolNotSelected } from "#lib/project/selection.ts"
 
 /**
  * The file name of the entry that runs Oxlint with the project's Oxlint runtime. The build writes
@@ -17,6 +21,27 @@ export const EDITOR_OXLINT_ENTRY = `node_modules/adamantite/dist/${OXLINT_ENTRY_
  * The variable through which a command names the project that the entry runs Oxlint for.
  */
 export const PROJECT_VARIABLE = "ADAMANTITE_PROJECT"
+
+/**
+ * How to start Oxlint for the project at `project`, with its Oxlint runtime. Without a selected
+ * script that runs Oxlint, Setup did not install it, and `adamantite update` would not either, so a
+ * missing Oxlint fails with `ToolNotSelected`, which names the script to add.
+ */
+export const resolveOxlintLaunch = Effect.fn("resolveOxlintLaunch")(function* (project: string) {
+  const runtime = yield* resolveOxlintRuntime(project).pipe(
+    Effect.catchTag("PackageNotInstalled", (error) =>
+      readSelection(project).pipe(
+        Effect.flatMap((selection) =>
+          Effect.fail(
+            Option.getOrElse(toToolNotSelected(selection, error.packageName), () => error)
+          )
+        )
+      )
+    )
+  )
+
+  return yield* toLaunch(runtime)
+})
 
 /**
  * The `CommandRunner` command that runs Oxlint for the project at `project`. Arguments go after

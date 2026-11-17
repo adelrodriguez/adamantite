@@ -1,6 +1,7 @@
 import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
@@ -11,6 +12,7 @@ import {
   resolveOxlintRuntime,
   StockPart,
   toBackendEnv,
+  toLaunch,
   TsrsBackend,
 } from "#lib/integrations/oxlint/runtime.ts"
 import {
@@ -330,7 +332,11 @@ describe("Oxlint runtime", () => {
 describe("toBackendEnv", () => {
   it.each([
     { backend: new NoBackend(), env: {} },
-    { backend: new TsrsBackend({ launcher: "/tsrs-lint" }), env: {} },
+    // The tsrs backend owns the variable, so an inherited path leaves the environment.
+    {
+      backend: new TsrsBackend({ launcher: "/tsrs-lint" }),
+      env: { OXLINT_TSGOLINT_PATH: undefined },
+    },
     {
       backend: new ReplacedBackend({ env: { NATIVE_BACKEND: "/backend" } }),
       env: { NATIVE_BACKEND: "/backend" },
@@ -345,4 +351,46 @@ describe("toBackendEnv", () => {
       OXLINT_TSGOLINT_PATH: "C:/tsrs-lint.cmd",
     })
   })
+})
+
+describe("toLaunch", () => {
+  const OXLINT = `${ROOT}/node_modules/oxlint`
+
+  it.effect.each([
+    {
+      expected: { cli: `${OXLINT}/dist/cli.js`, env: {}, preload: Option.none() },
+      name: "stock Oxlint",
+      runtime: { backend: new NoBackend(), binding: new StockPart(), oxlint: OXLINT },
+    },
+    {
+      expected: {
+        cli: `${OXLINT}/dist/cli.js`,
+        env: { OXLINT_TSGOLINT_PATH: undefined },
+        preload: Option.none(),
+      },
+      name: "the tsrs backend",
+      runtime: {
+        backend: new TsrsBackend({ launcher: `${ROOT}/node_modules/.bin/tsrs-lint` }),
+        binding: new StockPart(),
+        oxlint: OXLINT,
+      },
+    },
+    {
+      expected: {
+        cli: `${OXLINT}/dist/cli.js`,
+        env: { BINDING: "/binding.node", NATIVE_BACKEND: "/backend" },
+        preload: Option.some("/bridge.cjs"),
+      },
+      name: "a plugin's binding and backend",
+      runtime: {
+        backend: new ReplacedBackend({ env: { NATIVE_BACKEND: "/backend" } }),
+        binding: new ReplacedPart({ env: { BINDING: "/binding.node" }, preload: "/bridge.cjs" }),
+        oxlint: OXLINT,
+      },
+    },
+  ])("start Oxlint's CLI with $name", ({ expected, runtime }) =>
+    Effect.gen(function* () {
+      expect(yield* toLaunch(runtime, "linux")).toStrictEqual(expected)
+    }).pipe(Effect.provide(Path.layer))
+  )
 })

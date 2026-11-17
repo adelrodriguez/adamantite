@@ -72,9 +72,10 @@ describe("import-owners reports", () => {
   })
 })
 
-// `src/owner.ts` owns the project folder `src/high`, the linked workspace package `@acme/ui`, and the
-// pnpm dependency `dep`. Links give `src/high` other paths: a folder link, a source-file link, and a
-// link in the project root.
+// `src/owner.ts` owns the project folder `src/high`, the linked workspace package `@acme/ui`, the
+// pnpm dependency `dep`, and the alias folder `#lib/db`. Links give `src/high` other paths: a folder
+// link, a source-file link, and a link in the project root. A file link in `src/lib/db` gives
+// `src/other/actual.ts` a name in the alias folder.
 const LINKED_OWNERS = {
   config: {
     rules: {
@@ -83,6 +84,7 @@ const LINKED_OWNERS = {
         { import: "./src/high", owners: ["src/owner.ts"] },
         { import: "@acme/ui", owners: ["src/owner.ts"] },
         { import: "dep", owners: ["src/owner.ts"] },
+        { import: "#lib/db", owners: ["src/owner.ts"] },
       ],
     },
   },
@@ -90,19 +92,23 @@ const LINKED_OWNERS = {
     "node_modules/.pnpm/dep@1.0.0/node_modules/dep/index.js": "export const dep = 1\n",
     "node_modules/.pnpm/dep@1.0.0/node_modules/dep/package.json":
       '{"name":"dep","type":"module","exports":"./index.js"}\n',
-    "package.json": '{"type":"module","workspaces":["packages/*"]}\n',
+    "package.json":
+      '{"type":"module","workspaces":["packages/*"],"imports":{"#lib/*":"./src/lib/*"}}\n',
     "packages/ui/index.ts": "export const button = 1\n",
     "packages/ui/package.json": '{"name":"@acme/ui","type":"module","exports":"./index.ts"}\n',
     "src/high/api.ts": "export const api = 1\n",
     "src/high/value.ts": "export const value = 1\n",
+    "src/lib/db/query.ts": "export const query = 1\n",
     "src/low/base.ts": "export const low = 1\n",
     "src/low/dependency.ts": 'export { dep } from "dep"\n',
     "src/low/direct.ts": 'export { api } from "../high/api.ts"\n',
     "src/low/through-file-link.ts": 'export { value } from "./value-link.ts"\n',
     "src/low/through-folder-link.ts": 'export { api } from "./high-link/api.ts"\n',
+    "src/low/through-renamed-link.ts": 'export { actual } from "../lib/db/alias.ts"\n',
     "src/low/through-root-link.ts": 'export { api } from "../../high-root-link/api.ts"\n',
     "src/low/through-unowned-link.ts": 'export { low } from "../../low-root-link/base.ts"\n',
     "src/low/workspace-package.ts": 'export { button } from "@acme/ui"\n',
+    "src/other/actual.ts": "export const actual = 1\n",
     "src/owner.ts": [
       'export { api } from "./high/api.ts"',
       'export { value } from "./low/value-link.ts"',
@@ -116,6 +122,7 @@ const LINKED_OWNERS = {
     "low-root-link": "src/low",
     "node_modules/@acme/ui": "../../packages/ui",
     "node_modules/dep": ".pnpm/dep@1.0.0/node_modules/dep",
+    "src/lib/db/alias.ts": "../../other/actual.ts",
     "src/low/high-link": "../high",
     "src/low/value-link.ts": "../high/value.ts",
   },
@@ -165,6 +172,11 @@ describe.each([
       name: "report an import through the project root link `high-root-link`, in the owned folder by its real path `src/high/api.ts`",
     },
     {
+      file: "src/low/through-renamed-link.ts",
+      messages: [ownerReport("#lib/db", 3)],
+      name: "report an import through the file link `src/lib/db/alias.ts`, in the owned alias folder by its link name, although its real path is `src/other/actual.ts`",
+    },
+    {
       file: "src/low/through-unowned-link.ts",
       messages: [],
       name: "accept an import through the project root link `low-root-link`, outside the owned folder by its real path `src/low/base.ts`",
@@ -195,6 +207,7 @@ describe.each([
         "src/low/direct.ts",
         "src/low/through-file-link.ts",
         "src/low/through-folder-link.ts",
+        "src/low/through-renamed-link.ts",
         "src/low/through-root-link.ts",
         "src/low/workspace-package.ts",
       ])

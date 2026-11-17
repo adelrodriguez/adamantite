@@ -246,9 +246,10 @@ flowchart TD
 criteria, and optional reference content or notes. A coding agent or the user changes the target
 project, and a later assessment confirms whether the project reached the latest supported state.
 
-Doctor also asks Oxlint to list the files that it lints. Oxlint loads every config of the project
-first, so a config that fails to load fails the list, and Doctor reports the error that Oxlint
-printed as the `oxlint-config-load-failure` finding. The shared Oxlint process operations are in
+Doctor also asks Oxlint to list the files that it lints. Oxlint loads its native binding and every
+config of the project first, so a config that fails to load, or a binding that the install left out,
+fails the list. Doctor reports the error that Oxlint printed as the `oxlint-config-load-failure`
+finding, which gives the repair of each cause. The shared Oxlint process operations are in
 `integrations/oxlint/files.ts`.
 
 Runtime findings check the installed packages. Package findings check the declarations and

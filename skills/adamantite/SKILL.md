@@ -80,10 +80,11 @@ prints the assessment as one JSON document, and exits 1 when findings remain. Ea
 `currentState`, `goal`, and the optional `reference` and `notes`. Without `--json` and a terminal,
 Doctor prints the same findings as a Markdown repair prompt.
 Follow each finding's current state, goal, reference, and verification command.
-For a finding that Oxlint cannot load the lint config, repair the config or the rule file that the
-error names. When it imports an Adamantite preset or a name that the installed package does not
-export, use the replacement that the
-[changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md) names for it. For
+For the `oxlint-config-load-failure` finding, read the error that Oxlint printed. When it says
+`Cannot find native binding`, reinstall the dependencies as "Check and fix code" says, and keep the
+config unchanged. Otherwise, repair the config or the rule file that the error names. When it
+imports an Adamantite preset or a name that the installed package does not export, use the
+replacement that the [changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md) names for it. For
 a custom rule or a rules folder, use the repair step in
 [How to write and verify custom rules](references/custom-rules.md#repair-an-existing-rules-folder).
 

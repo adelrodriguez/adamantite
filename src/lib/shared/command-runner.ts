@@ -45,6 +45,13 @@ export interface CommandRunOptions {
 export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
 
 /**
+ * A step of `runAll`, `runConcurrently`, or `runUntilFailure`: the effect that finds the command to
+ * run, such as the Oxlint command, which resolves the Oxlint runtime of the project. A step that
+ * fails prints no section, and its failure counts as the failure of its command.
+ */
+type Step<E, R> = Effect.Effect<CommandRunOptions, E, R>
+
+/**
  * Bytes that a child wrote to its standard output or its standard error.
  */
 export interface OutputChunk {
@@ -72,23 +79,24 @@ interface CommandRunnerService {
   /**
    * Runs every step in order, even after one fails, then fails with the first failure.
    */
-  readonly runAll: (
-    steps: readonly CommandRunOptions[]
-  ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
+  readonly runAll: <E, R>(
+    steps: ReadonlyArray<Step<E, R>>
+  ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R>
   /**
    * Starts every step at once, then fails with the first failure in step order, as `runAll` does.
    * The output keeps the order of `runAll`: each step's heading and output print after the steps
-   * before it end, and the output of the first running step prints as it comes.
+   * before it end, and the output of the first running step prints as it comes. Every step finds
+   * its command before any command starts.
    */
-  readonly runConcurrently: (
-    steps: readonly CommandRunOptions[]
-  ) => Effect.Effect<void, CommandFailed | CommandFailedLike, Stdio.Stdio>
+  readonly runConcurrently: <E, R>(
+    steps: ReadonlyArray<Step<E, R>>
+  ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R | Stdio.Stdio>
   /**
    * Runs the steps in order and stops at the first failure.
    */
-  readonly runUntilFailure: (
-    steps: readonly CommandRunOptions[]
-  ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
+  readonly runUntilFailure: <E, R>(
+    steps: ReadonlyArray<Step<E, R>>
+  ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R>
 }
 
 function toHeading({ command, name, title }: CommandRunOptions & { readonly title: string }) {
@@ -112,20 +120,24 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       yield* toResult(options, yield* exitCode(options))
     })
 
-    const toSections = (steps: readonly CommandRunOptions[]) =>
+    const toSections = <E, R>(steps: ReadonlyArray<Step<E, R>>) =>
       steps.map((step, index) =>
-        index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))
+        Effect.flatMap(step, (options) =>
+          index === 0 ? run(options) : Effect.andThen(Console.log(""), run(options))
+        )
       )
 
     return {
       exitCode,
       run,
-      runAll: Effect.fn("CommandRunner.runAll")(function* (steps) {
+      runAll: Effect.fn("CommandRunner.runAll")(function* <E, R>(steps: ReadonlyArray<Step<E, R>>) {
         const results = yield* Effect.all(toSections(steps), { concurrency: 1, mode: "result" })
 
         yield* Effect.fromResult(Result.all(results))
       }),
-      runConcurrently: Effect.fn("CommandRunner.runConcurrently")(function* (steps) {
+      runConcurrently: Effect.fn("CommandRunner.runConcurrently")(function* <E, R>(
+        steps: ReadonlyArray<Step<E, R>>
+      ) {
         const stdio = yield* Stdio.Stdio
         const { canColor } = yield* TerminalCapabilities.TerminalCapabilities
 
@@ -137,27 +149,39 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
         const write = (chunk: OutputChunk) =>
           Stream.run(Stream.succeed(chunk.bytes), stdio[chunk.stream]())
 
+        // Every step finds its command before any command starts, so the commands still start
+        // together. A step that fails starts nothing and prints no section.
         const sections = yield* Effect.forEach(
           steps,
           (step) =>
-            Effect.map(Queue.unbounded<OutputChunk, Cause.Done>(), (queue) => ({ queue, step })),
+            Effect.all(
+              { found: Effect.result(step), queue: Queue.unbounded<OutputChunk, Cause.Done>() },
+              { concurrency: "unbounded" }
+            ),
           { concurrency: "unbounded" }
         )
 
         const runs = Effect.forEach(
           sections,
-          ({ queue, step }) =>
-            Effect.flatMap(
-              exitCode(toColored(step), (chunk) => Effect.asVoid(Queue.offer(queue, chunk))),
-              (code) => toResult(step, code)
-            ).pipe(Effect.ensuring(Queue.end(queue)), Effect.result),
+          ({ found, queue }) =>
+            Effect.gen(function* () {
+              const step = yield* Effect.fromResult(found)
+
+              const code = yield* exitCode(toColored(step), (chunk) =>
+                Effect.asVoid(Queue.offer(queue, chunk))
+              )
+
+              yield* toResult(step, code)
+            }).pipe(Effect.ensuring(Queue.end(queue)), Effect.result),
           { concurrency: "unbounded" }
         )
 
         // Each section waits for the sections before it, so the output of a later step stays in
         // its queue until its turn.
         const print = Effect.forEach(
-          sections,
+          sections.flatMap(({ found, queue }) =>
+            Result.isSuccess(found) ? [{ queue, step: found.success }] : []
+          ),
           ({ queue, step }, index) =>
             Effect.gen(function* () {
               if (index > 0) {
@@ -177,7 +201,9 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
 
         yield* Effect.fromResult(Result.all(results))
       }),
-      runUntilFailure: Effect.fn("CommandRunner.runUntilFailure")(function* (steps) {
+      runUntilFailure: Effect.fn("CommandRunner.runUntilFailure")(function* <E, R>(
+        steps: ReadonlyArray<Step<E, R>>
+      ) {
         yield* Effect.all(toSections(steps), { concurrency: 1, discard: true })
       }),
     }

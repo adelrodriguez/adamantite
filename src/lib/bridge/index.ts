@@ -64,12 +64,14 @@ export const check = Effect.fn("Bridge.check")(function* (
   const forwardedStage = only ?? "lint"
 
   const stages = {
-    format: oxfmt.check({
-      cwd,
-      files,
-      forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
-    }),
-    lint: yield* oxlint.check({
+    format: Effect.succeed(
+      oxfmt.check({
+        cwd,
+        files,
+        forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
+      })
+    ),
+    lint: oxlint.check({
       allowWarnings,
       cwd,
       files,
@@ -116,12 +118,14 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
   const forwardedStage = only ?? "lint"
 
   const stages = {
-    format: oxfmt.fix({
-      cwd,
-      files: targets,
-      forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
-    }),
-    lint: yield* oxlint.fix({
+    format: Effect.succeed(
+      oxfmt.fix({
+        cwd,
+        files: targets,
+        forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
+      })
+    ),
+    lint: oxlint.fix({
       cwd,
       files: targets,
       forwardedArguments: forwardedStage === "lint" ? forwardedArguments : [],
@@ -203,8 +207,9 @@ export const analyze = Effect.fn("Bridge.analyze")(function* (options: {
     }),
   }
 
-  const steps =
+  const steps = (
     only === undefined ? [...(isMonorepo ? [stages.monorepo] : []), stages.unused] : [stages[only]]
+  ).map((step) => Effect.succeed(step))
 
   // A failed Sherif fix means no install happened, and Knip would then delete from a stale
   // dependency graph.

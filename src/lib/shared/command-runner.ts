@@ -20,9 +20,10 @@ export interface CommandRunOptions {
   readonly command: string
   readonly cwd?: string
   /**
-   * Variables to set for the child, on top of this process's environment.
+   * Variables to set for the child, on top of this process's environment. A variable without a
+   * value leaves the child's environment.
    */
-  readonly env?: Readonly<Record<string, string>>
+  readonly env?: Readonly<Record<string, string | undefined>>
   /**
    * The tool that the heading names, when `command` only starts it, such as `node` for Oxlint.
    */

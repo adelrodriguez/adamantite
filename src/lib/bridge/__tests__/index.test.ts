@@ -10,6 +10,7 @@ import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
 import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
 import { IDIOM_TREES, IDIOMS_DIR, listFiles, listTreeStacks } from "#presets/__tests__/idioms.ts"
 import {
@@ -38,13 +39,8 @@ const CANARY = {
   source: "export const answer: string = 42\n",
 }
 
-// The build writes the Oxlint entry beside the CLI, so a run from source starts its source. Oxfmt
-// starts from this repository's install.
+// Oxfmt starts from this repository's install.
 function toSource(options: CommandRunOptions): CommandRunOptions {
-  if (options.name === "oxlint") {
-    return { ...options, args: [join(REPO_ROOT, "src/oxlint/index.ts"), ...options.args.slice(1)] }
-  }
-
   if (options.command === "oxfmt") {
     return { ...options, command: join(REPO_ROOT, "node_modules/.bin/oxfmt") }
   }
@@ -173,7 +169,10 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
         expect(readFiles(join(project, FIXTURES_DIRECTORY, "clean"), clean)).toStrictEqual(
           readFiles(join(idiomsDir, "clean"), clean)
         )
-      }).pipe(Effect.provideService(Project.Directory, project), Effect.provide(SOURCE_RUNNER))
+      }).pipe(
+        Effect.provideService(Project.Directory, project),
+        Effect.provide([SOURCE_RUNNER, ModuleResolver.layer])
+      )
     )
 
     it.live.skipIf(fixable.length === 0)(
@@ -228,7 +227,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
         }).pipe(
           Effect.provideService(Project.Directory, project),
           // `check` prints the output of its stages through `Stdio`.
-          Effect.provide([SOURCE_RUNNER, NodeServices.layer])
+          Effect.provide([SOURCE_RUNNER, NodeServices.layer, ModuleResolver.layer])
         )
     )
   })

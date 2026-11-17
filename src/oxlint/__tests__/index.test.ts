@@ -1,11 +1,10 @@
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import type { Selection } from "#lib/project/selection.ts"
-import { PROJECT_VARIABLE } from "#lib/integrations/oxlint/entry.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const ENTRY = join(import.meta.dirname, "../index.ts")
@@ -15,7 +14,8 @@ const ENTRY = join(import.meta.dirname, "../index.ts")
  * lockfile selects `scripts`.
  */
 function runWithoutOxlint(scripts: Selection["scripts"]) {
-  const project = mkdtempSync(join(tmpdir(), "adamantite-entry-"))
+  // The entry takes its working directory as the project, and the working directory has no links.
+  const project = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-entry-")))
 
   try {
     mkdirSync(join(project, ".adamantite"))
@@ -32,7 +32,6 @@ function runWithoutOxlint(scripts: Selection["scripts"]) {
     const result = spawnSync(process.execPath, [ENTRY], {
       cwd: project,
       encoding: "utf8",
-      env: { ...process.env, [PROJECT_VARIABLE]: project },
     })
 
     return { exitCode: result.status, stderr: result.stderr.replaceAll(project, "<project>") }

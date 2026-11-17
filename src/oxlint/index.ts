@@ -2,27 +2,21 @@ import process from "node:process"
 import { pathToFileURL } from "node:url"
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import * as NodePath from "@effect/platform-node/NodePath"
-import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
-import {
-  getProjectDirectory,
-  PROJECT_VARIABLE,
-  resolveOxlintLaunch,
-} from "#lib/integrations/oxlint/entry.ts"
+import { getProjectDirectory, resolveOxlintLaunch } from "#lib/integrations/oxlint/entry.ts"
 import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
-// Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
-// `adamantite check` start this file in place of `oxlint`.
+// Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors start
+// this file in place of `oxlint`. The CLI starts Oxlint's CLI module with the same launch itself.
 
 const entry = process.argv[1] ?? ""
 
 const result = await Effect.runPromise(
   Effect.gen(function* () {
-    const named = yield* Config.String(PROJECT_VARIABLE).pipe(Config.withDefault(""))
-    const project = getProjectDirectory(entry, yield* Project.Directory, named)
+    const project = getProjectDirectory(entry, yield* Project.Directory)
 
     return yield* resolveOxlintLaunch(project)
   }).pipe(

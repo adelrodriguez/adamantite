@@ -3,21 +3,19 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
-import * as Path from "effect/Path"
 import {
   createRunnerTestContext,
   getFailure,
   makeHandoffRunner,
   makeLockfileFile,
+  OXLINT_COMMAND,
+  oxlintInstalledLayer,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection } from "#__tests__/lifecycle.ts"
 import fixCommand from "#commands/fix.ts"
-import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CommandFailed, InvalidFixOptions, ToolNotSelected } from "#lib/shared/errors.ts"
-
-const OXLINT = Effect.runSync(getOxlintCommand("/project").pipe(Effect.provide(Path.layer)))
 
 describe("fix", () => {
   describe("default invocation", () => {
@@ -25,13 +23,15 @@ describe("fix", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
+        const exit = yield* runCommand(fixCommand, [], {
+          layers: [runner.layer, oxlintInstalledLayer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT,
-            args: [...OXLINT.args, "--fix"],
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix"],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -53,11 +53,13 @@ describe("fix", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommand(fixCommand, args, { layers: [runner.layer] })
+        const exit = yield* runCommand(fixCommand, args, {
+          layers: [runner.layer, oxlintInstalledLayer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toStrictEqual([
-          ...OXLINT.args,
+          ...OXLINT_COMMAND.args,
           "--fix",
           "--fix-suggestions",
           "--fix-dangerously",
@@ -73,14 +75,14 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["--only", "lint", "--suggested"], {
           forwardedArguments: ["--deny-warnings"],
-          layers: [runner.layer],
+          layers: [runner.layer, oxlintInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT,
-            args: [...OXLINT.args, "--fix", "--fix-suggestions", "--deny-warnings"],
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix", "--fix-suggestions", "--deny-warnings"],
             title: "🔧 Fixing lint issues",
           },
         ])
@@ -93,7 +95,7 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["--only", "format"], {
           forwardedArguments: ["--no-error-on-unmatched-pattern"],
-          layers: [runner.layer],
+          layers: [runner.layer, oxlintInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -113,7 +115,7 @@ describe("fix", () => {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, ["--only", "format", "--all"], {
-          layers: [runner.layer],
+          layers: [runner.layer, oxlintInstalledLayer],
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -135,14 +137,14 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["index.ts", "index.ts"], {
           files,
-          layers: [runner.layer],
+          layers: [runner.layer, oxlintInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT,
-            args: [...OXLINT.args, "--fix", join(files.root, "index.ts")],
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix", join(files.root, "index.ts")],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -163,14 +165,14 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["--dangerous"], {
           forwardedArguments: ["--deny-warnings"],
-          layers: [runner.layer],
+          layers: [runner.layer, oxlintInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT,
-            args: [...OXLINT.args, "--fix", "--fix-dangerously", "--deny-warnings"],
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix", "--fix-dangerously", "--deny-warnings"],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -193,7 +195,7 @@ describe("fix", () => {
 
           const exit = yield* runCommand(fixCommand, [], {
             files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
-            layers: [runner.layer],
+            layers: [runner.layer, oxlintInstalledLayer],
           })
 
           expect(getFailure(exit)).toStrictEqual(
@@ -208,7 +210,9 @@ describe("fix", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext([1, 2])
 
-        const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
+        const exit = yield* runCommand(fixCommand, [], {
+          layers: [runner.layer, oxlintInstalledLayer],
+        })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
@@ -224,7 +228,9 @@ describe("fix", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext([0, 2])
 
-        const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
+        const exit = yield* runCommand(fixCommand, [], {
+          layers: [runner.layer, oxlintInstalledLayer],
+        })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))

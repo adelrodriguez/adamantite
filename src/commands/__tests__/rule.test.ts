@@ -24,8 +24,6 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
 import ruleCommand, { AstReport, renderTrial, TrialReport } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
-import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
@@ -59,11 +57,7 @@ const TEST_LAYER = Layer.mergeAll(
   TestConsole.layer,
   CommandRunner.layer.pipe(Layer.provide(NodeServices.layer)),
   ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
-  Layer.succeed(OxlintCommand)((project) =>
-    getOxlintCommand(project).pipe(
-      Effect.map((command) => ({ ...command, args: [join(REPO_ROOT, "src/oxlint/index.ts")] }))
-    )
-  ),
+  ModuleResolver.layer,
   Layer.succeed(OxlintProbe)(new URL("../../oxlint/probe.ts", import.meta.url)),
   Layer.succeed(TerminalCapabilities.TerminalCapabilities)({
     canAnimate: false,
@@ -756,7 +750,7 @@ describe("rule try", () => {
           schemaVersion: 1,
           setting: new ErrorSetting({ options: [{ paths: ["node:fs"] }] }),
         })
-      }).pipe(Effect.provide([TEST_LAYER, ModuleResolver.layer]))
+      }).pipe(Effect.provide(TEST_LAYER))
     )
   })
 })

@@ -166,12 +166,6 @@ importers:
 
   .:
     dependencies:
-      '@effect/platform-node':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)(redis@6.2.1)
-      effect:
-        specifier: 4.1.2
-        version: 4.1.2
       oxc-resolver:
         specifier: 11.24.2
         version: 11.24.2
@@ -182,6 +176,9 @@ importers:
       '@changesets/cli':
         specifier: 3.0.3
         version: 3.0.3
+      '@effect/platform-node':
+        specifier: 4.1.2
+        version: 4.1.2(effect@4.1.2)(redis@6.2.1)
       '@effect/tsgo':
         specifier: 0.70.0
         version: 0.70.0
@@ -209,6 +206,9 @@ importers:
       '@vitest/ui':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
+      effect:
+        specifier: 4.1.2
+        version: 4.1.2
       figlet:
         specifier: 1.12.0
         version: 1.12.0

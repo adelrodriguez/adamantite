@@ -130,13 +130,12 @@
     "version": "changeset version"
   },
   "dependencies": {
-    "@effect/platform-node": "4.1.2",
-    "effect": "4.1.2",
     "oxc-resolver": "11.24.2"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
+    "@effect/platform-node": "4.1.2",
     "@effect/tsgo": "0.70.0",
     "@effect/vitest": "4.1.2",
     "@oxlint/plugins": "1.94.0",
@@ -146,6 +145,7 @@
     "@types/node": "22.20.5",
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/ui": "5.0.5",
+    "effect": "4.1.2",
     "figlet": "1.12.0",
     "knip": "6.45.1",
     "oxfmt": "0.78.0",

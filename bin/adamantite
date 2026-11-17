@@ -1,3 +1,9 @@
 #!/usr/bin/env node
 
+import module from "node:module"
+
+// V8 keeps the compiled code of the bundle in a folder of the system's temporary directory, so a
+// later start skips compiling it. Child processes, such as Oxlint, do not inherit the cache.
+module.enableCompileCache()
+
 import("../dist/index.js")

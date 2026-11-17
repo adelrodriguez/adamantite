@@ -1,10 +1,16 @@
 import type { ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync, readFileSync } from "node:fs"
 import { posix } from "node:path"
-import { isStringLiteral } from "../../shared/ast.ts"
 import { readStringArrayOption, readStringOption } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
-import { resolveImport } from "../shared/resolver.ts"
+import {
+  type ModuleSource,
+  readDynamicSource,
+  readImportEqualsSource,
+  readRequireSource,
+  readStaticSource,
+} from "../shared/imports.ts"
+import { type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
@@ -98,10 +104,14 @@ export interface Project {
    */
   readonly findRoot: (file: string) => Root | undefined
   /**
-   * The file that `specifier` in `importer` resolves to, with `/` between folders, or undefined
-   * when it does not resolve.
+   * The file that `specifier` in `importer` resolves to in `mode`, with `/` between folders, or
+   * undefined when it does not resolve.
    */
-  readonly resolve: (importer: string, specifier: string) => string | undefined
+  readonly resolve: (
+    importer: string,
+    specifier: string,
+    mode: ResolutionMode
+  ) => string | undefined
 }
 
 const OWNERS_HINT =
@@ -275,12 +285,13 @@ export function createImportOwnersRule(project: Project): Rule {
 
   /**
    * Whether `file` is the project module `entry.import`, or a file below it when the module is a
-   * folder. The module resolves from the root, as owner paths do. A folder resolves only through a
-   * file in it, so each tail of the file's path is tried below the module, in each name that an
-   * alias can give it.
+   * folder. The module resolves from the root, as owner paths do, and in the `mode` of the import,
+   * so an alias with a `require` condition names the file that `require()` loads. A folder resolves
+   * only through a file in it, so each tail of the file's path is tried below the module, in each
+   * name that an alias can give it.
    */
-  function covers(entry: ImportOwner, root: string, file: string) {
-    const key = [entry.import, root, file].join("\0")
+  function covers(entry: ImportOwner, root: string, file: string, mode: ResolutionMode) {
+    const key = [entry.import, root, file, mode].join("\0")
     const known = coverage.get(key)
 
     if (known !== undefined) {
@@ -292,8 +303,8 @@ export function createImportOwnersRule(project: Project): Rule {
     const tails = segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
 
     const result =
-      project.resolve(anchor, entry.import) === file
-      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`) === file)
+      project.resolve(anchor, entry.import, mode) === file
+      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`, mode) === file)
 
     coverage.set(key, result)
 
@@ -360,17 +371,20 @@ export function createImportOwnersRule(project: Project): Rule {
 
       const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
 
-      function findRestricted(source: ESTree.StringLiteral) {
+      function findRestricted(source: ModuleSource) {
         // A project module can match only an import that resolves to a file of the project.
-        const resolved = matchesFile ? project.resolve(importer, source.value) : undefined
+        const resolved = matchesFile
+          ? project.resolve(importer, source.specifier, source.mode)
+          : undefined
+
         const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
 
         return restricted.filter((entry) => {
           const matches = MODULE_MATCHES[entry.kind]
 
           return (
-            (matches.text && isImportOf(entry.import, source.value))
-            || (matches.file && file !== undefined && covers(entry, projectRoot, file))
+            (matches.text && isImportOf(entry.import, source.specifier))
+            || (matches.file && file !== undefined && covers(entry, projectRoot, file, source.mode))
           )
         })
       }
@@ -379,10 +393,10 @@ export function createImportOwnersRule(project: Project): Rule {
        * Check an import that reaches every export of the module, such as `import()`. A plain
        * `export * from` reaches every export except the default export.
        */
-      function checkWhole(source: ESTree.StringLiteral, withDefault = true) {
+      function checkWhole(source: ModuleSource, withDefault = true) {
         for (const entry of findRestricted(source)) {
           if (entry.names === undefined) {
-            reportModule(entry, source)
+            reportModule(entry, source.node)
             continue
           }
 
@@ -391,7 +405,7 @@ export function createImportOwnersRule(project: Project): Rule {
           )
 
           if (reached.size > 0) {
-            reportNamespace(entry, source, reached)
+            reportNamespace(entry, source.node, reached)
           }
         }
       }
@@ -402,7 +416,7 @@ export function createImportOwnersRule(project: Project): Rule {
        */
       function checkImportType(node: ESTree.TSImportType) {
         if (node.qualifier === null) {
-          checkWhole(node.source)
+          checkWhole(readStaticSource(node.source))
 
           return
         }
@@ -413,7 +427,7 @@ export function createImportOwnersRule(project: Project): Rule {
           first = first.left
         }
 
-        for (const entry of findRestricted(node.source)) {
+        for (const entry of findRestricted(readStaticSource(node.source))) {
           if (entry.names === undefined) {
             reportModule(entry, node.source)
           } else if (entry.names.has(first.name)) {
@@ -423,7 +437,7 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       function checkImport(node: ESTree.ImportDeclaration) {
-        for (const entry of findRestricted(node.source)) {
+        for (const entry of findRestricted(readStaticSource(node.source))) {
           const { names } = entry
 
           if (names === undefined) {
@@ -446,7 +460,7 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       function checkExport(node: ESTree.ExportNamedDeclaration, source: ESTree.StringLiteral) {
-        for (const entry of findRestricted(source)) {
+        for (const entry of findRestricted(readStaticSource(source))) {
           const { names } = entry
 
           if (names === undefined) {
@@ -463,8 +477,15 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       return {
+        CallExpression(node) {
+          const source = readRequireSource(context, node)
+
+          if (source !== undefined) {
+            checkWhole(source)
+          }
+        },
         ExportAllDeclaration(node) {
-          checkWhole(node.source, node.exported !== null)
+          checkWhole(readStaticSource(node.source), node.exported !== null)
         },
         ExportNamedDeclaration(node) {
           if (node.source !== null) {
@@ -473,8 +494,17 @@ export function createImportOwnersRule(project: Project): Rule {
         },
         ImportDeclaration: checkImport,
         ImportExpression(node) {
-          if (isStringLiteral(node.source)) {
-            checkWhole(node.source)
+          const source = readDynamicSource(node)
+
+          if (source !== undefined) {
+            checkWhole(source)
+          }
+        },
+        TSImportEqualsDeclaration(node) {
+          const source = readImportEqualsSource(node)
+
+          if (source !== undefined) {
+            checkWhole(source)
           }
         },
         TSImportType: checkImportType,

@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "imports": {
+    "#dual": {
+      "require": "./src/features/auth/index.ts",
+      "default": "./src/shared/ui.ts"
+    },
     "#*": "./src/*"
   }
 }

@@ -1,0 +1,5 @@
+{
+  "rules": {
+    "adamantite/import-owners": ["error", { "import": "#dual", "owners": ["src/owner.ts"] }]
+  }
+}

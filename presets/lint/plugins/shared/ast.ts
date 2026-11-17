@@ -18,6 +18,31 @@ export function isNumberLiteral(node: ESTree.Node): node is ESTree.NumericLitera
 }
 
 /**
+ * Return the string that an expression spells without computing it, such as `./api.ts` in
+ * `"./api.ts"`, `` `./api.ts` ``, or `("./api.ts" as const)!`. A type assertion does not change the
+ * value, so the string inside one counts. Return null when running the code gives the value, as for
+ * a variable, a concatenation, or a template with an expression.
+ */
+export function staticString(node: ESTree.Expression): string | null {
+  switch (node.type) {
+    case "Literal":
+      return typeof node.value === "string" ? node.value : null
+
+    case "TemplateLiteral":
+      return node.expressions.length === 0 ? (node.quasis[0]?.value.cooked ?? null) : null
+
+    case "TSAsExpression":
+    case "TSNonNullExpression":
+    case "TSSatisfiesExpression":
+    case "TSTypeAssertion":
+      return staticString(node.expression)
+
+    default:
+      return null
+  }
+}
+
+/**
  * Return the name that a property key spells without computing it, such as `get` in `Reflect.get`,
  * `Reflect["get"]`, ``Reflect[`get`]``, or `const { get } = Reflect`, and `"0"` in `{ 0: value }`
  * or `{ [0]: value }`. Return null when an expression gives the name.

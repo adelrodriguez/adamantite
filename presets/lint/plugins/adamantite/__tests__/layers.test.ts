@@ -23,15 +23,21 @@ RuleTester.itOnly = it.only
 
 // A fake of the file system: relative imports resolve from the importer, `#` imports from
 // `/project/src`, and `#dep` to a package. `#conditional` selects a lib layer only under the
-// `development` condition. `#missing/...` does not resolve. The fixture test covers the real
-// resolver.
+// `development` condition, and `#dual` selects a higher lib layer for `require` than for `import`.
+// `#missing/...` does not resolve. The fixture test covers the real resolver.
 const MODULES: Modules = {
   findPackage: () => "/project",
-  resolve: (importer, specifier, conditions) => {
+  resolve: (importer, specifier, mode, conditions) => {
     if (specifier === "#conditional") {
       return conditions.includes("development")
         ? "/project/src/lib/integrations/value.ts"
         : "/project/outside.ts"
+    }
+
+    if (specifier === "#dual") {
+      return mode === "require"
+        ? "/project/src/lib/integrations/value.cts"
+        : "/project/src/lib/shared/value.ts"
     }
 
     if (specifier.startsWith(".")) {
@@ -189,6 +195,45 @@ tester.run("layers", createLayersRule(MODULES), {
       code: 'const base = await import("#lib/integrations/base.ts")',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/lazy.ts"),
+      options: [LIB_OPTIONS],
+    },
+    // A source that the code spells without computing it: a template with no expression, or a
+    // string inside type assertions. The report points to the whole source expression.
+    ...[
+      "import(`#lib/integrations/base.ts`)",
+      'import("#lib/integrations/base.ts" as string)',
+      'import("#lib/integrations/base.ts" satisfies string)',
+      'import("#lib/integrations/base.ts"!)',
+      'import(<string>"#lib/integrations/base.ts")',
+      'import(("#lib/integrations/base.ts" as const)!)',
+    ].map((code) => ({
+      code,
+      errors: [{ column: 7, line: 1, messageId: "upward" }],
+      filename: lib("workspace/lazy.ts"),
+      options: [LIB_OPTIONS],
+    })),
+    // A CommonJS `require` and a TypeScript import-equals declaration reach the module too.
+    ...[
+      'const base = require("#lib/integrations/base.ts")',
+      "const base = require(`#lib/integrations/base.ts`)",
+      'import base = require("#lib/integrations/base.ts")',
+      'export import base = require("#lib/integrations/base.ts")',
+      'import type base = require("#lib/integrations/base.ts")',
+      // A type named `require` leaves the runtime `require` in place.
+      'type require = string\nconst base = require("#lib/integrations/base.ts")',
+      'interface require {}\nconst base = require("#lib/integrations/base.ts")',
+      'type require = string\nfunction load() {\n  return require("#lib/integrations/base.ts")\n}',
+    ].map((code) => ({
+      code,
+      errors: [{ messageId: "upward" }],
+      filename: lib("workspace/lazy.ts"),
+      options: [LIB_OPTIONS],
+    })),
+    {
+      // `require` resolves with the `require` condition, which selects a higher layer here.
+      code: 'const value = require("#dual")',
+      errors: [{ column: 22, line: 1, messageId: "upward" }],
+      filename: lib("workspace/dual.ts"),
       options: [LIB_OPTIONS],
     },
     {
@@ -372,6 +417,36 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import { value } from "#conditional"',
       filename: lib("workspace/conditional.ts"),
+      options: [LIB_OPTIONS],
+    },
+    // A source that only running the code gives is outside the map.
+    ...[
+      'const path = "#lib/integrations/base.ts"\nconst base = import(path)',
+      'const base = import("#lib/integrations/" + "base.ts")',
+      `const name = "base"\nconst base = import(\`#lib/integrations/\${name}.ts\`)`,
+      'const base = import("#lib/shared/errors.ts", { with: { type: "#lib/integrations/base.ts" } })',
+    ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
+    // A local function named `require`, a `require` property, and a namespace alias load no module.
+    ...[
+      'function load(require: (path: string) => unknown) {\n  return require("#lib/integrations/base.ts")\n}',
+      'const require = (path: string) => path\nrequire("#lib/integrations/base.ts")',
+      'const path = require.resolve("#lib/integrations/base.ts")',
+      "import Base = Integrations.Base",
+    ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
+    {
+      code: 'const errors = require("#lib/shared/errors.ts")\nimport files = require("./files.ts")',
+      filename: lib("workspace/lazy.ts"),
+      options: [LIB_OPTIONS],
+    },
+    {
+      code: 'import type base = require("#lib/integrations/base.ts")',
+      filename: lib("workspace/lazy.ts"),
+      options: [{ ...LIB_OPTIONS, ignoreTypes: true }],
+    },
+    {
+      // `import` resolves with the `import` condition, which selects a lower layer here.
+      code: 'import { value } from "#dual"\nconst lazy = import("#dual")',
+      filename: lib("workspace/dual.ts"),
       options: [LIB_OPTIONS],
     },
     {
@@ -592,7 +667,7 @@ describe("layer map", () => {
 // A nested map: `src` maps `lib`, and `lib` has its own layer map, as in this repository.
 const NESTED_MODULES: Modules = {
   findPackage: () => "/project",
-  resolve: (importer, specifier, conditions) => {
+  resolve: (importer, specifier, _mode, conditions) => {
     if (specifier === "#conditional") {
       return conditions.includes("development")
         ? "/project/src/lib/shared/value.ts"

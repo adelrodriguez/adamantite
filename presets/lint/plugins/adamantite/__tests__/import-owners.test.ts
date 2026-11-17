@@ -82,6 +82,57 @@ tester.run("import-owners", rule, {
       filename: file("src/lib/references/add.ts"),
       options: [GIGET],
     },
+    // A source that the code spells without computing it: a template with no expression, or a
+    // string inside type assertions. The report points to the whole source expression.
+    ...[
+      "import(`giget`)",
+      'import("giget" as string)',
+      'import("giget" satisfies string)',
+      'import("giget"!)',
+      'import(("giget" as const)!)',
+    ].map((code) => ({
+      code,
+      errors: [{ column: 7, line: 1, message: MODULE_MESSAGE }],
+      filename: file("src/lib/references/add.ts"),
+      options: [GIGET],
+    })),
+    {
+      code: "const Native = await import(`react-native`)",
+      errors: [{ messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    // A CommonJS `require` and a TypeScript import-equals declaration reach the module too, also
+    // when they import only types.
+    ...[
+      'const giget = require("giget")',
+      "const giget = require(`giget`)",
+      'import giget = require("giget")',
+      'export import giget = require("giget")',
+      'import type giget = require("giget")',
+      // A type named `require` leaves the runtime `require` in place.
+      'type require = string\nconst giget = require("giget")',
+      'interface require {}\nconst giget = require("giget")',
+      'type require = string\nfunction load() {\n  return require("giget")\n}',
+    ].map((code) => ({
+      code,
+      errors: [{ message: MODULE_MESSAGE }],
+      filename: file("src/lib/references/add.ts"),
+      options: [GIGET],
+    })),
+    {
+      // `require` reaches every export, as `import()` does, whatever the code destructures.
+      code: 'const { View } = require("react-native")',
+      errors: [{ column: 25, line: 1, messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    {
+      code: 'import Native = require("react-native")',
+      errors: [{ messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
     {
       code: 'type Result = import("giget").DownloadTemplateResult',
       errors: [{ message: MODULE_MESSAGE }],
@@ -253,6 +304,29 @@ tester.run("import-owners", rule, {
   valid: [
     {
       code: 'import { downloadTemplate } from "giget"',
+      filename: file("src/lib/sources/repository/fetch.ts"),
+      options: [GIGET],
+    },
+    {
+      code: "const giget = await import(`giget`)",
+      filename: file("src/lib/sources/repository/fetch.ts"),
+      options: [GIGET],
+    },
+    // A source that only running the code gives does not match a restricted module.
+    ...[
+      'const name = "giget"\nconst giget = import(name)',
+      'const giget = import("gi" + "get")',
+      `const name = "get"\nconst giget = import(\`gi\${name}\`)`,
+      'const zod = import("zod", { with: { type: "giget" } })',
+    ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
+    // A local function named `require`, or a `require` property, loads no module.
+    ...[
+      'function load(require: (name: string) => unknown) {\n  return require("giget")\n}',
+      'const require = (name: string) => name\nrequire("giget")',
+      'const path = require.resolve("giget")',
+    ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
+    {
+      code: 'const giget = require("giget")\nimport fetch = require("giget")',
       filename: file("src/lib/sources/repository/fetch.ts"),
       options: [GIGET],
     },

@@ -9,6 +9,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import * as Bridge from "#lib/bridge/index.ts"
 import {
   CurrentSetting,
   ErrorSetting,
@@ -28,7 +29,6 @@ import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
 import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
@@ -56,7 +56,7 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
       const cwd = yield* Project.Directory
       const path = yield* Path.Path
       const relative = path.relative(cwd, path.resolve(cwd, file))
-      const program = yield* Toolchain.ast(relative)
+      const program = yield* Bridge.ast(relative)
 
       yield* Output.result(
         AstReport,

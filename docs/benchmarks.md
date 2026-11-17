@@ -2,7 +2,7 @@
 
 `pnpm run bench` times `adamantite check` and `adamantite fix` in a target project for each stack,
 along with the direct Oxfmt and Oxlint commands that they run. It builds the package, runs
-[`src/lib/toolchain/__tests__/index.bench.ts`](../src/lib/toolchain/__tests__/index.bench.ts) with
+[`src/lib/bridge/__tests__/index.bench.ts`](../src/lib/bridge/__tests__/index.bench.ts) with
 `vitest bench`, and writes the report with
 [`scripts/bench-reporter.ts`](../scripts/bench-reporter.ts). The `bench` job of
 [`.github/workflows/weekly.yml`](../.github/workflows/weekly.yml) runs it each Monday. No

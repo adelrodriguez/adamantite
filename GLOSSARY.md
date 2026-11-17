@@ -101,10 +101,14 @@ the managed versions, and its managed files as this version renders them. A kept
 when Doctor reports no finding for it.
 _Avoid_: Managed ideal, managed state, supported state
 
-**Toolchain**:
-The code-quality tools and their plugins that Adamantite configures and runs for a target
-project.
-_Avoid_: Proxy
+**Bridge**:
+The layer between the commands and the integrations, in `src/lib/bridge`. `check`, `fix`, and
+`analyze` call it with the user's options. The lockfile selection decides which tools it runs, such
+as Oxfmt, Oxlint, Sherif, and Knip. The bridge runs them in order and decides when the command
+fails. Plugins extend an integration, such as the Effect build of Oxlint, so the bridge calls them
+through that integration. `@effect/tsgo/oxlint-bridge` is an Effect module that the Oxlint entry
+loads, not the bridge.
+_Avoid_: Toolchain, proxy
 
 **Oxlint runtime**:
 The Oxlint package, native binding, and type-aware backend that Adamantite runs Oxlint with for

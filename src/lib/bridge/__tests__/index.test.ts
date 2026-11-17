@@ -8,9 +8,9 @@ import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
+import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
 import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
 import { IDIOM_TREES, IDIOMS_DIR, listFiles, listTreeStacks } from "#presets/__tests__/idioms.ts"
 import {
   createFixtureProject,
@@ -165,7 +165,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
 
     it.live("keep each clean idiom unchanged after fix", () =>
       Effect.gen(function* () {
-        yield* Toolchain.fix({
+        yield* Bridge.fix({
           files: [`${FIXTURES_DIRECTORY}/clean`],
           level: FIX_LEVEL,
         })
@@ -189,7 +189,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
           // Fix fails while a report stays, as after the first pass of a known second pass, so
           // the test reads the files to see the result.
           yield* Effect.ignore(
-            Toolchain.fix({
+            Bridge.fix({
               files: [`${FIXTURES_DIRECTORY}/fixable`],
               level: FIX_LEVEL,
             })
@@ -204,7 +204,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
 
           if (repeated.size > 0) {
             yield* Effect.ignore(
-              Toolchain.fix({
+              Bridge.fix({
                 files: [...repeated].map((file) => `${FIXTURES_DIRECTORY}/fixable/${file}`),
                 level: FIX_LEVEL,
               })
@@ -214,12 +214,12 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
           expect(readFixable()).toStrictEqual(fixed)
 
           const checked = yield* Effect.exit(
-            Toolchain.check({ files: [`${FIXTURES_DIRECTORY}/fixable`] })
+            Bridge.check({ files: [`${FIXTURES_DIRECTORY}/fixable`] })
           )
 
           expect(checked).toStrictEqual(Exit.void)
 
-          yield* Toolchain.fix({
+          yield* Bridge.fix({
             files: [`${FIXTURES_DIRECTORY}/fixable`],
             level: FIX_LEVEL,
           })

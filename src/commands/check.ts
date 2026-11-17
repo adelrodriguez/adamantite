@@ -3,10 +3,10 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
 import { readSelection } from "#lib/project/lockfile.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Files to check. Omit to check the project"),
@@ -29,7 +29,7 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
   Command.withDescription("Check formatting, lint issues, and TypeScript types"),
   Command.withHandler(({ allowWarnings, files, only }) =>
     Effect.gen(function* () {
-      yield* Toolchain.check({
+      yield* Bridge.check({
         allowWarnings,
         files,
         forwardedArguments: yield* ForwardedArguments,

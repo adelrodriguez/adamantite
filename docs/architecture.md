@@ -50,14 +50,14 @@ disagree.
 | `src/lib`              | Hold the library. Lib code returns data, and never prints a line or asks a question.                                                                                                         | None                 |
 | `src/lib/setup`        | Apply a selection with `Setup.apply`: install the packages, set the managed scripts, write the managed files under the write rule, and write the lockfile last.                              | `integrations`       |
 | `src/lib/assessment`   | Assess the project with each integration that the selection includes, and render the repair prompt and the warning report.                                                                   | `integrations`       |
-| `src/lib/toolchain`    | Run the check, fix, and analyze stages, route forwarded arguments, and decide the failure policy.                                                                                            | `integrations`       |
+| `src/lib/bridge`       | Run the check, fix, and analyze stages, route forwarded arguments, and decide the failure policy.                                                                                            | `integrations`       |
 | `src/lib/hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, count the suppressions, find the discovery gaps, run rule trials, and render the harden prompt.            | `integrations`       |
 | `src/lib/integrations` | Hold the `Integration` list and one folder for each integration: its packages, its managed files, its `assess`, and its command builder.                                                     | `handoff`, `project` |
 | `src/lib/handoff`      | Detect the installed coding agent CLIs, and hand the terminal to one of them.                                                                                                                | `shared`             |
 | `src/lib/project`      | Read the target project: `package.json`, the workspace, the lockfile and its selection, the configs through the config loader, and the custom rules. Detect the package manager and install. | `shared`             |
 | `src/lib/shared`       | Define errors, filesystem and JSON helpers, the command runner, the working directory, the forwarded arguments, the public imports, and templates.                                           | None                 |
 
-`setup`, `assessment`, `toolchain`, and `hardening` are siblings above `integrations`, so none of
+`setup`, `assessment`, `bridge`, and `hardening` are siblings above `integrations`, so none of
 them imports another. `assessment` does not import `hardening`, because harden is not an
 assessment. `project` and `handoff` are siblings too. `project` knows target-project files and
 package state, but not integration types such as `Finding`. Lib code returns data, and commands
@@ -138,7 +138,7 @@ a conflicting JSON config, a missing config, and a config that does not load. `t
 package checks that several tools share. Helper modules beside an integration, such as
 `knip/config.ts`, hold the logic that only that integration uses. Oxlint, Oxfmt, Knip, and Sherif
 also have command builders in `command.ts`, which return `CommandRunOptions` and start no process.
-The builders stay out of the `Integration`, and Toolchain and `setup` import each `command.ts`
+The builders stay out of the `Integration`, and the bridge and `setup` import each `command.ts`
 directly. The Oxlint integration and the Oxlint entry use one Oxlint runtime resolver, and
 `hardening` starts the Oxlint entry through `oxlint/entry.ts` to capture the lint output.
 
@@ -311,20 +311,20 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
 
 ## Command boundaries
 
-- `check` and `fix` call Toolchain to run Oxfmt and Oxlint. Toolchain starts Oxlint through
+- `check` and `fix` call the bridge to run Oxfmt and Oxlint. The bridge starts Oxlint through
   the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
   `check` fails on Oxlint warnings unless `--allow-warnings` is set.
 - `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
   `antislop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
   one pass of fixes, so a fix that causes a new fixable report still needs a second `fix`.
-  `src/lib/toolchain/__tests__/index.test.ts` lists each such idiom in `secondPasses` and fails
+  `src/lib/bridge/__tests__/index.test.ts` lists each such idiom in `secondPasses` and fails
   when one fix ends it, so the entry goes when Oxlint repeats its passes
   ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
-- `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
+- `analyze` calls the bridge to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
-- `check`, `fix`, and `analyze` read the lockfile selection and pass it to Toolchain. When a tool
-  is not on `PATH` and no selected script runs it, Toolchain replaces `CliNotFound` with
+- `check`, `fix`, and `analyze` read the lockfile selection and pass it to the bridge. When a tool
+  is not on `PATH` and no selected script runs it, the bridge replaces `CliNotFound` with
   `ToolNotSelected`, which names the `init` command that adds the script. The Oxlint entry reads
   the selection and replaces `PackageNotInstalled` for Oxlint the same way. Without a lockfile, or
   for a selected tool, the failure of the tool stands.

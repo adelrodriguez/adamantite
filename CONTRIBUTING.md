@@ -89,7 +89,7 @@ Each kind of test has one place:
   several folders share go in `src/__tests__/`.
 - Tests of a script in `scripts/` go in `scripts/__tests__/<script>.test.ts`.
 - Benchmarks go in a `<name>.bench.ts` file beside the test of the module that they time, such as
-  `src/lib/toolchain/__tests__/index.bench.ts`.
+  `src/lib/bridge/__tests__/index.bench.ts`.
 
 Name each test file after the module that it tests, as `<folder>/__tests__/<name>.test.ts` for
 `<folder>/<name>.ts`, or list it with a reason in `src/__tests__/test-names.test.ts`.

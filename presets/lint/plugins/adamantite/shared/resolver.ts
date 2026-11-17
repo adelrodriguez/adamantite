@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs"
 import { type NapiResolveOptions, ResolverFactory } from "oxc-resolver"
 
 // The import resolution that the first-party rules share, so `adamantite/layers` and
@@ -19,7 +20,8 @@ const DEFAULT_CONDITIONS = {
 // TypeScript substitutes the source and declaration extensions for a runtime extension, such as
 // `./view.tsx` for `./view.jsx`, and `tsconfig.json` `paths` resolve from the nearest config.
 // oxc-resolver does not read `customConditions`, so they come from the `conditions` argument. The
-// resolver keeps symlinked paths as they are, so they compare with the paths that Oxlint lints.
+// resolver keeps symlinked paths as they are, so a path through `node_modules` keeps its package, and
+// `identifyPath` gives the rules the real path of every other file.
 const resolverOptions = {
   extensionAlias: {
     ".cjs": [".cts", ".d.cts", ".cjs"],
@@ -31,6 +33,31 @@ const resolverOptions = {
   symlinks: false,
   tsconfig: "auto",
 } as const satisfies NapiResolveOptions
+
+const identities = new Map<string, string>()
+
+/**
+ * The path that identifies the file or folder at `path` when a rule compares two paths, with `/`
+ * between folders. A path through a `node_modules` folder stays as it is, so a linked workspace
+ * package keeps its package. Every other path becomes its real path, so a symlink cannot give a
+ * protected file a second path. A rule identifies both paths of a comparison, so a project below a
+ * linked folder, such as `/tmp` on macOS, compares a real path with a real path. Oxlint caches the
+ * loaded plugin, so an editor language server needs a restart after a link changes.
+ */
+export function identifyPath(path: string): string {
+  if (path.split("/").includes("node_modules")) {
+    return path
+  }
+
+  let identity = identities.get(path)
+
+  if (identity === undefined) {
+    identity = realpathSync(path).replaceAll("\\", "/")
+    identities.set(path, identity)
+  }
+
+  return identity
+}
 
 const baseResolver = new ResolverFactory({
   ...resolverOptions,

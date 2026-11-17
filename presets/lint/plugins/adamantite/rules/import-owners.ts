@@ -10,7 +10,7 @@ import {
   readRequireSource,
   readStaticSource,
 } from "../shared/imports.ts"
-import { type ResolutionMode, resolveImport } from "../shared/resolver.ts"
+import { identifyPath, type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
@@ -103,6 +103,11 @@ export interface Project {
    * The root that owner paths are relative to for `file`.
    */
   readonly findRoot: (file: string) => Root | undefined
+  /**
+   * The path that identifies the file or folder at `path`, so the rule compares a resolved file
+   * with an owned module and the root by the same kind of path.
+   */
+  readonly identify: (path: string) => string
   /**
    * The file that `specifier` in `importer` resolves to in `mode`, with `/` between folders, or
    * undefined when it does not resolve.
@@ -259,7 +264,7 @@ function findRoot(file: string): Root | undefined {
   return found === undefined ? undefined : { kind: "package", path: found }
 }
 
-const project: Project = { findRoot, resolve: resolveImport }
+const project: Project = { findRoot, identify: identifyPath, resolve: resolveImport }
 
 /**
  * The names that an alias can give the file at `path`: the path itself, the path without its
@@ -279,19 +284,21 @@ function listAliasNames(path: string) {
 }
 
 export function createImportOwnersRule(project: Project): Rule {
-  // Whether a project module covers a resolved file, by module, root, and file. Oxlint loads the
-  // rule one time for a lint run, so the answers carry over between files.
+  // Whether a project module covers a resolved path, by module, root, path, and mode. Oxlint loads
+  // the rule one time for a lint run, so the answers carry over between files.
   const coverage = new Map<string, boolean>()
 
   /**
-   * Whether `file` is the project module `entry.import`, or a file below it when the module is a
-   * folder. The module resolves from the root, as owner paths do, and in the `mode` of the import,
-   * so an alias with a `require` condition names the file that `require()` loads. A folder resolves
-   * only through a file in it, so each tail of the file's path is tried below the module, in each
-   * name that an alias can give it.
+   * Whether the file at `path` is the project module `entry.import`, or a file below it when the
+   * module is a folder. The module resolves from the root, as owner paths do, and in the `mode` of
+   * the import, so an alias with a `require` condition names the file that `require()` loads. A
+   * folder resolves only through a file in it, so each tail of the file's path is tried below the
+   * module, in each name that an alias can give it. The tails come from both the path and the real
+   * path, because a link can give the file a name in the module that its real path lacks. A
+   * candidate matches when it identifies the same file.
    */
-  function covers(entry: ImportOwner, root: string, file: string, mode: ResolutionMode) {
-    const key = [entry.import, root, file, mode].join("\0")
+  function covers(entry: ImportOwner, root: string, path: string, mode: ResolutionMode) {
+    const key = [entry.import, root, path, mode].join("\0")
     const known = coverage.get(key)
 
     if (known !== undefined) {
@@ -299,12 +306,26 @@ export function createImportOwnersRule(project: Project): Rule {
     }
 
     const anchor = posix.join(root, "package.json")
-    const segments = posix.relative(root, file).split("/")
-    const tails = segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
+    const file = project.identify(path)
+
+    const tails = new Set(
+      [posix.relative(root, path), posix.relative(project.identify(root), file)].flatMap(
+        (relative) => {
+          const segments = relative.split("/")
+
+          return segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
+        }
+      )
+    )
+
+    function reaches(specifier: string) {
+      const resolved = project.resolve(anchor, specifier, mode)
+
+      return resolved !== undefined && project.identify(resolved) === file
+    }
 
     const result =
-      project.resolve(anchor, entry.import, mode) === file
-      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`, mode) === file)
+      reaches(entry.import) || [...tails].some((tail) => reaches(`${entry.import}/${tail}`))
 
     coverage.set(key, result)
 
@@ -372,19 +393,20 @@ export function createImportOwnersRule(project: Project): Rule {
       const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
 
       function findRestricted(source: ModuleSource) {
-        // A project module can match only an import that resolves to a file of the project.
+        // A project module can match only an import that resolves to a file of the project. A link
+        // cannot hide an owned module, because `covers` identifies the file and the module.
         const resolved = matchesFile
           ? project.resolve(importer, source.specifier, source.mode)
           : undefined
 
-        const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
+        const path = resolved?.includes("/node_modules/") === false ? resolved : undefined
 
         return restricted.filter((entry) => {
           const matches = MODULE_MATCHES[entry.kind]
 
           return (
             (matches.text && isImportOf(entry.import, source.specifier))
-            || (matches.file && file !== undefined && covers(entry, projectRoot, file, source.mode))
+            || (matches.file && path !== undefined && covers(entry, projectRoot, path, source.mode))
           )
         })
       }

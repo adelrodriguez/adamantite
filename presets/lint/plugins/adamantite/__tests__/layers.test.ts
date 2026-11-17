@@ -1,4 +1,5 @@
 import { posix } from "node:path"
+import { identity } from "effect/Function"
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import {
@@ -27,6 +28,7 @@ RuleTester.itOnly = it.only
 // `#missing/...` does not resolve. The fixture test covers the real resolver.
 const MODULES: Modules = {
   findPackage: () => "/project",
+  identify: identity,
   resolve: (importer, specifier, mode, conditions) => {
     if (specifier === "#conditional") {
       return conditions.includes("development")
@@ -667,6 +669,7 @@ describe("layer map", () => {
 // A nested map: `src` maps `lib`, and `lib` has its own layer map, as in this repository.
 const NESTED_MODULES: Modules = {
   findPackage: () => "/project",
+  identify: identity,
   resolve: (importer, specifier, _mode, conditions) => {
     if (specifier === "#conditional") {
       return conditions.includes("development")

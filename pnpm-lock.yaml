@@ -163,7 +163,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  effect@4.1.2: fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec
+  effect@4.1.2: d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619
 
 importers:
 
@@ -181,13 +181,13 @@ importers:
         version: 3.0.3
       '@effect/platform-node':
         specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec))(redis@6.2.1)
+        version: 4.1.2(effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619))(redis@6.2.1)
       '@effect/tsgo':
         specifier: 0.70.0
         version: 0.70.0
       '@effect/vitest':
         specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec))(vitest@5.0.5)
+        version: 4.1.2(effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619))(vitest@5.0.5)
       '@oxlint/plugins':
         specifier: 1.94.0
         version: 1.94.0
@@ -211,7 +211,7 @@ importers:
         version: 5.0.5(vitest@5.0.5)
       effect:
         specifier: 4.1.2
-        version: 4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec)
+        version: 4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619)
       figlet:
         specifier: 1.12.0
         version: 1.12.0
@@ -2428,19 +2428,19 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 2.0.0
 
-  '@effect/platform-node-shared@4.1.2(effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec))':
+  '@effect/platform-node-shared@4.1.2(effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619))':
     dependencies:
       '@types/ws': 8.18.2
-      effect: 4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec)
+      effect: 4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619)
       ws: 8.22.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.1.2(effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec))(redis@6.2.1)':
+  '@effect/platform-node@4.1.2(effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619))(redis@6.2.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.1.2(effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec))
-      effect: 4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec)
+      '@effect/platform-node-shared': 4.1.2(effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619))
+      effect: 4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619)
       redis: 6.2.1
       undici: 8.12.3
     transitivePeerDependencies:
@@ -2478,9 +2478,9 @@ snapshots:
       '@effect/tsgo-win32-arm64': 0.70.0
       '@effect/tsgo-win32-x64': 0.70.0
 
-  '@effect/vitest@4.1.2(effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec))(vitest@5.0.5)':
+  '@effect/vitest@4.1.2(effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619))(vitest@5.0.5)':
     dependencies:
-      effect: 4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec)
+      effect: 4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619)
       vitest: 5.0.5(@types/node@22.20.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(vite@8.2.1(@types/node@22.20.5)(jiti@2.7.0)(yaml@2.9.0))
 
   '@emnapi/core@1.11.2':
@@ -3160,7 +3160,7 @@ snapshots:
     optionalDependencies:
       oxc-resolver: 11.24.2
 
-  effect@4.1.2(patch_hash=fc4bd507d8445009c3c50d38d41c43b9440674f5e598ce39498f6eade2b7aaec): {}
+  effect@4.1.2(patch_hash=d34889258e67825d2ef3e78eb7202f9ab5488352e8ee512e287ffd305efef619): {}
 
   empathic@2.1.0: {}
 

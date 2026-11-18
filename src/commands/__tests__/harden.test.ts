@@ -70,6 +70,7 @@ const REQUIRED_PHRASES = {
     "Each link to a Markdown file that does not exist is a discovery gap too.",
     "the files that the instructions link to or tell agents to read, including files absent from the list",
     "**discovery gap**",
+    "When the decisions record above exists, read it too.",
     "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
   ],
   "## 2. List the written standards": [
@@ -122,6 +123,9 @@ const REQUIRED_PHRASES = {
     "one case that the rule must report and one similar case that it must accept",
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
+    "One that matches an entry is settled: do not propose it or ask about it again.",
+    "List it under **Also considered** in step 8, with the heading of its entry.",
+    "evidence that is newer than the date of the entry, such as fix commits after it",
     "Continue when every remaining candidate has a proposed step, evidence, limits, and cases",
   ],
   "## 8. Show the candidates and wait for approval": [
@@ -137,6 +141,16 @@ const REQUIRED_PHRASES = {
     "Wait until the user names the candidates to write or approves none",
     "When no human can approve",
     "stop after this step.",
+    "Write no file, also not the decisions record.",
+    "After the user answers, write the decisions record, also when the user approves none.",
+    "one for each item of the Decisions list that the user resolved",
+    "An approved candidate needs no entry, because its rule or instruction is the trace.",
+    "and each candidate that step 7 matched with an entry of the decisions record",
+    "- Decision: rejected",
+    "- Date: ",
+    "- Reason: ",
+    "- Evidence: ",
+    "Tell the user to commit the record",
   ],
   "## 9. Write the approved standards": [
     "**Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail",
@@ -167,6 +181,9 @@ const REQUIRED_PHRASES = {
     "When you changed a project check, also run that check with the project's own command",
     "add the file to the override as step 9 says, not a disable comment",
     "If a check is blocked, record its command and reason instead of claiming completion.",
+  ],
+  "## Check the result": [
+    "The decisions record has an entry for each candidate that the user did not approve and each decision that the user resolved",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 
@@ -234,6 +251,11 @@ interface ProcessOptions {
    */
   readonly indexOnlyFiles?: readonly string[]
   /**
+   * What `git log -1 --format="%H %cs"` prints for each file that a commit changed, by its path
+   * from the project root. Git prints nothing for another file.
+   */
+  readonly lastChanges?: Readonly<Record<string, string>>
+  /**
    * Files that an ignore pattern of the Oxlint config matches, so `oxlint` does not list them.
    */
   readonly lintIgnoredFiles?: readonly string[]
@@ -266,6 +288,7 @@ function makeProcessLayer(
   {
     exitCode = 0,
     indexOnlyFiles = [],
+    lastChanges = {},
     lintIgnoredFiles = [],
     oxlintExitCode = 0,
     probeReport = '{ "diagnostics": [], "number_of_files": 0 }',
@@ -278,10 +301,12 @@ function makeProcessLayer(
     )
 
   const getGitOutput = (args: ChildProcess.StandardCommand["args"]) =>
-    Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
-      .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
-      .map((file) => `${file}\0`)
-      .join("")
+    args[0] === "log"
+      ? (lastChanges[args.at(-1) ?? ""] ?? "")
+      : Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
+          .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
+          .map((file) => `${file}\0`)
+          .join("")
 
   const getOxlintOutput = () =>
     listFiles()
@@ -479,9 +504,13 @@ function runHardenHoisted() {
   })
 }
 
-function runHardenPrompt(files: Record<string, string>, args: readonly string[] = []) {
+function runHardenPrompt(
+  files: Record<string, string>,
+  args: readonly string[] = [],
+  processes: ProcessOptions = {}
+) {
   return Effect.gen(function* () {
-    const { exit, logLines } = yield* runHarden(files, args)
+    const { exit, logLines } = yield* runHarden(files, args, processes)
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(logLines).toHaveLength(1)
@@ -537,6 +566,16 @@ function getContext(prompt: string) {
 
 const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
 
+const RECORD = ".adamantite/decisions.md"
+const RECORD_COMMIT = "4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d"
+
+// A decisions record that commit `RECORD_COMMIT` last changed.
+const RECORD_FILES = {
+  [RECORD]: "# Decisions\n\n## Test files sit beside their module\n\n- Decision: rejected\n",
+}
+
+const RECORD_PROCESSES = { lastChanges: { [RECORD]: `${RECORD_COMMIT} 2026-11-02\n` } }
+
 // What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`.
 const INDEX_PROBE_REPORT = JSON.stringify({
   diagnostics: [
@@ -577,9 +616,10 @@ describe("harden", () => {
           brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
           unreached: ["docs/unreached.md"],
         }),
-        commits: 20,
         configs: ["oxlint.config.ts"],
+        decisionsRecord: { _tag: "Missing", path: RECORD },
         documentationFiles: Option.some(["AGENTS.md", "docs/unreached.md"]),
+        fixHistory: { _tag: "Last", count: 20 },
         instructionFiles: ["AGENTS.md"],
         overrides: new LintedOverrides({ rules: [] }),
         rulesFolders: [".adamantite/lint"],
@@ -589,6 +629,26 @@ describe("harden", () => {
           { locations: ["src/index.ts:1"], rule: Option.some("no-console") },
         ]),
         unloadedConfigs: [],
+      })
+    })
+  )
+
+  it.effect("print the commit of the decisions record, and the fix history since it, as JSON", () =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden(
+        { ...RECORD_FILES, ...INSTALLED },
+        ["--json"],
+        RECORD_PROCESSES
+      )
+
+      expect(decodeReport(logLines[0])).toMatchObject({
+        decisionsRecord: {
+          _tag: "Committed",
+          commit: RECORD_COMMIT,
+          date: "2026-11-02",
+          path: RECORD,
+        },
+        fixHistory: { _tag: "Since", commit: RECORD_COMMIT },
       })
     })
   )
@@ -724,6 +784,7 @@ describe("harden", () => {
           "### Instructions",
           "### Documentation",
           "### Agent reach",
+          "### Decisions",
           "### Suppressions",
           "### Overrides that turn a rule off",
           "## 1. Explore the documentation",
@@ -1022,9 +1083,12 @@ describe("harden", () => {
           )
         )
 
-        expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
-          "Steps 1 to 8 are read-only for the target project."
-        )
+        expect(
+          getMissingPhrases(prompt.slice(0, prompt.indexOf("\n## Context\n")), [
+            "Steps 1 to 8 are read-only for the target project.",
+            "The one exception is the decisions record, which you write after the user answers in step 8.",
+          ])
+        ).toStrictEqual([])
         expect(missing).toStrictEqual([])
       })
   )
@@ -1064,6 +1128,109 @@ describe("harden", () => {
       expect(getSection(prompt, "## 4. Read the fix history")).toContain(
         `\`git log -n 200 --no-merges --format="%h %s" -- 'src/(app)'\``
       )
+    })
+  )
+
+  it.effect(
+    "name the decisions record and its last commit, and read the fix history since that commit",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt(
+          { ...RECORD_FILES, ...INSTALLED },
+          [],
+          RECORD_PROCESSES
+        )
+
+        expect(
+          getMissingPhrases(getSection(prompt, "### Decisions"), [
+            "The decisions record is `.adamantite/decisions.md`.",
+            `Commit \`${RECORD_COMMIT}\` last changed it, on 2026-11-02.`,
+          ])
+        ).toStrictEqual([])
+        expect(
+          getMissingPhrases(getSection(prompt, "## 4. Read the fix history"), [
+            `\`git log ${RECORD_COMMIT}..HEAD --no-merges --format="%h %s" -- .\``,
+            "When it lists no commit, record that the history has no commit after the record",
+          ])
+        ).toStrictEqual([])
+        // The agent reads the record, so the prompt names it and does not repeat its entries.
+        expect(prompt).not.toContain("Test files sit beside their module")
+      })
+  )
+
+  it.effect("say that no decisions record exists, and that step 8 creates it", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(INSTALLED)
+
+      expect(
+        getMissingPhrases(getSection(prompt, "### Decisions"), [
+          "The decisions record is `.adamantite/decisions.md`.",
+          "It does not exist yet. Step 8 creates it.",
+        ])
+      ).toStrictEqual([])
+    })
+  )
+
+  it.effect.each([
+    { name: "git has no commit of the decisions record", processes: {} },
+    { name: "git cannot read the history", processes: { exitCode: 128 } },
+  ])("read the last 200 commits when $name", ({ processes }) =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden({ ...RECORD_FILES, ...INSTALLED }, [], processes)
+      const prompt = logLines[0] ?? ""
+
+      expect(getSection(prompt, "### Decisions")).toContain(
+        "Git names no commit that changed it, because the record is not committed or git cannot read the history."
+      )
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        '`git log -n 200 --no-merges --format="%h %s" -- .`'
+      )
+    })
+  )
+
+  it.effect("read the number of commits that --commits gives, also with a decisions record", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(
+        { ...RECORD_FILES, ...INSTALLED },
+        ["--commits", "50"],
+        RECORD_PROCESSES
+      )
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        '`git log -n 50 --no-merges --format="%h %s" -- .`'
+      )
+    })
+  )
+
+  it.effect("keep one decisions record at the project root when --path selects a package", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(
+        { ...MONOREPO_FILES, ...RECORD_FILES, "packages/web/.adamantite/decisions.md": "# Web\n" },
+        ["--path", "packages/web"],
+        RECORD_PROCESSES
+      )
+
+      expect(getSection(prompt, "### Decisions")).toContain(
+        "The decisions record is `.adamantite/decisions.md`."
+      )
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        `\`git log ${RECORD_COMMIT}..HEAD --no-merges --format="%h %s" -- packages/web\``
+      )
+    })
+  )
+
+  it.effect("leave the decisions record out of the documentation and the agent reach", () =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden(
+        { ...RECORD_FILES, "AGENTS.md": "# Acme\n", ...INSTALLED },
+        ["--json"],
+        RECORD_PROCESSES
+      )
+
+      expect(decodeReport(logLines[0])).toMatchObject({
+        agentReach: Option.some({ brokenLinks: [], unreached: [] }),
+        documentationFiles: Option.some(["AGENTS.md"]),
+      })
     })
   )
 
@@ -1420,6 +1587,20 @@ describe("harden", () => {
       expect(
         nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
       ).toStrictEqual(["claude", "oxfmt", "oxlint"])
+      expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
+    })
+  )
+
+  it.effect("pass the verification of a session that writes only the decisions record", () =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runInteractiveHarden({
+        keys: ["enter"],
+        onSession: (files) => {
+          files.write(RECORD, RECORD_FILES[RECORD])
+        },
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
       expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
     })
   )

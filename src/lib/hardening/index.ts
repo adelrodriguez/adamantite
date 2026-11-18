@@ -237,7 +237,7 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
     agentReach: agentReach.pipe(
       Option.map((reach) => ({
         brokenLinks: reach.brokenLinks.filter((link) => isSelectedFile(link.file)),
-        deadAnchors: reach.deadAnchors.filter((link) => isSelectedFile(link.file)),
+        unmatchedAnchors: reach.unmatchedAnchors.filter((link) => isSelectedFile(link.file)),
         unreached: reach.unreached.filter((file) => isSelectedFile(file)),
       }))
     ),
@@ -391,16 +391,21 @@ function renderAgentReach(reach: AgentReach) {
             .join("\n")}`,
         ]
 
-  const deadAnchors =
-    reach.deadAnchors.length === 0
+  const unmatchedAnchors =
+    reach.unmatchedAnchors.length === 0
       ? []
       : [
-          `These links go to headings that do not exist in their Markdown file:\n\n${reach.deadAnchors
-            .map((link) => `- \`${link.file}\` links to \`${link.target}#${link.anchor}\``)
-            .join("\n")}`,
+          [
+            "Adamantite could not match the anchors of these links to a heading of their Markdown file. It matches an anchor with a simple rule, the heading text as written and without link targets, HTML tags, and emphasis underscores, so it can list a link that works, such as one to a heading with an image, an HTML entity such as `&amp;`, or a code span with backticks inside it. For each link, open the target file, find the heading that the link means, and decide whether the link is broken. A broken link is a discovery gap, as step 1 describes. A link that works needs no change.",
+            "",
+            ...reach.unmatchedAnchors.map(
+              (link) =>
+                `- \`${link.file}\` links to \`${link.target}\` at the anchor \`#${link.anchor}\``
+            ),
+          ].join("\n"),
         ]
 
-  return [unreached, ...brokenLinks, ...deadAnchors].join("\n\n")
+  return [unreached, ...brokenLinks, ...unmatchedAnchors].join("\n\n")
 }
 
 function renderRulesFolders(context: HardenContext) {

@@ -7,7 +7,7 @@ Add `--json` to `doctor`, `harden`, `init`, `update`, `rule ast`, and `rule try`
 Each command prints one JSON document on standard output and writes its other lines on standard error. With `--json`, a command never asks a question and never starts an agent, and its exit codes stay the same. The Adamantite skill now tells agents to use `--json`.
 
 - `doctor --json` prints the `selection`, the applicable integrations, the `findings` with their `id`, `integration`, `title`, `currentState`, `goal`, `notes`, and `reference`, the `warnings`, and the `packageActions`.
-- `harden --json` prints the context of its prompt: the configs, rules folders, instructions, documentation, agent reach with its broken links and dead anchors, the suppressions of each rule and of each TypeScript directive, override trials, scope, decisions record, and fix history.
+- `harden --json` prints the context of its prompt: the configs, rules folders, instructions, documentation, agent reach with its broken links and the links whose anchor matches no heading, the suppressions of each rule and of each TypeScript directive, override trials, scope, decisions record, and fix history.
 - `init --json` and `update --json` print the file writes, the script writes, the installs, and the lockfile write of the setup, and the assessment after it. `init --json` sets up from the flags without `--non-interactive`.
 - `rule ast --json` prints the file and its tree, and `rule try --json` prints the rule, the setting, and the reports of each case.
 

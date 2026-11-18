@@ -48,7 +48,7 @@ The decisions record holds each candidate that the user did not approve, and eac
 
 Start with each `AGENTS.md` above, then read each file in the documentation list. Follow the files that the instructions link to or tell agents to read, including files absent from the list. Read the comments in the Oxlint config. Read a linked file outside `--path`, but keep the code survey inside the selected scope. Read each file once.
 
-Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to. A link to a heading that does not exist is the same kind of gap: record the heading that the link must go to.
+Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to. A link to a heading that does not exist is the same kind of gap: record the heading that the link must go to. The agent reach above lists the links whose anchor Adamantite could not match to a heading. Check each one, because the match is a simple rule.
 
 This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.
 

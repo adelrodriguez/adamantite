@@ -88,7 +88,7 @@ export class HandoffFailed extends Data.TaggedError("HandoffFailed")<{
   readonly reason: "not-found" | "spawn-failed"
 }> {}
 
-const ignoreSigint = () => {
+function ignoreSigint() {
   // Adamantite stays alive; the agent in the foreground process group handles the signal.
 }
 

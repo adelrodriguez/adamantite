@@ -6,7 +6,9 @@ import * as Terminal from "effect/Terminal"
 import * as Mode from "#terminal/mode.ts"
 import { printTitle } from "#terminal/title.ts"
 
-const noop = () => null
+function noop() {
+  return null
+}
 
 function makeTerminalLayer(columns?: number) {
   return Layer.succeed(Terminal.Terminal)(

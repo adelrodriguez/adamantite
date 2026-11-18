@@ -76,6 +76,19 @@ tester.run("standalone-functions", rule, {
       code: "let noop = () => null",
       errors: [declare("noop")],
     },
+    {
+      code: "const skip = () => undefined",
+      errors: [declare("skip")],
+    },
+    // A TypeScript expression around the function keeps it a plain function.
+    {
+      code: "export const render = (() => {\n  return 1\n}) satisfies () => number",
+      errors: [declare("render")],
+    },
+    {
+      code: "const toResult = ((value: string) => ({ ok: true, value })) as Convert",
+      errors: [declare("toResult")],
+    },
     // An arrow that returns a function returns what that function returns.
     {
       code: "const compare = (order: Order) => (left: Item, right: Item) => {\n  return order(left.name, right.name)\n}",
@@ -101,6 +114,7 @@ tester.run("standalone-functions", rule, {
     `const toResult = (options: Options, code: ExitCode) =>
   code === 0 ? Effect.void : Effect.fail(new CommandFailed({ command: options.command }))`,
     "const orElse = (fallback: Fallback) => fallback.effect ?? Effect.void",
+    "const readPath = ((path: string) => Effect.succeed(path)) satisfies Reader",
     // A callback and an object method are not standalone functions.
     `export const names = items.map((item) => {
   return item.name

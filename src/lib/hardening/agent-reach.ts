@@ -62,8 +62,10 @@ const URL_SCHEME = /^[a-z][\d+.a-z-]*:/iu
 const HEADING = /^ {0,3}#{1,6}(?:[\t ]([^\n]*))?$|^ {0,3}(\S[^\n]*)\n {0,3}(?:=+|-+)[\t ]*$/gmu
 
 // An id that a docs site reads from the end of a heading, such as `## Tests {#tests}`.
-const HEADING_ID = /\{#([^\s}]+)\}$/u
-const HTML_ID = /<[a-z][^<>]*?\s(?:id|name)=["']([^"'<>]+)["']/giu
+const HEADING_ID = /\{#([^\s{}]+)\}$/u
+
+// An `id` or `name` attribute of an HTML tag, each one on its own, so a tag can give two anchors.
+const HTML_ID = /\s(?:id|name)\s*=\s*["']([^"'<>]+)["']/giu
 
 // The markup that the second candidate anchor of a heading leaves out: the target or reference of
 // a link, an HTML tag, and an underscore that opens or closes emphasis. Each pattern stops at the
@@ -160,7 +162,6 @@ function readAnchors(prose: string) {
     // GitHub keeps the id in the text of the heading, and a docs site makes the id the anchor.
     if (id !== undefined) {
       anchors.add(id.toLowerCase())
-      anchors.add(toSlug(heading.replace(HEADING_ID, "").trimEnd()))
     }
 
     addNumbered(written, toSlug(heading))

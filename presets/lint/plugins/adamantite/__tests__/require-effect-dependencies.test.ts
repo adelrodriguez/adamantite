@@ -1,0 +1,47 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
+import plugin from "#presets/lint/plugins/adamantite/index.ts"
+
+RuleTester.describe = describe
+
+RuleTester.it = it
+
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({
+  languageOptions: { parserOptions: { lang: "tsx" }, sourceType: "module" },
+})
+
+tester.run("require-effect-dependencies", plugin.rules["require-effect-dependencies"], {
+  invalid: [
+    {
+      code: 'import { useEffect } from "react"\nexport function useTitle(title: string) {\n  useEffect(() => {\n    document.title = title\n  })\n}',
+      errors: [{ column: 2, data: { hook: "useEffect" }, line: 3, messageId: "missing" }],
+    },
+    {
+      code: 'import { useLayoutEffect as useMeasure } from "react"\nexport function useSize() {\n  useMeasure(() => {})\n}',
+      errors: [{ column: 2, data: { hook: "useLayoutEffect" }, line: 3, messageId: "missing" }],
+    },
+    {
+      code: 'import { useInsertionEffect } from "react"\nexport function useStyles() {\n  useInsertionEffect(() => {}, undefined)\n}',
+      errors: [{ column: 2, data: { hook: "useInsertionEffect" }, line: 3, messageId: "missing" }],
+    },
+    {
+      code: 'import React from "react"\nexport function useTitle() {\n  React.useEffect(() => {})\n}',
+      errors: [{ column: 2, data: { hook: "useEffect" }, line: 3, messageId: "missing" }],
+    },
+    {
+      code: 'import * as React from "react"\nexport function useTitle() {\n  React["useEffect"](() => {})\n}',
+      errors: [{ column: 2, data: { hook: "useEffect" }, line: 3, messageId: "missing" }],
+    },
+  ],
+  valid: [
+    'import { useEffect } from "react"\nexport function useTitle(title: string) {\n  useEffect(() => {\n    document.title = title\n  }, [title])\n}',
+    'import { useLayoutEffect } from "react"\nexport function useMount() {\n  useLayoutEffect(() => {}, [])\n}',
+    // The dependency array that a caller passes through a spread is not visible to the rule.
+    'import { useEffect } from "react"\nexport function useForward(args: Parameters<typeof useEffect>) {\n  useEffect(...args)\n}',
+    // Only the hooks of `react` are effects. A local function of the same name is not.
+    "function useEffect(run: () => void) {\n  run()\n}\nexport function useOnce() {\n  useEffect(() => {})\n}",
+    'import type { useEffect } from "react"\nexport type Effect = typeof useEffect',
+  ],
+})

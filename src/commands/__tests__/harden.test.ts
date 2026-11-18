@@ -151,7 +151,8 @@ const REQUIRED_PHRASES = {
     "When no human can approve",
     "stop after this step.",
     "Write no file, also not the decisions record.",
-    "After the user answers, append to the decisions record, also when the user approves none.",
+    "After the user answers, append to the decisions record.",
+    "Append this session line in each session that the user answers, also when the user approves every candidate or none.",
     "one for each item of the Decisions list that the user resolved",
     "An approved candidate needs no line, because its rule or instruction is the trace.",
     "and each candidate or decision that step 7 matched with a decision of the record",
@@ -187,7 +188,7 @@ const REQUIRED_PHRASES = {
     "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
   "## Check the result": [
-    "The decisions record has a line for each candidate that the user did not approve and each decision that the user resolved",
+    "The decisions record has the session line, and a line for each candidate that the user did not approve and each decision that the user resolved",
   ],
   "## Verify": [
     "no temporary verification cases, fixtures, or verification-only helpers remain",
@@ -265,10 +266,14 @@ interface ProcessOptions {
    */
   readonly indexOnlyFiles?: readonly string[]
   /**
-   * What `git log -1 --format="%H %cs"` prints for each file that a commit changed, by its path
-   * from the project root. Git prints nothing for another file.
+   * What `git rev-parse --verify HEAD` prints. Git prints nothing in a repository without a commit.
    */
-  readonly lastChanges?: Readonly<Record<string, string>>
+  readonly head?: string
+  /**
+   * What `git merge-base <commit> HEAD` prints, by the commit. Git prints nothing for a commit
+   * that the repository does not have.
+   */
+  readonly mergeBases?: Readonly<Record<string, string>>
   /**
    * Files that an ignore pattern of the Oxlint config matches, so `oxlint` does not list them.
    */
@@ -312,14 +317,23 @@ function makeProcessLayer(files: FileSystemTestContext, processes: ProcessOption
       Order.String
     )
 
-  const getGitOutput = (args: ChildProcess.StandardCommand["args"]) =>
-    args[0] === "log"
-      ? (Object.entries(processes.lastChanges ?? {}).find(([file]) => args.at(-1) === file)?.[1]
-        ?? "")
-      : Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
-          .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
-          .map((file) => `${file}\0`)
-          .join("")
+  const getGitOutput = (args: ChildProcess.StandardCommand["args"]) => {
+    if (args[0] === "rev-parse") {
+      return processes.head ?? ""
+    }
+
+    if (args[0] === "merge-base") {
+      const [, mergeBase = ""] =
+        Object.entries(processes.mergeBases ?? {}).find(([commit]) => args[1] === commit) ?? []
+
+      return mergeBase
+    }
+
+    return Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
+      .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
+      .map((file) => `${file}\0`)
+      .join("")
+  }
 
   const getOxlintOutput = () =>
     listFiles()
@@ -581,7 +595,15 @@ const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
 const { decisionsRecord: DecisionsRecord, fixHistory: FixHistory } = Report.fields
 
 const RECORD = ProjectPath.make(".adamantite/decisions.jsonl")
-const RECORD_COMMIT = "4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d"
+
+// The commit that `HEAD` names in this session, the commit that the session of `SESSION` recorded,
+// and the common ancestor of the two.
+const HEAD_COMMIT = "1a954628a960aaef81d7b2d4521929579f3541e6"
+const SESSION_HEAD = "fcbdc4c271c889825d8338d2d8f10b6e5e95c171"
+const BOUNDARY = "2db8c22f75474a58cd13fa2d3425017015d392ce"
+
+// A session line of the whole project, as the agent copies it from the prompt.
+const SESSION = { head: SESSION_HEAD, session: "2026-03-14" }
 
 // The lines of a decisions record, as the agent writes them and as `harden --json` prints them.
 const REJECTED = {
@@ -621,9 +643,9 @@ function makeRecord(decisions: readonly object[]) {
   return decisions.map((decision) => `${JSON.stringify(decision)}\n`).join("")
 }
 
-const RECORD_CONTENT = makeRecord([REJECTED, DEFERRED, DECIDED])
+const RECORD_CONTENT = makeRecord([REJECTED, DEFERRED, SESSION, DECIDED])
 
-// A decisions record that commit `RECORD_COMMIT` last changed.
+// A decisions record with three decisions and the line of one session of the whole project.
 const RECORD_FILES = { [RECORD]: RECORD_CONTENT }
 
 // The line that step 8 gives the agent to copy, without the scope of the session.
@@ -641,7 +663,11 @@ const EXAMPLE = {
 
 const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
 
-const RECORD_PROCESSES = { lastChanges: { [RECORD]: `${RECORD_COMMIT} 2026-11-02\n` } }
+// A git that knows `HEAD` and the commit of `SESSION`.
+const RECORD_PROCESSES = {
+  head: `${HEAD_COMMIT}\n`,
+  mergeBases: { [SESSION_HEAD]: `${BOUNDARY}\n` },
+}
 
 // What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`.
 const INDEX_PROBE_REPORT = JSON.stringify({
@@ -687,6 +713,7 @@ describe("harden", () => {
         decisionsRecord: DecisionsRecord.cases.Missing.make({ path: RECORD }),
         documentationFiles: Option.some(["AGENTS.md", "docs/unreached.md"]),
         fixHistory: FixHistory.cases.Last.make({ count: 20 }),
+        head: Option.none(),
         instructionFiles: ["AGENTS.md"],
         overrides: new LintedOverrides({ rules: [] }),
         rulesFolders: [".adamantite/lint"],
@@ -701,13 +728,13 @@ describe("harden", () => {
   )
 
   it.effect(
-    "print the decisions, the lines that do not decode, and the commit of the record as JSON",
+    "print the decisions, the sessions, the lines that do not decode, and the commit of HEAD as JSON",
     () =>
       Effect.gen(function* () {
         const { logLines } = yield* runHarden(
           {
             ...INSTALLED,
-            [RECORD]: `${makeRecord([REJECTED])}${BROKEN_LINE}\n${makeRecord([DEFERRED])}`,
+            [RECORD]: `${makeRecord([REJECTED, SESSION])}${BROKEN_LINE}\n${makeRecord([DEFERRED])}`,
           },
           ["--json"],
           RECORD_PROCESSES
@@ -718,20 +745,31 @@ describe("harden", () => {
         expect(report).toHaveProperty("decisionsRecord", {
           _tag: expect.stringMatching(/^Present$/u),
           decisions: [REJECTED, DEFERRED],
-          lastChange: { commit: RECORD_COMMIT, date: "2026-11-02" },
           path: RECORD,
-          undecodableLines: [{ issue: expect.any(String), line: 2, text: BROKEN_LINE }],
+          sessions: [SESSION],
+          undecodableLines: [{ issue: expect.any(String), line: 3, text: BROKEN_LINE }],
         })
+        expect(report).toHaveProperty("head", HEAD_COMMIT)
         expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
-          FixHistory.cases.Since.make({ commit: RECORD_COMMIT })
+          FixHistory.cases.Since.make({
+            boundary: BOUNDARY,
+            head: SESSION_HEAD,
+            session: "2026-03-14",
+          })
         )
       })
   )
 
-  it("give the fix history a number of commits or a start commit, and never both", () => {
+  it("give the fix history a number of commits, or a boundary with its session, and never both", () => {
     expectTypeOf<{ _tag: "Last"; count: number }>().toExtend<typeof FixHistory.Type>()
-    expectTypeOf<{ _tag: "Since"; commit: string }>().toExtend<typeof FixHistory.Type>()
-    expectTypeOf<{ _tag: "Last"; commit: string }>().not.toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{
+      _tag: "Since"
+      boundary: string
+      head: string
+      session: string
+    }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Last"; boundary: string }>().not.toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Since"; boundary: string }>().not.toExtend<typeof FixHistory.Type>()
   })
 
   it.effect("open no menu and start no agent with --json in an interactive terminal", () =>
@@ -1274,7 +1312,7 @@ describe("harden", () => {
   )
 
   it.effect(
-    "show each decision of the record on one line, and read the fix history since its last commit",
+    "show each decision of the record on one line, and read the fix history since the last session",
     () =>
       Effect.gen(function* () {
         const prompt = yield* runHardenPrompt(
@@ -1294,13 +1332,14 @@ describe("harden", () => {
           getMissingPhrases(decisions, [
             "Adamantite decoded the record, so do not read the file.",
             "The decisions record is `.adamantite/decisions.jsonl`.",
-            `Commit \`${RECORD_COMMIT}\` last changed it, on 2026-11-02.`,
           ])
         ).toStrictEqual([])
         expect(
           getMissingPhrases(getSection(prompt, "## 4. Read the fix history"), [
-            `\`git log ${RECORD_COMMIT}..HEAD --no-merges --format="%h %s" -- .\``,
-            "When it lists no commit, record that the history has no commit after the record",
+            `A session on 2026-03-14 read the fix history of the project up to commit \`${SESSION_HEAD}\`.`,
+            `the commits since commit \`${BOUNDARY}\`, the common ancestor of that commit and \`HEAD\``,
+            `\`git log ${BOUNDARY}..HEAD --no-merges --format="%h %s" -- .\``,
+            "When it lists no commit, record that the history has no commit after that session",
           ])
         ).toStrictEqual([])
       })
@@ -1353,18 +1392,89 @@ describe("harden", () => {
   )
 
   it.effect.each([
-    { name: "git has no commit of the decisions record", processes: {} },
-    { name: "git cannot read the history", processes: { exitCode: 128 } },
-  ])("read the last 200 commits when $name", ({ processes }) =>
+    {
+      lines: [REJECTED],
+      name: "the record has no session line",
+      processes: RECORD_PROCESSES,
+    },
+    {
+      lines: [{ ...SESSION, scope: "packages/web" }],
+      name: "no session line covers the session",
+      processes: RECORD_PROCESSES,
+    },
+    {
+      lines: [{ session: "2026-03-14" }],
+      name: "the covering session line has no head",
+      processes: RECORD_PROCESSES,
+    },
+    {
+      lines: [SESSION],
+      name: "git gives no common ancestor for the recorded commit",
+      processes: { head: `${HEAD_COMMIT}\n` },
+    },
+    {
+      lines: [SESSION],
+      name: "git cannot read the history",
+      processes: { ...RECORD_PROCESSES, exitCode: 128 },
+    },
+  ])("read the last 200 commits when $name", ({ lines, processes }) =>
     Effect.gen(function* () {
-      const { logLines } = yield* runHarden({ ...RECORD_FILES, ...INSTALLED }, [], processes)
-      const prompt = logLines[0] ?? ""
-
-      expect(getSection(prompt, "### Decisions")).toContain(
-        "Git names no commit that changed it, because the record is not committed or git cannot read the history."
+      const { logLines } = yield* runHarden(
+        { ...INSTALLED, [RECORD]: makeRecord(lines) },
+        [],
+        processes
       )
-      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+
+      expect(getSection(logLines[0] ?? "", "## 4. Read the fix history")).toContain(
         '`git log -n 200 --no-merges --format="%h %s" -- .`'
+      )
+    })
+  )
+
+  it.effect("start the fix history at the last session line that covers the session", () =>
+    Effect.gen(function* () {
+      const later = "2f".repeat(20)
+      const laterBoundary = "3e".repeat(20)
+
+      const prompt = yield* runHardenPrompt(
+        {
+          ...MONOREPO_FILES,
+          [RECORD]: makeRecord([
+            SESSION,
+            { head: later, scope: "packages", session: "2026-04-01" },
+            // The session of a sibling folder, and a session that recorded no commit.
+            { head: "4d".repeat(20), scope: "packages/api", session: "2026-05-01" },
+            { scope: "packages/web", session: "2026-06-01" },
+          ]),
+        },
+        ["--path", "packages/web"],
+        {
+          ...RECORD_PROCESSES,
+          mergeBases: { ...RECORD_PROCESSES.mergeBases, [later]: `${laterBoundary}\n` },
+        }
+      )
+
+      expect(
+        getMissingPhrases(getSection(prompt, "## 4. Read the fix history"), [
+          `A session on 2026-04-01 read the fix history of \`packages/web\` up to commit \`${later}\`.`,
+          `\`git log ${laterBoundary}..HEAD --no-merges --format="%h %s" -- packages/web\``,
+        ])
+      ).toStrictEqual([])
+    })
+  )
+
+  it.effect("read a commit that git prints with a carriage return and a line feed", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({ ...RECORD_FILES, ...INSTALLED }, [], {
+        head: `${HEAD_COMMIT}\r\n`,
+        mergeBases: { [SESSION_HEAD]: `${BOUNDARY}\r\n` },
+      })
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        `\`git log ${BOUNDARY}..HEAD --no-merges --format="%h %s" -- .\``
+      )
+      expect(getSection(prompt, "## 8. Show the candidates and wait for approval")).toContain(
+        `"head":"${HEAD_COMMIT}"`
       )
     })
   )
@@ -1402,9 +1512,6 @@ describe("harden", () => {
       expect(decisions).toContain(
         "It holds these decisions for `packages/web`, without the decisions of other folders."
       )
-      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
-        `\`git log ${RECORD_COMMIT}..HEAD --no-merges --format="%h %s" -- packages/web\``
-      )
     })
   )
 
@@ -1413,35 +1520,54 @@ describe("harden", () => {
       args: ["--path", "packages/web"],
       name: "the scope of --path",
       phrase: 'Write `"scope":"packages/web"` on each line, the folder of this session.',
+      processes: RECORD_PROCESSES,
       scope: "packages/web",
+      session: { head: HEAD_COMMIT, scope: "packages/web", session: "2026-03-14" },
+      sessionLine: `{"session":"2026-03-14","head":"${HEAD_COMMIT}","scope":"packages/web"}`,
     },
     {
       args: [],
       name: "no scope without --path",
       phrase: "Leave out `scope`, because this session covers the whole project.",
+      processes: RECORD_PROCESSES,
       scope: undefined,
+      session: { head: HEAD_COMMIT, session: "2026-03-14" },
+      sessionLine: `{"session":"2026-03-14","head":"${HEAD_COMMIT}"}`,
+    },
+    {
+      args: [],
+      name: "no head when git cannot name HEAD",
+      phrase: "Leave out `scope`, because this session covers the whole project.",
+      processes: {},
+      scope: undefined,
+      session: { session: "2026-03-14" },
+      sessionLine: '{"session":"2026-03-14"}',
     },
   ])(
-    "give an example line that decodes, with the date of the clock and $name",
-    ({ args, phrase, scope }) =>
+    "give a session line and an example line that decode, with the date of the clock and $name",
+    ({ args, phrase, processes, scope, session, sessionLine }) =>
       Effect.gen(function* () {
         yield* TestClock.setTime(Date.UTC(2026, 2, 14, 12))
 
         const step = getSection(
-          yield* runHardenPrompt(MONOREPO_FILES, args),
+          yield* runHardenPrompt(MONOREPO_FILES, args, processes),
           "## 8. Show the candidates and wait for approval"
         )
 
         const [example = ""] = /\{"id":.+\}/u.exec(step) ?? []
+        const [copied = ""] = /\{"session":.+\}/u.exec(step) ?? []
 
-        // The record of the next session holds the example line, as the agent copies it.
-        const { logLines } = yield* runHarden({ ...MONOREPO_FILES, [RECORD]: `${example}\n` }, [
-          "--json",
-        ])
+        // The record of the next session holds both lines, as the agent copies them.
+        const { logLines } = yield* runHarden(
+          { ...MONOREPO_FILES, [RECORD]: `${copied}\n${example}\n` },
+          ["--json"]
+        )
 
+        expect(copied).toBe(sessionLine)
         expect(step).toContain(phrase)
         expect(step).toContain("`at` is `2026-03-14`, the date of today.")
         expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.undecodableLines", [])
+        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.sessions", [session])
         expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
           scope === undefined ? EXAMPLE : { ...EXAMPLE, scope },
         ])

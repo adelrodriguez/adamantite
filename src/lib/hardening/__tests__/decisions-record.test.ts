@@ -1,15 +1,13 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
-import * as Sink from "effect/Sink"
-import * as Stream from "effect/Stream"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   DECISIONS_RECORD_PATH,
   DecisionsRecord,
+  findCoveringSession,
   readDecisionsRecord,
 } from "#lib/hardening/decisions-record.ts"
 import { ProjectPath } from "#lib/hardening/project-files.ts"
@@ -31,44 +29,9 @@ const OPTIONAL = {
 }
 
 const COMMIT = "4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d"
+const LATER_COMMIT = "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b"
 
 const encodeRecord = Schema.encodeSync(DecisionsRecord)
-
-/**
- * A `git` that prints `lastChange` for `git log`, the one command that reads the record's commit.
- */
-function makeGitLayer(lastChange: string) {
-  return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
-    ChildProcessSpawner.make(() =>
-      Effect.succeed(
-        ChildProcessSpawner.makeHandle({
-          all: Stream.empty,
-          exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
-          getInputFd: () => Sink.drain,
-          getOutputFd: () => Stream.empty,
-          isRunning: Effect.succeed(false),
-          kill: () => Effect.void,
-          pid: ChildProcessSpawner.ProcessId(1),
-          stderr: Stream.empty,
-          stdin: Sink.drain,
-          stdout: Stream.make(new TextEncoder().encode(lastChange)),
-          unref: Effect.succeed(Effect.void),
-        })
-      )
-    )
-  )
-}
-
-interface ReadOptions {
-  /**
-   * What `git log -1 --format="%H %cs"` prints for the record.
-   */
-  readonly lastChange?: string
-  /**
-   * The folder that `--path` selects, relative to the project root.
-   */
-  readonly scope?: string
-}
 
 /**
  * The text of a record that has one of `decisions` on each line.
@@ -78,18 +41,23 @@ function toLines(decisions: readonly object[]) {
 }
 
 /**
- * Reads a record with `content`, as `harden --json` prints it.
+ * Reads a record with `content`. `scope` is the folder that `--path` selects, relative to the
+ * project root.
  */
-function readRecord(content: string, options: ReadOptions = {}) {
+function readRecord(content: string, scope?: string) {
   const context = createFileSystemTestContext({ files: { [DECISIONS_RECORD_PATH]: content } })
 
   return readDecisionsRecord(
     context.root,
-    options.scope === undefined ? null : ProjectPath.make(options.scope)
-  ).pipe(
-    Effect.map((record) => encodeRecord(record)),
-    Effect.provide([context.layer, Path.layer, makeGitLayer(options.lastChange ?? "")])
-  )
+    scope === undefined ? null : ProjectPath.make(scope)
+  ).pipe(Effect.provide([context.layer, Path.layer]))
+}
+
+/**
+ * Reads a record with `content`, as `harden --json` prints it.
+ */
+function readEncodedRecord(content: string, scope?: string) {
+  return readRecord(content, scope).pipe(Effect.map((record) => encodeRecord(record)))
 }
 
 describe("readDecisionsRecord", () => {
@@ -98,7 +66,7 @@ describe("readDecisionsRecord", () => {
       const context = createFileSystemTestContext()
 
       const record = yield* readDecisionsRecord(context.root, null).pipe(
-        Effect.provide([context.layer, Path.layer, makeGitLayer("")])
+        Effect.provide([context.layer, Path.layer])
       )
 
       expect(DecisionsRecord.guards.Missing(record)).toBe(true)
@@ -108,7 +76,7 @@ describe("readDecisionsRecord", () => {
 
   it.effect("decode a line that has only the required keys", () =>
     Effect.gen(function* () {
-      const record = yield* readRecord(toLines([REQUIRED]))
+      const record = yield* readEncodedRecord(toLines([REQUIRED]))
 
       expect(record).toHaveProperty("decisions", [REQUIRED])
       expect(record).toHaveProperty("undecodableLines", [])
@@ -117,7 +85,7 @@ describe("readDecisionsRecord", () => {
 
   it.effect("decode a line that has each optional key", () =>
     Effect.gen(function* () {
-      const record = yield* readRecord(toLines([{ ...REQUIRED, ...OPTIONAL }]))
+      const record = yield* readEncodedRecord(toLines([{ ...REQUIRED, ...OPTIONAL }]))
 
       expect(record).toHaveProperty("decisions", [{ ...REQUIRED, ...OPTIONAL }])
     })
@@ -125,7 +93,7 @@ describe("readDecisionsRecord", () => {
 
   it.effect("accept a line with a key that the schema does not know, and leave the key out", () =>
     Effect.gen(function* () {
-      const record = yield* readRecord(toLines([{ ...REQUIRED, reviewer: "maintainer" }]))
+      const record = yield* readEncodedRecord(toLines([{ ...REQUIRED, reviewer: "maintainer" }]))
 
       expect(record).toHaveProperty("decisions", [REQUIRED])
       expect(record).toHaveProperty("undecodableLines", [])
@@ -137,7 +105,7 @@ describe("readDecisionsRecord", () => {
       const other = { ...REQUIRED, id: "default-exports", standard: "Ban default exports" }
       const later = { ...REQUIRED, at: "2026-06-01", decision: "deferred", reason: "After 2.0" }
 
-      const record = yield* readRecord(toLines([REQUIRED, other, later]))
+      const record = yield* readEncodedRecord(toLines([REQUIRED, other, later]))
 
       expect(record).toHaveProperty("decisions", [later, other])
     })
@@ -160,7 +128,7 @@ describe("readDecisionsRecord", () => {
     },
   ])("$name", ({ decisions, lines }) =>
     Effect.gen(function* () {
-      expect(yield* readRecord(toLines(lines))).toHaveProperty("decisions", decisions)
+      expect(yield* readEncodedRecord(toLines(lines))).toHaveProperty("decisions", decisions)
     })
   )
 
@@ -168,7 +136,7 @@ describe("readDecisionsRecord", () => {
     Effect.gen(function* () {
       const scoped = { ...REQUIRED, scope: "packages/web" }
 
-      expect(yield* readRecord(toLines([scoped]))).toHaveProperty("decisions", [scoped])
+      expect(yield* readEncodedRecord(toLines([scoped]))).toHaveProperty("decisions", [scoped])
     })
   )
 
@@ -186,7 +154,7 @@ describe("readDecisionsRecord", () => {
   ])("$name, in a session of packages/web", ({ kept, scope }) =>
     Effect.gen(function* () {
       const line = scope === undefined ? REQUIRED : { ...REQUIRED, scope }
-      const record = yield* readRecord(toLines([line]), { scope: "packages/web" })
+      const record = yield* readEncodedRecord(toLines([line]), "packages/web")
 
       expect(record).toHaveProperty("decisions", kept ? [line] : [])
     })
@@ -211,6 +179,16 @@ describe("readDecisionsRecord", () => {
       name: "has a scope that is not a path from the project root",
       text: JSON.stringify({ ...REQUIRED, scope: "./packages/web" }),
     },
+    { name: "has neither `id` nor `session`", text: '{"note":"Ask the maintainer"}' },
+    { name: "has a `session` that is not a date", text: '{"session":"March"}' },
+    {
+      name: "has a `head` that is not a full commit hash",
+      text: JSON.stringify({ head: "1a2b3c4", session: "2026-03-14" }),
+    },
+    {
+      name: "has a session scope that is not a path from the project root",
+      text: JSON.stringify({ scope: "/packages/web", session: "2026-03-14" }),
+    },
     {
       name: "has a standard of two lines",
       text: JSON.stringify({ ...REQUIRED, standard: "One.\n## Two" }),
@@ -220,7 +198,7 @@ describe("readDecisionsRecord", () => {
       const other = { ...REQUIRED, id: "default-exports" }
 
       // The blank line is not a decision, and it keeps its place in the line numbers.
-      const record = yield* readRecord(`${toLines([REQUIRED])}\n${text}\n${toLines([other])}`)
+      const record = yield* readEncodedRecord(`${toLines([REQUIRED])}\n${text}\n${toLines([other])}`)
 
       expect(record).toHaveProperty("decisions", [REQUIRED, other])
       expect(record).toHaveProperty("undecodableLines", [
@@ -229,30 +207,110 @@ describe("readDecisionsRecord", () => {
     })
   )
 
-  it.effect.each([
-    { lastChange: { commit: COMMIT, date: "2026-11-02" }, output: `${COMMIT} 2026-11-02\n` },
-    { lastChange: { commit: COMMIT, date: "2026-11-02" }, output: `${COMMIT} 2026-11-02\r\n` },
-    { lastChange: null, output: "" },
-  ])(
-    "give the commit that last changed the record, or none: $lastChange",
-    ({ lastChange, output }) =>
-      Effect.gen(function* () {
-        const record = yield* readRecord(toLines([REQUIRED]), { lastChange: output })
+  it.effect("decode a session line with and without its optional keys, in the order of the file", () =>
+    Effect.gen(function* () {
+      const sessions = [
+        { session: "2026-03-14" },
+        { head: COMMIT, scope: "packages/web", session: "2026-03-20" },
+        { head: LATER_COMMIT, session: "2026-04-01", tool: "a later key" },
+      ]
 
-        expect(record).toHaveProperty("lastChange", lastChange)
-      })
+      // A session line is not a decision, and a scope does not leave one out.
+      const record = yield* readEncodedRecord(toLines([REQUIRED, ...sessions]), "packages/api")
+
+      expect(record).toHaveProperty("decisions", [REQUIRED])
+      expect(record).toHaveProperty("sessions", [
+        { session: "2026-03-14" },
+        { head: COMMIT, scope: "packages/web", session: "2026-03-20" },
+        { head: LATER_COMMIT, session: "2026-04-01" },
+      ])
+      expect(record).toHaveProperty("undecodableLines", [])
+    })
   )
 
-  it("give only a record that exists its decisions, its lines, and its commit", () => {
+  it("give only a record that exists its decisions, its sessions, and its lines", () => {
     type Missing = Extract<DecisionsRecord, { _tag: "Missing" }>
 
     type Present = Extract<DecisionsRecord, { _tag: "Present" }>
 
     expectTypeOf<Missing>().not.toHaveProperty("decisions")
     expectTypeOf<Missing>().not.toHaveProperty("undecodableLines")
-    expectTypeOf<Missing>().not.toHaveProperty("lastChange")
+    expectTypeOf<Missing>().not.toHaveProperty("sessions")
     expectTypeOf<Present["decisions"][number]["decision"]>().toEqualTypeOf<
       "decided" | "deferred" | "rejected"
     >()
+  })
+})
+
+describe("findCoveringSession", () => {
+  const SESSION = { head: COMMIT, session: "2026-03-14" }
+
+  function findSession(lines: readonly object[], scope?: string) {
+    return readRecord(toLines(lines), scope).pipe(
+      Effect.map((record) =>
+        findCoveringSession(record, scope === undefined ? null : ProjectPath.make(scope))
+      )
+    )
+  }
+
+  it.effect.each([
+    { covers: true, line: undefined, name: "a session of the whole project", scope: "packages/web" },
+    { covers: true, line: "packages/web", name: "a session of the same folder", scope: "packages/web" },
+    { covers: true, line: "packages", name: "a session of a parent folder", scope: "packages/web" },
+    {
+      covers: false,
+      line: "packages/web/src",
+      name: "a session of a child folder",
+      scope: "packages/web",
+    },
+    { covers: false, line: "packages/api", name: "a session of a sibling", scope: "packages/web" },
+    {
+      covers: false,
+      line: "packages/web",
+      name: "a session of a folder whose name starts its name",
+      scope: "packages/web-admin",
+    },
+    { covers: true, line: undefined, name: "a session of the whole project", scope: undefined },
+    { covers: false, line: "packages/web", name: "a session of a folder", scope: undefined },
+  ])("say whether $name covers a session of $scope: $covers", ({ covers, line, scope }) =>
+    Effect.gen(function* () {
+      const found = yield* findSession(
+        [line === undefined ? SESSION : { ...SESSION, scope: line }],
+        scope
+      )
+
+      expect(found).toStrictEqual(covers ? Option.some(SESSION) : Option.none())
+    })
+  )
+
+  it.effect("give the last covering line that has a head", () =>
+    Effect.gen(function* () {
+      const found = yield* findSession(
+        [
+          SESSION,
+          { head: LATER_COMMIT, scope: "packages", session: "2026-04-01" },
+          { head: COMMIT, scope: "packages/api", session: "2026-05-01" },
+          { scope: "packages/web", session: "2026-06-01" },
+        ],
+        "packages/web"
+      )
+
+      expect(found).toStrictEqual(Option.some({ head: LATER_COMMIT, session: "2026-04-01" }))
+    })
+  )
+
+  it.effect.each([
+    { lines: [REQUIRED], name: "the record has no session line" },
+    { lines: [{ session: "2026-03-14" }], name: "the covering line has no head" },
+  ])("give none when $name", ({ lines }) =>
+    Effect.gen(function* () {
+      expect(yield* findSession(lines)).toStrictEqual(Option.none())
+    })
+  )
+
+  it("give none for a project without a record", () => {
+    const record = DecisionsRecord.cases.Missing.make({ path: ProjectPath.make("decisions.jsonl") })
+
+    expect(findCoveringSession(record, null)).toStrictEqual(Option.none())
   })
 })

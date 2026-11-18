@@ -704,8 +704,8 @@ describe("harden", () => {
     })
   )
 
-  // An agent that starts from the `AGENTS.md` of a new setup must find the Adamantite skill.
-  it.effect("reach each copy of the Adamantite skill from the AGENTS.md that init writes", () =>
+  // A coding agent finds the skills of its skill folder on its own, so harden lists none of them.
+  it.effect("list no copy of the Adamantite skill in a project that init set up", () =>
     Effect.gen(function* () {
       const project = createFileSystemTestContext({
         files: {
@@ -726,14 +726,8 @@ describe("harden", () => {
 
       const { agentReach, documentationFiles } = decodeReport(logLines[0])
 
-      expect(documentationFiles).toStrictEqual(
-        Option.some([
-          ...[".agents", ".claude"].flatMap((folder) =>
-            Object.keys(SKILL_FILES).map((file) => file.replace(".agents", folder))
-          ),
-          "AGENTS.md",
-        ])
-      )
+      expect(project.list()).toContain(".claude/skills/adamantite/SKILL.md")
+      expect(documentationFiles).toStrictEqual(Option.some(["AGENTS.md"]))
       expect(agentReach).toStrictEqual(Option.some({ brokenLinks: [], unreached: [] }))
     })
   )
@@ -817,21 +811,27 @@ describe("harden", () => {
       })
   )
 
-  it.effect("list each Markdown file that git lists, except changesets and changelogs", () =>
+  it.effect("list each Markdown file that git lists, except changesets, changelogs, and skills", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
+        ".agents/skills/review/SKILL.md": "# Review\n",
         ".changeset/add-cart.md": '---\n"acme": patch\n---\n',
+        ".claude/skills/review/references/checks.md": "# Checks\n",
         "CHANGELOG.md": "# acme\n",
         "CONTRIBUTING.md": "# Contributing\n",
         "docs/guides/errors.mdx": "# Errors\n",
+        "docs/skills/writing.md": "# Writing\n",
+        "packages/cart/.grok/skills/review/SKILL.md": "# Review\n",
         "packages/cart/CHANGELOG.md": "# cart\n",
         "src/cart/README.md": "# Cart\n",
         ...INSTALLED,
       })
 
+      // `docs/skills` is not a skill folder of an agent, so its files stay.
       expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
         "- `CONTRIBUTING.md`",
         "- `docs/guides/errors.mdx`",
+        "- `docs/skills/writing.md`",
         "- `src/cart/README.md`",
       ])
       expect(

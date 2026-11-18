@@ -54,7 +54,7 @@ describe("readAgentReach", () => {
     },
     {
       // Each pattern of the rule stops early on this text, where a backtracking pattern would not.
-      heading: `${"](<a {# _ ".repeat(20_000)}${"#".repeat(20_000)}tail`,
+      heading: `${"](<a {# _ ".repeat(20_000)}${"{#x".repeat(200_000)}${"#".repeat(20_000)}tail`,
       matched: "top",
       name: "a very long heading of unclosed markup",
     },

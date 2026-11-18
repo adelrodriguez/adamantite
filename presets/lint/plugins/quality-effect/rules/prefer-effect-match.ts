@@ -2,8 +2,11 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 
 const equalityOperators = new Set(["==", "===", "!=", "!=="])
 
-const isLiteral = (node: ESTree.Node): boolean =>
-  node.type === "Literal" || (node.type === "TemplateLiteral" && node.expressions.length === 0)
+function isLiteral(node: ESTree.Node): boolean {
+  return (
+    node.type === "Literal" || (node.type === "TemplateLiteral" && node.expressions.length === 0)
+  )
+}
 
 const rule: Rule = {
   createOnce(context) {

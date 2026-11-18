@@ -4,14 +4,13 @@ import { isStringLiteral, staticKeyName } from "../../shared/ast.ts"
 const equalityOperators = new Set(["==", "===", "!=", "!=="])
 const broadEffectCatchMethods = new Set(["catch", "catchAll", "catchIf"])
 
-export const isTagMember = (
-  node: ESTree.Node | null | undefined
-): node is ESTree.MemberExpression =>
-  node?.type === "MemberExpression" && staticKeyName(node.property, node.computed) === "_tag"
+export function isTagMember(node: ESTree.Node | null | undefined): node is ESTree.MemberExpression {
+  return node?.type === "MemberExpression" && staticKeyName(node.property, node.computed) === "_tag"
+}
 
-export const tagMemberFromComparison = (
+export function tagMemberFromComparison(
   node: ESTree.BinaryExpression
-): ESTree.MemberExpression | undefined => {
+): ESTree.MemberExpression | undefined {
   if (!equalityOperators.has(node.operator)) {
     return undefined
   }
@@ -27,16 +26,19 @@ export const tagMemberFromComparison = (
   return undefined
 }
 
-const isBroadEffectCatchCall = (
+function isBroadEffectCatchCall(
   node: ESTree.Node | null | undefined
-): node is ESTree.CallExpression =>
-  node?.type === "CallExpression"
-  && node.callee.type === "MemberExpression"
-  && node.callee.object.type === "Identifier"
-  && node.callee.object.name === "Effect"
-  && broadEffectCatchMethods.has(staticKeyName(node.callee.property, node.callee.computed) ?? "")
+): node is ESTree.CallExpression {
+  return (
+    node?.type === "CallExpression"
+    && node.callee.type === "MemberExpression"
+    && node.callee.object.type === "Identifier"
+    && node.callee.object.name === "Effect"
+    && broadEffectCatchMethods.has(staticKeyName(node.callee.property, node.callee.computed) ?? "")
+  )
+}
 
-export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
+export function isInsideBroadEffectHandler(node: ESTree.Node): boolean {
   let current: ESTree.Node | null = node.parent
 
   while (current !== null) {
@@ -50,14 +52,18 @@ export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
   return false
 }
 
-export const isReasonTagMember = (node: ESTree.MemberExpression): boolean =>
-  node.object.type === "MemberExpression"
-  && staticKeyName(node.object.property, node.object.computed) === "reason"
+export function isReasonTagMember(node: ESTree.MemberExpression): boolean {
+  return (
+    node.object.type === "MemberExpression"
+    && staticKeyName(node.object.property, node.object.computed) === "reason"
+  )
+}
 
-export const propertyName = (property: ESTree.ObjectProperty): string | undefined =>
-  staticKeyName(property.key, property.computed) ?? undefined
+export function propertyName(property: ESTree.ObjectProperty): string | undefined {
+  return staticKeyName(property.key, property.computed) ?? undefined
+}
 
-export const isMatchPatternObject = (node: ESTree.ObjectExpression): boolean => {
+export function isMatchPatternObject(node: ESTree.ObjectExpression): boolean {
   const call = node.parent
 
   if (call.type !== "CallExpression" || !call.arguments.includes(node)) {

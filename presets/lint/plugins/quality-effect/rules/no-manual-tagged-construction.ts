@@ -15,7 +15,7 @@ const TAG_INPUT_CONSTRUCTORS = new Set([
   "systemError",
 ])
 
-const calleeName = (callee: ESTree.Expression | ESTree.Super): string | undefined => {
+function calleeName(callee: ESTree.Expression | ESTree.Super): string | undefined {
   if (callee.type === "Identifier") {
     return callee.name
   }
@@ -27,7 +27,7 @@ const calleeName = (callee: ESTree.Expression | ESTree.Super): string | undefine
   return undefined
 }
 
-const isTagInputConstructorArgument = (node: ESTree.ObjectExpression): boolean => {
+function isTagInputConstructorArgument(node: ESTree.ObjectExpression): boolean {
   const call = node.parent
 
   if (

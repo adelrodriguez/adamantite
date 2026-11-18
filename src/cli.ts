@@ -76,7 +76,7 @@ export const makeAppLayer = (
  * expected, so it fails again without the typed errors, and the runtime reports it: a defect with
  * its stack and exit code 1, and an interruption with exit code 130.
  */
-export const reportFailure = <E extends { readonly message: string }>(cause: Cause.Cause<E>) => {
+export function reportFailure<E extends { readonly message: string }>(cause: Cause.Cause<E>) {
   // A defect or an interruption holds no typed error, which inference cannot see from the reasons.
   const unexpected = Cause.fromReasons<never>(
     cause.reasons.flatMap((reason) => (Cause.isFailReason(reason) ? [] : [reason]))

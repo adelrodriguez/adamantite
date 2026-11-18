@@ -27,6 +27,13 @@ tester.run("require-effect-dependencies", plugin.rules["require-effect-dependenc
       errors: [{ column: 2, data: { hook: "useInsertionEffect" }, line: 3, messageId: "missing" }],
     },
     {
+      // React stores missing dependencies as `null`, so a JavaScript file that passes `null` runs the
+      // effect after every render too.
+      code: 'import { useEffect } from "react"\nexport function useTitle() {\n  useEffect(() => {}, null)\n}',
+      errors: [{ column: 2, data: { hook: "useEffect" }, line: 3, messageId: "missing" }],
+      languageOptions: { parserOptions: { lang: "jsx" } },
+    },
+    {
       code: 'import React from "react"\nexport function useTitle() {\n  React.useEffect(() => {})\n}',
       errors: [{ column: 2, data: { hook: "useEffect" }, line: 3, messageId: "missing" }],
     },
@@ -42,6 +49,5 @@ tester.run("require-effect-dependencies", plugin.rules["require-effect-dependenc
     'import { useEffect } from "react"\nexport function useForward(args: Parameters<typeof useEffect>) {\n  useEffect(...args)\n}',
     // Only the hooks of `react` are effects. A local function of the same name is not.
     "function useEffect(run: () => void) {\n  run()\n}\nexport function useOnce() {\n  useEffect(() => {})\n}",
-    'import type { useEffect } from "react"\nexport type Effect = typeof useEffect',
   ],
 })

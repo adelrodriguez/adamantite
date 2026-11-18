@@ -14,7 +14,8 @@ const REACT_MODULE = "react"
 
 /**
  * Whether React runs the effect after every render: the call passes no dependency array, or passes
- * `undefined` in its place. A spread argument can hold the array, so a call with one passes.
+ * `undefined` or `null` in its place. A spread argument can hold the array, so a call with one
+ * passes.
  */
 function runsAfterEveryRender(call: ESTree.CallExpression) {
   if (call.arguments.some((argument) => argument.type === "SpreadElement")) {
@@ -26,6 +27,7 @@ function runsAfterEveryRender(call: ESTree.CallExpression) {
   return (
     dependencies === undefined
     || (dependencies.type === "Identifier" && dependencies.name === "undefined")
+    || (dependencies.type === "Literal" && dependencies.value === null)
   )
 }
 
@@ -51,7 +53,7 @@ const rule: Rule = {
     },
     messages: {
       missing:
-        "`{{hook}}` has no dependency array, so it runs after every render. Pass the values that the effect reads, or `[]` to run it once after the first render.",
+        "`{{hook}}` has no dependency array, so it runs after every render. Pass the values that the effect reads, or `[]` when it reads none.",
     },
     schema: [],
     type: "problem",

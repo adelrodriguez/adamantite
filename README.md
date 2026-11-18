@@ -742,9 +742,9 @@ export default defineConfig({
 Each option replaces its default list.
 
 `adamantite/require-effect-dependencies` reports a call to `useEffect`, `useLayoutEffect`, or
-`useInsertionEffect` from `react` that passes no dependency array, or passes `undefined`, because
-React then runs the effect after every render. Pass the values that the effect reads, or `[]` to
-run it once after the first render. The rule reports these calls in hook modules too, where
+`useInsertionEffect` from `react` that passes no dependency array, or passes `undefined` or `null`,
+because React then runs the effect after every render. Pass the values that the effect reads, or
+`[]` when it reads none. The rule reports these calls in hook modules too, where
 `adamantite/no-react-state-hooks` allows effects.
 
 The React Doctor package exports more than 900 rules. The preset enables only rules that run on one file

@@ -165,8 +165,8 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):warning"])
   })
 
-  // The Adamantite skill tells agents that a rule that throws fails the lint run, and names the
-  // error that they must look for.
+  // The `adamantite-hardening` skill tells agents that a rule that throws in a visitor fails the
+  // lint run, and names the error that they must look for.
   it("fail the run with a plugin error for the file where a rule throws in a visitor", () => {
     write(".adamantite/lint/throw-on-debugger.ts", THROWING_RULE)
     write("oxlint.config.ts", makeConfig("custom()"))

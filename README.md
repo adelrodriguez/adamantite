@@ -1228,10 +1228,8 @@ project, and how to write [custom rules](#custom-rules). The Adamantite package 
 
 `adamantite init` asks whether to set up coding agents. When you answer yes, or pass
 `--agents` in non-interactive mode, init writes `AGENTS.md` with the Adamantite section when the
-project has no `AGENTS.md`, and writes the skill to these folders. The section links to each copy
-of the skill, so an agent that starts from `AGENTS.md` finds the skill and its guides, and
-`adamantite harden` lists none of them as a file that no `AGENTS.md` reaches. Init never edits an
-existing `AGENTS.md`: Doctor reports one without the section, so you or an agent can add it.
+project has no `AGENTS.md`, and writes the skill to these folders. Init never edits an existing
+`AGENTS.md`: Doctor reports one without the section, so you or an agent can add it.
 
 | Skill folder     | Agents                                  | When                        |
 | ---------------- | --------------------------------------- | --------------------------- |

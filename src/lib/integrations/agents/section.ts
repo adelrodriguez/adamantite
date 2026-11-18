@@ -14,10 +14,6 @@ interface AgentsSectionOptions {
   readonly isMonorepo: boolean
   readonly packageManager: SupportedPackageManager
   readonly scripts: readonly Script[]
-  /**
-   * The skill folders that hold a copy of the Adamantite skill, such as `.agents/skills`.
-   */
-  readonly skillFolders: readonly string[]
 }
 
 function getScriptGuidance(
@@ -38,15 +34,9 @@ function getScriptGuidance(
 }
 
 /**
- * The Adamantite section of `AGENTS.md`, between its two marker comments. It links to each copy of
- * the Adamantite skill, so an agent that starts from `AGENTS.md` reaches the skill and its guides.
+ * The Adamantite section of `AGENTS.md`, between its two marker comments.
  */
-export function renderAgentsSection({
-  isMonorepo,
-  packageManager,
-  scripts,
-  skillFolders,
-}: AgentsSectionOptions) {
+export function renderAgentsSection({ isMonorepo, packageManager, scripts }: AgentsSectionOptions) {
   const selectedScriptGuidance = SCRIPT_ORDER.flatMap((script) =>
     scripts.includes(script) ? [getScriptGuidance(packageManager, script, isMonorepo)] : []
   )
@@ -66,9 +56,6 @@ export function renderAgentsSection({
             "",
           ].join("\n")
         : "",
-    skills: new Intl.ListFormat("en-US", { type: "conjunction" }).format(
-      skillFolders.map((folder) => `[\`${folder}/adamantite\`](${folder}/adamantite/SKILL.md)`)
-    ),
     start: ADAMANTITE_AGENTS_START_MARKER,
   })
 }

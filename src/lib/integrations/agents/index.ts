@@ -32,29 +32,22 @@ const shippedSkill = getShippedSkillFiles()
  */
 const readAgentsSection = Effect.fn("readAgentsSection")(function* (
   { workspace }: Project.Snapshot,
-  { scripts }: Selection,
-  skillFolders: readonly string[]
+  { scripts }: Selection
 ) {
   const cwd = yield* Project.Directory
   const detected = yield* (yield* DependencyInstaller).detectPackageManager(cwd)
 
   return Option.map(detected, ({ name }) =>
-    renderAgentsSection({
-      isMonorepo: workspace.isMonorepo,
-      packageManager: name,
-      scripts,
-      skillFolders,
-    })
+    renderAgentsSection({ isMonorepo: workspace.isMonorepo, packageManager: name, scripts })
   )
 })
 
 /**
  * The findings for `AGENTS.md`: a missing file, and a file without the Adamantite section.
  * Adamantite writes `AGENTS.md` only when it does not exist, and never adds the section to a file
- * that the project wrote, so the finding names each copy of the skill that the section must link
- * to. In a monorepo, Doctor checks only the root.
+ * that the project wrote. In a monorepo, Doctor checks only the root.
  */
-const assess = Effect.fn("assess")(function* (cwd: string, skillFolders: readonly string[]) {
+const assess = Effect.fn("assess")(function* (cwd: string) {
   const path = yield* Path.Path
   const content = yield* readFileIfExists(path.join(cwd, AGENTS_PATH))
 
@@ -80,15 +73,11 @@ const assess = Effect.fn("assess")(function* (cwd: string, skillFolders: readonl
     return []
   }
 
-  const skills = new Intl.ListFormat("en-US", { type: "conjunction" }).format(
-    skillFolders.map((folder) => `\`${folder}/adamantite/SKILL.md\``)
-  )
-
   return [
     {
       currentState: `\`${AGENTS_PATH}\` has no Adamantite section, so coding agents do not learn the Adamantite skill and commands.`,
       goal: [
-        `Add a section between \`${ADAMANTITE_AGENTS_START_MARKER}\` and \`${ADAMANTITE_AGENTS_END_MARKER}\` to \`${AGENTS_PATH}\`. It links to ${skills}, and tells coding agents to use the Adamantite skill, to run the managed scripts, and to run \`adamantite doctor\` for setup findings. Keep the rest of the file.`,
+        `Add a section between \`${ADAMANTITE_AGENTS_START_MARKER}\` and \`${ADAMANTITE_AGENTS_END_MARKER}\` to \`${AGENTS_PATH}\`. It tells coding agents to use the Adamantite skill, to run the managed scripts, and to run \`adamantite doctor\` for setup findings. Keep the rest of the file.`,
         "Run `adamantite doctor` again. It must not report this finding.",
       ],
       id: "missing-agents-section",
@@ -130,10 +119,9 @@ const readSkillFile = Effect.fn("readSkillFile")(function* (
  * changed file. An earlier version wrote that file before the lockfile recorded it, or the project
  * changed it, so `update` keeps it.
  */
-const assessSkill = Effect.fn("assessSkill")(function* (
-  project: Project.Snapshot,
-  folders: readonly string[]
-) {
+const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapshot) {
+  const folders = yield* detectSkillFolders(yield* Project.Directory)
+
   const copies = yield* Effect.forEach(
     folders,
     (folder) =>
@@ -236,10 +224,9 @@ export default {
   assess: (project: Project.Snapshot, _selection: Selection) =>
     Effect.gen(function* () {
       const cwd = yield* Project.Directory
-      const folders = yield* detectSkillFolders(cwd)
 
       const [agents, skill, lock] = yield* Effect.all(
-        [assess(cwd, folders), assessSkill(project, folders), assessSkillsLock(cwd)],
+        [assess(cwd), assessSkill(project), assessSkillsLock(cwd)],
         { concurrency: "unbounded" }
       )
 
@@ -249,7 +236,7 @@ export default {
   files: (project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
       const folders = yield* detectSkillFolders(yield* Project.Directory)
-      const section = yield* readAgentsSection(project, selection, folders)
+      const section = yield* readAgentsSection(project, selection)
 
       return [
         ...Option.match(section, {

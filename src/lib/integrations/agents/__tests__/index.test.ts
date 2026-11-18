@@ -27,9 +27,6 @@ describe("agent guidance setup", () => {
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(AGENTS)).toContain("- Run `bun run check` to catch formatting")
-      expect(files.read(AGENTS)).toContain(
-        "This project has the skill in [`.agents/skills/adamantite`](.agents/skills/adamantite/SKILL.md). If"
-      )
       expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
       expect(output).toContain(`✔ \`${AGENTS}\` created.`)
     })
@@ -42,9 +39,6 @@ describe("agent guidance setup", () => {
       yield* runLifecycle("init", files, INIT_ARGS)
 
       expect(files.read(".claude/skills/adamantite/SKILL.md")).toBe(shippedSkill["SKILL.md"])
-      expect(files.read(AGENTS)).toContain(
-        "in [`.agents/skills/adamantite`](.agents/skills/adamantite/SKILL.md) and [`.claude/skills/adamantite`](.claude/skills/adamantite/SKILL.md). If"
-      )
     })
   )
 
@@ -60,7 +54,6 @@ describe("agent guidance setup", () => {
       expect(files.read(AGENTS)).toBe(own)
       expect(init.output).toContain(`● \`${AGENTS}\` kept, because it has changes`)
       expect(doctor.output).toContain("AGENTS.md has no Adamantite section")
-      expect(doctor.output).toContain("It links to `.agents/skills/adamantite/SKILL.md`, and tells")
     })
   )
 

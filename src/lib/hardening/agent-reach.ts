@@ -63,13 +63,37 @@ const HEADING =
 const HEADING_ID = /\s*\{#([^\s}]+)\}\s*$/u
 const HTML_ID = /<[a-z][^>]*\s(?:id|name)=["']([^"']+)["']/giu
 
-// A code span: a run of backticks, its text, and a run of the same length.
-const HEADING_CODE_SPAN = /(`+)(.+?)(?<!`)\1(?!`)/gu
-const LINK_TEXT = /!?\[([^\]]*)\](?:\([^)]*\)|\[[^\]]*\])/gu
-const HTML_TAG = /<\/?[a-z][^>]*>/giu
+const ASCII_PUNCTUATION = /^[!-/:-@[-`{-~]$/u
+const WORD_CHARACTER = /^[\p{L}\p{N}]$/u
 
-// An underscore that opens or closes emphasis, and not one inside a name such as `snake_case`.
-const EMPHASIS_UNDERSCORE = /(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu
+// An autolink, such as `<https://example.com>`, shows its address.
+const AUTOLINK = /^<([a-z][\d+.a-z-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>]+)>/iu
+
+// An HTML tag or comment shows no text.
+const HTML_TAG = /^<(?:\/?[a-z][\da-z-]*(?:\s[^<>]*)?\/?|!--[\s\S]*?--)>/iu
+const ENTITY = /^&(?:#(\d{1,7})|#x([\da-f]{1,6})|([\da-z]+));/iu
+
+const NAMED_ENTITIES = new Map([
+  ["amp", "&"],
+  ["apos", "'"],
+  ["gt", ">"],
+  ["lt", "<"],
+  ["nbsp", "\u00A0"],
+  ["quot", '"'],
+])
+
+// A named entity of a Latin letter with a diacritic, such as `&eacute;`.
+const DIACRITIC_ENTITY = /^([a-z])(acute|cedil|circ|grave|ring|tilde|uml)$/iu
+
+const DIACRITICS = new Map([
+  ["acute", "\u0301"],
+  ["cedil", "\u0327"],
+  ["circ", "\u0302"],
+  ["grave", "\u0300"],
+  ["ring", "\u030A"],
+  ["tilde", "\u0303"],
+  ["uml", "\u0308"],
+])
 
 // GitHub keeps letters and other alphabetic characters, marks, decimal digits, connector
 // punctuation such as `_`, spaces, and hyphens, as `github-slugger` does. A number such as `²` goes.
@@ -100,44 +124,271 @@ function matchAll(content: string, pattern: RegExp) {
 }
 
 /**
- * Text outside a code span without its Markdown and HTML markup: a link keeps its text.
+ * The end of the code span that opens with the backtick run at `start`: the index after its closing
+ * run of the same length, or -1 when no such run closes it.
  */
-function removeMarkup(text: string) {
-  return text
-    .replaceAll(LINK_TEXT, "$1")
-    .replaceAll(HTML_TAG, "")
-    .replaceAll(EMPHASIS_UNDERSCORE, "")
+function findCodeSpanEnd(source: string, start: number) {
+  const run = /^`+/u.exec(source.slice(start))?.[0] ?? "`"
+  const contentStart = start + run.length
+
+  for (const match of source.slice(contentStart).matchAll(/`+/gu)) {
+    if (match[0].length === run.length) {
+      return contentStart + match.index + run.length
+    }
+  }
+
+  return -1
 }
 
 /**
- * The text of a heading as GitHub renders it. Links keep their text and lose their target, and HTML
- * tags and emphasis underscores go. A code span keeps its text as it is, such as `Option<A>` or
- * `__tests__`, without one space at each end when it has both, as CommonMark says.
+ * The index of the `]` that closes the bracket at `start`, or -1. A code span binds before a link,
+ * so a `]` inside a code span does not close it.
  */
-function readHeadingText(heading: string) {
-  let text = ""
-  let end = 0
+function findLabelEnd(source: string, start: number) {
+  let depth = 0
 
-  for (const match of heading.matchAll(HEADING_CODE_SPAN)) {
-    const code = match[2] ?? ""
-    const padded = code.startsWith(" ") && code.endsWith(" ") && code.trim() !== ""
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index]
 
-    text += removeMarkup(heading.slice(end, match.index)) + (padded ? code.slice(1, -1) : code)
-    end = match.index + match[0].length
+    if (character === "\\") {
+      index += 1
+    } else if (character === "`") {
+      const end = findCodeSpanEnd(source, index)
+
+      if (end !== -1) {
+        index = end - 1
+      }
+    } else if (character === "[") {
+      depth += 1
+    } else if (character === "]") {
+      depth -= 1
+
+      if (depth === 0) {
+        return index
+      }
+    }
   }
 
-  return text + removeMarkup(heading.slice(end))
+  return -1
+}
+
+/**
+ * The index after the `)` that closes the destination and title of an inline link, whose `(` is at
+ * `start`, or -1.
+ */
+function findDestinationEnd(source: string, start: number) {
+  let depth = 0
+
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index]
+
+    if (character === "\\") {
+      index += 1
+    } else if (character === "<" || character === '"' || character === "'") {
+      const close = source.indexOf(character === "<" ? ">" : character, index + 1)
+
+      if (close === -1) {
+        return -1
+      }
+
+      index = close
+    } else if (character === "(") {
+      depth += 1
+    } else if (character === ")") {
+      depth -= 1
+
+      if (depth === 0) {
+        return index + 1
+      }
+    }
+  }
+
+  return -1
+}
+
+/**
+ * The character of a numeric entity. CommonMark shows U+FFFD for a code point that Unicode does not
+ * have, such as `&#0;` or `&#9999999;`.
+ */
+function toCharacter(codePoint: number) {
+  return codePoint > 0 && codePoint <= 0x10_ff_ff ? String.fromCodePoint(codePoint) : "\uFFFD"
+}
+
+/**
+ * The text of an entity, or the texts that it can show when the scanner does not know it: none, as
+ * for a symbol, or its name, as when it is not an entity.
+ */
+function readEntity([text, decimal, hex, name = ""]: RegExpExecArray): readonly string[] {
+  if (decimal !== undefined) {
+    return [toCharacter(Number.parseInt(decimal, 10))]
+  }
+
+  if (hex !== undefined) {
+    return [toCharacter(Number.parseInt(hex, 16))]
+  }
+
+  const known = NAMED_ENTITIES.get(name)
+  const [, letter, mark = ""] = DIACRITIC_ENTITY.exec(name) ?? []
+
+  if (known !== undefined) {
+    return [known]
+  }
+
+  return letter === undefined
+    ? ["", text]
+    : [`${letter}${DIACRITICS.get(mark) ?? ""}`.normalize("NFC")]
+}
+
+/**
+ * The text that a heading renders, as a list of pieces, each with the texts that it can show. One
+ * pass reads the inline constructs in the order that CommonMark gives them precedence: an escape,
+ * then a code span, an autolink, an HTML tag, and an entity, then a link or an image, whose text
+ * the pass reads again and whose destination shows no text. An underscore run that is not inside a
+ * word opens or closes emphasis and shows nothing, when the runs pair up.
+ *
+ * A false dead anchor fails a harden session, so a construct that the pass cannot settle gives each
+ * text that it can show: a reference link, whose definition decides whether it is a link, an
+ * unknown entity, and underscore runs that do not pair up.
+ */
+function scanInline(source: string): ReadonlyArray<readonly string[]> {
+  const pieces: Array<readonly string[]> = []
+  const underscoreRuns: number[] = []
+  let text = ""
+
+  const flush = () => {
+    if (text.length > 0) {
+      pieces.push([text])
+      text = ""
+    }
+  }
+
+  for (let index = 0; index < source.length;) {
+    const character = source[index] ?? ""
+    const rest = source.slice(index)
+
+    if (character === "\\" && ASCII_PUNCTUATION.test(source[index + 1] ?? "")) {
+      text += source[index + 1]
+      index += 2
+      continue
+    }
+
+    if (character === "`") {
+      const run = /^`+/u.exec(rest)?.[0] ?? "`"
+      const end = findCodeSpanEnd(source, index)
+
+      if (end === -1) {
+        text += run
+        index += run.length
+        continue
+      }
+
+      const code = source.slice(index + run.length, end - run.length)
+      const padded = code.startsWith(" ") && code.endsWith(" ") && code.trim() !== ""
+      text += padded ? code.slice(1, -1) : code
+      index = end
+      continue
+    }
+
+    const autolink = AUTOLINK.exec(rest)
+    const tag = HTML_TAG.exec(rest)
+    const entity = ENTITY.exec(rest)
+
+    if (autolink !== null) {
+      text += autolink[1]
+      index += autolink[0].length
+      continue
+    }
+
+    if (tag !== null) {
+      index += tag[0].length
+      continue
+    }
+
+    if (entity !== null) {
+      flush()
+      pieces.push(readEntity(entity))
+      index += entity[0].length
+      continue
+    }
+
+    const isImage = character === "!" && source[index + 1] === "["
+    const labelStart = isImage ? index + 1 : index
+    const labelEnd = character === "[" || isImage ? findLabelEnd(source, labelStart) : -1
+
+    if (labelEnd !== -1) {
+      const label = scanInline(source.slice(labelStart + 1, labelEnd))
+
+      const destinationEnd =
+        source[labelEnd + 1] === "(" ? findDestinationEnd(source, labelEnd + 1) : -1
+
+      const referenceEnd = source[labelEnd + 1] === "[" ? findLabelEnd(source, labelEnd + 1) : -1
+
+      flush()
+
+      if (destinationEnd !== -1) {
+        // An image shows no text in the heading, and a link shows its text.
+        pieces.push(...(isImage ? [] : label))
+        index = destinationEnd
+        continue
+      }
+
+      pieces.push(...label)
+
+      if (referenceEnd !== -1) {
+        // Without its definition, a reference link shows its brackets and the reference as text.
+        pieces.push(["", source.slice(labelEnd + 2, referenceEnd)])
+        index = referenceEnd + 1
+        continue
+      }
+
+      index = labelEnd + 1
+      continue
+    }
+
+    if (character === "_") {
+      const run = /^_+/u.exec(rest)?.[0] ?? "_"
+      const before = source[index - 1] ?? ""
+      const after = source[index + run.length] ?? ""
+
+      if (!(WORD_CHARACTER.test(before) && WORD_CHARACTER.test(after))) {
+        flush()
+        underscoreRuns.push(pieces.length)
+        pieces.push([run])
+        index += run.length
+        continue
+      }
+    }
+
+    text += character
+    index += 1
+  }
+
+  flush()
+
+  for (const position of underscoreRuns) {
+    const [run = ""] = pieces[position] ?? []
+    pieces[position] = underscoreRuns.length % 2 === 0 ? [""] : ["", run]
+  }
+
+  return pieces
+}
+
+/**
+ * Each text that a heading can render. The first text is the one that the scanner reads as most
+ * likely, and the others come from the constructs that it cannot settle.
+ */
+function readHeadingTexts(heading: string) {
+  return scanInline(heading).reduce<readonly string[]>(
+    (texts, piece) => texts.flatMap((text) => piece.map((option) => `${text}${option}`)),
+    [""]
+  )
 }
 
 /**
  * The anchor that GitHub makes from the text of a heading, before the suffix of a repeated heading.
  */
-function toSlug(heading: string) {
-  return readHeadingText(heading)
-    .trim()
-    .toLowerCase()
-    .replaceAll(SLUG_REMOVED, "")
-    .replaceAll(" ", "-")
+function toSlug(text: string) {
+  return text.toLowerCase().replaceAll(SLUG_REMOVED, "").replaceAll(" ", "-")
 }
 
 /**
@@ -153,13 +404,19 @@ function readAnchors(prose: string) {
     const heading = (match[1] ?? match[2] ?? "").trim()
     const id = HEADING_ID.exec(heading)?.[1]
 
+    const texts = readHeadingTexts(heading)
+
     // GitHub keeps the id in the text of the heading, and a docs site makes the id the anchor.
+    const alternatives =
+      id === undefined ? texts : [...texts, ...readHeadingTexts(heading.replace(HEADING_ID, ""))]
+
     if (id !== undefined) {
       anchors.add(id.toLowerCase())
-      anchors.add(toSlug(heading.replace(HEADING_ID, "")))
     }
 
-    const slug = toSlug(heading)
+    // A false dead anchor fails a session, so each text that the heading can render, with and
+    // without the space that a construct with no text leaves at an end, gives an anchor.
+    const slug = toSlug(texts[0] ?? "")
 
     let anchor = slug
 
@@ -171,6 +428,14 @@ function readAnchors(prose: string) {
 
     occurrences.set(anchor, 0)
     anchors.add(anchor)
+
+    const suffix = anchor.slice(slug.length)
+
+    for (const text of alternatives) {
+      for (const candidate of new Set([toSlug(text), toSlug(text.trim())])) {
+        anchors.add(`${candidate}${suffix}`)
+      }
+    }
   }
 
   for (const id of matchAll(prose, HTML_ID)) {

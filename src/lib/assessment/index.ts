@@ -302,7 +302,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 /**
  * The assessment that Doctor reports for the target project, from a new read of it. A project that
  * does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so a
- * coding agent can repair it.
+ * coding agent can repair it. Any other read or parse failure still fails Doctor.
  */
 export const readAssessment = Effect.fn("readAssessment")(function* () {
   // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets

@@ -241,88 +241,37 @@ source text. Nothing enforces it.
 
 ## Command boundaries
 
-- `check` and `fix` call the bridge to run Oxfmt and Oxlint. The bridge resolves the project's
-  Oxlint runtime and starts Oxlint's own CLI module with `node`, so Oxlint runs with that runtime
-  and no second process loads Effect. It starts the project's Oxfmt CLI module with `node` too,
-  without the shell script in `node_modules/.bin`, so a missing Oxfmt fails as
-  `PackageNotInstalled`. `bin/adamantite` sets `NODE_COMPILE_CACHE` to its compile cache folder, so
-  both tools load their compiled code from the cache. `check` fails on Oxlint warnings unless
-  `--allow-warnings` is set.
-- `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
-  `quality/require-readable-spacing` counts a line past its `printWidth` option as multiline and
-  adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
-  one pass of fixes, so a fix that causes a new fixable report still needs a second `fix`.
-  `src/lib/bridge/__tests__/index.test.ts` lists each such idiom in `secondPasses` and fails
-  when one fix ends it, so the entry goes when Oxlint repeats its passes
-  ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
-- `analyze` calls the bridge to run Sherif in a detected monorepo, then Knip. `--only` selects
-  one stage.
-- `check`, `fix`, and `analyze` read the lockfile selection and pass it to the bridge. When a tool
-  is not on `PATH` and no selected script runs it, the bridge replaces `CliNotFound` with
-  `ToolNotSelected`, which names the `init` command that adds the script. `resolveOxlintLaunch`
-  in `oxlint/entry.ts` reads the selection and replaces `PackageNotInstalled` for Oxlint the same
-  way, for the bridge and for the Oxlint entry. The step that starts Oxlint resolves it, so a
-  missing Oxlint fails only the lint stage. Without a lockfile, or for a selected tool, the failure
-  of the tool stands.
-- `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
-  runs `applySetup`, as "Setup and the write rule" describes. `init --json` takes the selection
-  from the flags and asks nothing. When the selection includes coding agents, the `agents`
-  integration renders `AGENTS.md` with the Adamantite section, and each Adamantite skill in
-  `.agents/skills` and in each other skill folder whose agent folder exists, such as
-  `.claude/skills`. A build macro bundles each folder of `skills/` into the CLI, so a copy matches
-  the running Adamantite version without `node_modules` or the network. A new skill is a new folder
-  there, and the integration writes and assesses it without a code change. Doctor reports an `AGENTS.md`
-  without the section, and a skill copy that differs from the bundled skill.
-- `doctor` assesses the integrations, reports the findings, and offers their repair through
-  `Resolution.offer`, which assesses again after a handoff. The Oxlint assessment resolves the
-  same runtime as the entry and reports missing installed packages, and unsupported native builds
-  or platforms. Resolution neither launches a tool nor changes files or process variables.
-  Unexpected read and parse failures still propagate.
-- `harden` renders a prompt that tells a coding agent to move the project's coding standards up
-  the enforcement ladder, and offers it through `Resolution.offer`. A build macro inlines the
-  ladder from `skills/adamantite-hardening/references/enforcement-ladder.md`, so the prompt and the
-  hardening skill state it from one file. Its `verify` runs
-  Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
-  The agent verifies new and changed custom rules with temporary RuleTester cases during the
-  session and removes the cases before handback. Harden never produces findings, so it never
-  changes Doctor's result. The prompt lists each Markdown file that `git ls-files` gives, except
-  the changesets, the changelogs, and the files in the skill folders of the coding agents, so the
-  agent reads all the documentation. An agent finds its skills on its own, so they need no reach.
-  `hardening/agent-reach.ts` finds the discovery gaps: the files that no chain of links from an
-  `AGENTS.md` reaches, the links to missing files, and the links whose anchor a simple rule cannot
-  match to a heading, for the agent to check. After a handoff, a link to a missing file that the
-  session added fails the verification. `hardening/suppressions.ts` counts the disable
-  comments of each rule and the TypeScript directives in the files that Oxlint lints, and `hardening/overrides.ts` marks each file
-  of an override that turns a rule off, after a trial that turns the rule on again. The prompt shows
-  both as data. `hardening/decisions-record.ts` decodes the decisions record, a JSON Lines log
-  that the agent appends to, and the prompt shows its decisions. A session line of the record names
-  the commit that a session read the history up to, and the fix history of a later session starts
-  after the common ancestor of that commit and `HEAD`. A line that the session added and that does
-  not decode fails the verification. `harden` reads the workspace before the session, and takes `project.workspace` from
-  its `Project.read` after the session, because the agent can change the project. The functions in
-  `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
-- `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
-  project without a lockfile, it runs no setup and offers the `lockfile-missing` finding, which
-  says to run `adamantite init`. `update` does not edit `skills-lock.json`,
-  which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
-  finding.
-- `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,
-  from the probe plugin, and `rule ast --json` and `rule try --json` print their results through
-  `Output.result`. Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a
-  temporary file. Temporary verification cases do not stay in the target project. Users can opt in
-  to saved `.test.*` files beside their rules, add them with `rule test add [name]`, and run them
-  explicitly with `rule test`. `--path` selects another test location. Init, CI, and harden do not
-  run them by default.
-- `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
-  folder, puts a trial config in place of the config that lints the cases, and lints the cases
-  with Oxlint from the root of the copy. It reads the workspace one time. The copy gets a real
-  `node_modules` folder with a link to each entry of the project folder, so the entry module that
-  `custom()` writes stays in the copy. A link to a workspace package goes to the copy of the
-  package, with the files that git ignores in it, such as build output. It exits 0 when each case
-  is as expected, 1 when a case is not, and 2 when the trial is not evidence.
+Each command is one module of `src/commands`, and `src/cli.ts` lists them.
 
-Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
-commands do not forward arguments because they coordinate multiple operations.
+- `check` checks the formatting with Oxfmt and lints with Oxlint, through `Bridge.check` in
+  `src/lib/bridge/index.ts`. It fails on Oxlint warnings unless `--allow-warnings` is set.
+- `fix` fixes lint issues, then formats, through `Bridge.fix`.
+- `analyze` runs Sherif in a detected monorepo, then Knip, through `Bridge.analyze`.
+- `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
+  runs `applySetup`.
+- `update` runs `applySetup` with the recorded selection. Without a lockfile, it runs no setup and
+  offers the `lockfile-missing` finding.
+- `doctor` assesses the project, reports the findings, and offers their repair.
+- `harden` renders a prompt that tells a coding agent to move the project's coding standards up
+  the enforcement ladder, from the facts that `src/lib/hardening/index.ts` computes, and offers it.
+  Harden is not an assessment and produces no findings.
+- `rule add` writes only a custom rule stub. `rule ast` prints the syntax tree that Oxlint rules
+  visit. `rule test` runs the saved tests that a user chose to keep. `rule try` runs a trial in a
+  copy of the project, through `src/lib/hardening/trial.ts`.
+
+The tests in `src/commands/__tests__` hold these invariants, and one more test where the line names
+it:
+
+- `check`, `fix`, and `analyze` forward the arguments after `--` to one tool. A lifecycle command
+  coordinates several operations, so it rejects them. `src/__tests__/cli.test.ts` holds it.
+- `check`, `fix`, and `analyze` read the lockfile selection. A missing tool that no selected script
+  runs fails with `ToolNotSelected`, which names the `init` command that adds the script.
+- Oxlint applies one pass of fixes, so a fix that causes a new fixable report needs a second `fix`.
+  `src/lib/bridge/__tests__/index.test.ts` lists each such idiom in `secondPasses`, until Oxlint
+  repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
+- A trial changes no file of the project. `src/lib/hardening/__tests__/trial.test.ts` holds it.
+- `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is
+  not evidence.
 
 ## Preset layout
 

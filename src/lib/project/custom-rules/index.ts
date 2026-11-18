@@ -32,8 +32,9 @@ export function toCustomRuleStub(name: string): string {
 }
 
 /**
- * Write only a rule stub. Agents verify it with temporary RuleTester cases. A relative dir resolves
- * from cwd. An existing rule stays unchanged.
+ * Write only a rule stub. Agents verify it with temporary RuleTester cases, which run
+ * `adamantite/rules/testing` from stdin or a temporary file and do not stay in the target project.
+ * A relative dir resolves from cwd. An existing rule stays unchanged.
  */
 export const addCustomRule = Effect.fn("addCustomRule")(function* (
   cwd: string,
@@ -153,7 +154,9 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
  * The command that runs the optional rule tests of each rules folder that a `custom()` call loads,
  * with paths relative to the project root, or none when no test exists, and the configs that did
  * not load. A test is a `.test.*` file beside the rules, so a `_` file is a helper. `RuleTester`
- * runs only on Node.js, so the tests run under Node.js, also in a Bun project.
+ * runs only on Node.js, so the tests run under Node.js, also in a Bun project. A saved test is the
+ * user's choice, and only `adamantite rule test` runs it: `init`, the CI workflow, and `harden` do
+ * not.
  */
 export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* ({
   customRules,

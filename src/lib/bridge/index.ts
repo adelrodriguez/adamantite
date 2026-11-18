@@ -138,6 +138,8 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
   // past the print width as multiline. Oxlint applies one pass of fixes, so a fix that causes a new
   // report still needs a second `fix` until Oxlint repeats its passes:
   // https://github.com/oxc-project/oxc/issues/16118
+  // `__tests__/index.test.ts` lists each such idiom in `secondPasses` and fails when one fix ends
+  // it, so the entry goes when Oxlint repeats its passes.
   yield* runner
     .runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
     .pipe(

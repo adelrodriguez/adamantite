@@ -72,6 +72,12 @@ chain, which lists each binding file and package that Oxlint tried. When it stop
 mean that the install left out the optional dependency for this platform. Reinstall the
 dependencies with optional dependencies for this platform, then run the check again.
 
+When `adamantite check` ends with a line that says that `.adamantite/adamantite-lock.json` records
+the setup of another Adamantite version than the project installs, the check fails for that
+reason even when the stages pass. When the lockfile is older, run `adamantite update` as
+"Update managed dependencies" says, and commit the changes. When it is newer, install the
+dependencies, and do not run `update`, which would bring the setup back to the older version.
+
 `adamantite check` proves formatting, lint rules, and types. It does not run the project's tests.
 After you change behavior, find the project's test command in its instructions or its package
 scripts, and run the tests of the changed code.
@@ -107,6 +113,9 @@ missing or unchanged since Adamantite wrote them, and writes
 `.adamantite/adamantite-lock.json`. In a project without a lockfile, it sets up nothing and reports
 one finding: run `adamantite init`. Commit the lockfile. The JSON lists the file writes, the script writes, and the installs in `setup`, and the
 findings that remain in `assessment`. It exits 1 while findings remain.
+
+Run it after each update of the `adamantite` package. Until the lockfile records the installed
+version, `adamantite check` fails and Doctor reports the `setup-outdated` finding.
 
 Follow the repair step above. The update is complete when Doctor reports no findings and
 the project's checks pass.

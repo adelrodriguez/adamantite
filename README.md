@@ -211,6 +211,13 @@ agents copy. Use `--allow-warnings` to pass with warnings. A forwarded `--max-wa
 `--deny-warnings`, such as `adamantite check -- --max-warnings 10`, replaces this default. To keep existing violations of a
 rule while new code follows it, turn the rule off for those files in an Oxlint override.
 
+`check` also fails when `.adamantite/adamantite-lock.json` records another Adamantite version
+than the one that the project installs, such as after an update of the `adamantite` package
+without `adamantite update`. It runs the stages first, so their reports still print, and then
+names both versions and the repair. For an older lockfile, run `adamantite update` and commit the
+changes. For a lockfile that a newer Adamantite wrote, install the dependencies. A project without
+a lockfile passes this step.
+
 Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
 both run:
 
@@ -424,7 +431,9 @@ from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry
 when findings remain after it, and offers their repair as `init` does.
 It also writes the managed files of the recorded setup, such as the
 [Adamantite skills](#agent-skills), that are missing or unchanged since Adamantite wrote them,
-and writes the lockfile again with the installed version. A project without a lockfile, such as
+and writes the lockfile again with the installed version, also when no managed file changed.
+Run it after each update of the `adamantite` package, because `check` fails until the lockfile
+records the installed version. A project without a lockfile, such as
 one that an Adamantite version before the lockfile set up, has no recorded setup, so `update`
 changes nothing and reports one finding: run `adamantite init`. `init` keeps each existing file
 that differs from what it writes, and Doctor then reports the changes that break the setup.

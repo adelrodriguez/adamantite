@@ -1,7 +1,5 @@
 import type { Options } from "@oxlint/plugins"
 
-// The readers of rule options that more than one plugin uses.
-
 type OptionValue = Options[number]
 
 type OptionObject = Exclude<OptionValue, OptionValue[] | boolean | number | string | null>

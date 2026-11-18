@@ -145,9 +145,8 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
  * enforcement ladder, and offers it through `Resolution.offer` as a `Task`. The prompt shows what
  * `src/lib/hardening` computes as data: each Markdown file that git lists outside the skill
  * folders, the discovery gaps, the disable comments of each rule, each file of an override that
- * turns a rule off, and the decisions of the decisions record. The functions of `src/lib/hardening`
- * take the `Workspace` as a parameter and do not read it, so the command reads it one time before
- * the session. Harden produces no findings, so it never changes Doctor's result.
+ * turns a rule off, and the decisions of the decisions record. Harden produces no findings, so it
+ * never changes Doctor's result.
  */
 export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   Command.withDescription(

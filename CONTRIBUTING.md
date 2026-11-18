@@ -95,10 +95,11 @@ Name each test file after the module that it tests, as `<folder>/__tests__/<name
 `<folder>/<name>.ts`, or list it with a reason in `src/__tests__/test-names.test.ts`.
 
 A test file with a test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest,
-belongs in the `PROCESS_RUN_TESTS` list of `vitest.config.ts`. Keep that test in the file of its
+belongs in the `PROCESS_RUN_TESTS` list of `process-run-tests.ts`. Keep that test in the file of its
 module, beside the unit tests, which then run with it. That list is the `presets` Vitest project,
 which `pnpm run test:presets` runs. Every other test file runs in the `unit` project, which must not
-touch the host filesystem.
+touch the host filesystem. `pnpm run check` reports a unit test that imports a host layer, or a
+`node:fs` function that does more than read the repository.
 
 ## Validate a change
 

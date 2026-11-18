@@ -2,31 +2,13 @@ import { join } from "node:path"
 import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { configDefaults, defineConfig } from "vitest/config"
+import { PROCESS_RUN_TESTS } from "./process-run-tests.ts"
 
 // An Oxlint package folder, such as `<folder>/node_modules/oxlint`, that replaces the Oxlint of the
 // repository. CI sets it to test the rules with the minimum Oxlint version that `peerDependencies`
 // allows. The RuleTester tests import `oxlint/plugins-dev` from it, and
 // `presets/__tests__/rule-fixtures.ts` lints the preset fixtures with it.
 const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
-
-// The test files with tests that start real processes: Oxlint and Oxfmt runs that lint and format
-// files, rule trials in a copy of a project, Node.js runs that load configs, and Vitest runs that
-// check the module cache. They touch the host filesystem, so they stay out of the unit tests. The
-// unit tests in the same file run with them.
-const PROCESS_RUN_TESTS = [
-  "presets/__tests__/**/*.test.ts",
-  "src/__tests__/macro-cache.test.ts",
-  "src/oxlint/__tests__/index.test.ts",
-  "src/commands/__tests__/rule.test.ts",
-  "src/lib/hardening/__tests__/overrides.test.ts",
-  "src/lib/hardening/__tests__/suppressions.test.ts",
-  "src/lib/hardening/__tests__/trial.test.ts",
-  "src/lib/integrations/oxlint/__tests__/index.test.ts",
-  "src/lib/project/__tests__/config-loader.test.ts",
-  "src/lib/project/custom-rules/__tests__/stub.test.ts",
-  "src/lib/setup/__tests__/index.test.ts",
-  "src/lib/bridge/__tests__/index.test.ts",
-]
 
 // Fixtures are code that the preset tests lint, not tests of this repository. Vitest cannot run some
 // of them, such as a Jest test that imports `@jest/globals`.

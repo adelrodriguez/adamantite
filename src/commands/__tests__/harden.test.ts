@@ -130,7 +130,8 @@ const REQUIRED_PHRASES = {
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
     "One that matches a recorded decision is settled: do not propose it or ask about it again.",
-    "List it under **Also considered** in step 8, with the `id` of the decision.",
+    "A decision that the section shows `in` a folder settles it for that folder only.",
+    "List it under **Also considered** in step 8, with the `id` of the decision, and its folder when its line shows one.",
     "evidence that is newer than the date of the decision, such as fix commits after it",
     "Continue when every remaining candidate has a proposed step, evidence, limits, and cases",
   ],
@@ -1539,37 +1540,39 @@ describe("harden", () => {
     })
   )
 
-  it.effect("show two decisions that have one id, each with its scope, in the prompt and as JSON", () =>
-    Effect.gen(function* () {
-      // The same standard, which an earlier session rejected for the whole project.
-      const project = {
-        at: DEFERRED.at,
-        decision: "rejected",
-        id: DEFERRED.id,
-        rule: DEFERRED.rule,
-        standard: DEFERRED.standard,
-      }
+  it.effect(
+    "show two decisions that have one id, each with its scope, in the prompt and as JSON",
+    () =>
+      Effect.gen(function* () {
+        // The same standard, which an earlier session rejected for the whole project.
+        const project = {
+          at: DEFERRED.at,
+          decision: "rejected",
+          id: DEFERRED.id,
+          rule: DEFERRED.rule,
+          standard: DEFERRED.standard,
+        }
 
-      const api = { ...DEFERRED, scope: "packages/api" }
+        const api = { ...DEFERRED, scope: "packages/api" }
 
-      const files = {
-        ...MONOREPO_FILES,
-        // The session of `packages/api` wrote its line last, with the `id` of the standard.
-        [RECORD]: makeRecord([project, DEFERRED, api]),
-      }
+        const files = {
+          ...MONOREPO_FILES,
+          // The session of `packages/api` wrote its line last, with the `id` of the standard.
+          [RECORD]: makeRecord([project, DEFERRED, api]),
+        }
 
-      const prompt = yield* runHardenPrompt(files, ["--path", "packages/web"])
-      const { logLines } = yield* runHarden(files, ["--json", "--path", "packages/web"])
+        const prompt = yield* runHardenPrompt(files, ["--path", "packages/web"])
+        const { logLines } = yield* runHarden(files, ["--json", "--path", "packages/web"])
 
-      expect(getListItems(getSection(prompt, "### Decisions"))).toStrictEqual([
-        "- `default-exports`, rejected 2026-03-14: Ban default exports. Proposed: `import/no-default-export`.",
-        "- `default-exports`, deferred 2026-03-14, in `packages/web`: Ban default exports. Proposed: `import/no-default-export`.",
-      ])
-      expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
-        project,
-        DEFERRED,
-      ])
-    })
+        expect(getListItems(getSection(prompt, "### Decisions"))).toStrictEqual([
+          "- `default-exports`, rejected 2026-03-14: Ban default exports. Proposed: `import/no-default-export`.",
+          "- `default-exports`, deferred 2026-03-14, in `packages/web`: Ban default exports. Proposed: `import/no-default-export`.",
+        ])
+        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
+          project,
+          DEFERRED,
+        ])
+      })
   )
 
   it.effect.each([

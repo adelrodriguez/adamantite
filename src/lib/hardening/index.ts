@@ -668,8 +668,12 @@ export function renderHardenPrompt(
     decisionExample: renderDecisionExample(today, context.scope),
     decisionScope:
       context.scope === null
-        ? "Leave out `scope`, because this session covers the whole project."
-        : `Write \`"scope":${JSON.stringify(context.scope)}\` on each line, the folder of this session.`,
+        ? "A line of this session has no `scope`, because this session covers the whole project."
+        : `A line of this session has \`"scope":${JSON.stringify(context.scope)}\`, the folder of this session.`,
+    decisionsCovered:
+      context.scope === null
+        ? "This session covers each decision that the section shows."
+        : `This session covers a decision in \`${context.scope}\` or in a folder inside it.`,
     decisionsRecord: renderDecisionsRecord(context.decisionsRecord, context.scope),
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>

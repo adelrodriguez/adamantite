@@ -32,7 +32,7 @@ These are the Markdown files of the project, without the changesets, the changel
 
 ### Decisions
 
-The decisions record holds each candidate that the user did not approve, and each decision that the user resolved, in an earlier session. Adamantite decoded the record, so do not read the file.
+The decisions record holds each candidate that the user did not approve, and each decision that the user resolved, in an earlier session. Adamantite decoded the record, so do not read the file. A decision is its `id` together with its folder, which a line shows after `in`, so one `id` can have a decision for the project and another for a folder.
 
 {{decisionsRecord}}
 
@@ -118,7 +118,7 @@ This step is done when each rule has its gaps or the note "none found".
 
 ## 7. Place each candidate on the enforcement ladder
 
-Before you place a candidate, compare it with the decisions in the Decisions section above, and do the same for each decision from steps 3 and 6, and for each choice that this step finds. One that matches a recorded decision is settled: do not propose it or ask about it again. List it under **Also considered** in step 8, with the `id` of the decision. The exception is evidence that is newer than the date of the decision, such as fix commits after it: then show the candidate or the decision again, with the `id` and the new evidence.
+Before you place a candidate, compare it with the decisions in the Decisions section above, and do the same for each decision from steps 3 and 6, and for each choice that this step finds. One that matches a recorded decision is settled: do not propose it or ask about it again. A decision that the section shows `in` a folder settles it for that folder only. List it under **Also considered** in step 8, with the `id` of the decision, and its folder when its line shows one. The exception is evidence that is newer than the date of the decision, such as fix commits after it: then show the candidate or the decision again, with the `id` and the new evidence.
 
 {{ladder}}
 
@@ -170,8 +170,10 @@ After the user answers, append to the decisions record. It is the only project f
   {{sessionLine}}
   ```
 
-- Append one line for each candidate that you showed and that the user did not approve, and one for each item of the Decisions list that the user resolved. An approved candidate needs no line, because its rule or instruction is the trace. The exception is an approved candidate whose `id` the Decisions section shows: append a line with that `id` and the decision `approved`, so the earlier decision no longer applies.
-- Never edit or delete an earlier line. To change a decision, append a line with the same `id`. The one edit is the repair of a line that the Decisions section lists as not decoded.
+- Append one line for each candidate that you showed and that the user did not approve, and one for each item of the Decisions list that the user resolved. An approved candidate needs no line, because its rule or instruction is the trace.
+- A decision is its `id` together with its `scope`. A line replaces only the earlier line that has the same `id` and the same `scope`, so one standard can have a decision for the project and another for a folder. Never edit or delete an earlier line. The one edit is the repair of a line that the Decisions section lists as not decoded.
+- {{decisionScope}} To change a decision that the Decisions section shows, write its `id` and its scope in place of that: the folder that its line shows after `in`, or no `scope` when its line shows none. Change a shown decision when the user decides the standard again for that same scope, or says to change it. Otherwise, the line of this session stands beside the shown decision, and both apply.
+- To end a decision that the Decisions section shows, append a line with its `id`, its scope, and the decision `approved`. Do this for each shown decision that an approved candidate matches and that this session covers. {{decisionsCovered}} A decision that this session does not cover stays, because it still applies outside this session.
 - Write one JSON object on one line, with no trailing comma, and end the line with a newline. Leave out a key that has no value.
 - Copy the form of this line:
 
@@ -179,9 +181,9 @@ After the user answers, append to the decisions record. It is the only project f
   {{decisionExample}}
   ```
 
-- `id` is kebab-case and stays the same for a standard: reuse the `id` that the Decisions section shows when the standard was decided before. `at` is `{{today}}`, the date of today. `standard` is the standard in one sentence.
+- `id` is kebab-case and stays the same for a standard, in each scope: reuse the `id` that the Decisions section shows when the standard was decided before. `at` is `{{today}}`, the date of today. `standard` is the standard in one sentence.
 - `decision` is `rejected`, `deferred` when the user wants to decide later, `decided` for a resolved item of the Decisions list, or `approved`. `reason` is the reason that the user gave, or the choice of a `decided` line.
-- `rule` is the rule or the ladder step that you proposed. {{decisionScope}} `follow` and `break` are the numbers of places that follow and break the standard, and `fixes` are the short hashes of the fix commits that you saw.
+- `rule` is the rule or the ladder step that you proposed. `follow` and `break` are the numbers of places that follow and break the standard, and `fixes` are the short hashes of the fix commits that you saw.
 - Tell the user to commit the record with the other changes of the session, because the next session takes its decisions and the start of its fix history from it.
 
 If the user approves none, stop after you append the lines, without another change to the project files.

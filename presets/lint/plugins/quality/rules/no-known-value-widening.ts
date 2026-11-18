@@ -1,5 +1,6 @@
 import type { ESTree, Rule, SourceCode, Variable } from "@oxlint/plugins"
 
+import { resolveVariable } from "../../shared/scope.ts"
 import {
   classifyWideningTarget,
   isKnownEvidenceExpression,
@@ -10,7 +11,6 @@ import {
   functionParameterBindingName,
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
-import { resolveVariable } from "../shared/scope.ts"
 import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { resolvesToUnknown } from "../shared/unknown-type.ts"
 

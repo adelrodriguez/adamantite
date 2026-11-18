@@ -1,6 +1,6 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { resolveVariable } from "../shared/scope.ts"
+import { resolveVariable } from "../../shared/scope.ts"
 
 // Parentheses and type operators do not change the value that a branch spreads.
 const EXPRESSION_WRAPPERS: ReadonlySet<string> = new Set([

@@ -523,7 +523,8 @@ helpers that only this plugin uses. `adamantite/shared/imports.ts`, for example,
 imported functions, such as `useState` and `React.useState`.
 
 `plugins/shared/` holds the helpers that more than one plugin uses: `options.ts` reads rule
-options, and `ast.ts` holds the AST helpers, such as the key reader. A helper moves there only
+options, `ast.ts` holds the AST helpers, such as the key reader, and `scope.ts` resolves a name to
+its binding and follows `const` aliases. A helper moves there only
 when a second plugin needs it. `replacement.d.ts` holds the `Replacement` type that any rule can
 declare. It is a declaration file, so the build ships no module for it.
 

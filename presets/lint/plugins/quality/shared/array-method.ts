@@ -1,6 +1,6 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
 import { staticKeyName } from "../../shared/ast.ts"
-import { constBinding } from "./scope.ts"
+import { constBinding } from "../../shared/scope.ts"
 import { namedTypeReference } from "./type-alias-resolution.ts"
 
 /**

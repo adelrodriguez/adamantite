@@ -6,7 +6,7 @@ import {
   matchesThroughAliases,
   readsProperty,
   resolveVariable,
-} from "../shared/scope.ts"
+} from "../../shared/scope.ts"
 
 const moduleMockMethods = new Set(["doMock", "mock", "unstable_mockModule"])
 

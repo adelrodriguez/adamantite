@@ -33,6 +33,8 @@ const EXCEPTIONS = {
   "presets/__tests__/vitest.test.ts": STACK_TEST,
   "src/__tests__/architecture-doc.test.ts":
     "Checks that `docs/architecture.md` matches the layer map of `oxlint.config.ts`.",
+  "src/__tests__/doc-references.test.ts":
+    "Checks the links and the source paths of the docs against the files of the repository.",
   "src/__tests__/exports.test.ts": "Checks the `exports` of `package.json` against the README.",
   "src/__tests__/macro-cache.test.ts":
     "Checks the macro cache workaround of `vitest.config.ts`, until unplugin-macros sets the cache key.",

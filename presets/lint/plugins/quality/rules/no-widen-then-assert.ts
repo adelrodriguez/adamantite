@@ -1,6 +1,8 @@
-import type { ESTree, Rule, Variable } from "@oxlint/plugins"
+import type { ESTree, Reference, Rule, Variable } from "@oxlint/plugins"
 
 import { namedTypeReference } from "../shared/type-alias-resolution.ts"
+
+type Assertion = ESTree.TSAsExpression | ESTree.TSTypeAssertion
 
 type BroadTypeKind = "top" | "object" | "record"
 
@@ -203,27 +205,10 @@ function isInsideBoundary(node: ESTree.Node, boundary: ESTree.Node | null): bool
   return boundary === null || (node.start >= boundary.start && node.end <= boundary.end)
 }
 
-function resolvedVariableForIdentifier(
-  scopes: ReadonlyArray<{
-    readonly references: ReadonlyArray<{
-      readonly identifier: ESTree.Node
-      readonly resolved: Variable | null
-    }>
-  }>,
-  identifier: ESTree.IdentifierReference
-): Variable | null {
-  for (const scope of scopes) {
-    const reference = scope.references.find(
-      (candidate) =>
-        candidate.identifier.start === identifier.start
-        && candidate.identifier.end === identifier.end
-    )
-
-    if (reference !== undefined) return reference.resolved
-  }
-
-  return null
-}
+/**
+ * Resolve an identifier reference to the variable that it reads.
+ */
+type Resolve = (identifier: ESTree.IdentifierReference) => Variable | null
 
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
   for (const definition of variable.defs) {
@@ -237,7 +222,7 @@ function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | nul
 
 function knownValueEvidence(
   expression: ESTree.Expression,
-  scopes: Parameters<typeof resolvedVariableForIdentifier>[0],
+  resolve: Resolve,
   boundary: ESTree.Node | null,
   visitedVariables: ReadonlySet<Variable>
 ): KnownValueEvidence | null {
@@ -265,7 +250,7 @@ function knownValueEvidence(
   }
 
   if (unwrapped.type !== "Identifier") return null
-  const variable = resolvedVariableForIdentifier(scopes, unwrapped)
+  const variable = resolve(unwrapped)
 
   if (variable === null || visitedVariables.has(variable)) return null
 
@@ -297,7 +282,7 @@ function knownValueEvidence(
 
   return knownValueEvidence(
     declarator.init,
-    scopes,
+    resolve,
     boundary,
     new Set([...visitedVariables, variable])
   )
@@ -305,7 +290,7 @@ function knownValueEvidence(
 
 function widenedBinding(
   variable: Variable,
-  scopes: Parameters<typeof resolvedVariableForIdentifier>[0]
+  resolve: Resolve
 ): {
   readonly broadKind: BroadTypeKind
   readonly evidence: KnownValueEvidence
@@ -341,7 +326,7 @@ function widenedBinding(
       ? assertedExpression(initializerAssertion)
       : declarator.init
 
-  const evidence = knownValueEvidence(originalExpression, scopes, boundary, new Set([variable]))
+  const evidence = knownValueEvidence(originalExpression, resolve, boundary, new Set([variable]))
 
   return evidence === null ? null : { boundary, broadKind, declaredAt: declarator.end, evidence }
 }
@@ -369,17 +354,39 @@ function assertionIsNarrower(
  */
 const rule: Rule = {
   createOnce(context) {
-    let scopes: Parameters<typeof resolvedVariableForIdentifier>[0] = []
+    // The rule checks an assertion only when its identifier names a `const` binding that widens
+    // its value, so most files never build the scope analysis that resolves references.
+    const candidates: Array<{
+      readonly expression: ESTree.IdentifierReference
+      readonly node: Assertion
+    }> = []
 
-    const checkAssertion = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion) => {
-      const expression = assertedExpression(node)
+    const widenedNames = new Set<string>()
+    let references: Map<number, Reference> | null = null
 
-      if (expression.type !== "Identifier") return
+    const resolve: Resolve = (identifier) => {
+      if (references === null) {
+        references = new Map()
 
-      const variable = resolvedVariableForIdentifier(scopes, expression)
+        for (const scope of context.sourceCode.scopeManager.scopes) {
+          for (const reference of scope.references) {
+            if (!references.has(reference.identifier.start)) {
+              references.set(reference.identifier.start, reference)
+            }
+          }
+        }
+      }
+
+      const reference = references.get(identifier.start)
+
+      return reference?.identifier.end === identifier.end ? reference.resolved : null
+    }
+
+    const checkAssertion = (node: Assertion, expression: ESTree.IdentifierReference) => {
+      const variable = resolve(expression)
 
       if (variable === null) return
-      const widened = widenedBinding(variable, scopes)
+      const widened = widenedBinding(variable, resolve)
 
       if (
         widened === null
@@ -402,12 +409,48 @@ const rule: Rule = {
       })
     }
 
+    const collectAssertion = (node: Assertion) => {
+      const expression = assertedExpression(node)
+
+      if (expression.type === "Identifier") candidates.push({ expression, node })
+    }
+
     return {
       Program() {
-        scopes = context.sourceCode.scopeManager.scopes
+        candidates.length = 0
+        widenedNames.clear()
+        references = null
       },
-      TSAsExpression: checkAssertion,
-      TSTypeAssertion: checkAssertion,
+      "Program:exit"() {
+        for (const { expression, node } of candidates) {
+          if (widenedNames.has(expression.name)) checkAssertion(node, expression)
+        }
+
+        candidates.length = 0
+        references = null
+      },
+      TSAsExpression: collectAssertion,
+      TSTypeAssertion: collectAssertion,
+      VariableDeclarator(node) {
+        if (
+          node.parent.type !== "VariableDeclaration"
+          || node.parent.kind !== "const"
+          || node.id.type !== "Identifier"
+          || node.init === null
+        ) {
+          return
+        }
+
+        const declaredType = node.id.typeAnnotation?.typeAnnotation
+        const initializerType = assertionFromExpression(node.init)?.typeAnnotation
+
+        if (
+          (declaredType !== undefined && broadTypeKind(declaredType) !== null)
+          || (initializerType !== undefined && broadTypeKind(initializerType) !== null)
+        ) {
+          widenedNames.add(node.id.name)
+        }
+      },
     }
   },
   meta: {

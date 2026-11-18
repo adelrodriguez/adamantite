@@ -1,6 +1,7 @@
 import type { ESTree, Rule } from "@oxlint/plugins"
 
 const FORBIDDEN_SYMBOL_NAME = "shape"
+const FORBIDDEN_SYMBOL_PATTERN = new RegExp(FORBIDDEN_SYMBOL_NAME, "i")
 
 // An import binding takes its name from another module, so the rule checks only an import that
 // the file renames. An implicit global has no declaration in the file.
@@ -62,6 +63,12 @@ const rule: Rule = {
       },
       MethodDefinition: reportMemberKey,
       "Program:exit"() {
+        // A declared name with the term appears in the source text, unless an escape spells it.
+        // Without either, skip the scope analysis that the walk below would build.
+        const { text } = context.sourceCode
+
+        if (!FORBIDDEN_SYMBOL_PATTERN.test(text) && !text.includes("\\u")) return
+
         // A class name is a variable in two scopes, so report each declared name once.
         const declaredNames = new Set<DeclaredName>()
 

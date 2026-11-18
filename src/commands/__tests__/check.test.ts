@@ -4,10 +4,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import type { Selection } from "#lib/project/selection.ts"
 import {
   ADAMANTITE_RESOLUTION,
   createRunnerTestContext,
   getFailure,
+  getFailures,
   makeAdamantitePackageFile,
   makeLockfileFile,
   makeToolsInstalledLayer,
@@ -38,16 +41,24 @@ const installedLayer = makeModuleResolverLayer("/project", {
   ...ADAMANTITE_RESOLUTION,
 })
 
+// The test project installs Adamantite and only `tool`.
+function makeInstalledLayer(tool: "oxfmt" | "oxlint") {
+  return makeModuleResolverLayer("/project", {
+    [`${tool}/package.json`]: `node_modules/${tool}/package.json`,
+    ...ADAMANTITE_RESOLUTION,
+  })
+}
+
 // A project that installs Adamantite `installed`, with a lockfile that Adamantite `recorded` wrote
 // when it names one.
-function makeSetupFiles(options: { installed: string; recorded?: string }) {
+function makeSetupFiles(options: { installed: string; recorded?: string; selection?: Selection }) {
   const files = createFileSystemTestContext({
     files: makeAdamantitePackageFile(options.installed),
   })
 
   if (options.recorded !== undefined) {
     const lockfile = makeLockfileFile(
-      makeSelection({ presets: ["core"], scripts: ["check"] }),
+      options.selection ?? makeSelection({ presets: ["core"], scripts: ["check"] }),
       {},
       options.recorded
     )
@@ -406,27 +417,68 @@ describe("check", () => {
     )
 
     // A failed stage already printed its report, so the last line names the setup repair.
-    it.effect("fail with the outdated setup when a stage fails too", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext([1, 1])
+    const OUTDATED = new SetupOutdated({
+      installed: "0.47.0",
+      path: LOCKFILE_PATH,
+      recorded: "0.46.0",
+    })
 
-        const exit = yield* runCommand(checkCommand, [], {
-          files: makeSetupFiles({ installed: "0.47.0", recorded: "0.46.0" }),
-          layers: [runner.layer, installedLayer],
-        })
+    // The CLI prints each error after the stage reports, in this order, so the agent reads why a
+    // stage did not run, then the setup repair. The first error decides the exit code.
+    it.effect.each([
+      {
+        args: [],
+        error: new CommandFailed({ command: "node", exitCode: ChildProcessSpawner.ExitCode(1) }),
+        layer: installedLayer,
+        name: "a stage that printed its report",
+        runner: createRunnerTestContext([1, 0]),
+        selection: undefined,
+      },
+      {
+        args: ["--only", "format", "--allow-warnings"],
+        error: new InvalidCheckOptions({
+          reason: "`--allow-warnings` applies to the lint stage. Remove it or `--only format`.",
+        }),
+        layer: installedLayer,
+        name: "invalid options",
+        runner: createRunnerTestContext(),
+        selection: undefined,
+      },
+      {
+        args: [],
+        error: new PackageNotInstalled({ packageName: "oxlint", project: "/project" }),
+        layer: makeInstalledLayer("oxfmt"),
+        name: "an Oxlint that is not installed",
+        runner: createRunnerTestContext(),
+        selection: undefined,
+      },
+      {
+        args: [],
+        error: new PackageNotInstalled({ packageName: "oxfmt", project: "/project" }),
+        layer: makeInstalledLayer("oxlint"),
+        name: "an Oxfmt that is not installed",
+        runner: createRunnerTestContext(),
+        selection: undefined,
+      },
+      {
+        args: [],
+        error: new ToolNotSelected({ script: "check", tool: "oxfmt" }),
+        layer: makeInstalledLayer("oxlint"),
+        name: "a tool that the lockfile does not select",
+        runner: createRunnerTestContext(),
+        selection: makeSelection({}),
+      },
+    ])(
+      "fail with the stage error, then the outdated setup, after $name",
+      ({ args, error, layer, runner, selection }) =>
+        Effect.gen(function* () {
+          const exit = yield* runCommand(checkCommand, args, {
+            files: makeSetupFiles({ installed: "0.47.0", recorded: "0.46.0", selection }),
+            layers: [runner.layer, layer],
+          })
 
-        expect({
-          error: getFailure(exit),
-          ran: runner.invocations.map((invocation) => invocation.name ?? invocation.command),
-        }).toStrictEqual({
-          error: new SetupOutdated({
-            installed: "0.47.0",
-            path: LOCKFILE_PATH,
-            recorded: "0.46.0",
-          }),
-          ran: ["oxfmt", "oxlint"],
+          expect(getFailures(exit)).toStrictEqual([error, OUTDATED])
         })
-      })
     )
 
     it.effect(

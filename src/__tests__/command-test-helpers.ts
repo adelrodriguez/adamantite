@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto"
+import * as Cause from "effect/Cause"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
@@ -500,6 +501,15 @@ export function runCommand<
  */
 export function getFailure<E>(exit: Exit.Exit<unknown, E>): E | undefined {
   return Option.getOrUndefined(Exit.findErrorOption(exit))
+}
+
+/**
+ * Each error that a command failed with, in order. Empty when it succeeded or only died.
+ */
+export function getFailures<E>(exit: Exit.Exit<unknown, E>): E[] {
+  return Exit.isFailure(exit)
+    ? exit.cause.reasons.filter((reason) => Cause.isFailReason(reason)).map(({ error }) => error)
+    : []
 }
 
 /**

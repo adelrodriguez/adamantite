@@ -78,7 +78,7 @@ const rule: Rule = {
         // Without either, skip the scope analysis that the walk below would build.
         const { text } = context.sourceCode
 
-        if (!FORBIDDEN_SYMBOL_PATTERN.test(text) && !text.includes("\\u")) {
+        if (!FORBIDDEN_SYMBOL_PATTERN.test(text) && !text.includes(String.raw`\u`)) {
           return
         }
 

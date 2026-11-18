@@ -261,7 +261,7 @@ const SHELL_SAFE = /^[\w./-]+$/u
  * space or a parenthesis.
  */
 function quoteShellArgument(argument: string) {
-  return SHELL_SAFE.test(argument) ? argument : `'${argument.replaceAll("'", "'\\''")}'`
+  return SHELL_SAFE.test(argument) ? argument : `'${argument.replaceAll("'", String.raw`'\''`)}'`
 }
 
 function renderList(paths: readonly string[], empty: string) {

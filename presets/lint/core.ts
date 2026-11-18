@@ -587,6 +587,7 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "unicorn/prefer-set-has": "error",
     "unicorn/prefer-set-size": "error",
     "unicorn/prefer-single-call": "error",
+    "unicorn/prefer-string-raw": "error",
     "unicorn/prefer-string-replace-all": "error",
     "unicorn/prefer-string-slice": "error",
     "unicorn/prefer-string-trim-start-end": "error",

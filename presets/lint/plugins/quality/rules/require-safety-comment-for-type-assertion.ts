@@ -144,7 +144,7 @@ const rule: Rule = {
         additionalProperties: false,
         properties: {
           markers: {
-            items: { pattern: "\\S", type: "string" },
+            items: { pattern: String.raw`\S`, type: "string" },
             minItems: 1,
             type: "array",
             uniqueItems: true,

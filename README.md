@@ -337,15 +337,18 @@ commits of the last 200 commits, and a mistake that the fixes repeat becomes a c
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 
-After you answer, the agent appends one line to the decisions record for each candidate that you
-did not approve, and for each decision that you made. The decisions record is
-`.adamantite/decisions.jsonl` at the project root, or at the workspace root of a monorepo. It is
-a JSON Lines log with one decision on each line. Commit the record. Adamantite never writes it.
+After you answer, the agent appends lines to the decisions record:
+`.adamantite/decisions.jsonl` at the project root, or at the workspace root of a monorepo. The
+record is a JSON Lines log. Commit it. Adamantite never writes it.
 
 ```jsonl
+{"session":"2026-03-14","head":"4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d","scope":"packages/web"}
 {"id":"tests-beside-module","at":"2026-03-14","standard":"Test files sit beside the module that they test","decision":"rejected","reason":"Integration tests stay in tests/","follow":41,"break":7,"fixes":["1a2b3c4"]}
 {"id":"default-exports","at":"2026-03-14","standard":"Ban default exports","decision":"deferred","rule":"import/no-default-export","scope":"packages/web","follow":14,"break":9}
 ```
+
+The agent appends one decision line for each candidate that you did not approve, and for each
+decision that you made:
 
 | Key               | Required | Meaning                                                                                                                                                      |
 | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -363,11 +366,27 @@ Adamantite decodes the record and keeps the last line of each `id`. The next pro
 decisions, so the agent does not propose them again, unless it has evidence that is newer than the
 decision. With `--path`, the prompt leaves out the decisions of other folders. Adamantite ignores a
 key that it does not know. The prompt lists each line that does not decode, with its line number,
-for the agent to repair. To let harden propose a candidate again, delete its line.
+for the agent to repair. To let harden propose a candidate again, delete its decision line. A
+decision line does not change which commits the next session reads.
 
-With a committed record, the agent reads only the commits since the commit that last changed the
-record, in place of the last 200 commits. `--commits` gives a number of commits to read instead,
-with or without a record.
+The agent also appends one session line in each session that you answer. The prompt gives the
+line, so the agent copies it:
+
+| Key       | Required | Meaning                                                                |
+| --------- | -------- | ---------------------------------------------------------------------- |
+| `session` | Yes      | The date of the session, as `YYYY-MM-DD`.                              |
+| `head`    | No       | The full hash of the commit that `HEAD` named, when git could name it. |
+| `scope`   | No       | The `--path` of the session, as a folder from the project root.        |
+
+A session line starts the fix history of a later session. Adamantite takes the last session line
+that covers the scope of the session and has a `head`. A line covers a scope when it has no
+`scope`, or when its `scope` is that folder or a parent of it. A session of a child or a sibling
+folder does not count, and for the whole project only a line without `scope` covers. The agent then
+reads the commits after the common ancestor of that commit and `HEAD`, in place of the last 200
+commits. That range can list a commit that the earlier session read, such as after a squash merge,
+and it cannot skip one that the earlier session did not read. Without a covering line, or when the
+repository does not have the recorded commit, the agent reads the last 200 commits. `--commits`
+gives a number of commits to read instead, in each case.
 
 In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
 installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,

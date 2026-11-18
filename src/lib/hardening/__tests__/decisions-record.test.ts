@@ -198,7 +198,9 @@ describe("readDecisionsRecord", () => {
       const other = { ...REQUIRED, id: "default-exports" }
 
       // The blank line is not a decision, and it keeps its place in the line numbers.
-      const record = yield* readEncodedRecord(`${toLines([REQUIRED])}\n${text}\n${toLines([other])}`)
+      const record = yield* readEncodedRecord(
+        `${toLines([REQUIRED])}\n${text}\n${toLines([other])}`
+      )
 
       expect(record).toHaveProperty("decisions", [REQUIRED, other])
       expect(record).toHaveProperty("undecodableLines", [
@@ -207,25 +209,27 @@ describe("readDecisionsRecord", () => {
     })
   )
 
-  it.effect("decode a session line with and without its optional keys, in the order of the file", () =>
-    Effect.gen(function* () {
-      const sessions = [
-        { session: "2026-03-14" },
-        { head: COMMIT, scope: "packages/web", session: "2026-03-20" },
-        { head: LATER_COMMIT, session: "2026-04-01", tool: "a later key" },
-      ]
+  it.effect(
+    "decode a session line with and without its optional keys, in the order of the file",
+    () =>
+      Effect.gen(function* () {
+        const sessions = [
+          { session: "2026-03-14" },
+          { head: COMMIT, scope: "packages/web", session: "2026-03-20" },
+          { head: LATER_COMMIT, session: "2026-04-01", tool: "a later key" },
+        ]
 
-      // A session line is not a decision, and a scope does not leave one out.
-      const record = yield* readEncodedRecord(toLines([REQUIRED, ...sessions]), "packages/api")
+        // A session line is not a decision, and a scope does not leave one out.
+        const record = yield* readEncodedRecord(toLines([REQUIRED, ...sessions]), "packages/api")
 
-      expect(record).toHaveProperty("decisions", [REQUIRED])
-      expect(record).toHaveProperty("sessions", [
-        { session: "2026-03-14" },
-        { head: COMMIT, scope: "packages/web", session: "2026-03-20" },
-        { head: LATER_COMMIT, session: "2026-04-01" },
-      ])
-      expect(record).toHaveProperty("undecodableLines", [])
-    })
+        expect(record).toHaveProperty("decisions", [REQUIRED])
+        expect(record).toHaveProperty("sessions", [
+          { session: "2026-03-14" },
+          { head: COMMIT, scope: "packages/web", session: "2026-03-20" },
+          { head: LATER_COMMIT, session: "2026-04-01" },
+        ])
+        expect(record).toHaveProperty("undecodableLines", [])
+      })
   )
 
   it("give only a record that exists its decisions, its sessions, and its lines", () => {
@@ -242,20 +246,34 @@ describe("readDecisionsRecord", () => {
   })
 })
 
-describe("findCoveringSession", () => {
-  const SESSION = { head: COMMIT, session: "2026-03-14" }
+// A session line of the whole project that recorded a commit.
+const SESSION = { head: COMMIT, session: "2026-03-14" }
 
-  function findSession(lines: readonly object[], scope?: string) {
-    return readRecord(toLines(lines), scope).pipe(
-      Effect.map((record) =>
-        findCoveringSession(record, scope === undefined ? null : ProjectPath.make(scope))
-      )
+/**
+ * The session line that covers `scope` in a record with `lines`.
+ */
+function findSession(lines: readonly object[], scope?: string) {
+  return readRecord(toLines(lines), scope).pipe(
+    Effect.map((record) =>
+      findCoveringSession(record, scope === undefined ? null : ProjectPath.make(scope))
     )
-  }
+  )
+}
 
+describe("findCoveringSession", () => {
   it.effect.each([
-    { covers: true, line: undefined, name: "a session of the whole project", scope: "packages/web" },
-    { covers: true, line: "packages/web", name: "a session of the same folder", scope: "packages/web" },
+    {
+      covers: true,
+      line: undefined,
+      name: "a session of the whole project",
+      scope: "packages/web",
+    },
+    {
+      covers: true,
+      line: "packages/web",
+      name: "a session of the same folder",
+      scope: "packages/web",
+    },
     { covers: true, line: "packages", name: "a session of a parent folder", scope: "packages/web" },
     {
       covers: false,

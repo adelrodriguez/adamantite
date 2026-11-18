@@ -367,9 +367,10 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   comments of each rule in the files that Oxlint lints, and `hardening/overrides.ts` marks each file
   of an override that turns a rule off, after a trial that turns the rule on again. The prompt shows
   both as data. `hardening/decisions-record.ts` decodes the decisions record, a JSON Lines log
-  that the agent appends to, and the prompt shows its decisions. The commit that last changed the
-  record starts the fix history of the next session, and a line that the session added and that
-  does not decode fails the verification. `harden` reads the workspace before the session, and takes `project.workspace` from
+  that the agent appends to, and the prompt shows its decisions. A session line of the record names
+  the commit that a session read the history up to, and the fix history of a later session starts
+  after the common ancestor of that commit and `HEAD`. A line that the session added and that does
+  not decode fails the verification. `harden` reads the workspace before the session, and takes `project.workspace` from
   its `Project.read` after the session, because the agent can change the project. The functions in
   `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
 - `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a

@@ -244,9 +244,11 @@ _Avoid_: Scan, codify, audit
 
 **Decisions record**:
 `.adamantite/decisions.jsonl` at the root of a target project, or at the workspace root of a
-monorepo. It is a JSON Lines log with one decision on each line: a candidate that the user did not
-approve in a harden session, or a decision that the user resolved. A later line with the same `id`
-replaces an earlier one. The coding agent appends the lines, and the project commits the file.
-Adamantite never writes it. Adamantite decodes it and shows its decisions in the harden prompt, so
-a later session does not propose them again.
+monorepo. It is a JSON Lines log with two kinds of lines. A decision line is a candidate that the
+user did not approve in a harden session, or a decision that the user resolved, and a later line
+with the same `id` replaces an earlier one. A session line records one session that the user
+answered, with the commit that it read the history up to. The coding agent appends the lines, and
+the project commits the file. Adamantite never writes it. Adamantite decodes it, shows its
+decisions in the harden prompt, so a later session does not propose them again, and starts the fix
+history of a later session after the commit of the last session line that covers its scope.
 _Avoid_: ADR, decision log, harden state

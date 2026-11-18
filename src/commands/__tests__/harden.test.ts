@@ -270,8 +270,8 @@ interface ProcessOptions {
    */
   readonly head?: string
   /**
-   * What `git merge-base <commit> HEAD` prints, by the commit. Git prints nothing for a commit
-   * that the repository does not have.
+   * What `git merge-base <commit> HEAD` prints, by the commit. Git prints nothing for a commit that
+   * the repository does not have.
    */
   readonly mergeBases?: Readonly<Record<string, string>>
   /**
@@ -1545,12 +1545,12 @@ describe("harden", () => {
     },
   ])(
     "give a session line and an example line that decode, with the date of the clock and $name",
-    ({ args, phrase, processes, scope, session, sessionLine }) =>
+    (expected) =>
       Effect.gen(function* () {
         yield* TestClock.setTime(Date.UTC(2026, 2, 14, 12))
 
         const step = getSection(
-          yield* runHardenPrompt(MONOREPO_FILES, args, processes),
+          yield* runHardenPrompt(MONOREPO_FILES, expected.args, expected.processes),
           "## 8. Show the candidates and wait for approval"
         )
 
@@ -1563,13 +1563,16 @@ describe("harden", () => {
           ["--json"]
         )
 
-        expect(copied).toBe(sessionLine)
-        expect(step).toContain(phrase)
-        expect(step).toContain("`at` is `2026-03-14`, the date of today.")
-        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.undecodableLines", [])
-        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.sessions", [session])
-        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
-          scope === undefined ? EXAMPLE : { ...EXAMPLE, scope },
+        const report = decodeJson(logLines[0])
+
+        expect(copied).toBe(expected.sessionLine)
+        expect(
+          getMissingPhrases(step, [expected.phrase, "`at` is `2026-03-14`, the date of today."])
+        ).toStrictEqual([])
+        expect(report).toHaveProperty("decisionsRecord.undecodableLines", [])
+        expect(report).toHaveProperty("decisionsRecord.sessions", [expected.session])
+        expect(report).toHaveProperty("decisionsRecord.decisions", [
+          expected.scope === undefined ? EXAMPLE : { ...EXAMPLE, scope: expected.scope },
         ])
       })
   )

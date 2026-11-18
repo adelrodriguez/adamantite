@@ -162,7 +162,13 @@ When no human can approve, for example in CI or in an unattended session, report
 
 Otherwise, put the approval question last in the report, with no text after it. Ask the user which named candidates to write. Wait until the user names the candidates to write or approves none.
 
-After the user answers, append to the decisions record, also when the user approves none. It is the only project file that you change before step 9. Create the file when it does not exist.
+After the user answers, append to the decisions record. It is the only project file that you change before step 9. Create the file when it does not exist.
+
+- Append this session line in each session that the user answers, also when the user approves every candidate or none. It records how far this session read the fix history, so the next session reads only the commits after it:
+
+  ```jsonl
+  {{sessionLine}}
+  ```
 
 - Append one line for each candidate that you showed and that the user did not approve, and one for each item of the Decisions list that the user resolved. An approved candidate needs no line, because its rule or instruction is the trace. The exception is an approved candidate whose `id` the Decisions section shows: append a line with that `id` and the decision `approved`, so the earlier decision no longer applies.
 - Never edit or delete an earlier line. To change a decision, append a line with the same `id`. The one edit is the repair of a line that the Decisions section lists as not decoded.
@@ -176,7 +182,7 @@ After the user answers, append to the decisions record, also when the user appro
 - `id` is kebab-case and stays the same for a standard: reuse the `id` that the Decisions section shows when the standard was decided before. `at` is `{{today}}`, the date of today. `standard` is the standard in one sentence.
 - `decision` is `rejected`, `deferred` when the user wants to decide later, `decided` for a resolved item of the Decisions list, or `approved`. `reason` is the reason that the user gave, or the choice of a `decided` line.
 - `rule` is the rule or the ladder step that you proposed. {{decisionScope}} `follow` and `break` are the numbers of places that follow and break the standard, and `fixes` are the short hashes of the fix commits that you saw.
-- Tell the user to commit the record with the other changes of the session, because the next session reads the fix history from the commit that last changed it.
+- Tell the user to commit the record with the other changes of the session, because the next session takes its decisions and the start of its fix history from it.
 
 If the user approves none, stop after you append the lines, without another change to the project files.
 
@@ -215,7 +221,7 @@ The report is complete when each approved candidate has a verified result or an 
 ## Check the result
 
 - Every project change implements an approved candidate and stays inside the selected scope, or is a line of the decisions record.
-- The decisions record has a line for each candidate that the user did not approve and each decision that the user resolved, each line is one JSON object, and the record is unchanged when no human answered.
+- The decisions record has the session line, and a line for each candidate that the user did not approve and each decision that the user resolved. Each line is one JSON object, and the record is unchanged when no human answered.
 - Each new or changed custom rule passed valid and invalid cases, including a regression case for a bug fix.
 - Temporary verification files are removed, and user-owned tests and CI steps remain.
 - Project checks and Doctor pass, or the report names each blocked check and remaining finding.

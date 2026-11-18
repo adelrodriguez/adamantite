@@ -5,7 +5,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
-import { ProjectPath, readLastChange, toProjectPath } from "#lib/hardening/project-files.ts"
+import { ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 /**
@@ -24,7 +24,10 @@ const DecisionId = Schema.String.check(
   })
 ).pipe(Schema.brand("DecisionId"))
 
-const DecisionDate = Schema.String.check(
+/**
+ * The local date of a session, which a person reads and the agent compares with newer evidence.
+ */
+const SessionDate = Schema.String.check(
   Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u, { message: "Expected a date as `YYYY-MM-DD`" })
 )
 
@@ -53,14 +56,24 @@ const CommitHash = Schema.String.check(
 )
 
 /**
- * The keys of a line except `decision`. The schema grows only by optional keys, and decoding leaves
- * out a key that it does not know, so an older Adamantite reads the record of a newer one.
+ * A whole commit hash, of SHA-1 or SHA-256. A short hash can come to name two commits.
  */
-const lineFields = {
+const FullCommitHash = Schema.String.check(
+  Schema.isPattern(/^(?:[\da-f]{40}|[\da-f]{64})$/u, {
+    message: "Expected a full commit hash of 40 or 64 characters",
+  })
+)
+
+/**
+ * The keys of a decision line except `decision`. The schema grows only by optional keys, and
+ * decoding leaves out a key that it does not know, so an older Adamantite reads the record of a
+ * newer one.
+ */
+const decisionFields = {
   /**
    * The date of the decision, which the agent compares with newer evidence.
    */
-  at: DecisionDate,
+  at: SessionDate,
   /**
    * How many places broke the standard when the session counted them.
    */
@@ -90,12 +103,12 @@ const lineFields = {
 }
 
 /**
- * One line of the record, as the coding agent appends it. An `approved` line only replaces an
- * earlier line of the same `id`: the user approved what an earlier session rejected or deferred, so
- * the rule or the instruction is the trace from then on.
+ * A decision line of the record, as the coding agent appends it. An `approved` line only replaces
+ * an earlier line of the same `id`: the user approved what an earlier session rejected or deferred,
+ * so the rule or the instruction is the trace from then on.
  */
 const DecisionLine = Schema.Struct({
-  ...lineFields,
+  ...decisionFields,
   decision: Schema.Literals(["approved", "decided", "deferred", "rejected"]),
 })
 
@@ -104,11 +117,26 @@ const DecisionLine = Schema.Struct({
  * resolved item of the Decisions list, with the choice in `reason`.
  */
 const Decision = Schema.Struct({
-  ...lineFields,
+  ...decisionFields,
   decision: Schema.Literals(["decided", "deferred", "rejected"]),
 })
 
 export type Decision = typeof Decision.Type
+
+/**
+ * A session line of the record: one harden session that the user answered. The coding agent copies
+ * it from the prompt, also when the session wrote no decision line. `head` is the commit that
+ * `HEAD` named when Adamantite rendered the prompt, so the session read the history up to it. It is
+ * absent when git could not name `HEAD`, and such a line gives the fix history no start. `scope` is
+ * the `--path` of the session, and is absent for the whole project.
+ */
+const Session = Schema.Struct({
+  head: Schema.OptionFromOptionalKey(FullCommitHash),
+  scope: Schema.OptionFromOptionalKey(Scope),
+  session: SessionDate,
+})
+
+type Session = typeof Session.Type
 
 /**
  * A line of the record that does not decode, with its number in the file, its text, and the reason
@@ -120,21 +148,23 @@ const UndecodableLine = Schema.Struct({
   text: Schema.String,
 })
 
-export type UndecodableLine = typeof UndecodableLine.Type
-
 /**
  * What Adamantite knows about the decisions record, the memory of harden. The record is a JSON
- * Lines log: one decision on each line, and a later line replaces an earlier line of the same `id`.
- * After the user answers a session, the coding agent appends a line for each candidate that the
- * user did not approve and for each decision that the user resolved. An approved candidate needs no
- * line, because its rule or instruction is the trace.
+ * Lines log with two kinds of lines, which their keys tell apart. A decision line has an `id`, and
+ * a later line replaces an earlier line of the same `id`. A session line has a `session`. After the
+ * user answers a session, the coding agent appends the session line, and a decision line for each
+ * candidate that the user did not approve and for each decision that the user resolved. An approved
+ * candidate needs no line, because its rule or instruction is the trace.
  *
  * Adamantite never writes the record. It decodes each line, keeps the last line of each `id`, and
  * leaves out an `id` whose last line is `approved`, and the decisions of another `--path`. The
  * harden prompt shows the kept decisions, so the agent does not read the file, and it does not
  * propose again what a decision settles. A line that does not decode is a fact for the agent to
- * repair, and it does not hide the other lines. The commit that last changed the file gives the fix
- * history its default start, because the session that wrote the record read the history before it.
+ * repair, and it does not hide the other lines.
+ *
+ * The decisions and the coverage of the history are separate facts. Only a session line says what a
+ * session read, so a decision line that a person edits or deletes does not move the start of the
+ * fix history. `findCoveringSession` gives the session line that the fix history starts from.
  */
 export const DecisionsRecord = Schema.TaggedUnion({
   /**
@@ -142,16 +172,13 @@ export const DecisionsRecord = Schema.TaggedUnion({
    */
   Missing: { path: ProjectPath },
   /**
-   * The record exists. `lastChange` is the commit that last changed it, with its date as
-   * `YYYY-MM-DD`, or none when git names no such commit: the record is not committed yet, or git
-   * cannot read the history.
+   * The record exists. `decisions` has the decisions that the scope of the session keeps.
+   * `sessions` has each session line in the order of the file, for each scope.
    */
   Present: {
     decisions: Schema.Array(Decision),
-    lastChange: Schema.OptionFromNullOr(
-      Schema.Struct({ commit: Schema.String, date: Schema.String })
-    ),
     path: ProjectPath,
+    sessions: Schema.Array(Session),
     undecodableLines: Schema.Array(UndecodableLine),
   },
 })
@@ -160,7 +187,50 @@ export type DecisionsRecord = typeof DecisionsRecord.Type
 
 const { Missing, Present } = Data.taggedEnum<DecisionsRecord>()
 
-const decodeLine = Schema.decodeUnknownResult(Schema.fromJsonString(DecisionLine))
+/**
+ * A decoded line of one of the two kinds.
+ */
+type Line = Data.TaggedEnum<{
+  DecisionLine: { readonly value: typeof DecisionLine.Type }
+  SessionLine: { readonly value: Session }
+}>
+
+const Lines = Data.taggedEnum<Line>()
+
+const decodeObject = Schema.decodeUnknownResult(
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
+)
+
+const decodeDecisionLine = Schema.decodeUnknownResult(DecisionLine)
+const decodeSession = Schema.decodeUnknownResult(Session)
+
+/**
+ * Decodes one line of the record. The keys tell the kind of the line, so the issue of a line names
+ * only what is wrong for its own kind.
+ */
+function decodeLine(text: string): Result.Result<Line, string> {
+  const object = decodeObject(text)
+
+  if (Result.isFailure(object)) {
+    return Result.fail(object.failure.message)
+  }
+
+  if (Object.hasOwn(object.success, "id")) {
+    return Result.mapBoth(decodeDecisionLine(object.success), {
+      onFailure: (error) => error.message,
+      onSuccess: (value): Line => Lines.DecisionLine({ value }),
+    })
+  }
+
+  if (Object.hasOwn(object.success, "session")) {
+    return Result.mapBoth(decodeSession(object.success), {
+      onFailure: (error) => error.message,
+      onSuccess: (value): Line => Lines.SessionLine({ value }),
+    })
+  }
+
+  return Result.fail("Expected a decision line with `id`, or a session line with `session`")
+}
 
 /**
  * Whether `folder` is `scope` or a folder inside it. Both are paths from the project root.
@@ -170,9 +240,39 @@ function contains(scope: ProjectPath, folder: ProjectPath) {
 }
 
 /**
+ * The session line that the fix history of a session with `scope` starts from: the last line in the
+ * file that covers the scope and has a `head`. A line covers a scope when it has no `scope`, or
+ * when its `scope` is that folder or a parent of it, because such a session read the history of the
+ * folder too. A session of a child or a sibling folder read other history, and for the whole
+ * project only a line without `scope` covers. None when no such line exists.
+ */
+export function findCoveringSession(record: DecisionsRecord, scope: ProjectPath | null) {
+  return DecisionsRecord.match(record, {
+    Missing: () => Option.none(),
+    Present: ({ sessions }) =>
+      Array.last(
+        sessions
+          .filter((line) =>
+            Option.match(line.scope, {
+              onNone: () => true,
+              onSome: (folder) => scope !== null && contains(folder, scope),
+            })
+          )
+          .flatMap((line) =>
+            Option.match(line.head, {
+              onNone: () => [],
+              onSome: (head) => [{ head, session: line.session }],
+            })
+          )
+      ),
+  })
+}
+
+/**
  * Reads the decisions record of the project at `cwd`. `scope` is the folder that `--path` selects,
  * or `null` for the whole project. A scope keeps a decision without a scope, and a decision whose
- * scope contains the scope of the session or lies inside it. A blank line is not a decision.
+ * scope contains the scope of the session or lies inside it. A blank line is not a line of the
+ * record, and it keeps its place in the line numbers.
  */
 export const readDecisionsRecord = Effect.fn("readDecisionsRecord")(function* (
   cwd: string,
@@ -193,15 +293,17 @@ export const readDecisionsRecord = Effect.fn("readDecisionsRecord")(function* (
       .map((text, index) => ({ line: index + 1, text }))
       .filter(({ text }) => text.trim() !== ""),
     ({ line, text }) =>
-      Result.mapError(decodeLine(text), (error): UndecodableLine => ({
-        issue: error.message.replaceAll(/\s*\n\s*/gu, " "),
+      Result.mapError(decodeLine(text), (issue) => ({
+        issue: issue.replaceAll(/\s*\n\s*/gu, " "),
         line,
         text,
       }))
   )
 
+  const decisionLines = lines.filter(Lines.$is("DecisionLine")).map(({ value }) => value)
+
   // A map keeps the place of the first line of an `id`, and the value of its last line.
-  const decisions = [...new Map(lines.map((line) => [line.id, line])).values()]
+  const decisions = [...new Map(decisionLines.map((line) => [line.id, line])).values()]
     .flatMap((line): Decision[] =>
       line.decision === "approved" ? [] : [{ ...line, decision: line.decision }]
     )
@@ -217,7 +319,7 @@ export const readDecisionsRecord = Effect.fn("readDecisionsRecord")(function* (
   return Present({
     ...record,
     decisions,
-    lastChange: yield* readLastChange(cwd, DECISIONS_RECORD_PATH),
+    sessions: lines.filter(Lines.$is("SessionLine")).map(({ value }) => value),
     undecodableLines,
   })
 })

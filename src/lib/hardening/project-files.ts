@@ -93,27 +93,35 @@ export function listIgnoredFiles(cwd: string, folder: string) {
   ])
 }
 
-// A commit hash, of SHA-1 or SHA-256, and a date as `YYYY-MM-DD`.
-const LAST_CHANGE = /^([\da-f]{40}|[\da-f]{64}) (\d{4}-\d{2}-\d{2})$/u
+const COMMIT_HASH = /^(?:[\da-f]{40}|[\da-f]{64})$/u
 
 /**
- * The commit of the history of `HEAD` that last changed `file`, a path relative to `cwd`, with the
- * date of the commit as `YYYY-MM-DD`. None when no commit changed the file, such as a file that is
- * not committed yet, or when git cannot read the history.
+ * The commit hash on the first line of what a git plumbing command prints, of SHA-1 or SHA-256.
+ * None when the line is something else, so a config that adds output cannot pass as a commit.
  */
-export function readLastChange(cwd: string, file: string) {
-  // `log.showSignature` adds the signature of the commit to the output, which `%H %cs` does not ask
-  // for.
-  return readGit(cwd, ["log", "-1", "--no-show-signature", "--format=%H %cs", "--", file]).pipe(
-    Effect.map(
-      Option.flatMap((output) => {
-        // Git ends the line with a line feed, or with a carriage return and a line feed.
-        const [, commit, date] = LAST_CHANGE.exec(output.trim()) ?? []
+function parseCommit(output: string) {
+  const [line = ""] = output.trim().split(/\r?\n/u)
 
-        return commit !== undefined && date !== undefined
-          ? Option.some({ commit, date })
-          : Option.none()
-      })
-    )
+  return Option.liftPredicate(line.trim(), (hash) => COMMIT_HASH.test(hash))
+}
+
+/**
+ * The commit that `HEAD` names in the repository of `cwd`. None in a repository without a commit,
+ * or when git is unavailable.
+ */
+export function readHead(cwd: string) {
+  return readGit(cwd, ["rev-parse", "--verify", "HEAD"]).pipe(
+    Effect.map(Option.flatMap((output) => parseCommit(output)))
+  )
+}
+
+/**
+ * The best common ancestor of `commit` and `HEAD`. None when the repository does not have `commit`,
+ * such as another clone after a squash merge or a shallow clone, when the two share no history, or
+ * when git is unavailable.
+ */
+export function readMergeBase(cwd: string, commit: string) {
+  return readGit(cwd, ["merge-base", commit, "HEAD"]).pipe(
+    Effect.map(Option.flatMap((output) => parseCommit(output)))
   )
 }

@@ -1,6 +1,6 @@
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, it } from "vitest"
-import plugin from "#presets/lint/plugins/quality/index.ts"
+import plugin from "#presets/lint/plugins/testing/index.ts"
 
 RuleTester.describe = describe
 
@@ -11,7 +11,7 @@ RuleTester.itOnly = it.only
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 const error = { messageId: "moduleMock" }
 
-tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
+tester.run("no-doubles", plugin.rules["no-doubles"], {
   invalid: [
     { code: "vi.mock('./user-store');", errors: [error] },
     { code: "jest.mock('./user-store');", errors: [error] },

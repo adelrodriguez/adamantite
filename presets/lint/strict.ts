@@ -9,11 +9,11 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // console call stays, and no task comment marks a workaround. Use it with any other preset.
 //
 // The quality plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
-// access, no module mocking, and readable spacing. Its rules started as a copy of
+// access, and readable spacing. Its rules started as a copy of
 // https://github.com/dmmulroy/anti-slop and now live in plugins/quality/ as first-party code. They
 // use the `quality` namespace.
 //
-// The testing plugin holds the rules that keep tests honest in test files: no fixed sleeps,
+// The testing plugin holds the rules that keep tests honest: no module mocks, fixed sleeps,
 // retries, or raised timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
 // in plugins/testing/ as first-party code. They use the `testing` namespace.
 
@@ -77,8 +77,6 @@ const config: OxlintConfig = {
     // Decode input at its boundary into types that the code owns, instead of passing `unknown`,
     // loose dictionaries, or `typeof` checks through the code.
     "quality/no-known-value-widening": "error",
-    // Tests replace a dependency through its interface instead of mocking its module.
-    "quality/no-module-mocking": "error",
     "quality/no-object-parameters": "error",
     "quality/no-reduce-accumulator-copy": "error",
     "quality/no-reflect-apply": "error",
@@ -92,6 +90,9 @@ const config: OxlintConfig = {
     "quality/no-unknown-type-aliases": "error",
     "quality/no-unsafe-dictionary-type": "error",
     "quality/require-readable-spacing": "error",
+    // Tests replace a dependency through its interface instead of mocking its module. The rule runs
+    // in every file, so a Vitest or Jest setup file cannot mock a module for each test either.
+    "testing/no-doubles": "error",
     // The autofix of this core rule makes `Record` aliases that no-known-value-widening reports
     // again.
     "typescript/consistent-indexed-object-style": "off",

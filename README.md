@@ -985,8 +985,7 @@ It needs no extra package. Most of its type rules started as
   Fix the code now, or track the work in your issue tracker. Do not only rename the marker.
 - The quality rules ask the code to decode input at its boundary into types that it owns.
   They report `unknown` in function signatures and type aliases, loose dictionary types, a
-  `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
-  module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
+  `typeof` check outside a type predicate, and `Reflect.get` and `Reflect.apply`. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
   accumulator, `shape` in symbol names, and a missing blank line between statement groups.
 - `quality/no-unsafe-dictionary-type` reports a named dictionary such as
   `Record<string, unknown>` at its declaration, not at each use. Some types accept open fields on
@@ -1014,6 +1013,10 @@ It needs no extra package. Most of its type rules started as
   `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
   one of these rules in test files, use an `overrides` entry. See
   [change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
+- `testing/no-doubles` reports a Vitest or Jest module mock, such as `vi.mock("./store")`, also
+  through a namespace import, a destructured method, or a `const` alias. A test replaces a
+  dependency through its interface, such as an Effect `Layer` or a function parameter. The rule runs
+  in every file, so a setup file cannot mock a module for every test either.
 - In test files, `testing/no-flake-masking` reports a test retry and a raised test timeout. A
   test that passes only on a retry is flaky, and a raised timeout hides a slow or stuck test. The
   rule reports a `retry` or `timeout` option of a test or suite, a timeout after the test

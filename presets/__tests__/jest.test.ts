@@ -166,7 +166,7 @@ describe("jest preset", () => {
       { "src/load.test.ts": moduleMock.join("\n") }
     )
 
-    expect(codes["src/load.test.ts"]).toStrictEqual(["quality(no-module-mocking)"])
+    expect(codes["src/load.test.ts"]).toStrictEqual(["testing(no-doubles)"])
   })
 
   it("expose its plugins and rules only to JavaScript", () => {

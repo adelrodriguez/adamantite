@@ -1,6 +1,6 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { isNumberLiteral, staticKeyName, staticString } from "../../shared/ast.ts"
+import { isNumberLiteral, staticKeyName, staticString, unwrapExpression } from "../../shared/ast.ts"
 import { constBinding, resolveVariable } from "../../shared/scope.ts"
 
 // The functions that register a test or a suite, by the name at the root of the call, such as `it`
@@ -102,10 +102,12 @@ function isTestCall(node: ESTree.CallExpression): boolean {
 }
 
 /**
- * Return the value that a `const` binding of an identifier holds, or the node itself for any other
- * expression.
+ * Return the value that an expression holds without its type wrappers, also through a `const`
+ * binding, such as `60_000` for `LONG` after `const LONG = 60_000 as const`.
  */
-function constValue(sourceCode: SourceCode, node: ESTree.Node): ESTree.Node {
+function constValue(sourceCode: SourceCode, expression: ESTree.Node): ESTree.Node {
+  const node = unwrapExpression(expression)
+
   if (node.type !== "Identifier") {
     return node
   }
@@ -113,7 +115,7 @@ function constValue(sourceCode: SourceCode, node: ESTree.Node): ESTree.Node {
   const variable = resolveVariable(sourceCode, node)
   const binding = variable === null ? null : constBinding(variable)
 
-  return binding?.id.type === "Identifier" ? binding.init : node
+  return binding?.id.type === "Identifier" ? unwrapExpression(binding.init) : node
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { staticKeyName } from "../../shared/ast.ts"
+import { staticKeyName, unwrapExpression } from "../../shared/ast.ts"
 import {
   constBinding,
   isGlobalObject,
@@ -147,12 +147,13 @@ function passesImplementation(sourceCode: SourceCode, node: ESTree.CallExpressio
 
 /**
  * Reports whether an expression is a mock or a spy that the test framework builds, such as
- * `vi.fn()`, also through a `const` binding.
+ * `vi.fn()`, also through type wrappers and a `const` binding.
  */
-function isFrameworkMock(sourceCode: SourceCode, node: ESTree.Node) {
+function isFrameworkMock(sourceCode: SourceCode, expression: ESTree.Node) {
+  const node = unwrapExpression(expression)
   const variable = node.type === "Identifier" ? resolveVariable(sourceCode, node) : null
   const binding = variable === null ? null : constBinding(variable)
-  const value = binding?.id.type === "Identifier" ? binding.init : node
+  const value = binding?.id.type === "Identifier" ? unwrapExpression(binding.init) : node
 
   return (
     value.type === "CallExpression"

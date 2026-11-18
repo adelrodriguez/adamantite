@@ -107,6 +107,16 @@ tester.run("no-doubles", plugin.rules["no-doubles"], {
       errors: [replacement],
     },
     {
+      code: "const save = vi.fn() as Mock<() => number>; save.withImplementation(() => 1, run);",
+      errors: [replacement],
+      name: "withImplementation on a mock with a type assertion",
+    },
+    {
+      code: "(vi.fn() as Mock<() => number>).withImplementation(() => 1, run);",
+      errors: [replacement],
+      name: "withImplementation on an asserted mock call",
+    },
+    {
       code: "vi.spyOn(store, 'save').withImplementation(() => 1, run);",
       errors: [replacement],
     },

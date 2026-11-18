@@ -83,6 +83,16 @@ tester.run("no-flake-masking", plugin.rules["no-flake-masking"], {
       name: "vi.setConfig options in a binding",
     },
     {
+      code: 'const LONG = 60_000 as const; test("loads", load, LONG);',
+      errors: [timeout],
+      name: "a timeout constant with a type assertion",
+    },
+    {
+      code: 'test("loads", load, 60_000 satisfies number);',
+      errors: [timeout],
+      name: "a timeout with satisfies",
+    },
+    {
       code: 'const LONG = 60_000; test("loads", load, LONG);',
       errors: [timeout],
       name: "a timeout constant after a named test function",

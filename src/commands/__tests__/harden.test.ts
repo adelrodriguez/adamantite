@@ -811,36 +811,38 @@ describe("harden", () => {
       })
   )
 
-  it.effect("list each Markdown file that git lists, except changesets, changelogs, and skills", () =>
-    Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({
-        ".agents/skills/review/SKILL.md": "# Review\n",
-        ".changeset/add-cart.md": '---\n"acme": patch\n---\n',
-        ".claude/skills/review/references/checks.md": "# Checks\n",
-        "CHANGELOG.md": "# acme\n",
-        "CONTRIBUTING.md": "# Contributing\n",
-        "docs/guides/errors.mdx": "# Errors\n",
-        "docs/skills/writing.md": "# Writing\n",
-        "packages/cart/.grok/skills/review/SKILL.md": "# Review\n",
-        "packages/cart/CHANGELOG.md": "# cart\n",
-        "src/cart/README.md": "# Cart\n",
-        ...INSTALLED,
-      })
+  it.effect(
+    "list each Markdown file that git lists, except changesets, changelogs, and skills",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt({
+          ".agents/skills/review/SKILL.md": "# Review\n",
+          ".changeset/add-cart.md": '---\n"acme": patch\n---\n',
+          ".claude/skills/review/references/checks.md": "# Checks\n",
+          "CHANGELOG.md": "# acme\n",
+          "CONTRIBUTING.md": "# Contributing\n",
+          "docs/guides/errors.mdx": "# Errors\n",
+          "docs/skills/writing.md": "# Writing\n",
+          "packages/cart/.grok/skills/review/SKILL.md": "# Review\n",
+          "packages/cart/CHANGELOG.md": "# cart\n",
+          "src/cart/README.md": "# Cart\n",
+          ...INSTALLED,
+        })
 
-      // `docs/skills` is not a skill folder of an agent, so its files stay.
-      expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
-        "- `CONTRIBUTING.md`",
-        "- `docs/guides/errors.mdx`",
-        "- `docs/skills/writing.md`",
-        "- `src/cart/README.md`",
-      ])
-      expect(
-        getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
-          "read each file in the documentation list",
-          "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
+        // `docs/skills` is not a skill folder of an agent, so its files stay.
+        expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
+          "- `CONTRIBUTING.md`",
+          "- `docs/guides/errors.mdx`",
+          "- `docs/skills/writing.md`",
+          "- `src/cart/README.md`",
         ])
-      ).toStrictEqual([])
-    })
+        expect(
+          getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
+            "read each file in the documentation list",
+            "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
+          ])
+        ).toStrictEqual([])
+      })
   )
 
   it.effect("leave out a file that the git index has and the working tree does not", () =>

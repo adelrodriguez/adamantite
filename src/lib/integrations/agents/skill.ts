@@ -14,7 +14,7 @@ type SkillFolder = (typeof codingAgents)[number]["skillsFolder"]
 /**
  * Each skill folder once, in alphabetical order, which puts the shared `.agents/skills` first.
  */
-const skillFolders: readonly SkillFolder[] = Array.sort(
+export const skillFolders: readonly SkillFolder[] = Array.sort(
   Array.dedupe(codingAgents.map((agent) => agent.skillsFolder)),
   Order.String
 )

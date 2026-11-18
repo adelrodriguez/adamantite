@@ -23,7 +23,7 @@ const CONTRIBUTOR_DOCS = [
  */
 const USER_DOCS = ["README.md", "skills/**/*.md"]
 
-const SOURCE_FOLDERS = ["src/", "presets/", "scripts/", "docs/", "skills/"]
+const SOURCE_FOLDERS = ["src/", "presets/", "scripts/", "config/", "docs/", "skills/"]
 
 /**
  * The lines of a Markdown file outside its fenced code blocks, each with its line number.

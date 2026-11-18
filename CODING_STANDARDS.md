@@ -3,39 +3,12 @@
 These standards cover choices that require review. The [architecture](docs/architecture.md)
 describes the module boundaries and lifecycle. [Oxlint](oxlint.config.ts),
 [Vitest](vitest.config.ts), and the [build](tsdown.config.ts) enforce the constraints they can
+check. A standard that a rule checks has no section here. The rule and the comment beside it, in
+[oxlint.config.ts](oxlint.config.ts) or in [.adamantite/lint](.adamantite/lint), are its only
+source. A section that names a rule states only the part of its standard that the rule cannot
 check. Domain terms belong in [GLOSSARY.md](GLOSSARY.md).
 
 ## Tests
-
-### Keep unit filesystem access in memory
-
-Use `createFileSystemTestContext` with `Path.layer` in unit tests, and reserve host filesystem
-access for integration tests that start real processes. In-memory fixtures keep unit tests
-independent from the machine and from each other.
-
-Spot it: A unit test creates a temporary directory, changes the working directory, or provides
-`NodeServices.layer` to obtain a filesystem.
-
-```ts
-// Avoid: the broad host layer from the test helper removed in #378.
-export function runResult<A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  layer: Layer.Layer<R> = NodeServices.layer as Layer.Layer<R>
-) {
-  const provided = effect.pipe(Effect.provide(layer))
-  return provided.pipe(Effect.result)
-}
-
-// Prefer: the agent reach tests create an in-memory context.
-function makeFiles(files?: Record<string, string>) {
-  return createFileSystemTestContext({ files, root: ROOT })
-}
-```
-
-The [filesystem helper](src/__tests__/filesystem.ts) exposes fixture operations and a layer.
-The [agent reach tests](src/lib/hardening/__tests__/agent-reach.test.ts) provide that layer with
-`Path.layer`. [PR #378](https://github.com/adelrodriguez/adamantite/pull/378) replaced host-backed
-unit tests so they could run independently without changing the machine.
 
 ### Choose the clock that the test controls
 
@@ -66,33 +39,33 @@ and this repository instruction.
 
 ## Functions
 
-### Declare standalone functions
+### Use a standalone arrow only for an Effect chain
 
-Use function declarations for standalone functions, and arrows for callbacks, object methods,
-and functions that directly return an Effect chain. The distinction keeps plain helpers separate
-from Effect composition.
+Write a standalone function as an arrow only when the call that it returns is an Effect chain, and
+declare every other standalone function. The distinction keeps plain helpers separate from Effect
+composition. `project/standalone-functions` reports a module-level arrow that has a block body or
+returns a plain value, such as an object or a comparison. A rule gets no types, so it accepts an
+arrow that returns any call.
 
-Spot it: A standalone helper uses an arrow even though its body is not an Effect chain.
+Spot it: A standalone arrow returns a call that is not an Effect chain, such as a type guard that
+calls `Array.isArray`.
 
 ```ts
-// Avoid: turning the standalone Knip workspace helper into an arrow.
-const toKnipWorkspace = ({ workspace }: Project, { presets }: Selection): KnipWorkspace => ({
-  isMonorepo: workspace.isMonorepo,
-  usesEffectPreset: presets.includes("effect"),
-})
+// Avoid: the JSON array guard as an arrow, which returns a boolean.
+export const checkIsJsonArray = (value: JsonValue | undefined): value is JsonValue[] =>
+  Array.isArray(value)
 
-// Prefer: the declaration in knip/config.ts.
-export function toKnipWorkspace({ workspace }: Project, { presets }: Selection): KnipWorkspace {
-  return {
-    isMonorepo: workspace.isMonorepo,
-    usesEffectPreset: presets.includes("effect"),
-  }
-}
+// Prefer: the arrow in filesystem.ts returns an Effect chain.
+export const readFile = (path: string) =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.readFileString(path)),
+    Effect.mapError((cause) => new FailedToReadFile({ cause, path }))
+  )
 ```
 
-[Knip's config helper](src/lib/integrations/knip/config.ts) shows the declaration form.
-[Filesystem helpers](src/lib/shared/filesystem.ts) show the Effect-chain exception. This moves the
-existing rule retained by [PR #344](https://github.com/adelrodriguez/adamantite/pull/344).
+[The JSON helpers](src/lib/shared/json.ts) show the declaration form.
+[Filesystem helpers](src/lib/shared/filesystem.ts) show the Effect chains. This moves the existing
+rule retained by [PR #344](https://github.com/adelrodriguez/adamantite/pull/344).
 
 ## Integrations
 
@@ -122,10 +95,12 @@ modules, the plugin registry, and shared infrastructure.
 Keep `init` and `update` deterministic: each applies its selection through `Setup.apply`, then
 offers the repair of the findings that remain through `Resolution.offer`, without choosing its
 work from them. Keep `assess` and `doctor` read-only. A finding describes a repair for an agent or
-a human, and does not authorize another command to make that repair.
+a human, and does not authorize another command to make that repair. `project/file-writers`
+reports a file write outside the file writers that it lists. This standard covers the changes that
+the rule cannot see.
 
-Spot it: An assessment repairs a file, init or update chooses its work from Doctor findings, or
-code outside `src/lib/setup/` writes a file of the target project.
+Spot it: An assessment changes the target project without a file write of its own, such as an
+install or a tool run that fixes files, or init or update chooses its work from Doctor findings.
 
 ```ts
 // Avoid: Doctor installed packages before #393.

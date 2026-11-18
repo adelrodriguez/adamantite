@@ -169,6 +169,27 @@ describe("managed scripts", () => {
       expect(output).toContain("✔ `check` script replaced: `tsc && eslint .` → `adamantite check`.")
     })
   )
+
+  it.effect("report a selected script that runs another command in doctor, until update", () =>
+    Effect.gen(function* () {
+      const files = makeProject(makeLockfileFile(makeSelection({ scripts: ["check"] })))
+      const finding = "Managed script runs another command"
+
+      const before = yield* runLifecycle("doctor", files)
+
+      expect(getFailure(before.exit)).toStrictEqual(findingsLeft("doctor"))
+      expect(before.output).toContain(finding)
+      expect(before.output).toContain(
+        "the root `package.json` sets it to `tsc && eslint .`, not to `adamantite check`"
+      )
+      expect(readScripts(files)).toStrictEqual({ check: "tsc && eslint .", test: "vitest" })
+
+      yield* runLifecycle("update", files)
+      const after = yield* runLifecycle("doctor", files)
+
+      expect(after.output).not.toContain(finding)
+    })
+  )
 })
 
 // A selection as init records it: each list in the order of its source list, and `core` first

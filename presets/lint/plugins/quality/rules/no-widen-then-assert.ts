@@ -404,7 +404,7 @@ const rule: Rule = {
     const widenedNames = new Set<string>()
     let references: Map<number, Reference> | null = null
 
-    const resolve: Resolve = (identifier) => {
+    function resolve(identifier: ESTree.IdentifierReference): Variable | null {
       if (references === null) {
         references = new Map()
 

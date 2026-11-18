@@ -390,6 +390,10 @@ interface InteractiveHardenOptions {
    * Codex`, `Copy the agent prompt`, and `Finish without an agent`, with the cursor on the first.
    */
   readonly keys: readonly TestKey[]
+  /**
+   * The modules that the project resolves. Defaults to `PROJECT_RESOLUTIONS`.
+   */
+  readonly resolutions?: Readonly<Record<string, string>>
   readonly runner?: Parameters<typeof makeHandoffRunner>[0]
 }
 
@@ -426,7 +430,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
         runner.layer,
         promptingLayer,
         makeProcessLayer(files),
-        makeModuleResolverLayer(files.root, PROJECT_RESOLUTIONS),
+        makeModuleResolverLayer(files.root, options.resolutions ?? PROJECT_RESOLUTIONS),
       ],
       logLines,
       terminal,
@@ -1455,6 +1459,42 @@ describe("harden", () => {
         "⚠️ Harden found issues.",
       ])
     })
+  )
+
+  // The CLI finds the Oxlint runtime before it starts Oxlint, so a missing Oxlint fails check with
+  // an error and no Oxlint output. Harden still runs Doctor and reports both.
+  it.effect(
+    "name the repair and still run Doctor when check cannot find Oxlint after the session",
+    () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runInteractiveHarden({
+          // Knip is installed without its managed config, so Doctor reports one finding.
+          files: {
+            ...ADAMANTITE_MODULE,
+            ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
+            ...SKILL_FILES,
+            "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
+            "package.json": manifest({
+              devDependencies: { adamantite: "1.0.0", knip: knip.version },
+              scripts: { analyze: "adamantite analyze" },
+            }),
+          },
+          keys: ["enter", "n"],
+          resolutions: { "adamantite/lint": PROJECT_RESOLUTIONS["adamantite/lint"] },
+        })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(logLines).toStrictEqual([
+          "💠 adamantite harden",
+          "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+          "✨ Checking formatting · adamantite (oxfmt)",
+          "✖ The lockfile selects no script that runs `oxlint`, so `oxlint` is not installed. Run `adamantite init --non-interactive --script check` to add the script and install it.",
+          "✖ `adamantite check` failed.",
+          "▲ 1 finding remains after the Claude Code session.",
+          expect.stringMatching(/^\n1\. Missing knip configuration\n {2}Current state\n/u),
+          "⚠️ Harden found issues.",
+        ])
+      })
   )
 
   it.effect("fail and show the findings when Doctor finds issues after the session", () =>

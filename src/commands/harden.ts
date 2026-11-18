@@ -104,12 +104,12 @@ const verify = Effect.fn("verify")(function* (
 ) {
   const CHECK_FAILED = "`adamantite check` failed."
 
+  // A failed command already printed why it failed. Any other failure, such as a missing tool,
+  // printed nothing about itself, so its message joins the failures.
   const checkFailures = yield* Bridge.check().pipe(
     Effect.as([]),
-    Effect.catchTags({
-      CliNotFound: (error) => Effect.succeed([error.message, CHECK_FAILED]),
-      CommandFailed: () => Effect.succeed([CHECK_FAILED]),
-    })
+    Effect.catchTag("CommandFailed", () => Effect.succeed([CHECK_FAILED])),
+    Effect.catch((error) => Effect.succeed([error.message, CHECK_FAILED]))
   )
 
   // The session can change the project, so agent reach and assessment share a new read.

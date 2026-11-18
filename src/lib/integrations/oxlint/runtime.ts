@@ -80,7 +80,9 @@ export function toBackendEnv(
 
 /**
  * What runs Oxlint for one project: the Oxlint package, its native binding, and its type-aware
- * backend.
+ * backend. The resolver sets no variable and loads no Oxlint module: a process starts Oxlint from
+ * the `OxlintLaunch` that `toLaunch` gives. Doctor reports what the same resolver finds, in
+ * `runtime-assessment.ts`.
  */
 export interface OxlintRuntime {
   readonly backend: RuntimeBackend

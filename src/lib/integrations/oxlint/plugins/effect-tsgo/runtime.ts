@@ -68,7 +68,9 @@ const findArtifact = Effect.fn("findArtifact")(function* (
 /**
  * The Effect builds of the Oxlint binding and tsrs for the installed Oxlint and tsrs versions. They
  * come from the `@effect/tsgo` platform package, so the project needs no patch. No overrides when
- * the project does not install `@effect/tsgo`.
+ * the project does not install `@effect/tsgo`. The installed package turns the Effect builds on, so
+ * a nested config and a relative preset import get them too. Whether Adamantite requires the
+ * package depends on the configs instead, as `defineManagedPlugin` says.
  */
 export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* (
   project: string,

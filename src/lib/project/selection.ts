@@ -11,8 +11,8 @@ import { ToolNotSelected } from "#lib/shared/errors.ts"
 
 /**
  * Every lint preset a target project can select besides core, in the order that init offers them.
- * Each one is published as `adamantite/lint/<name>`. `tooling/oxlint/presets.ts` describes each
- * one.
+ * Each one is published as `adamantite/lint/<name>`. `integrations/oxlint/presets.ts` describes
+ * each one. The list is here because the `Selection` schema needs it below the integrations.
  */
 export const LINT_PRESETS = [
   "react",

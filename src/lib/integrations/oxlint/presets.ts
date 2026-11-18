@@ -109,7 +109,9 @@ const definitions = {
 } as const satisfies Record<LintPreset, LintPresetDefinition>
 
 /**
- * Each lint preset of `LINT_PRESETS` with its definition, in the order that init offers them.
+ * Each lint preset of `LINT_PRESETS` with its definition, in the order that init offers them. Init
+ * builds its choices, the presets that it adds for a required preset, and its `--preset` check from
+ * this list.
  */
 export const lintPresets = LINT_PRESETS.map((name) => ({ ...definitions[name], name }))
 

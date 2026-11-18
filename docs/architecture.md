@@ -300,81 +300,53 @@ presets/
 
 An integration records the version of each package that Adamantite installs in target projects,
 from the build-time version of the dependency in `package.json`. Packages that belong to Oxlint sit
-under `integrations/oxlint/`: tsrs beside the integration, managed plugins in `plugins/`. The
-Oxlint integration installs tsrs and the managed plugin of each selected preset.
+under `src/lib/integrations/oxlint`: tsrs beside the integration, in
+`src/lib/integrations/oxlint/tsrs.ts`, and the managed plugins in
+`src/lib/integrations/oxlint/plugins`. The Oxlint integration installs tsrs and the managed plugin
+of each selected preset. `getDependencyVersion` in `src/lib/shared/version.macro.ts` fails the build
+for a package that `package.json` does not declare.
 
 ## Lint presets
 
-`LINT_PRESETS` in `project/selection.ts` is the one list of the presets that a target project can
-select besides core, because the `Selection` schema needs it below the integrations.
-`oxlint/presets.ts` gives each one a definition, and `lintPresets` lists them in the order
-of `LINT_PRESETS`. The type checker rejects a preset without a definition. Each entry has the
-preset name, the init label, a hint that describes the rules, the presets it requires, and its
-managed plugin. Init builds its choices,
-its required-preset additions, and its `--preset` check from the list. `describeLintPreset`
-appends the plugin package and the required presets to the hint, so a written hint holds no
-setup text. A test fails when the list and the preset files in `presets/lint/` disagree.
+`LINT_PRESETS` in `src/lib/project/selection.ts` is the one list of the presets that a target
+project can select besides core. `src/lib/integrations/oxlint/presets.ts` gives each one a
+definition: its init label and hint, the presets that it requires or excludes, and its managed
+plugin.
 
-`package.json` exports core as `adamantite/lint` and each preset in the list as
-`adamantite/lint/<name>`. It has no wildcard export, so the first-party plugins, their rules, and
-other modules below `presets/lint/` stay private. A new preset needs its own export entry. A test
-fails when the export map, the README import table, and `lintPresets` disagree, and the smoke
-test rejects each built module that the export map does not list.
-
-CLI code that writes, resolves, or compares a public import gets it from `publicImport()` in
-`src/lib/shared/package-exports.ts`, such as `publicImport("./format")`. Its parameter type is the
-set of keys in the export map, so the type checker rejects a private or removed subpath. Prose in
-findings and prompts keeps literal imports.
+- Each preset of the list has a definition and a file in `presets/lint`. The type of `definitions`
+  and `src/lib/integrations/oxlint/__tests__/presets.test.ts` hold it.
+- `package.json` exports core as `adamantite/lint` and each preset as `adamantite/lint/<name>`. It
+  has no wildcard export, so the first-party plugins, their rules, and the other modules below
+  `presets/lint` stay private, and a new preset needs its own export entry. The same test and
+  `src/__tests__/exports.test.ts` hold the export map against `lintPresets` and the README import
+  table, and `scripts/test-smoke.ts` rejects each built module that the export map does not list.
+- CLI code that writes, resolves, or compares a public import gets it from `publicImport()` in
+  `src/lib/shared/package-exports.ts`. Its parameter type is the set of keys in the export map, so
+  the type checker rejects a private or removed subpath. Nothing rejects a literal import.
 
 ## Managed plugins
 
-A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
-for `tailwind` and `oxlint-plugin-react-doctor` for `react-strict`. Each definition under
-`oxlint/plugins/` uses `defineOxlintPlugin` and declares its package and JavaScript or
-native runtime capability. The preset catalog links each plugin to its preset, and
-`plugins/index.ts` derives the one registry of definitions from the catalog. Neither imports a
-version macro, so the Oxlint entry can load them from source. JavaScript plugins
-still load through the preset's `jsPlugins` entries, which resolve from the target project.
+A preset can need a third-party Oxlint plugin from npm, such as `@shadcn/lint` for `tailwind`.
+`src/lib/integrations/oxlint/plugins` holds one definition for each, the preset catalog links each
+plugin to its preset, and `src/lib/integrations/oxlint/plugins/managed.ts` derives one integration
+for each. `src/lib/integrations/oxlint/runtime.ts` resolves the Oxlint runtime, with the native
+parts that a plugin replaces.
 
-`plugins/managed.ts` derives one integration for each catalog entry that has a plugin, with
-`defineManagedPlugin`. Its version table holds the build-time version of each registered
-package, and its type fails when a package has no version. Setup installs the packages of the
-selected presets. Doctor and update maintain a package while the root config imports its
-preset.
-
-Doctor also reports an Adamantite preset that Oxlint applies before the last core preset.
-Oxlint applies the entries in order, so core then replaces the rules that the preset changes.
-`findMisplacedCorePreset` in `oxlint/config.ts` reads the order from the loaded config. An entry
-that is not an Adamantite preset can come before core, and the finding keeps its place.
-
-The Effect definition also assesses the language service entry in `tsconfig.json`, through
-`integrations/effect-language-service.ts`. The `typescript` integration writes the entry in the
-`tsconfig.json` that it renders for the `effect` preset, and never adds it to a config that the
-project changed.
-Its runtime resolver, in `plugins/effect-tsgo/runtime.ts`, returns binding and backend
-overrides when the target project installs `@effect/tsgo`. The installed package turns the
-Effect builds on, so nested configs and relative preset imports get them too. The managed
-package requirement depends on the root config import instead.
-
-`oxlint/runtime.ts` resolves the installed Oxlint package and applies the native overrides. Only
-the Effect plugin replaces native parts, so no two overrides replace one part. A backend override
-replaces all default backend variables. Without a backend override, Oxlint starts the
-installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
-launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
-runs stock Oxlint. `toLaunch` turns the runtime into an `OxlintLaunch`: the variables, the
-preload module, and Oxlint's CLI module. The CLI starts Oxlint's CLI module with the variables and
-passes the preload module to `node --import`. The entry `src/oxlint/index.ts`, which editors start,
-sets the variables and loads both modules in its own process. A binding override names a preload
-module and its variables. The Effect plugin names
-`@effect/tsgo/oxlint-bridge`, which swaps the installed `@oxlint/binding-*` file for the Effect build
-through `process.dlopen`, so every other napi-rs binding, such as `oxc-resolver` in a JavaScript
-plugin, loads unchanged.
-
-Doctor's `oxlint/runtime-assessment.ts` reports what the same resolver finds: a missing declared
-package, a missing `tsrs-lint` launcher, and an `@effect/tsgo` without a build or the bridge for
-the installed versions. It does not predict which platform package Oxlint's binding loader or the
-tsrs launcher picks. When that package is missing, the loader lists each file it tried, and the
-launcher names the missing `@tsrs/*` package, as soon as `adamantite check` runs.
+- Each registered plugin package has a managed version. The type of `versions` in
+  `src/lib/integrations/oxlint/plugins/managed.ts` holds it.
+- No module that the Oxlint entry loads imports a version macro, so the entry runs from source. The
+  `presets` tests hold it, because `presets/__tests__/rule-fixtures.ts` starts
+  `src/oxlint/index.ts`.
+- The resolver reads files, loads no Oxlint module, and changes no process variable. Only a
+  process that starts Oxlint applies the `OxlintLaunch` of a runtime: the CLI starts Oxlint's CLI
+  module with it, and the Oxlint entry, which editors start, applies it in its own process. Nothing
+  enforces it.
+- One resolver serves the CLI, the entry, and Doctor, so
+  `src/lib/integrations/oxlint/runtime-assessment.ts` reports what the entry would find.
+  `src/lib/integrations/oxlint/__tests__/runtime.test.ts` and
+  `src/lib/integrations/oxlint/__tests__/runtime-assessment.test.ts` hold the resolver.
+- Only the Effect plugin replaces native parts, so no two overrides replace one part. Nothing
+  enforces it.
 
 ## Type resets
 

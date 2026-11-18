@@ -8,7 +8,9 @@ type Subpath = Extract<keyof (typeof packageJson)["exports"], `./${string}`>
 
 /**
  * The import that a target project writes for a public subpath, such as `adamantite/lint/react` for
- * `./lint/react`. The type checker rejects a subpath that the package does not export.
+ * `./lint/react`. The type checker rejects a subpath that the package does not export. CLI code that
+ * writes, resolves, or compares a public import gets it here. Prose in findings and prompts keeps
+ * literal imports.
  */
 export function publicImport(subpath: Subpath) {
   return `adamantite${subpath.slice(1)}`

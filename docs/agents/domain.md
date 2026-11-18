@@ -7,7 +7,7 @@ This repository uses a single-context domain-doc layout.
 Read these files when they exist:
 
 - `GLOSSARY.md` at the repository root.
-- Relevant ADRs in `docs/adr/`.
+- Relevant ADRs in the `adr` folder of `docs/`.
 
 If a file does not exist, continue without a warning. Domain-modeling skills create these
 files when the project resolves terms or decisions.

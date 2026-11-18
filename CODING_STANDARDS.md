@@ -87,8 +87,8 @@ import tailwind from "#lib/integrations/oxlint/plugins/tailwind.ts"
 ```
 
 [PR #472](https://github.com/adelrodriguez/adamantite/pull/472) moved managed plugins under Oxlint.
-The [module seams](docs/architecture.md#module-seams) describe integration exports, helper
-modules, the plugin registry, and shared infrastructure.
+[Integrations](docs/architecture.md#integrations) in the architecture names the owner of the
+integration list, the helper modules, the plugin registry, and the shared checks.
 
 ### Keep lifecycle writes within their command
 
@@ -116,7 +116,8 @@ Effect.gen(function* () {
 ```
 
 [PR #393](https://github.com/adelrodriguez/adamantite/pull/393) removed Doctor's repair path.
-The [lifecycle reference](docs/architecture.md#integration-lifecycle) describes each command's work.
+[Command boundaries](docs/architecture.md#command-boundaries) in the architecture states each
+command's work.
 
 ### Preserve explicit project choices when defaults change
 

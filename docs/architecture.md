@@ -198,29 +198,27 @@ flowchart TD
 
 `Resolution.offer` in `src/terminal/resolution.ts` is the one way that a command hands a prompt to
 a coding agent. `doctor`, `init`, and `update` offer the repair prompt of an assessment as a
-`Repair`, and `harden` offers its prompt as a `Task`. A `Repair` fails the command while findings
-remain. A `Task` is work that the user can decline.
+`Repair`, which fails the command while findings remain. `harden` offers its prompt as a `Task`,
+which the user can decline. `CodingAgents` in `src/lib/handoff/coding-agents.ts` detects the
+installed agent CLIs and does the handoff.
 
-The command decides its mode once, in `src/terminal/mode.ts`:
+The command decides its mode once, with `Mode.provide` from `src/terminal/mode.ts`:
 
-- `Json` with `--json`. The offer prints the command's JSON document on standard output, which an
-  Effect Schema that the command exports describes, and `Output` writes every other line on
-  standard error. The command never asks and never starts an agent.
-- `Menu` when the terminal can prompt and the user allows it. `init --non-interactive` turns it
-  off. The offer prints the findings as terminal notes, then the resolution menu in
-  `src/terminal/resolution-menu.ts` offers to hand off to an installed coding agent CLI or to copy
-  the combined Markdown prompt.
-- `Plain` otherwise. The offer prints the Markdown prompt, or a Markdown warning report when an
-  assessment reports only warnings, and the command exits 0 with only warnings.
+- `Json` with `--json`. The offer prints the command's JSON document on standard output, and
+  `src/terminal/output.ts` writes every other line on standard error. The command never asks and
+  never starts an agent.
+- `Menu` when the terminal can prompt and the user allows it. The offer prints the findings, then
+  the resolution menu in `src/terminal/resolution-menu.ts`.
+- `Plain` otherwise. The offer prints the Markdown prompt, or the warning report when an assessment
+  has only warnings.
 
-After an agent session the offer runs the command's `verify`, and the command exits 0 only when no
-finding or failed check remains. `CodingAgents` in `src/lib/handoff` detects the agents and does
-the handoff. It probes the version command of each supported CLI, bounded by a timeout, and only
-agents whose probe command starts appear in the menu. A handoff gives the terminal to the agent CLI
-with inherited stdio and a per-agent seed argument that carries the combined Markdown prompt.
-Adamantite passes no provider permission, sandbox, or trust flags. The agent's exit code is
-ignored, and only the verification decides success. An agent CLI that does not start leaves the
-prompt printed and copied.
+The tests in `src/commands/__tests__` hold these invariants:
+
+- After an agent session, only the command's `verify` decides success. The offer ignores the exit
+  code of the agent.
+- An agent CLI that does not start leaves the prompt printed and copied.
+- With `--json`, standard output holds only the JSON document, which decodes with the Schema that
+  the command exports. `scripts/test-smoke.ts` holds it for the packed CLI.
 
 ## Reading configs, comments, and syntax trees
 

@@ -17,7 +17,8 @@ export interface CodingAgent {
   readonly probeArguments?: readonly string[]
   /**
    * Arguments that start the CLI's interactive session seeded with the prompt. OpenCode only
-   * pre-fills its input box, so that handoff needs one Enter press.
+   * pre-fills its input box, so that handoff needs one Enter press. Adamantite passes no
+   * permission, sandbox, or trust flag of the provider.
    */
   readonly seedArguments: (prompt: string) => string[]
   /**

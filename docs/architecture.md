@@ -334,7 +334,8 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   from the flags and asks nothing. When the selection includes coding agents, the `agents`
   integration renders `AGENTS.md` with the Adamantite section, and the Adamantite skill in
   `.agents/skills` and in each other skill folder whose agent folder exists, such as
-  `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the copy matches the
+  `.claude/skills`. The section links to the `SKILL.md` of each copy, so the agent reach of
+  `harden` starts from `AGENTS.md` and reaches the skill and its guides. A build macro bundles `skills/adamantite/` into the CLI, so the copy matches the
   running Adamantite version without `node_modules` or the network. Doctor reports an `AGENTS.md`
   without the section, and a skill copy that differs from the bundled skill.
 - `doctor` assesses the integrations, reports the findings, and offers their repair through

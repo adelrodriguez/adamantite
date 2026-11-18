@@ -2,7 +2,7 @@
 
 ## Adamantite
 
-Use the Adamantite skill for managed setup, Doctor repairs, and hardening. If the skill is not installed, read `skills/adamantite/SKILL.md` in the installed `adamantite` package.
+Use the Adamantite skill for managed setup, Doctor repairs, and hardening. This project has the skill in {{skills}}. If the skill is not installed, read `skills/adamantite/SKILL.md` in the installed `adamantite` package.
 
 {{scripts}}{{customRules}}- Run `adamantite doctor --json` for managed setup findings. Repair each finding and rerun Doctor to verify the result.
 

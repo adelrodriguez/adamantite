@@ -102,7 +102,14 @@ tester.run("no-doubles", plugin.rules["no-doubles"], {
     { code: "load.mockRejectedValueOnce(new Error('down'));", errors: [replacement] },
     { code: "load.mockResolvedValueOnce(1);", errors: [replacement] },
     { code: "builder.mockReturnThis();", errors: [replacement] },
-    { code: "save.withImplementation(() => 1, run);", errors: [replacement] },
+    {
+      code: "const save = vi.fn(); save.withImplementation(() => 1, run);",
+      errors: [replacement],
+    },
+    {
+      code: "vi.spyOn(store, 'save').withImplementation(() => 1, run);",
+      errors: [replacement],
+    },
     { code: "save['mockReturnValue'](1);", errors: [replacement], name: "computed method name" },
   ],
   valid: [
@@ -112,6 +119,10 @@ tester.run("no-doubles", plugin.rules["no-doubles"], {
     "const save = vi.spyOn(store, 'save'); expect(save).toHaveBeenCalledOnce();",
     "vi.useFakeTimers();",
     "vi.stubEnv('NODE_ENV', 'test');",
+    {
+      code: "client.withImplementation(strategy, run);",
+      name: "a withImplementation method of another object",
+    },
     "const when = (spy) => spy; when(save);",
     "const fn = { fn() {} }; fn.fn(() => 1);",
     {

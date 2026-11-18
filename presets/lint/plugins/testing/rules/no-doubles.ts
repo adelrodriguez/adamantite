@@ -2,6 +2,7 @@ import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
 import { staticKeyName } from "../../shared/ast.ts"
 import {
+  constBinding,
   isGlobalObject,
   matchesThroughAliases,
   readsProperty,
@@ -38,8 +39,14 @@ const behaviorMethods: ReadonlySet<string> = new Set([
   "mockReturnThis",
   "mockReturnValue",
   "mockReturnValueOnce",
-  "withImplementation",
 ])
+
+// A mock method with a common name, which other objects also have. It counts only on a mock or a
+// spy that the test framework builds, as `vi.fn().withImplementation(...)`.
+const sharedBehaviorMethod = "withImplementation"
+
+// The methods of the test framework object that build or type a mock or a spy.
+const mockBuilders: ReadonlySet<string> = new Set(["fn", "mocked", "spyOn"])
 
 /**
  * The test framework object that each test package exports. Vitest and Jest also make the object a
@@ -138,12 +145,31 @@ function passesImplementation(sourceCode: SourceCode, node: ESTree.CallExpressio
   )
 }
 
-function isBehaviorMethod(callee: ESTree.Node) {
+/**
+ * Reports whether an expression is a mock or a spy that the test framework builds, such as
+ * `vi.fn()`, also through a `const` binding.
+ */
+function isFrameworkMock(sourceCode: SourceCode, node: ESTree.Node) {
+  const variable = node.type === "Identifier" ? resolveVariable(sourceCode, node) : null
+  const binding = variable === null ? null : constBinding(variable)
+  const value = binding?.id.type === "Identifier" ? binding.init : node
+
+  return (
+    value.type === "CallExpression"
+    && isFrameworkMethod(sourceCode, value.callee, (name) => mockBuilders.has(name))
+  )
+}
+
+function isBehaviorMethod(sourceCode: SourceCode, callee: ESTree.Node) {
   if (callee.type !== "MemberExpression") {
     return false
   }
 
   const name = staticKeyName(callee.property, callee.computed)
+
+  if (name === sharedBehaviorMethod) {
+    return isFrameworkMock(sourceCode, callee.object)
+  }
 
   return name !== null && behaviorMethods.has(name)
 }
@@ -161,7 +187,7 @@ const rule: Rule = {
         if (isFrameworkMethod(sourceCode, node.callee, (name) => moduleMockMethods.has(name))) {
           context.report({ messageId: "moduleMock", node })
         } else if (
-          isBehaviorMethod(node.callee)
+          isBehaviorMethod(sourceCode, node.callee)
           || passesImplementation(sourceCode, node)
           || isFrameworkMethod(sourceCode, node.callee, (name) => replacementMethods.has(name))
         ) {

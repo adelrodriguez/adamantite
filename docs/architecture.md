@@ -595,8 +595,10 @@ code that its folder derives from. The build copies each `license.md` under `pre
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship.
 
-The rules in `presets/lint/plugins/testing/` ship in the `strict` preset, in the override for the
-test files of the jest and vitest presets. They started as a copy of
+The rules in `presets/lint/plugins/testing/` ship in the `strict` preset. `no-flake-masking` and
+`no-fixed-sleep` run in the override for the test files of the jest and vitest presets, and
+`no-flake-masking` also runs in Vite and Vitest configs. `no-doubles` runs in every file, so a
+setup file cannot mock a module either. They started as a copy of
 [landmines](https://github.com/interfere-inc/landmines) at commit `92084b1`, and `license.md` keeps
 its MIT notice. Adamantite drops the per-file allowlists of landmines: a file that needs an
 exception suppresses the rule with a reason, as `adamantite/require-suppression-reason` asks.

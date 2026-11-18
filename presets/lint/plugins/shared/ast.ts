@@ -18,6 +18,27 @@ export function isNumberLiteral(node: ESTree.Node): node is ESTree.NumericLitera
 }
 
 /**
+ * Return the expression inside wrappers that only change its syntax or its type, such as `vi.fn()`
+ * in `(vi.fn() as Mock)` or `60_000` in `60_000 as const`.
+ */
+export function unwrapExpression(expression: ESTree.Node): ESTree.Node {
+  let node = expression
+
+  while (
+    node.type === "ParenthesizedExpression"
+    || node.type === "ChainExpression"
+    || node.type === "TSAsExpression"
+    || node.type === "TSTypeAssertion"
+    || node.type === "TSNonNullExpression"
+    || node.type === "TSSatisfiesExpression"
+  ) {
+    node = node.expression
+  }
+
+  return node
+}
+
+/**
  * Return the string that an expression spells without computing it, such as `./api.ts` in
  * `"./api.ts"`, `` `./api.ts` ``, or `("./api.ts" as const)!`. A type assertion does not change the
  * value, so the string inside one counts. Return null when running the code gives the value, as for

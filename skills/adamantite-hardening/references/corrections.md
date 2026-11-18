@@ -99,7 +99,9 @@ Prove that the choice prevents the mistake and accepts the similar correct case:
   rule, complete the verification and cleanup of its guide.
 - For an instruction, run `adamantite harden --json` and read `agentReach`. Its `unreached`
   list must not name the file that holds the instruction, and `brokenLinks` must be empty for
-  the links that you added.
+  the links that you added. For each link that you added and that `unmatchedAnchors` lists,
+  open its target and confirm that the heading exists, because Adamantite matches anchors with
+  a simple rule.
 
 Then run the project's checks and the tests of the changed code. `adamantite check` proves
 formatting, lint rules, and types. It does not run the project's tests.

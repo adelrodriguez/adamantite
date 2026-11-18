@@ -8,14 +8,14 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // validation or narrowing instead of assertions, each suppression gives its reason, no debug
 // console call stays, and no task comment marks a workaround. Use it with any other preset.
 //
-// The antislop plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
+// The quality plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
 // access, no module mocking, and readable spacing. Its rules started as a copy of
-// https://github.com/dmmulroy/anti-slop and now live in plugins/antislop/ as first-party code. They
-// use the `antislop` namespace.
+// https://github.com/dmmulroy/anti-slop and now live in plugins/quality/ as first-party code. They
+// use the `quality` namespace.
 
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,
-  jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("antislop")],
+  jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("quality")],
   overrides: [
     {
       // A declaration file states the types of code that it does not hold, such as a built-in API or
@@ -23,10 +23,10 @@ const config: OxlintConfig = {
       // `object`, or a dictionary.
       files: ["**/*.d.{ts,mts,cts}"],
       rules: {
-        "antislop/no-object-parameters": "off",
-        "antislop/no-unknown-parameters": "off",
-        "antislop/no-unknown-returns": "off",
-        "antislop/no-unsafe-dictionary-type": "off",
+        "quality/no-object-parameters": "off",
+        "quality/no-unknown-parameters": "off",
+        "quality/no-unknown-returns": "off",
+        "quality/no-unsafe-dictionary-type": "off",
       },
     },
     {
@@ -36,9 +36,9 @@ const config: OxlintConfig = {
       // are each file that the jest or vitest preset treats as a test, so the presets agree.
       files: [...new Set([...jestTestFiles, ...vitestTestFiles])],
       rules: {
-        "antislop/no-chained-type-assertions": "error",
-        "antislop/no-widen-then-assert": "error",
-        "antislop/require-safety-comment-for-type-assertion": "error",
+        "quality/no-chained-type-assertions": "error",
+        "quality/no-widen-then-assert": "error",
+        "quality/require-safety-comment-for-type-assertion": "error",
         "typescript/consistent-type-assertions": "error",
       },
     },
@@ -49,32 +49,32 @@ const config: OxlintConfig = {
     "adamantite/no-overzealous-destructuring": "error",
     // A suppression states why the rule does not apply, after ` -- `, so a reviewer can judge it.
     "adamantite/require-suppression-reason": "error",
-    "antislop/no-array-filter-map": "error",
-    "antislop/no-conditional-empty-object-spread": "error",
-    // Decode input at its boundary into types that the code owns, instead of passing `unknown`,
-    // loose dictionaries, or `typeof` checks through the code.
-    "antislop/no-known-value-widening": "error",
-    // Tests replace a dependency through its interface instead of mocking its module.
-    "antislop/no-module-mocking": "error",
-    "antislop/no-object-parameters": "error",
-    "antislop/no-reduce-accumulator-copy": "error",
-    "antislop/no-reflect-apply": "error",
-    "antislop/no-reflect-get": "error",
-    // Type predicates (`(x): x is T`) are the boundary that the rule recommends, and they cannot
-    // do the check without `typeof`.
-    "antislop/no-runtime-typeof": ["error", { allowInTypeGuards: true }],
-    "antislop/no-shape-in-symbol-names": "error",
-    "antislop/no-unknown-parameters": "error",
-    "antislop/no-unknown-returns": "error",
-    "antislop/no-unknown-type-aliases": "error",
-    "antislop/no-unsafe-dictionary-type": "error",
-    "antislop/require-readable-spacing": "error",
     // A console call is debug output that stays in the code. `console.info` stays allowed for
     // intended output.
     "no-console": ["error", { allow: ["info"] }],
     // A TODO, FIXME, XXX, or HACK comment marks a workaround, and agents copy the workaround with
     // the comment. Fix the code now, or track the work in the issue tracker.
     "no-warning-comments": ["error", { terms: ["todo", "fixme", "xxx", "hack"] }],
+    "quality/no-array-filter-map": "error",
+    "quality/no-conditional-empty-object-spread": "error",
+    // Decode input at its boundary into types that the code owns, instead of passing `unknown`,
+    // loose dictionaries, or `typeof` checks through the code.
+    "quality/no-known-value-widening": "error",
+    // Tests replace a dependency through its interface instead of mocking its module.
+    "quality/no-module-mocking": "error",
+    "quality/no-object-parameters": "error",
+    "quality/no-reduce-accumulator-copy": "error",
+    "quality/no-reflect-apply": "error",
+    "quality/no-reflect-get": "error",
+    // Type predicates (`(x): x is T`) are the boundary that the rule recommends, and they cannot
+    // do the check without `typeof`.
+    "quality/no-runtime-typeof": ["error", { allowInTypeGuards: true }],
+    "quality/no-shape-in-symbol-names": "error",
+    "quality/no-unknown-parameters": "error",
+    "quality/no-unknown-returns": "error",
+    "quality/no-unknown-type-aliases": "error",
+    "quality/no-unsafe-dictionary-type": "error",
+    "quality/require-readable-spacing": "error",
     // The autofix of this core rule makes `Record` aliases that no-known-value-widening reports
     // again.
     "typescript/consistent-indexed-object-style": "off",

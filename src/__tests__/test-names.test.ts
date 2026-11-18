@@ -24,7 +24,7 @@ const EXCEPTIONS = {
   "presets/__tests__/react-doctor.test.ts": STACK_TEST,
   "presets/__tests__/react-strict.test.ts": STACK_TEST,
   "presets/__tests__/require-safety-comment-for-type-assertion.test.ts":
-    "Runs the rule of `presets/lint/plugins/antislop/rules/` in real Oxlint, which validates its options.",
+    "Runs the rule of `presets/lint/plugins/quality/rules/` in real Oxlint, which validates its options.",
   "presets/__tests__/stacks.test.ts": STACK_TEST,
   "presets/__tests__/strict.test.ts": STACK_TEST,
   "presets/__tests__/tailwind.test.ts": STACK_TEST,

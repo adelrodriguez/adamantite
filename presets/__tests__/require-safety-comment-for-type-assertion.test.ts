@@ -22,11 +22,11 @@ function lint(options: Readonly<Options>) {
       JSON.stringify({
         jsPlugins: [
           {
-            name: "antislop",
-            specifier: pathToFileURL(join(REPO, "presets/lint/plugins/antislop/index.ts")).href,
+            name: "quality",
+            specifier: pathToFileURL(join(REPO, "presets/lint/plugins/quality/index.ts")).href,
           },
         ],
-        rules: { "antislop/require-safety-comment-for-type-assertion": ["error", ...options] },
+        rules: { "quality/require-safety-comment-for-type-assertion": ["error", ...options] },
       })
     )
 

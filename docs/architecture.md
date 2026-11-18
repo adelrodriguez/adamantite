@@ -316,7 +316,7 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
   `check` fails on Oxlint warnings unless `--allow-warnings` is set.
 - `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
-  `antislop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
+  `quality/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
   one pass of fixes, so a fix that causes a new fixable report still needs a second `fix`.
   `src/lib/bridge/__tests__/index.test.ts` lists each such idiom in `secondPasses` and fails
@@ -391,8 +391,8 @@ presets/
       entry.ts      the jsPlugins entry of each plugin, for the presets
       shared/       helpers that more than one plugin uses
       adamantite/   the adamantite rules
-      antislop/     the antislop rules of the strict preset
-      antislop-effect/ the antislop-effect rules of the effect preset
+      quality/        the quality rules of the strict preset
+      quality-effect/ the quality-effect rules of the effect preset
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
@@ -500,7 +500,7 @@ package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through 
 ## First-party plugins
 
 Adamantite has three Oxlint plugins of its own under `presets/lint/plugins/`: `adamantite`,
-`antislop`, and `antislop-effect`. Each plugin has one folder, and the folder name is the rule
+`quality`, and `quality-effect`. Each plugin has one folder, and the folder name is the rule
 namespace, the `meta.name` of the plugin, and the name of its fixture folder. In a plugin folder,
 `index.ts` registers the rules, `rules/` holds one module for each rule, and `shared/` holds the
 helpers that only this plugin uses. `adamantite/shared/imports.ts`, for example, finds calls of
@@ -519,7 +519,7 @@ declaration, counts the overrides of each loaded config, and warns with the step
 outside its rule.
 
 A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
-such as `firstPartyPlugin("antislop")`. The function builds a file URL from its own location.
+such as `firstPartyPlugin("quality")`. The function builds a file URL from its own location.
 The source tree has `<name>/index.ts` and the dist tree has `<name>/index.js`, so it takes the
 extension from its own module URL. Its parameter type accepts only the three namespaces.
 `entry.ts` imports no plugin code, so a preset loads no rule module.
@@ -540,7 +540,7 @@ and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
 Oxlint run. The fixtures stay below `src/`: below `presets/`, the published `presets/tsconfig.json`
 would include them, and the Oxlint type check of `presets/analyze.ts` reports each file of that
-project, also a file that `ignorePatterns` ignores. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one
+project, also a file that `ignorePatterns` ignores. Each fixture file holds one case. The namespace folder, such as `quality`, lets one
 preset hold fixtures for several plugins. The harness in `presets/__tests__/rule-fixtures.ts`
 starts the Oxlint entry `src/oxlint/index.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.
@@ -570,11 +570,11 @@ rule of core that a preset changes has fixtures under
 a result that differs from the result of core alone, so the test fails when the change has no
 effect.
 
-The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and the rules in
-`presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
+The rules in `presets/lint/plugins/quality/` ship in the `strict` preset, and the rules in
+`presets/lint/plugins/quality-effect/` ship in the `effect` preset. Both started as a copy of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Their rules follow the same conventions as the
 `adamantite` rules. The RuleTester cases of `require-readable-spacing` fix each output again with
-`recursive`, so a fix that a second run would change fails. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
+`recursive`, so a fix that a second run would change fails. Each `license.md`, and `quality/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship. Adamantite shipped both plugins as vendored bundles before.

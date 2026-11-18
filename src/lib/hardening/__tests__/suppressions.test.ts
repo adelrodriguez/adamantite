@@ -125,7 +125,7 @@ describe("readSuppressions", () => {
 
   it.live("count the comments of the scripts of Vue, Svelte, and Astro files at their lines", () =>
     Effect.gen(function* () {
-      const comment = "// oxlint-disable-next-line antislop/no-reflect-get -- migration"
+      const comment = "// oxlint-disable-next-line quality/no-reflect-get -- migration"
 
       write("src/Jsx.vue", `<script lang="tsx">\n${comment}\nconst view = <div />\n</script>\n`)
       write(
@@ -144,7 +144,7 @@ describe("readSuppressions", () => {
       expect(yield* read()).toStrictEqual([
         {
           locations: ["src/App.astro:2", "src/App.svelte:2", "src/Jsx.vue:2", "src/Setup.vue:3"],
-          rule: Option.some("antislop/no-reflect-get"),
+          rule: Option.some("quality/no-reflect-get"),
         },
         { locations: ["src/App.astro:8"], rule: Option.some("no-console") },
       ])

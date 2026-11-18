@@ -25,8 +25,8 @@ _Avoid_: Target project, test project, sandbox
 
 **Vendored bundle**:
 Historical. Third-party code that Adamantite built into the package at a pinned upstream commit
-because upstream did not publish to npm. No vendored bundle remains. The antislop rules became
-first-party plugins.
+because upstream did not publish to npm. No vendored bundle remains. The anti-slop rules became
+the first-party `quality` and `quality-effect` plugins.
 _Avoid_: Plugin, dependency
 
 **Type reset**:
@@ -37,8 +37,8 @@ _Avoid_: Vendored bundle, patch, override
 **First-party plugin**:
 Adamantite's own Oxlint plugin, under the `adamantite/*` rule namespace. It ships inside the
 package, and presets load it by file URL, so target projects install nothing extra. A rule
-in it is a first-party rule. The `antislop` and `antislop-effect` plugins are first-party
-plugins too. Their namespaces use the `antislop` spelling.
+in it is a first-party rule. The `quality` and `quality-effect` plugins are first-party
+plugins too.
 _Avoid_: Vendored bundle, managed plugin, custom plugin
 
 **Managed plugin**:

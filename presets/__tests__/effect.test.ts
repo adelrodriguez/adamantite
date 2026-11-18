@@ -9,12 +9,12 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
-import antislopEffectPlugin from "#presets/lint/plugins/antislop-effect/index.ts"
+import qualityEffectPlugin from "#presets/lint/plugins/quality-effect/index.ts"
 import { listFixtureRules } from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 const NAMESPACE = "effecttsgo"
-const ANTISLOP_NAMESPACE = "antislop-effect"
+const QUALITY_NAMESPACE = "quality-effect"
 const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/effect")
 const CATEGORY_PRESETS = ["correctness", "antipattern", "effect-native", "style"] as const
 
@@ -84,7 +84,7 @@ function listPresetRules(namespace: string) {
 }
 
 const presetRules = listPresetRules(NAMESPACE)
-const antislopPresetRules = listPresetRules(ANTISLOP_NAMESPACE)
+const qualityPresetRules = listPresetRules(QUALITY_NAMESPACE)
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(
@@ -276,17 +276,17 @@ describe("effect preset", () => {
   })
 })
 
-describe("effect preset antislop rules", () => {
-  it("enable exactly the rules the antislop-effect plugin defines", () => {
-    expect(new Set(antislopPresetRules)).toStrictEqual(
-      new Set(Object.keys(antislopEffectPlugin.rules))
+describe("effect preset quality rules", () => {
+  it("enable exactly the rules the quality-effect plugin defines", () => {
+    expect(new Set(qualityPresetRules)).toStrictEqual(
+      new Set(Object.keys(qualityEffectPlugin.rules))
     )
   })
 
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
       EffectArray.sort(
-        antislopPresetRules.map((rule) => `${ANTISLOP_NAMESPACE}/${rule}`),
+        qualityPresetRules.map((rule) => `${QUALITY_NAMESPACE}/${rule}`),
         Order.String
       )
     )

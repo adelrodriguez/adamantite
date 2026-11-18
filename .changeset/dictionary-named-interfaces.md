@@ -4,9 +4,9 @@
 
 Read named interfaces, heritage clauses, and finite key sets in the dictionary rules
 
-`antislop/no-unsafe-dictionary-type` and `antislop/no-known-value-widening` now treat a named interface like a named alias, and a finite key set like a closed object.
+`quality/no-unsafe-dictionary-type` and `quality/no-known-value-widening` now treat a named interface like a named alias, and a finite key set like a closed object.
 
-`antislop/no-unsafe-dictionary-type`:
+`quality/no-unsafe-dictionary-type`:
 
 - Reports `interface A extends Record<string, unknown>`, `class A implements Record<string, unknown>`, and a type alias or interface whose default type argument makes it an unsafe dictionary, such as `type Bag<T = unknown> = Record<string, T>`.
 - Reads `globalThis.Record<string, unknown>` as the built-in `Record`, which Effect code writes when `import { Record } from "effect"` hides the global type.
@@ -15,7 +15,7 @@ Read named interfaces, heritage clauses, and finite key sets in the dictionary r
 - No longer reports `Record<"a" | "b", unknown>` or a mapped type over literal keys, because `{ a: unknown; b: unknown }` passes. It still reports a key type that it cannot resolve, such as an imported type.
 - No longer reports `Record<string, unknown>` in a conditional type test, such as `T extends Record<string, unknown> ? A : B`, or as the filter of the built-in `Extract` and `Exclude`. Those positions ask whether a type is a plain object, and `object` gives a different answer for interfaces and arrays.
 
-`antislop/no-known-value-widening`:
+`quality/no-known-value-widening`:
 
 - Reports a known value widened to a named interface with an index signature, such as `interface ScoreMap { [name: string]: number }`, as it does for `type Scores = Record<string, number>`. A generic interface passes its type arguments to the types it extends, so `interface Dict<K extends string, V> extends Record<K, V>` is open as `Dict<string, number>` and closed as `Dict<"a" | "b", number>`. The message now asks for a named owner contract with known keys.
 - No longer calls an inline mapped type over literal keys, such as `{ [K in "a" | "b"]: number }`, an open dictionary.

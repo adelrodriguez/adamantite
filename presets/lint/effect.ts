@@ -18,16 +18,15 @@ import { firstPartyPlugin } from "./plugins/entry.ts"
 // The preset enables only the @effect/tsgo rules that report Effect code. It does not ban platform
 // APIs in code that is not Effect code.
 //
-// The preset also loads the antislop-effect plugin, which reports tagged values that code handles
+// The preset also loads the quality-effect plugin, which reports tagged values that code handles
 // by hand instead of with Effect's tagged constructors, `Match`, and `catchTag`. Its rules started
 // as a copy of the Effect rules of https://github.com/dmmulroy/anti-slop and now live in
-// plugins/antislop-effect/ as first-party code. They keep the `antislop-effect` namespace, so
-// project settings and suppressions keep working. The preset targets Effect codebases, so it
-// enables every rule of the plugin.
+// plugins/quality-effect/ as first-party code under the `quality-effect` namespace. The preset
+// targets Effect codebases, so it enables every rule of the plugin.
 
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/effect" } satisfies PresetIdentity,
-  jsPlugins: [firstPartyPlugin("antislop-effect")],
+  jsPlugins: [firstPartyPlugin("quality-effect")],
   options: {
     typeAware: true,
   },
@@ -163,11 +162,11 @@ const config: OxlintConfig = {
     "effecttsgo/unnecessary-pipe-chain": "error",
     "effecttsgo/unnecessary-typeof-type": "error",
 
-    "antislop-effect/no-manual-effect-error-tag": "error",
-    "antislop-effect/no-manual-tag-comparison": "error",
-    "antislop-effect/no-manual-tagged-construction": "error",
-    "antislop-effect/no-service-constructor-imports": "error",
-    "antislop-effect/prefer-effect-match": "error",
+    "quality-effect/no-manual-effect-error-tag": "error",
+    "quality-effect/no-manual-tag-comparison": "error",
+    "quality-effect/no-manual-tagged-construction": "error",
+    "quality-effect/no-service-constructor-imports": "error",
+    "quality-effect/prefer-effect-match": "error",
 
     // Core turns on this rule, which matches an array method by its name only. It reads the
     // callback of `Effect.map` or `Option.map` as an `Array.prototype.map` callback, and reports a

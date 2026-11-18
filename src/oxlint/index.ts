@@ -11,6 +11,8 @@ import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors start
 // this file in place of `oxlint`. The CLI starts Oxlint's CLI module with the same launch itself.
+// The build writes this file as `dist/oxlint.js`. It imports no macro module, so the Adamantite
+// repository runs it from source with `node src/oxlint/index.ts`.
 
 const entry = process.argv[1] ?? ""
 

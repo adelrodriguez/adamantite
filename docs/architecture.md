@@ -6,34 +6,21 @@ domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 
 ## Runtime
 
-`src/index.ts` starts the Effect runtime. `src/cli.ts` defines the command tree and command
-options. Command modules validate command-specific input, obtain Effect services, and
-invoke target-project operations.
+`bin/adamantite` loads `dist/index.js`, which Tsdown bundles from `src/index.ts` with the presets.
+The CLI bundle and the Oxlint entry include Effect, so the package installs no Effect.
+`src/index.ts` starts the Effect runtime, `src/cli.ts` defines the command tree and the services,
+and each module of `src/commands` defines one command. `src/oxlint/index.ts`, the Oxlint entry, and
+`src/oxlint/probe.ts`, the probe plugin, run in Oxlint's process. They build beside the CLI bundle
+as `dist/oxlint.js` and `dist/probe.js`, which `scripts/test-build.ts` holds.
 
-A command runs in the target project, the folder that `yield* Project.Directory` gives.
-`Project.Directory` in `src/lib/project/index.ts` is a required service. `makeAppLayer` provides
-it from the working directory of the process, and a test provides the folder instead of changing
-the process. A function that always acts on the target project reads `Project.Directory`, so the
-folder shows in its requirements. A function that callers also run on other folders, such as a
-trial copy or a workspace package, takes the folder as a parameter.
-`eslint/no-restricted-properties` rejects every `process.cwd()` and `process.chdir()` call.
-
-`@effect/platform-node` supplies the production filesystem, path, process, and terminal
-services. Other external behavior, such as prompts and child commands, is also behind
-services so command behavior can be tested without changing a real project.
-
-Tsdown bundles the CLI, the Oxlint entry, the probe plugin, and the presets into `dist`. The CLI
-bundle and the Oxlint entry include Effect and `@effect/platform-node`, so Node.js starts the CLI
-from a few files, and the package installs neither. `oxc-resolver` loads native bindings, so it
-stays a runtime dependency. Unplugin
-macros expands compile-time package metadata and terminal-title values during builds and Vitest
-source transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint` holds the
-two entries that run in Oxlint's process, and each builds beside the CLI bundle.
-`src/oxlint/index.ts` builds to `dist/oxlint.js` and runs Oxlint with the project's Oxlint
-runtime. The entry imports no macro module, so this repository runs it from source with
-`node src/oxlint/index.ts`. `src/oxlint/probe.ts` builds to `dist/probe.js`, the Oxlint plugin
-that "Reading configs, comments, and syntax trees" describes. Repository tests run with Vitest
-under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
+- A command runs in the target project, the folder that `yield* Project.Directory` gives.
+  `eslint/no-restricted-properties` in `oxlint.config.ts` rejects `process.cwd()` and
+  `process.chdir()`.
+- External behavior, such as the filesystem, prompts, and child commands, is behind Effect services
+  that `makeAppLayer` in `src/cli.ts` provides, so a test runs a command without changing a real
+  project. `project/file-writers` and `adamantite/import-owners` hold the writes and the prompts.
+- The package runs under Node.js and Bun. The tests run under Node.js, and the `test` workflow runs
+  the packed CLI and presets with the minimum Bun.
 
 ## Layers
 

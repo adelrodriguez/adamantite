@@ -51,8 +51,10 @@ const main = Command.make("adamantite").pipe(
 )
 
 /**
- * Every service the CLI needs. The runner is a parameter so tests exercise this exact wiring while
- * stubbing process spawning.
+ * Every service the CLI needs. `@effect/platform-node` supplies the filesystem, path, process, and
+ * terminal services. The other external behavior, such as prompts and child commands, is behind
+ * services too, so a test runs a command without changing a real project. The runner is a parameter
+ * so tests exercise this exact wiring while stubbing process spawning.
  */
 export const makeAppLayer = (
   runner: Layer.Layer<CommandRunner, never, ChildProcessSpawner.ChildProcessSpawner>

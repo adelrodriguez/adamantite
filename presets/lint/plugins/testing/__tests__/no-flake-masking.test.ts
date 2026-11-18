@@ -57,6 +57,21 @@ tester.run("no-flake-masking", plugin.rules["no-flake-masking"], {
       name: "a scoped test of @effect/vitest 3",
     },
     {
+      code: 'const options = { retry: 2, timeout: 60_000 }; function body() {} test("a", options, body); test("b", options, body);',
+      errors: [retry, timeout],
+      name: "options in a binding that two tests share",
+    },
+    {
+      code: 'const options = { timeout: 60_000 }; test("loads", async () => {}, options);',
+      errors: [timeout],
+      name: "options in a binding after the test function",
+    },
+    {
+      code: "const config = { testTimeout: 45_000 }; vi.setConfig(config);",
+      errors: [timeout],
+      name: "vi.setConfig options in a binding",
+    },
+    {
       code: 'const LONG = 60_000; test("loads", load, LONG);',
       errors: [timeout],
       name: "a timeout constant after a named test function",

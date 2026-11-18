@@ -162,13 +162,24 @@ const rule: Rule = {
     // The local names of `flakyTest` that the file imports from @effect/vitest.
     const flakyTestNames = new Set<string>()
     let isConfig = false
+    // The options that a `const` binding holds can reach several tests, so each option gets one
+    // report.
+    const reported = new Set<ESTree.Node>()
 
     function reportOptions(node: ESTree.Node | undefined, timeoutKeys: ReadonlySet<string>) {
-      if (node?.type !== "ObjectExpression") {
+      if (node === undefined) {
         return
       }
 
-      for (const property of node.properties) {
+      const options = constValue(context.sourceCode, node)
+
+      if (options.type !== "ObjectExpression" || reported.has(options)) {
+        return
+      }
+
+      reported.add(options)
+
+      for (const property of options.properties) {
         const key = propertyName(property)
 
         if (key === "retry") {
@@ -221,7 +232,7 @@ const rule: Rule = {
           || third === undefined
           || second.type === "SpreadElement"
           || third.type === "SpreadElement"
-          || third.type === "ObjectExpression"
+          || constValue(context.sourceCode, third).type === "ObjectExpression"
           || isFunctionValue(context.sourceCode, third)
         ) {
           return
@@ -266,6 +277,7 @@ const rule: Rule = {
       // A benchmark is slow by design, so its timeout hides no flaky test.
       before() {
         flakyTestNames.clear()
+        reported.clear()
         isConfig = configFile.test(context.filename.replaceAll("\\", "/"))
 
         return !benchmarkFile.test(context.filename)

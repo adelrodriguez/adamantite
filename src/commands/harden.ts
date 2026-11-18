@@ -172,7 +172,7 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
 
 export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   Command.withDescription(
-    "Ask a coding agent to turn project standards into custom rules and instructions"
+    "Ask a coding agent to find the project's coding standards and move each one up the enforcement ladder"
   ),
   Command.withHandler(({ commits, json, scope }) =>
     Effect.gen(function* () {

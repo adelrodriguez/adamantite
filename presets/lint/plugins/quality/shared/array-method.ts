@@ -32,13 +32,19 @@ export function resolveArrayBinding(
 ): Variable | null {
   const node = unwrapArrayExpression(expression)
 
-  if (node.type !== "Identifier") return null
+  if (node.type !== "Identifier") {
+    return null
+  }
+
   let scope: Scope | null = sourceCode.getScope(node)
 
   while (scope !== null) {
     const variable = scope.set.get(node.name)
 
-    if (variable !== undefined) return variable
+    if (variable !== undefined) {
+      return variable
+    }
+
     scope = scope.upper
   }
 
@@ -64,7 +70,10 @@ export function arrayMethodTarget(
 ): { readonly name: string; readonly object: ESTree.Node } | null {
   const node = unwrapArrayExpression(callee)
 
-  if (node.type !== "MemberExpression") return null
+  if (node.type !== "MemberExpression") {
+    return null
+  }
+
   const name = staticKeyName(node.property, node.computed)
 
   return name === null ? null : { name, object: node.object }
@@ -73,15 +82,22 @@ export function arrayMethodTarget(
 const ARRAY_TYPES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"])
 
 function isArrayAnnotation(type: ESTree.TSType): boolean {
-  if (type.type === "TSArrayType" || type.type === "TSTupleType") return true
+  if (type.type === "TSArrayType" || type.type === "TSTupleType") {
+    return true
+  }
 
-  if (type.type === "TSParenthesizedType") return isArrayAnnotation(type.typeAnnotation)
+  if (type.type === "TSParenthesizedType") {
+    return isArrayAnnotation(type.typeAnnotation)
+  }
 
   if (type.type === "TSTypeOperator" && type.operator === "readonly") {
     return isArrayAnnotation(type.typeAnnotation)
   }
 
-  if (type.type !== "TSTypeReference") return false
+  if (type.type !== "TSTypeReference") {
+    return false
+  }
+
   const reference = namedTypeReference(type)
 
   return reference !== null && ARRAY_TYPES.has(reference.name)
@@ -105,7 +121,9 @@ function isKnownArrayExpressionFrom(
 ): boolean {
   const node = unwrapArrayExpression(expression)
 
-  if (node.type === "ArrayExpression") return true
+  if (node.type === "ArrayExpression") {
+    return true
+  }
 
   if (node.type === "CallExpression") {
     const method = arrayMethodTarget(node.callee)
@@ -126,17 +144,25 @@ function isKnownArrayExpressionFrom(
     )
   }
 
-  if (node.type !== "Identifier") return false
+  if (node.type !== "Identifier") {
+    return false
+  }
+
   const variable = resolveArrayBinding(sourceCode, node)
 
-  if (variable === null || visited.has(variable)) return false
+  if (variable === null || visited.has(variable)) {
+    return false
+  }
+
   visited.add(variable)
 
   // The annotation holds for each value that the binding gets, so check it before reassignment.
   for (const identifier of variable.identifiers) {
     const annotation = identifier.typeAnnotation?.typeAnnotation
 
-    if (annotation !== undefined) return isArrayAnnotation(annotation)
+    if (annotation !== undefined) {
+      return isArrayAnnotation(annotation)
+    }
   }
 
   const initializer = constInitializer(variable)

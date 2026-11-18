@@ -40,7 +40,9 @@ export function builtInTypeName(
 ): string | null {
   const reference = namedTypeReference(type)
 
-  if (reference === null) return null
+  if (reference === null) {
+    return null
+  }
 
   return reference.global || !hasVisibleTypeBinding(reference.name, type, environment)
     ? reference.name
@@ -53,13 +55,22 @@ function matchesUnknown(
   containers: ReadonlySet<string>
 ): boolean {
   return resolvedTypeMatches(type, environment, (resolved, matches) => {
-    if (resolved.type === "TSUnknownKeyword") return true
+    if (resolved.type === "TSUnknownKeyword") {
+      return true
+    }
 
-    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+    if (resolved.type === "TSParenthesizedType") {
+      return matches(resolved.typeAnnotation)
+    }
 
-    if (resolved.type === "TSUnionType") return resolved.types.some(matches)
+    if (resolved.type === "TSUnionType") {
+      return resolved.types.some(matches)
+    }
 
-    if (resolved.type !== "TSTypeReference") return false
+    if (resolved.type !== "TSTypeReference") {
+      return false
+    }
+
     const name = builtInTypeName(resolved, environment)
     const argument = resolved.typeArguments?.params[0]
 

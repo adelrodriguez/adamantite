@@ -16,7 +16,9 @@ function collectInferTypeParameters(
   visitorKeys: VisitorKeys,
   parameters: ESTree.TSTypeParameter[]
 ): void {
-  if (node.type === "TSInferType") parameters.push(node.typeParameter)
+  if (node.type === "TSInferType") {
+    parameters.push(node.typeParameter)
+  }
 
   for (const child of childNodes(node, visitorKeys)) {
     collectInferTypeParameters(child, visitorKeys, parameters)
@@ -92,7 +94,9 @@ function findInferTypeParameter(
   for (const child of childNodes(node, visitorKeys)) {
     const parameter = findInferTypeParameter(child, name, visitorKeys)
 
-    if (parameter !== undefined) return parameter
+    if (parameter !== undefined) {
+      return parameter
+    }
   }
 
   return undefined
@@ -117,7 +121,9 @@ export function nearestTypeParameter(
         (candidate) => candidate.name.name === name
       )
 
-      if (parameter !== undefined) return { declaration: parameter, distance, name }
+      if (parameter !== undefined) {
+        return { declaration: parameter, distance, name }
+      }
     }
 
     if (
@@ -131,7 +137,9 @@ export function nearestTypeParameter(
     if (current.type === "TSConditionalType" && descendant === current.trueType) {
       const parameter = findInferTypeParameter(current.extendsType, name, visitorKeys)
 
-      if (parameter !== undefined) return { declaration: parameter, distance, name }
+      if (parameter !== undefined) {
+        return { declaration: parameter, distance, name }
+      }
     }
 
     descendant = current

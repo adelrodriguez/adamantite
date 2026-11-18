@@ -55,7 +55,9 @@ export const isFunction = (node: ESTree.Node): boolean =>
 export function getActualLastToken(node: ESTree.Node, sourceCode: SourceCode): Token {
   const semiToken = sourceCode.getLastToken(node)
 
-  if (semiToken === null) throw new Error("Padding rule invariant: statement has no tokens")
+  if (semiToken === null) {
+    throw new Error("Padding rule invariant: statement has no tokens")
+  }
 
   const prevToken = sourceCode.getTokenBefore(semiToken)
   const nextToken = sourceCode.getTokenAfter(semiToken)

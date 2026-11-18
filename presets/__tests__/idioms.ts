@@ -46,9 +46,12 @@ export interface IdiomTree {
 export const IDIOM_TREES: readonly IdiomTree[] = [
   {
     preset: "core",
-    // `no-else-return` moves a statement, and the blank line that the spacing rule then needs
-    // comes in the next pass.
-    secondPasses: [{ file: "moved.ts", issue: ONE_FIX_PASS }],
+    // `curly` wraps a statement in a block, and `no-else-return` moves a statement. The blank line
+    // that the spacing rule then needs comes in the next pass.
+    secondPasses: [
+      { file: "braces.ts", issue: ONE_FIX_PASS },
+      { file: "moved.ts", issue: ONE_FIX_PASS },
+    ],
   },
   {
     allowedUnstableApis: [

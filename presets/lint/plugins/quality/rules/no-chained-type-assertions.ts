@@ -66,7 +66,10 @@ function isForbiddenAssertionChain(node: TypeAssertionExpression): boolean {
 const rule: Rule = {
   createOnce(context) {
     const checkTypeAssertion = (node: TypeAssertionExpression) => {
-      if (!isOutermostAssertionInChain(node) || !isForbiddenAssertionChain(node)) return
+      if (!isOutermostAssertionInChain(node) || !isForbiddenAssertionChain(node)) {
+        return
+      }
+
       context.report({ messageId: "chained", node })
     }
 

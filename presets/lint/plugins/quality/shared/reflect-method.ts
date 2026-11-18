@@ -56,9 +56,14 @@ export function matchReflectMethodCall(
 
   const forwarder = staticKeyName(callee.property, callee.computed)
 
-  if (forwarder === "call") return { arguments: call.arguments.slice(1), kind: "listed" }
+  if (forwarder === "call") {
+    return { arguments: call.arguments.slice(1), kind: "listed" }
+  }
 
-  if (forwarder !== "apply") return null
+  if (forwarder !== "apply") {
+    return null
+  }
+
   const list = call.arguments[1]
 
   return list?.type === "ArrayExpression"

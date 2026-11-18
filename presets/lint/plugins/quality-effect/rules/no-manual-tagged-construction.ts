@@ -16,7 +16,9 @@ const TAG_INPUT_CONSTRUCTORS = new Set([
 ])
 
 const calleeName = (callee: ESTree.Expression | ESTree.Super): string | undefined => {
-  if (callee.type === "Identifier") return callee.name
+  if (callee.type === "Identifier") {
+    return callee.name
+  }
 
   if (callee.type === "MemberExpression") {
     return staticKeyName(callee.property, callee.computed) ?? undefined
@@ -44,7 +46,9 @@ const rule: Rule = {
   createOnce(context) {
     return {
       ObjectExpression(node) {
-        if (isMatchPatternObject(node) || isTagInputConstructorArgument(node)) return
+        if (isMatchPatternObject(node) || isTagInputConstructorArgument(node)) {
+          return
+        }
 
         const tag = node.properties.find(
           (property) =>

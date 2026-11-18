@@ -310,8 +310,10 @@ remain. See [JSON output](#json-output).
 ### `adamantite harden`
 
 Ask a coding agent to find the coding standards that the project already follows, and to put
-each one at the highest level of enforcement that works: a custom rule when a rule can check
-it, and a line in `CODING_STANDARDS.md` when no rule can.
+each one on the highest step of the
+[enforcement ladder](skills/adamantite/references/enforcement-ladder.md) that can hold it. The
+steps go from a type that makes the mistake impossible, through rules and project checks, to an
+entry in `CODING_STANDARDS.md` with its reason and an example.
 
 ```sh
 adamantite harden
@@ -773,6 +775,12 @@ export default defineConfig({
 ```
 
 Each option replaces its default list.
+
+`adamantite/require-effect-dependencies` reports a call to `useEffect`, `useLayoutEffect`, or
+`useInsertionEffect` from `react` that passes no dependency array, or passes `undefined` or `null`,
+because React then runs the effect after every render. Pass the values that the effect reads, or
+`[]` when it reads none. The rule reports these calls in hook modules too, where
+`adamantite/no-react-state-hooks` allows effects.
 
 The React Doctor package exports more than 900 rules. The preset enables only rules that run on one file
 and that the native `react`, `react-hooks`, `jsx-a11y`, and `unicorn` rules do not already
@@ -1260,7 +1268,8 @@ warns about a config that does not load.
 ## Agent skill
 
 The Adamantite skill teaches coding agents how to initialize, assess, repair, and update a
-project, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
+project, what to keep after they fix a mistake so that it does not recur, and how to write
+[custom rules](#custom-rules). The Adamantite package ships it.
 
 `adamantite init` asks whether to set up coding agents. When you answer yes, or pass
 `--agents` in non-interactive mode, init writes `AGENTS.md` with the Adamantite section when the

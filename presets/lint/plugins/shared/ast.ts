@@ -48,11 +48,17 @@ export function staticString(node: ESTree.Expression): string | null {
  * or `{ [0]: value }`. Return null when an expression gives the name.
  */
 export function staticKeyName(key: ESTree.Node, computed: boolean): string | null {
-  if (!computed && key.type === "Identifier") return key.name
+  if (!computed && key.type === "Identifier") {
+    return key.name
+  }
 
-  if (isStringLiteral(key)) return key.value
+  if (isStringLiteral(key)) {
+    return key.value
+  }
 
-  if (isNumberLiteral(key)) return String(key.value)
+  if (isNumberLiteral(key)) {
+    return String(key.value)
+  }
 
   if (computed && key.type === "TemplateLiteral" && key.expressions.length === 0) {
     return key.quasis[0]?.value.cooked ?? null
@@ -84,13 +90,16 @@ export function childNodes(
 ): readonly ESTree.Node[] {
   const fields = new Map(Object.entries(node))
 
-  if (!fields.has("type"))
+  if (!fields.has("type")) {
     throw new Error("Child node invariant: AST node fields are not own enumerable properties")
+  }
 
   return (visitorKeys[node.type] ?? []).flatMap((key) => {
     const value = fields.get(key)
 
-    if (isNode(value)) return [value]
+    if (isNode(value)) {
+      return [value]
+    }
 
     return Array.isArray(value) ? value.filter(isNode) : []
   })

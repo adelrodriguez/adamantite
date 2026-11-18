@@ -18,7 +18,9 @@ type ReducerCallback = ESTree.ArrowFunctionExpression | ESTree.Function
 function callWithArgument(node: ESTree.Node) {
   let owner: ESTree.Node | null = node.parent
 
-  while (owner !== null && unwrapArrayExpression(owner) === node) owner = owner.parent
+  while (owner !== null && unwrapArrayExpression(owner) === node) {
+    owner = owner.parent
+  }
 
   return owner?.type === "CallExpression"
     && owner.arguments.some((argument) => unwrapArrayExpression(argument) === node)
@@ -32,7 +34,10 @@ function callWithArgument(node: ESTree.Node) {
 function reduceCallWithReducer(node: ESTree.Node) {
   const call = callWithArgument(node)
 
-  if (call === null) return null
+  if (call === null) {
+    return null
+  }
+
   const method = arrayMethodTarget(call.callee)
   const [reducer] = call.arguments
 
@@ -63,7 +68,10 @@ function functionBinding(sourceCode: SourceCode, callback: ReducerCallback) {
     declarator = declarator.parent
   }
 
-  if (declarator?.type !== "VariableDeclarator") return null
+  if (declarator?.type !== "VariableDeclarator") {
+    return null
+  }
+
   const [variable] = sourceCode.getDeclaredVariables(declarator)
 
   return variable !== undefined && constInitializer(variable) === declarator.init ? variable : null
@@ -76,13 +84,18 @@ function functionBinding(sourceCode: SourceCode, callback: ReducerCallback) {
 function reduceCallForCallback(sourceCode: SourceCode, callback: ReducerCallback) {
   const inlineCall = reduceCallWithReducer(callback)
 
-  if (inlineCall !== null) return inlineCall
+  if (inlineCall !== null) {
+    return inlineCall
+  }
+
   const variable = functionBinding(sourceCode, callback)
 
   for (const reference of variable?.references ?? []) {
     const call = reduceCallWithReducer(reference.identifier)
 
-    if (call !== null) return call
+    if (call !== null) {
+      return call
+    }
   }
 
   return null
@@ -98,7 +111,9 @@ function reducerParts(callback: ReducerCallback, call: ESTree.CallExpression) {
   const accumulator =
     firstParameter?.type === "AssignmentPattern" ? firstParameter.left : firstParameter
 
-  if (accumulator?.type !== "Identifier") return null
+  if (accumulator?.type !== "Identifier") {
+    return null
+  }
 
   return { accumulator, callback, initialValue: call.arguments[1] }
 }
@@ -119,9 +134,13 @@ function enclosingReducer(sourceCode: SourceCode, node: ESTree.Node) {
     ) {
       const call = reduceCallForCallback(sourceCode, parent)
 
-      if (call !== null) return reducerParts(parent, call)
+      if (call !== null) {
+        return reducerParts(parent, call)
+      }
 
-      if (callWithArgument(parent) === null) return null
+      if (callWithArgument(parent) === null) {
+        return null
+      }
     }
 
     parent = parent.parent
@@ -138,9 +157,14 @@ function referencesAccumulator(
 ): boolean {
   const variable = resolveArrayBinding(sourceCode, node)
 
-  if (variable === null || visited.has(variable)) return false
+  if (variable === null || visited.has(variable)) {
+    return false
+  }
 
-  if (variable === accumulator) return true
+  if (variable === accumulator) {
+    return true
+  }
+
   visited.add(variable)
   const initializer = constInitializer(variable)
 
@@ -178,9 +202,13 @@ function isNegativeNumberLiteral(node: ESTree.Node) {
 function hasFixedWindow(args: ESTree.CallExpression["arguments"]) {
   const [start, end] = args
 
-  if (start === undefined) return false
+  if (start === undefined) {
+    return false
+  }
 
-  if (isNegativeNumberLiteral(start)) return true
+  if (isNegativeNumberLiteral(start)) {
+    return true
+  }
 
   return end !== undefined && isNumberLiteral(start) && isNumberLiteral(end)
 }
@@ -196,7 +224,10 @@ function resolveInitialValue(
   const node = unwrapArrayExpression(expression)
   const variable = resolveArrayBinding(sourceCode, node)
 
-  if (variable === null || visited.has(variable)) return node
+  if (variable === null || visited.has(variable)) {
+    return node
+  }
+
   visited.add(variable)
   const initializer = constInitializer(variable)
 
@@ -236,7 +267,9 @@ function stepResult(
       const call = parent.parent
       const method = call.type === "CallExpression" ? arrayMethodTarget(call.callee) : null
 
-      if (method === null || ARRAY_COPY_LENGTH.get(method.name) !== "keep") return null
+      if (method === null || ARRAY_COPY_LENGTH.get(method.name) !== "keep") {
+        return null
+      }
 
       result = call
     } else {
@@ -285,7 +318,9 @@ const rule: Rule = {
 
         const reducer = enclosingReducer(context.sourceCode, node)
 
-        if (reducer === null) return
+        if (reducer === null) {
+          return
+        }
 
         const accumulator = context.sourceCode
           .getDeclaredVariables(reducer.callback)
@@ -295,7 +330,9 @@ const rule: Rule = {
             )
           )
 
-        if (accumulator === undefined) return
+        if (accumulator === undefined) {
+          return
+        }
 
         const isAccumulator = (expression: ESTree.Node) =>
           referencesAccumulator(context.sourceCode, expression, accumulator)
@@ -361,7 +398,9 @@ const rule: Rule = {
             arrayAccumulator && (isAccumulator(method.object) || concatsAccumulator) && !isBounded
         }
 
-        if (copiesAccumulator) context.report({ messageId: "accumulatorCopy", node })
+        if (copiesAccumulator) {
+          context.report({ messageId: "accumulatorCopy", node })
+        }
       },
     }
   },

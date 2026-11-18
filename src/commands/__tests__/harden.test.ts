@@ -36,6 +36,8 @@ import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
+import glossary from "../../../GLOSSARY.md?raw"
+import ladder from "../../../skills/adamantite/references/enforcement-ladder.md?raw"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -123,6 +125,8 @@ const REQUIRED_PHRASES = {
     "Write one combined `no-restricted-imports` for each set of files",
     "**Project check:**",
     "one case that the rule must report and one similar case that it must accept",
+    "For a type, a project check, or an instruction, give the mistake that it prevents",
+    "A step that reports valid code cannot hold the standard, so use a lower step.",
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
     "One that matches a recorded decision is settled: do not propose it or ask about it again.",
@@ -134,6 +138,9 @@ const REQUIRED_PHRASES = {
     "or the fix commits",
     "each rule with many suppressions, and each gap in a shipped rule that no option can close",
     "Score each candidate from 1 to 5",
+    "Score the mistake that a proposal prevents and the valid code that it accepts, not its step.",
+    "An instruction with a reason and an example can score 5",
+    "whether you propose to fix it in the same change",
     "name it on the first line of the report and state the fallback you used",
     "put the approval question last in the report, with no text after it",
     "Show the candidates with a score of 4 or 5, from the highest score to the lowest.",
@@ -167,9 +174,12 @@ const REQUIRED_PHRASES = {
     "skills/adamantite/SKILL.md",
     "pass it with `--dir`",
     "states the standard and why it exists",
-    "delete the instruction of each standard that a rule now checks",
-    "keep the other part as the instruction",
-    "keep the code that a new rule reports as it is",
+    "delete the text that only repeats what the rule now reports",
+    "Keep the reason and the example of a standard that shapes a design",
+    "Keep the part of the standard that the rule does not check.",
+    "fix the code that a new rule reports in the same change when the user approved the fixes",
+    "state the change that removes each file from it",
+    "The entry states the standard, the reason for it, how to spot the mistake, and one example",
     "turns the rule off only in the files that break it now",
     "Do not set the rule to `warn`: `adamantite check` fails on warnings.",
     "`CODING_STANDARDS.md`",
@@ -1198,6 +1208,31 @@ describe("harden", () => {
         ).toStrictEqual([])
         expect(missing).toStrictEqual([])
       })
+  )
+
+  // The shipped skill is the one statement of the ladder, so the prompt and the glossary follow it.
+  it.effect("state the enforcement ladder as the shipped skill and the glossary do", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(INSTALLED)
+      const steps = [...ladder.matchAll(/^\d+\. \*\*(.+):\*\*/gmu)].map(([, step = ""]) => step)
+
+      expect(steps).toStrictEqual([
+        "Type or structure",
+        "Preset rule",
+        "Import rule",
+        "Project check",
+        "Custom rule",
+        "Instruction",
+      ])
+      expect(getSection(prompt, "## 7. Place each candidate on the enforcement ladder")).toContain(
+        ladder.slice(ladder.indexOf("\n") + 1).trim()
+      )
+
+      const entry = glossary.match(/^\*\*Enforcement ladder\*\*:\n(?:.+\n)+/mu)?.[0] ?? ""
+      const named = entry.replaceAll("\n", " ")
+
+      expect(steps.filter((step) => !named.includes(step.toLowerCase()))).toStrictEqual([])
+    })
   )
 
   it.effect("tell the agent to read the last 200 commits of the project folder by default", () =>

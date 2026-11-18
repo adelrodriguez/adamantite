@@ -3,7 +3,7 @@ import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
 import type * as Project from "#lib/project/index.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import { listAppliedLintPresets } from "#lib/integrations/oxlint/config.ts"
-import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
+import { definePackageTooling } from "#lib/integrations/oxlint/package-tooling.ts"
 import { getScriptsThatRun } from "#lib/project/package-json.ts"
 
 interface ManagedPluginOptions<AssessError, AssessRequirements> {

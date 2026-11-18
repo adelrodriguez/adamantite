@@ -165,7 +165,7 @@ describe("parseTrialCase", () => {
     "../outside.ts",
     "/abs/cart.ts",
     "C:/cart.ts",
-    "C:\\cart.ts",
+    String.raw`C:\cart.ts`,
     ".",
     "=/tmp/a.ts",
     "src/cart.ts=",

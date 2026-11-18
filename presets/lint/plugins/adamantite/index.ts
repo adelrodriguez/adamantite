@@ -5,6 +5,7 @@ import noOverzealousDestructuring from "./rules/no-overzealous-destructuring.ts"
 import noQueryDataInState from "./rules/no-query-data-in-state.ts"
 import noReactStateHooks from "./rules/no-react-state-hooks.ts"
 import queryFromLoader from "./rules/query-from-loader.ts"
+import requireEffectDependencies from "./rules/require-effect-dependencies.ts"
 import requireSuppressionReason from "./rules/require-suppression-reason.ts"
 
 interface AdamantitePlugin extends Plugin {
@@ -15,6 +16,7 @@ interface AdamantitePlugin extends Plugin {
     readonly "no-query-data-in-state": Rule
     readonly "no-react-state-hooks": Rule
     readonly "query-from-loader": Rule
+    readonly "require-effect-dependencies": Rule
     readonly "require-suppression-reason": Rule
   }
 }
@@ -32,6 +34,7 @@ const plugin: AdamantitePlugin = {
     "no-query-data-in-state": noQueryDataInState,
     "no-react-state-hooks": noReactStateHooks,
     "query-from-loader": queryFromLoader,
+    "require-effect-dependencies": requireEffectDependencies,
     "require-suppression-reason": requireSuppressionReason,
   },
 }

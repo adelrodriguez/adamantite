@@ -11,7 +11,7 @@ describe("parseOxlintReport", () => {
           diagnostics: [
             {
               code: "eslint(no-console)",
-              filename: "src\\cart\\index.ts",
+              filename: String.raw`src\cart\index.ts`,
               labels: [{ span: { column: 1, line: 1 } }],
               message: "Unexpected console statement.",
             },

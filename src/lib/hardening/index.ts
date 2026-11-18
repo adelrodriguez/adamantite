@@ -12,7 +12,10 @@ import {
   DecisionsRecord,
   readDecisionsRecord,
 } from "#lib/hardening/decisions-record.ts"
-import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
+import {
+  getEnforcementLadder,
+  getHardenPromptTemplate,
+} from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
 import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
@@ -24,6 +27,7 @@ import { fillTemplate } from "#lib/shared/template.ts"
 import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
+const enforcementLadder = getEnforcementLadder()
 
 /**
  * Each coding agent starts from `AGENTS.md`, and `AGENTS.md` points to the other documentation.
@@ -310,7 +314,7 @@ const SHELL_SAFE = /^[\w./-]+$/u
  * space or a parenthesis.
  */
 function quoteShellArgument(argument: string) {
-  return SHELL_SAFE.test(argument) ? argument : `'${argument.replaceAll("'", "'\\''")}'`
+  return SHELL_SAFE.test(argument) ? argument : `'${argument.replaceAll("'", String.raw`'\''`)}'`
 }
 
 function renderList(paths: readonly string[], empty: string) {
@@ -560,9 +564,10 @@ function renderFixHistory(history: FixHistory, folder: string) {
 
 /**
  * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
- * files, the facts that Adamantite computes, and the commands; `harden-prompt.md` holds the rest.
- * `today` is the date of the session as `YYYY-MM-DD`, which step 8 gives the agent for the `at` of
- * each line that it appends to the decisions record.
+ * files, the facts that Adamantite computes, and the commands. The shipped skill holds the
+ * enforcement ladder, and `harden-prompt.md` holds the rest. `today` is the date of the session as
+ * `YYYY-MM-DD`, which step 8 gives the agent for the `at` of each line that it appends to the
+ * decisions record.
  */
 export function renderHardenPrompt(
   context: HardenContext,
@@ -598,6 +603,7 @@ export function renderHardenPrompt(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."
     ),
+    ladder: enforcementLadder,
     overrides: renderOverrides(context.overrides),
     rulesFolders: renderRulesFolders(context),
     scope:

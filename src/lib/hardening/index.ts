@@ -75,12 +75,22 @@ export const DEFAULT_FIX_HISTORY_COMMITS = 200
  * and the range is exact. After a squash or a rebase of the branch of that session, the boundary is
  * the point where the branch left, and the range lists some commits again. The range can read a
  * commit twice, and it cannot skip one.
+ *
+ * The case also decides what the session line of this session records. A session that reads the
+ * default count or the commits after a boundary records the commit of `HEAD`, because it read the
+ * fix history up to that commit. A session that reads a requested count records no commit: the user
+ * chose how much to read, and the session can leave out older commits that no session read. Its
+ * line then gives later sessions no start, so they start at an earlier session line.
  */
 const FixHistory = Schema.TaggedUnion({
   /**
-   * The last `count` commits: the number that `--commits` gives, or the default.
+   * The last `count` commits, where `count` is the default. No session line gave a start.
    */
   Last: { count: Schema.Int },
+  /**
+   * The last `count` commits, where `count` is the number that `--commits` gave.
+   */
+  Requested: { count: Schema.Int },
   /**
    * The commits after `boundary`, the common ancestor of `HEAD` and of `head`, the commit that the
    * session of the date `session` recorded.
@@ -90,7 +100,7 @@ const FixHistory = Schema.TaggedUnion({
 
 type FixHistory = typeof FixHistory.Type
 
-const { Last, Since } = Data.taggedEnum<FixHistory>()
+const { Last, Requested, Since } = Data.taggedEnum<FixHistory>()
 
 /**
  * What a harden session starts from: the files that Adamantite found, and what it computed about
@@ -263,7 +273,7 @@ const readFixHistory = Effect.fn("readFixHistory")(function* (
   scope: ProjectPath | null
 ) {
   if (Option.isSome(commits)) {
-    return Last({ count: commits.value })
+    return Requested({ count: commits.value })
   }
 
   const covering = findCoveringSession(record, scope)
@@ -578,14 +588,22 @@ function renderDecisionExample(today: string, scope: HardenContext["scope"]) {
 }
 
 /**
- * The session line that step 8 gives the agent to copy: the date of today, the commit that `HEAD`
- * names when git can name it, and the scope of this session, so the agent computes nothing.
+ * The session line that step 8 gives the agent to copy: the date of today, the commit that this
+ * session read the fix history up to, and the scope of this session, so the agent computes nothing.
+ * The line has no commit when git cannot name `HEAD`, and when the session reads a requested number
+ * of commits, as the `FixHistory` cases say.
  */
 function renderSessionLine(today: string, context: HardenContext) {
-  const head = Option.match(context.head, {
-    onNone: () => "",
-    onSome: (commit) => `,"head":"${commit}"`,
-  })
+  const head = FixHistory.match(context.fixHistory, {
+    Last: () => context.head,
+    Requested: () => Option.none(),
+    Since: () => context.head,
+  }).pipe(
+    Option.match({
+      onNone: () => "",
+      onSome: (commit) => `,"head":"${commit}"`,
+    })
+  )
 
   const scope = context.scope === null ? "" : `,"scope":${JSON.stringify(context.scope)}`
 
@@ -604,13 +622,17 @@ function renderFixHistory(history: FixHistory, scope: HardenContext["scope"]) {
   const command = (range: string) =>
     `\`git log ${range} --no-merges --format="%h %s" -- ${folder}\``
 
+  // The agent reads a default count and a requested count in the same way.
+  const renderLast = ({ count }: { readonly count: number }) =>
+    [
+      "Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.",
+      "",
+      command(`-n ${count}`),
+    ].join("\n")
+
   return FixHistory.match(history, {
-    Last: ({ count }) =>
-      [
-        "Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.",
-        "",
-        command(`-n ${count}`),
-      ].join("\n"),
+    Last: renderLast,
+    Requested: renderLast,
     Since: ({ boundary, head, session }) =>
       [
         `A session on ${session} read the fix history of ${scope === null ? "the project" : `\`${scope}\``} up to commit \`${head}\`. Run this command from the project root, and read the commits that it lists: the commits since commit \`${boundary}\`, the common ancestor of that commit and \`HEAD\`. When it lists no commit, record that the history has no commit after that session, and continue with step 5. To read older history, the user runs \`adamantite harden --commits <number>\`.`,

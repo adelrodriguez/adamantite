@@ -372,11 +372,11 @@ decision line does not change which commits the next session reads.
 The agent also appends one session line in each session that you answer. The prompt gives the
 line, so the agent copies it:
 
-| Key       | Required | Meaning                                                                |
-| --------- | -------- | ---------------------------------------------------------------------- |
-| `session` | Yes      | The date of the session, as `YYYY-MM-DD`.                              |
-| `head`    | No       | The full hash of the commit that `HEAD` named, when git could name it. |
-| `scope`   | No       | The `--path` of the session, as a folder from the project root.        |
+| Key       | Required | Meaning                                                                             |
+| --------- | -------- | ----------------------------------------------------------------------------------- |
+| `session` | Yes      | The date of the session, as `YYYY-MM-DD`.                                           |
+| `head`    | No       | The full hash of the commit that `HEAD` named. A session with `--commits` has none. |
+| `scope`   | No       | The `--path` of the session, as a folder from the project root.                     |
 
 A session line starts the fix history of a later session. Adamantite takes the last session line
 that covers the scope of the session and has a `head`. A line covers a scope when it has no
@@ -386,7 +386,9 @@ reads the commits after the common ancestor of that commit and `HEAD`, in place 
 commits. That range can list a commit that the earlier session read, such as after a squash merge,
 and it cannot skip one that the earlier session did not read. Without a covering line, or when the
 repository does not have the recorded commit, the agent reads the last 200 commits. `--commits`
-gives a number of commits to read instead, in each case.
+gives a number of commits to read instead, in each case. A session with `--commits` reads only that
+number of commits, so its session line has no `head` and does not move the start of later sessions.
+The line also has no `head` when git cannot name `HEAD`.
 
 In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
 installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,

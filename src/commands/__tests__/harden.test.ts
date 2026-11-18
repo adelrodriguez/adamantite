@@ -760,18 +760,20 @@ describe("harden", () => {
       })
   )
 
-  it.effect("print the default fix history as the last 200 commits, apart from a requested count", () =>
-    Effect.gen(function* () {
-      const { logLines } = yield* runHarden(INSTALLED, ["--json"])
-      const requested = yield* runHarden(INSTALLED, ["--json", "--commits", "200"])
+  it.effect(
+    "print the default fix history as the last 200 commits, apart from a requested count",
+    () =>
+      Effect.gen(function* () {
+        const { logLines } = yield* runHarden(INSTALLED, ["--json"])
+        const requested = yield* runHarden(INSTALLED, ["--json", "--commits", "200"])
 
-      expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
-        FixHistory.cases.Last.make({ count: 200 })
-      )
-      expect(decodeReport(requested.logLines[0]).fixHistory).toStrictEqual(
-        FixHistory.cases.Requested.make({ count: 200 })
-      )
-    })
+        expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
+          FixHistory.cases.Last.make({ count: 200 })
+        )
+        expect(decodeReport(requested.logLines[0]).fixHistory).toStrictEqual(
+          FixHistory.cases.Requested.make({ count: 200 })
+        )
+      })
   )
 
   it("give the fix history a number of commits, or a boundary with its session, and never both", () => {

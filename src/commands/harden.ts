@@ -91,7 +91,7 @@ const commits = Flag.Int("commits").pipe(
   ),
   Flag.optional,
   Flag.withDescription(
-    `Read the last <commits> commits to find past fixes. By default, the agent reads the commits since the decisions record last changed, or the last ${DEFAULT_FIX_HISTORY_COMMITS} commits`
+    `Read the last <commits> commits to find past fixes. A session with this flag does not move the start of later sessions. By default, the agent reads the commits since the last session that the decisions record has for the scope, or the last ${DEFAULT_FIX_HISTORY_COMMITS} commits`
   )
 )
 

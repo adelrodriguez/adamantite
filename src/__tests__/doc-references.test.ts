@@ -63,10 +63,11 @@ function slugHeading(heading: string) {
 
 /**
  * The anchors of a Markdown file. GitHub adds `-1`, `-2`, and so on to a heading that repeats an
- * earlier one.
+ * earlier anchor, and takes the next number while the result is an anchor too, so the headings
+ * `Setup`, `Setup`, and `Setup-1` get `setup`, `setup-1`, and `setup-1-1`.
  */
 function listAnchors(file: string) {
-  const seen = new Map<string, number>()
+  const counts = new Map<string, number>()
 
   return readProse(file).flatMap(({ text }) => {
     const heading = /^#{1,6} +(.+?)(?: +#+)?$/u.exec(text)?.[1]
@@ -76,10 +77,18 @@ function listAnchors(file: string) {
     }
 
     const slug = slugHeading(heading)
-    const count = seen.get(slug) ?? 0
-    seen.set(slug, count + 1)
+    let anchor = slug
 
-    return [count === 0 ? slug : `${slug}-${count}`]
+    while (counts.has(anchor)) {
+      const count = (counts.get(slug) ?? 0) + 1
+
+      counts.set(slug, count)
+      anchor = `${slug}-${count}`
+    }
+
+    counts.set(anchor, 0)
+
+    return [anchor]
   })
 }
 
@@ -105,13 +114,31 @@ function findDeadLink(file: string, target: string): string[] {
     : [`links to ${target}, and ${linked} has no heading with the anchor #${anchor}`]
 }
 
+const CODE_SPAN = /`[^`\n]+`/gu
+const INLINE_LINK = /\]\(\s*<?([^\s)>]+)>?(?:\s[^)]*)?\)/gu
+const LINK_DEFINITION = /^ {0,3}\[(?!\^)[^\]]+\]:\s*<?([^\s>]+)>?/u
+
+/**
+ * The link targets of a line: the target of each inline link, with or without a title, and the
+ * target of a link reference definition, such as `[map]: docs/architecture.md`. A link inside a
+ * code span is an example, so it does not count. A footnote definition is not a link.
+ */
+function listLinkTargets(text: string) {
+  const prose = text.replaceAll(CODE_SPAN, "")
+
+  return [
+    ...[...prose.matchAll(INLINE_LINK)].map(([, target = ""]) => target),
+    ...(LINK_DEFINITION.exec(prose)?.slice(1) ?? []),
+  ]
+}
+
 /**
  * The dead links of the docs, each with its file and its line.
  */
 function listDeadLinks() {
   return listDocs([...CONTRIBUTOR_DOCS, ...USER_DOCS]).flatMap((file) =>
     readProse(file).flatMap(({ line, text }) =>
-      [...text.matchAll(/\]\(([^)\s]+)\)/gu)].flatMap(([, target = ""]) =>
+      listLinkTargets(text).flatMap((target) =>
         findDeadLink(file, target).map((reason) => `${file}:${line} ${reason}`)
       )
     )

@@ -6,7 +6,10 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type * as Project from "#lib/project/index.ts"
 import { AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
-import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
+import {
+  getEnforcementLadder,
+  getHardenPromptTemplate,
+} from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
 import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
@@ -18,6 +21,7 @@ import { fillTemplate } from "#lib/shared/template.ts"
 import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
+const enforcementLadder = getEnforcementLadder()
 
 /**
  * Each coding agent starts from `AGENTS.md`, and `AGENTS.md` points to the other documentation.
@@ -388,7 +392,8 @@ export const DEFAULT_FIX_HISTORY_COMMITS = 200
 
 /**
  * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
- * files, the facts that Adamantite computes, and the commands; `harden-prompt.md` holds the rest.
+ * files, the facts that Adamantite computes, and the commands. The shipped skill holds the
+ * enforcement ladder, and `harden-prompt.md` holds the rest.
  */
 export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
   // `.` keeps the history to the project folder when the project is a folder of a larger repository.
@@ -415,6 +420,7 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."
     ),
+    ladder: enforcementLadder,
     overrides: renderOverrides(context.overrides),
     rulesFolders: renderRulesFolders(context),
     scope:

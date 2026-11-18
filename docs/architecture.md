@@ -351,8 +351,10 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   same runtime as the entry and reports missing installed packages, and unsupported native builds
   or platforms. Resolution neither launches a tool nor changes files or process variables.
   Unexpected read and parse failures still propagate.
-- `harden` renders a prompt that tells a coding agent to turn the project's coding standards
-  into custom rules and instructions, and offers it through `Resolution.offer`. Its `verify` runs
+- `harden` renders a prompt that tells a coding agent to move the project's coding standards up
+  the enforcement ladder, and offers it through `Resolution.offer`. A build macro inlines the
+  ladder from `skills/adamantite/references/enforcement-ladder.md`, so the prompt and the
+  Adamantite skill state it from one file. Its `verify` runs
   Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
   The agent verifies new and changed custom rules with temporary RuleTester cases during the
   session and removes the cases before handback. Harden never produces findings, so it never

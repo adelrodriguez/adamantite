@@ -217,14 +217,16 @@ to a file that does not exist is a discovery gap too. A file in a skill folder, 
 _Avoid_: Orphan doc, missing pointer
 
 **Standards file**:
-`CODING_STANDARDS.md` in the target project. It holds the coding standards that no tool can
-check.
+`CODING_STANDARDS.md` in the target project. It holds the coding standards that need judgment or
+that no tool can check, each with its reason and an example.
 _Avoid_: Style guide, conventions doc
 
 **Enforcement ladder**:
 The order of the places that can hold a coding standard, from strongest to weakest: a type
-or structure, a preset rule, an import rule, a custom rule, and an instruction. A standard goes on
-the highest step that can hold it.
+or structure, a preset rule, an import rule, a project check, a custom rule, and an instruction. A
+standard goes on the highest step that can hold it.
+`skills/adamantite/references/enforcement-ladder.md` defines each step, and the harden prompt
+shows that file.
 _Avoid_: Pyramid, enforcement level
 
 **Trial**:

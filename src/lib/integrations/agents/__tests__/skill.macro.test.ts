@@ -1,15 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
 import { codingAgents } from "#lib/handoff/coding-agents.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts"
-import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import { CORRECTIONS_SECTION, CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 
 describe("shipped skill", () => {
-  it("have the section that the prompts name", () => {
-    // AGENTS.md, rule add, and the harden prompt send agents to this section by its name.
-    expect(getShippedSkillFiles()["SKILL.md"]).toMatch(
-      new RegExp(`^## ${CUSTOM_RULES_SECTION}$`, "mu")
-    )
-  })
+  it.each([CUSTOM_RULES_SECTION, CORRECTIONS_SECTION])(
+    "have the %s section that the prompts name",
+    (section) => {
+      // AGENTS.md, rule add, and the harden prompt send agents to these sections by their names.
+      expect(getShippedSkillFiles()["SKILL.md"]).toMatch(new RegExp(`^## ${section}$`, "mu"))
+    }
+  )
 
   it("name each skill folder that init writes in the setup guide", () => {
     // The setup guide tells agents where `--agents` writes the skill, so a new agent folder must

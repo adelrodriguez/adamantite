@@ -1,13 +1,11 @@
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Runtime from "effect/Runtime"
 import * as Stdio from "effect/Stdio"
-import { makeAppLayer, runCli } from "#cli.ts"
+import { makeAppLayer, reportFailure, runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import * as Output from "#terminal/output.ts"
 
 const version = getPackageVersion()
 
@@ -18,8 +16,7 @@ const program = Effect.gen(function* () {
   yield* runCli(args, version)
 }).pipe(
   Effect.as(0),
-  // A defect or an interruption keeps the runtime's report.
-  Effect.catchCauseIf(Cause.hasFails, Output.failures),
+  Effect.catchCause(reportFailure),
   Effect.provide(makeAppLayer(CommandRunner.layer))
 )
 

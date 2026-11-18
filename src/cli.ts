@@ -1,6 +1,7 @@
 import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Array from "effect/Array"
+import * as Cause from "effect/Cause"
 import * as Command from "effect/cli/Command"
 import * as Digest from "effect/crypto/Digest"
 import * as DateTime from "effect/DateTime"
@@ -23,6 +24,7 @@ import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
+import * as Output from "#terminal/output.ts"
 
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
@@ -67,6 +69,26 @@ export const makeAppLayer = (
     DateTime.layerCurrentZoneLocal,
     Project.Directory.layer
   )
+
+/**
+ * Reports the cause that ended the CLI, and returns the exit code. `Output.failures` prints each
+ * typed error. A defect or an interruption in the same cause is not an error that a command
+ * expected, so it fails again without the typed errors, and the runtime reports it: a defect with
+ * its stack and exit code 1, and an interruption with exit code 130.
+ */
+export const reportFailure = <E extends { readonly message: string }>(cause: Cause.Cause<E>) => {
+  // A defect or an interruption holds no typed error, which inference cannot see from the reasons.
+  const unexpected = Cause.fromReasons<never>(
+    cause.reasons.flatMap((reason) => (Cause.isFailReason(reason) ? [] : [reason]))
+  )
+
+  return Output.failures(cause).pipe(
+    Effect.filterOrElse(
+      () => unexpected.reasons.length === 0,
+      () => Effect.failCause(unexpected)
+    )
+  )
+}
 
 export const runCli = Effect.fn("runCli")(function* (args: readonly string[], version: string) {
   const [commandArguments, forwardedWithSeparator] = Array.splitWhere(

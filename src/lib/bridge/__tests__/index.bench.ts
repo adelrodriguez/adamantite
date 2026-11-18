@@ -86,8 +86,9 @@ const CLI = "node_modules/adamantite/bin/adamantite"
 const OXLINT_ENTRY = join("node_modules/adamantite/dist", OXLINT_ENTRY_FILE)
 const OXLINT_BIN = "node_modules/oxlint/bin/oxlint"
 
-// Adamantite starts the `oxfmt` that `PATH` finds, so the direct run starts the same launcher.
-const OXFMT_BIN = "node_modules/.bin/oxfmt"
+// Adamantite starts the project's Oxfmt with Node.js, as it starts Oxlint, so the direct run starts
+// Oxfmt's bin with Node.js too, without the shell script in `node_modules/.bin`.
+const OXFMT_BIN = "node_modules/oxfmt/bin/oxfmt"
 
 const PackageJson = Schema.Struct({
   files: Schema.optionalKey(Schema.Array(Schema.String)),
@@ -309,7 +310,7 @@ interface Process {
 function toProcess(project: TargetProject, step: Step, files: readonly string[]): Process {
   return Match.valueTags(step, {
     Adamantite: ({ args }) => ({ args: [CLI, ...args, ...files], command: "node", env: {} }),
-    Oxfmt: ({ args }) => ({ args: [...args, ...files], command: OXFMT_BIN, env: {} }),
+    Oxfmt: ({ args }) => ({ args: [OXFMT_BIN, ...args, ...files], command: "node", env: {} }),
     Oxlint: ({ args }) => ({
       args: [OXLINT_BIN, ...args, ...files],
       command: "node",

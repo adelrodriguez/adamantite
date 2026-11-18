@@ -187,6 +187,9 @@ extension that the setup needs.
 
 Run `adamantite --help` or `adamantite <command> --help` for the complete CLI reference.
 
+`check` and `fix` run the Oxfmt and Oxlint that the project installs, and start each one with
+Node.js. An `oxfmt` or `oxlint` on `PATH` that the project does not install does not count.
+
 When `check`, `fix`, or `analyze` needs a tool that is not installed and that no script of the
 lockfile selection runs, such as Oxlint without the `check` or `fix` script, the error names the
 command that adds the script and installs the tool, such as

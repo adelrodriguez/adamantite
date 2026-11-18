@@ -209,8 +209,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
           expect(readFixable()).toStrictEqual(fixed)
         }).pipe(
           Effect.provideService(Project.Directory, project),
-          // `check` prints the output of its stages through `Stdio`.
-          Effect.provide([RUNNER, NodeServices.layer, ModuleResolver.layer])
+          Effect.provide([RUNNER, ModuleResolver.layer])
         )
     )
   })

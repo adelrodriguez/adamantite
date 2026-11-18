@@ -26,8 +26,9 @@ import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as Output from "#terminal/output.ts"
 
-// The commands that wrap one tool forward the arguments after `--` to it. A lifecycle command
-// coordinates several operations, so it forwards none.
+// The commands that run tools through the bridge forward the arguments after `--` to one stage,
+// which the bridge chooses. A lifecycle command coordinates several operations, so it forwards
+// none.
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
 const commands = [

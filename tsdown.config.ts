@@ -4,8 +4,9 @@ import packageJson from "./package.json" with { type: "json" }
 
 export default defineConfig([
   {
-    // The bundle includes Effect, so Node.js loads three files at startup in place of more than
-    // two hundred Effect modules, and the package installs no Effect. Each runtime dependency stays
+    // The bundles of the CLI and of the Oxlint entry include Effect and `@effect/platform-node`, so
+    // Node.js loads three files at startup in place of more than two hundred Effect modules, and
+    // the package installs neither. Each runtime dependency stays
     // external, such as `oxc-resolver`, which loads native bindings. The build fails when the
     // bundle imports any other package, or bundles a package that `onlyBundle` leaves out.
     deps: {

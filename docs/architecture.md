@@ -11,10 +11,11 @@ describes how the area works.
 ## Runtime
 
 `bin/adamantite` loads `dist/index.js`, which Tsdown bundles from `src/index.ts`, beside the
-presets. The CLI bundle includes Effect, so the package installs no Effect. `src/index.ts` starts
-the Effect runtime, `src/cli.ts` defines the command tree and the services, and each module of
-`src/commands` defines one command. The Oxlint entry, `src/oxlint/index.ts`, and the probe plugin,
-`src/oxlint/probe.ts`, run in Oxlint's process, and build as `dist/oxlint.js` and `dist/probe.js`.
+presets. The CLI bundle and the Oxlint entry include Effect and `@effect/platform-node`, so the
+package installs neither. `src/index.ts` starts the Effect runtime, `src/cli.ts` defines the
+command tree and the services, and each module of `src/commands` defines one command. The Oxlint
+entry, `src/oxlint/index.ts`, and the probe plugin, `src/oxlint/probe.ts`, run in Oxlint's process,
+and build as `dist/oxlint.js` and `dist/probe.js`.
 
 | Invariant                                                                                                                                                        | Held by                                                                                                                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -125,22 +126,23 @@ Each file gets a `FileWrite`:
 | `Kept`      | The user changed it. Its integration's `assess` reports only a change that breaks the setup. |
 | `Deleted`   | The selection no longer renders it, and its hash still matched.                              |
 
-| Invariant                                                                                                                          | Held by                                 |
-| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `Setup.apply` is the only code that writes the managed files and the lockfile, which it writes last.                               | `project/file-writers`                  |
-| The write rule holds, and a second run changes no file, because `apply` formats each file with the project's Oxfmt.                | `src/lib/setup/__tests__/index.test.ts` |
-| A config that Oxfmt cannot load fails `apply` before any write.                                                                    | `src/lib/setup/__tests__/index.test.ts` |
-| A managed script is the one exception to whole files: `apply` sets each selected script of the root `package.json` to its command. | `src/lib/setup/__tests__/index.test.ts` |
+| Invariant                                                                                                                                                                  | Held by                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `Setup.apply` is the only code that writes the managed files and the lockfile.                                                                                             | `project/file-writers`, which rejects a file write outside the modules that it lists. Nothing checks which file a listed module writes. |
+| `Setup.apply` writes the lockfile last, so the lockfile records what the run wrote.                                                                                        | Nothing                                                                                                                                 |
+| The write rule holds, and a second run changes no file, because `apply` formats each file with the project's Oxfmt.                                                        | `src/lib/setup/__tests__/index.test.ts`                                                                                                 |
+| A config that Oxfmt cannot load fails `apply` before it sets a managed script or writes a managed file or the lockfile. The install and the `prepare` steps run before it. | `src/lib/setup/__tests__/index.test.ts`                                                                                                 |
+| A managed script is the one exception to whole files: `apply` sets each selected script of the root `package.json` to its command.                                         | `src/lib/setup/__tests__/index.test.ts`                                                                                                 |
 
 ## Lockfile
 
 `src/lib/project/lockfile.ts` owns `.adamantite/adamantite-lock.json`: its schema, its read, and
 the hash of a managed file.
 
-| Invariant                                                                                                               | Held by                                                                           |
-| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| A lockfile that does not decode, or that a newer Adamantite wrote, fails `init` and `update` before they change a file. | `src/commands/__tests__/init.test.ts` and `src/commands/__tests__/update.test.ts` |
-| `Project.read` decodes the lockfile one time, and the rest of the code trusts `project.lockfile`.                       | Nothing                                                                           |
+| Invariant                                                                                                                                              | Held by                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| A lockfile that does not decode, or that has a schema version that this Adamantite does not know, fails `init` and `update` before they change a file. | `src/commands/__tests__/init.test.ts` and `src/commands/__tests__/update.test.ts` |
+| `Project.read` decodes the lockfile one time, and the rest of the code trusts `project.lockfile`.                                                      | Nothing                                                                           |
 
 `verifyLockfileVersion` compares the lockfile's `version` with the Adamantite that the project
 installs. `check` fails with its error after the stages, and `assessProject` reports it as the
@@ -213,13 +215,13 @@ Each command is one module of `src/commands`:
 | `harden`       | Offer a prompt that tells a coding agent to move the project's coding standards up the enforcement ladder, from the facts that `src/lib/hardening/index.ts` computes. It produces no findings. |
 | `rule`         | Write a custom rule stub, print a syntax tree, run the saved rule tests, and run a trial in a copy of the project through `src/lib/hardening/trial.ts`.                                        |
 
-| Invariant                                                                                                                                                            | Held by                                                                                               |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Only `check`, `fix`, and `analyze` forward the arguments after `--`, because each wraps one tool.                                                                    | `src/__tests__/cli.test.ts`                                                                           |
-| A missing tool that no selected script runs fails with `ToolNotSelected`, which names the `init` command that adds the script.                                       | The tests in `src/commands/__tests__`                                                                 |
-| A trial changes no file of the project.                                                                                                                              | `src/lib/hardening/__tests__/trial.test.ts`                                                           |
-| `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                        | `src/commands/__tests__/rule.test.ts`                                                                 |
-| Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)). | `secondPasses` in `presets/__tests__/idioms.ts`, which `src/lib/bridge/__tests__/index.test.ts` reads |
+| Invariant                                                                                                                                                                                   | Held by                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Only `check`, `fix`, and `analyze` forward the arguments after `--`. The bridge gives them to one stage: the lint stage, the unused stage of `analyze`, or the stage that `--only` selects. | `src/__tests__/cli.test.ts`, for the commands, and the tests in `src/commands/__tests__`, for the stage |
+| A missing tool that no selected script runs fails with `ToolNotSelected`, which names the `init` command that adds the script.                                                              | The tests in `src/commands/__tests__`                                                                   |
+| A trial changes no file of the project.                                                                                                                                                     | `src/lib/hardening/__tests__/trial.test.ts`                                                             |
+| `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                                               | `src/commands/__tests__/rule.test.ts`                                                                   |
+| Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).                        | `secondPasses` in `presets/__tests__/idioms.ts`, which `src/lib/bridge/__tests__/index.test.ts` reads   |
 
 ## Preset layout
 
@@ -272,13 +274,13 @@ A preset can need a third-party Oxlint plugin from npm, such as `@shadcn/lint` f
 `src/lib/integrations/oxlint/runtime.ts` resolves the Oxlint runtime, with the native parts that a
 plugin replaces.
 
-| Invariant                                                                                                                                                                                                                                      | Held by                                                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Each plugin package has a managed version.                                                                                                                                                                                                     | The type of `versions` in `src/lib/integrations/oxlint/plugins/managed.ts`                          |
-| No module that the Oxlint entry loads imports a version macro, so the entry runs from source.                                                                                                                                                  | The `presets` tests, which start `src/oxlint/index.ts` through `presets/__tests__/rule-fixtures.ts` |
-| One resolver serves the CLI, the Oxlint entry, and Doctor, so `src/lib/integrations/oxlint/runtime-assessment.ts` reports what a lint run finds.                                                                                               | `src/lib/integrations/oxlint/__tests__/runtime.test.ts`                                             |
-| The resolver reads files and changes nothing. Only a process that starts Oxlint applies the `OxlintLaunch` of a runtime: the CLI starts Oxlint's CLI module with it, and the Oxlint entry, which editors start, applies it in its own process. | Nothing                                                                                             |
-| Only the Effect plugin replaces native parts, so no two overrides replace one part.                                                                                                                                                            | Nothing                                                                                             |
+| Invariant                                                                                                                                                                                                                                      | Held by                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Each plugin package has a managed version.                                                                                                                                                                                                     | The type of `versions` in `src/lib/integrations/oxlint/plugins/managed.ts`                                |
+| No module that the Oxlint entry loads imports a version macro, so the entry runs from source.                                                                                                                                                  | The `presets` tests, which start `src/oxlint/index.ts` through `presets/__tests__/rule-fixtures.ts`       |
+| One resolver serves the CLI, the Oxlint entry, and Doctor, so `src/lib/integrations/oxlint/runtime-assessment.ts` reports what a lint run finds.                                                                                               | Nothing holds the shared use. `src/lib/integrations/oxlint/__tests__/runtime.test.ts` holds the resolver. |
+| The resolver reads files and changes nothing. Only a process that starts Oxlint applies the `OxlintLaunch` of a runtime: the CLI starts Oxlint's CLI module with it, and the Oxlint entry, which editors start, applies it in its own process. | Nothing                                                                                                   |
+| Only the Effect plugin replaces native parts, so no two overrides replace one part.                                                                                                                                                            | Nothing                                                                                                   |
 
 ## Type resets
 
@@ -307,7 +309,7 @@ the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `presets/lint/plugi
 | Each rule has a RuleTester test, and a `valid` and an `invalid` fixture that a real Oxlint run lints through `presets/__tests__/rule-fixtures.ts`. [Place a test](../CONTRIBUTING.md#place-a-test) names the folders. | `presets/__tests__/stacks.test.ts`, for the fixtures. Nothing requires the RuleTester test.                                            |
 | No rule of a stack reports a valid fixture, and each invalid fixture gets the report of its rule. A report that stays is in `knownReports`.                                                                           | `presets/__tests__/stacks.test.ts`                                                                                                     |
 | No two presets set one rule, unless one of them is core. Each core rule that a preset changes has a fixture that gets a different result from core alone.                                                             | `presets/__tests__/overlap.test.ts`                                                                                                    |
-| The fixture packages in `presets/__tests__/fixture-packages` are a separate pnpm workspace, and no package is in both manifests.                                                                                      | `presets/__tests__/fixture-packages.test.ts`                                                                                           |
+| The fixture packages in `presets/__tests__/fixture-packages` are a separate pnpm workspace, and no package is in both manifests.                                                                                      | `presets/__tests__/fixture-packages.test.ts`, for the manifests. Nothing checks the workspace file.                                    |
 | A rule declares the hand-written config that it replaces in `meta.docs.replaces`, so `src/lib/integrations/oxlint/replacements.ts` names no rule.                                                                     | `src/lib/integrations/oxlint/__tests__/replacements.test.ts`                                                                           |
 | Each `license.md` below `presets` ships at the same path in `dist/presets`.                                                                                                                                           | `scripts/test-build.ts`                                                                                                                |
 

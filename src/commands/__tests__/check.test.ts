@@ -7,10 +7,11 @@ import * as Option from "effect/Option"
 import {
   createRunnerTestContext,
   getFailure,
-  makeHandoffRunner,
   makeLockfileFile,
+  makeToolsInstalledLayer,
+  OXFMT_CLI,
   OXLINT_COMMAND,
-  oxlintInstalledLayer,
+  toolsInstalledLayer,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -18,9 +19,9 @@ import { makeSelection } from "#__tests__/lifecycle.ts"
 import checkCommand from "#commands/check.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
-  CliNotFound,
   CommandFailed,
   InvalidCheckOptions,
+  PackageNotInstalled,
   ToolNotSelected,
 } from "#lib/shared/errors.ts"
 
@@ -32,7 +33,7 @@ describe("check", () => {
 
         const exit = yield* runCommand(checkCommand, ["--only", "lint"], {
           forwardedArguments: ["--format", "github"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -52,15 +53,16 @@ describe("check", () => {
 
         const exit = yield* runCommand(checkCommand, ["--only", "format"], {
           forwardedArguments: ["--no-error-on-unmatched-pattern"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--check", "--no-error-on-unmatched-pattern"],
-            command: "oxfmt",
+            args: [OXFMT_CLI, "--check", "--no-error-on-unmatched-pattern"],
+            command: "node",
             cwd: "/project",
+            name: "oxfmt",
             title: "✨ Checking formatting",
           },
         ])
@@ -73,7 +75,7 @@ describe("check", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        yield* runCommand(checkCommand, [], { layers: [runner.layer, oxlintInstalledLayer] })
+        yield* runCommand(checkCommand, [], { layers: [runner.layer, toolsInstalledLayer] })
 
         expect(runner.invocations).toContainEqual(
           expect.objectContaining({
@@ -89,7 +91,7 @@ describe("check", () => {
         const runner = createRunnerTestContext()
 
         yield* runCommand(checkCommand, ["--allow-warnings"], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(runner.invocations).toContainEqual(
@@ -103,7 +105,7 @@ describe("check", () => {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(checkCommand, ["--only", "format", "--allow-warnings"], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -119,7 +121,7 @@ describe("check", () => {
 
         yield* runCommand(checkCommand, [], {
           forwardedArguments: ["--deny-warnings"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(runner.invocations).toContainEqual(
@@ -137,7 +139,7 @@ describe("check", () => {
 
         yield* runCommand(checkCommand, [], {
           forwardedArguments: ["--max-warnings=5"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(runner.invocations).toContainEqual(
@@ -157,7 +159,7 @@ describe("check", () => {
         const logLines: unknown[] = []
 
         yield* runCommand(checkCommand, [], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
           logLines,
         })
 
@@ -182,15 +184,16 @@ describe("check", () => {
         const exit = yield* runCommand(checkCommand, ["index.ts"], {
           files,
           forwardedArguments: ["--format", "github"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--check", join(files.root, "index.ts")],
-            command: "oxfmt",
+            args: [OXFMT_CLI, "--check", join(files.root, "index.ts")],
+            command: "node",
             cwd: "/project",
+            name: "oxfmt",
             title: "✨ Checking formatting",
           },
           {
@@ -214,11 +217,11 @@ describe("check", () => {
       "name the init command that adds check when the lockfile selects no script and Oxfmt is missing",
       () =>
         Effect.gen(function* () {
-          const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+          const runner = createRunnerTestContext()
 
           const exit = yield* runCommand(checkCommand, [], {
             files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
-            layers: [runner.layer, oxlintInstalledLayer],
+            layers: [runner.layer, makeToolsInstalledLayer("oxlint")],
           })
 
           const error = getFailure(exit)
@@ -241,7 +244,7 @@ describe("check", () => {
 
           const exit = yield* runCommand(checkCommand, [], {
             files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
-            layers: [runner.layer],
+            layers: [runner.layer, makeToolsInstalledLayer("oxfmt")],
           })
 
           const error = getFailure(exit)
@@ -267,7 +270,7 @@ describe("check", () => {
 
           const exit = yield* runCommand(checkCommand, [], {
             files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
-            layers: [runner.layer, oxlintInstalledLayer],
+            layers: [runner.layer, toolsInstalledLayer],
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
@@ -278,32 +281,36 @@ describe("check", () => {
     )
 
     // `adamantite update` installs a selected tool, so its own failure stands.
-    it.effect("keep the not-found failure of a tool that the lockfile selects", () =>
+    it.effect("keep the missing-package failure of a tool that the lockfile selects", () =>
       Effect.gen(function* () {
-        const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+        const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(checkCommand, [], {
           files: createFileSystemTestContext({
             files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
           }),
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, makeToolsInstalledLayer("oxlint")],
         })
 
-        expect(getFailure(exit)).toStrictEqual(new CliNotFound({ command: "oxfmt" }))
+        expect(getFailure(exit)).toStrictEqual(
+          new PackageNotInstalled({ packageName: "oxfmt", project: "/project" })
+        )
       })
     )
 
     // Doctor reports the lockfile, and the tools fail as without a lockfile.
-    it.effect("keep the not-found failure when the lockfile does not decode", () =>
+    it.effect("keep the missing-package failure when the lockfile does not decode", () =>
       Effect.gen(function* () {
-        const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+        const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(checkCommand, [], {
           files: createFileSystemTestContext({ files: { [LOCKFILE_PATH]: "<<<<<<< HEAD\n" } }),
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, makeToolsInstalledLayer("oxlint")],
         })
 
-        expect(getFailure(exit)).toStrictEqual(new CliNotFound({ command: "oxfmt" }))
+        expect(getFailure(exit)).toStrictEqual(
+          new PackageNotInstalled({ packageName: "oxfmt", project: "/project" })
+        )
       })
     )
   })
@@ -314,13 +321,13 @@ describe("check", () => {
         const runner = createRunnerTestContext([2, 3])
 
         const exit = yield* runCommand(checkCommand, [], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toBeInstanceOf(CommandFailed)
-        expect(error).toMatchObject({ command: "oxfmt", exitCode: 2 })
+        expect(error).toMatchObject({ command: "node", exitCode: 2 })
         expect(
           runner.invocations.map((invocation) => invocation.name ?? invocation.command)
         ).toStrictEqual(["oxfmt", "oxlint"])

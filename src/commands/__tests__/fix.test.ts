@@ -6,10 +6,11 @@ import * as Option from "effect/Option"
 import {
   createRunnerTestContext,
   getFailure,
-  makeHandoffRunner,
   makeLockfileFile,
+  makeToolsInstalledLayer,
+  OXFMT_CLI,
   OXLINT_COMMAND,
-  oxlintInstalledLayer,
+  toolsInstalledLayer,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -24,7 +25,7 @@ describe("fix", () => {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, [], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -35,9 +36,10 @@ describe("fix", () => {
             title: "🔧 Fixing lint issues",
           },
           {
-            args: ["--write"],
-            command: "oxfmt",
+            args: [OXFMT_CLI, "--write"],
+            command: "node",
             cwd: "/project",
+            name: "oxfmt",
             title: "✨ Formatting",
           },
         ])
@@ -54,7 +56,7 @@ describe("fix", () => {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, args, {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -75,7 +77,7 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["--only", "lint", "--suggested"], {
           forwardedArguments: ["--deny-warnings"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -95,15 +97,16 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["--only", "format"], {
           forwardedArguments: ["--no-error-on-unmatched-pattern"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--write", "--no-error-on-unmatched-pattern"],
-            command: "oxfmt",
+            args: [OXFMT_CLI, "--write", "--no-error-on-unmatched-pattern"],
+            command: "node",
             cwd: "/project",
+            name: "oxfmt",
             title: "✨ Formatting",
           },
         ])
@@ -115,7 +118,7 @@ describe("fix", () => {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, ["--only", "format", "--all"], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -137,7 +140,7 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["index.ts", "index.ts"], {
           files,
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -148,9 +151,10 @@ describe("fix", () => {
             title: "🔧 Fixing lint issues",
           },
           {
-            args: ["--write", join(files.root, "index.ts")],
-            command: "oxfmt",
+            args: [OXFMT_CLI, "--write", join(files.root, "index.ts")],
+            command: "node",
             cwd: "/project",
+            name: "oxfmt",
             title: "✨ Formatting",
           },
         ])
@@ -165,7 +169,7 @@ describe("fix", () => {
 
         const exit = yield* runCommand(fixCommand, ["--dangerous"], {
           forwardedArguments: ["--deny-warnings"],
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -176,9 +180,10 @@ describe("fix", () => {
             title: "🔧 Fixing lint issues",
           },
           {
-            args: ["--write"],
-            command: "oxfmt",
+            args: [OXFMT_CLI, "--write"],
+            command: "node",
             cwd: "/project",
+            name: "oxfmt",
             title: "✨ Formatting",
           },
         ])
@@ -191,11 +196,11 @@ describe("fix", () => {
       "name the init command that adds check when the lockfile selects no script and Oxfmt is missing",
       () =>
         Effect.gen(function* () {
-          const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
+          const runner = createRunnerTestContext()
 
           const exit = yield* runCommand(fixCommand, [], {
             files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
-            layers: [runner.layer, oxlintInstalledLayer],
+            layers: [runner.layer, makeToolsInstalledLayer("oxlint")],
           })
 
           expect(getFailure(exit)).toStrictEqual(
@@ -211,7 +216,7 @@ describe("fix", () => {
         const runner = createRunnerTestContext([1, 2])
 
         const exit = yield* runCommand(fixCommand, [], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -229,13 +234,13 @@ describe("fix", () => {
         const runner = createRunnerTestContext([0, 2])
 
         const exit = yield* runCommand(fixCommand, [], {
-          layers: [runner.layer, oxlintInstalledLayer],
+          layers: [runner.layer, toolsInstalledLayer],
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toBeInstanceOf(CommandFailed)
-        expect(error).toMatchObject({ command: "oxfmt", exitCode: 2 })
+        expect(error).toMatchObject({ command: "node", exitCode: 2 })
       })
     )
   })

@@ -320,8 +320,11 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
 
 - `check` and `fix` call the bridge to run Oxfmt and Oxlint. The bridge resolves the project's
   Oxlint runtime and starts Oxlint's own CLI module with `node`, so Oxlint runs with that runtime
-  and no second process loads Effect. `check` fails on Oxlint warnings unless `--allow-warnings`
-  is set.
+  and no second process loads Effect. It starts the project's Oxfmt CLI module with `node` too,
+  without the shell script in `node_modules/.bin`, so a missing Oxfmt fails as
+  `PackageNotInstalled`. `bin/adamantite` sets `NODE_COMPILE_CACHE` to its compile cache folder, so
+  both tools load their compiled code from the cache. `check` fails on Oxlint warnings unless
+  `--allow-warnings` is set.
 - `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
   `quality/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies

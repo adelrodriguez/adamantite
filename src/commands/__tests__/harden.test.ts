@@ -20,6 +20,7 @@ import {
   makeLockfileFile,
   promptingLayer,
   nonProbeInvocations,
+  OXFMT_CLI,
   OXLINT_COMMAND,
   runCommand,
   SKILL_FILES,
@@ -193,6 +194,7 @@ const ADAMANTITE_MODULE = {
 // The project installs Oxlint, which Harden runs to list and probe the files.
 const PROJECT_RESOLUTIONS = {
   "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
+  "oxfmt/package.json": "node_modules/oxfmt/package.json",
   "oxlint/package.json": "node_modules/oxlint/package.json",
 }
 
@@ -1429,7 +1431,7 @@ describe("harden", () => {
           stdin: "inherit",
           stdout: "inherit",
         }),
-        expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
+        expect.objectContaining({ args: [OXFMT_CLI, "--check"], command: "node", name: "oxfmt" }),
         expect.objectContaining({
           ...OXLINT_COMMAND,
           args: [...OXLINT_COMMAND.args, "--deny-warnings"],
@@ -1518,15 +1520,18 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         keys: ["enter"],
-        runner: { commandExits: { oxfmt: "not-found" } },
+        resolutions: {
+          "adamantite/lint": PROJECT_RESOLUTIONS["adamantite/lint"],
+          "oxlint/package.json": PROJECT_RESOLUTIONS["oxlint/package.json"],
+        },
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         "💠 adamantite harden",
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
-        ...CHECK_TITLES,
-        "✖ The command `oxfmt` was not found on PATH. Install it, then run the command again.",
+        "🔍 Linting · adamantite (oxlint)",
+        "✖ `oxfmt` is not installed in `/project`. Install the dependencies, or run `adamantite update`.",
         "✖ `adamantite check` failed.",
         "⚠️ Harden found issues.",
       ])
@@ -1552,7 +1557,10 @@ describe("harden", () => {
             }),
           },
           keys: ["enter", "n"],
-          resolutions: { "adamantite/lint": PROJECT_RESOLUTIONS["adamantite/lint"] },
+          resolutions: {
+            "adamantite/lint": PROJECT_RESOLUTIONS["adamantite/lint"],
+            "oxfmt/package.json": PROJECT_RESOLUTIONS["oxfmt/package.json"],
+          },
         })
 
         expect(Exit.isFailure(exit)).toBe(true)

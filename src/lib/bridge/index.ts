@@ -24,13 +24,13 @@ import { checkExists } from "#lib/shared/filesystem.ts"
 export type { FixLevel } from "#lib/integrations/oxlint/command.ts"
 
 /**
- * Replaces the failure of a tool that is not on `PATH` with `ToolNotSelected` when `selection`
- * includes no script that runs the tool, because `adamantite update` would not install it. The
- * Oxlint entry does the same for Oxlint.
+ * Replaces the failure of the missing tool `tool` with `ToolNotSelected` when `selection` includes
+ * no script that runs the tool, because `adamantite update` would not install it. A tool that
+ * `PATH` finds fails with `CliNotFound`, and a tool that Node.js starts from the project fails with
+ * `PackageNotInstalled`. The Oxlint entry does the same for Oxlint.
  */
-function explainMissingTool(selection: Option.Option<Selection>) {
-  return (error: CliNotFound) =>
-    Effect.fail(Option.getOrElse(toToolNotSelected(selection, error.command), () => error))
+function explainMissingTool<E>(selection: Option.Option<Selection>, error: E, tool: string) {
+  return Effect.fail(Option.getOrElse(toToolNotSelected(selection, tool), () => error))
 }
 
 /**
@@ -65,13 +65,11 @@ export const check = Effect.fn("Bridge.check")(function* (
   const forwardedStage = only ?? "lint"
 
   const stages = {
-    format: Effect.succeed(
-      oxfmt.check({
-        cwd,
-        files,
-        forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
-      })
-    ),
+    format: oxfmt.check({
+      cwd,
+      files,
+      forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
+    }),
     lint: oxlint.check({
       allowWarnings,
       cwd,
@@ -85,7 +83,11 @@ export const check = Effect.fn("Bridge.check")(function* (
     only === undefined
       ? runner.runConcurrently([stages.format, stages.lint])
       : runner.runAll([stages[only]])
-  ).pipe(Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())))
+  ).pipe(
+    Effect.catchTag("PackageNotInstalled", (error) =>
+      explainMissingTool(options.selection ?? Option.none(), error, error.packageName)
+    )
+  )
 })
 
 /**
@@ -119,13 +121,11 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
   const forwardedStage = only ?? "lint"
 
   const stages = {
-    format: Effect.succeed(
-      oxfmt.fix({
-        cwd,
-        files: targets,
-        forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
-      })
-    ),
+    format: oxfmt.fix({
+      cwd,
+      files: targets,
+      forwardedArguments: forwardedStage === "format" ? forwardedArguments : [],
+    }),
     lint: oxlint.fix({
       cwd,
       files: targets,
@@ -140,7 +140,11 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
   // https://github.com/oxc-project/oxc/issues/16118
   yield* runner
     .runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
-    .pipe(Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())))
+    .pipe(
+      Effect.catchTag("PackageNotInstalled", (error) =>
+        explainMissingTool(options.selection ?? Option.none(), error, error.packageName)
+      )
+    )
 })
 
 /**
@@ -215,7 +219,9 @@ export const analyze = Effect.fn("Bridge.analyze")(function* (options: {
   // A failed Sherif fix means no install happened, and Knip would then delete from a stale
   // dependency graph.
   yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
-    Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())),
+    Effect.catchTag("CliNotFound", (error) =>
+      explainMissingTool(options.selection ?? Option.none(), error, error.command)
+    ),
     Effect.mapError((error) =>
       Predicate.isTagged(error, "CliNotFound") && error.command === stages.monorepo.command
         ? new CliNotFound({

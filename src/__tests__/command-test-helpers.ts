@@ -115,12 +115,28 @@ export const OXLINT_COMMAND = {
 } as const
 
 /**
- * Finds the Oxlint package of the test project, so a command that runs Oxlint resolves the runtime
- * of `OXLINT_COMMAND`.
+ * The Oxfmt CLI module of a test project that installs Oxfmt. `check` and `fix` start it with
+ * Node.js.
  */
-export const oxlintInstalledLayer = makeModuleResolverLayer("/project", {
-  "oxlint/package.json": "node_modules/oxlint/package.json",
-})
+export const OXFMT_CLI = "/project/node_modules/oxfmt/dist/cli.js"
+
+/**
+ * Finds the packages of `tools` in the test project, so a command that runs Oxlint resolves the
+ * runtime of `OXLINT_COMMAND`, and a command that runs Oxfmt starts `OXFMT_CLI`.
+ */
+export function makeToolsInstalledLayer(...tools: ReadonlyArray<"oxfmt" | "oxlint">) {
+  return makeModuleResolverLayer(
+    "/project",
+    Object.fromEntries(
+      tools.map((tool) => [`${tool}/package.json`, `node_modules/${tool}/package.json`])
+    )
+  )
+}
+
+/**
+ * Finds the Oxfmt and Oxlint packages of the test project.
+ */
+export const toolsInstalledLayer = makeToolsInstalledLayer("oxfmt", "oxlint")
 
 // A layer's output type is contravariant, so `never` accepts every layer that does not fail.
 // `runCommand` provides the filesystem of the test to each one.

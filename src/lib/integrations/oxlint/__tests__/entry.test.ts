@@ -6,7 +6,7 @@ import type { ModuleResolver } from "#lib/project/module-resolver.ts"
 import {
   makeLockfileFile,
   OXLINT_COMMAND,
-  oxlintInstalledLayer,
+  toolsInstalledLayer,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection } from "#__tests__/lifecycle.ts"
@@ -63,7 +63,7 @@ describe("oxlint-entry", () => {
   describe("getOxlintCommand", () => {
     it.effect("start Oxlint's CLI module of the project with Node.js", () =>
       Effect.gen(function* () {
-        expect(yield* runIn({}, oxlintInstalledLayer)).toStrictEqual(OXLINT_COMMAND)
+        expect(yield* runIn({}, toolsInstalledLayer)).toStrictEqual(OXLINT_COMMAND)
       })
     )
 

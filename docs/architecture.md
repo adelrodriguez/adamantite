@@ -502,8 +502,8 @@ The fixtures in `src/__tests__/presets/fixtures/typescript/` hold one file of ty
 reset. `presets/__tests__/typescript.test.ts` type checks them in one run with
 `adamantite/typescript`, where they must pass, and in one run with `adamantite/tsconfig`, where
 every fixture must fail. The second run proves that each fixture tests a reset. The tests also
-fail when a reset has no fixture or `index.d.ts` does not reference it. The resets and the
-fixtures started from ts-reset, so `license.md` keeps its MIT notice.
+fail when a reset has no fixture or `index.d.ts` does not reference it. `license.md` keeps the
+MIT notice of ts-reset, which the resets and the fixtures derive from.
 
 Doctor's `typescript` integration, in `integrations/typescript/`, asks the project's TypeScript which files a config loads. For each
 package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
@@ -583,13 +583,12 @@ a result that differs from the result of core alone, so the test fails when the 
 effect.
 
 The rules in `presets/lint/plugins/quality/` ship in the `strict` preset, and the rules in
-`presets/lint/plugins/quality-effect/` ship in the `effect` preset. Both started as a copy of
-[anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Their rules follow the same conventions as the
+`presets/lint/plugins/quality-effect/` ship in the `effect` preset. Their rules follow the same conventions as the
 `adamantite` rules. The RuleTester cases of `require-readable-spacing` fix each output again with
 `recursive`, so a fix that a second run would change fails. Each `license.md`, and `quality/stylistic/license.md`, keeps the MIT notice of the
-copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
+code that its folder derives from. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
-ship. Adamantite shipped both plugins as vendored bundles before.
+ship.
 
 The `architecture` preset loads the `adamantite` plugin without enabling rules. Init offers it
 for projects that configure layer maps and import owners without the other rules of `strict`.

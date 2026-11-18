@@ -318,6 +318,36 @@ export class InvalidLockfile extends Data.TaggedError("InvalidLockfile")<{
 }
 
 /**
+ * An older Adamantite wrote the lockfile than the one that the project installs, so the managed
+ * packages, the managed files, and the Adamantite skill are those of the older version. `update`
+ * repairs it.
+ */
+export class SetupOutdated extends Data.TaggedError("SetupOutdated")<{
+  installed: string
+  path: string
+  recorded: string
+}> {
+  override get message() {
+    return `\`${this.path}\` records the setup of Adamantite ${this.recorded}, but the project installs Adamantite ${this.installed}. Run \`adamantite update\` to update the managed packages, files, and skill, commit the changes, and run \`adamantite check\` again.`
+  }
+}
+
+/**
+ * A newer Adamantite wrote the lockfile than the one that the project installs, such as after a
+ * pull that updated the dependency before an install. `update` would bring the setup back to the
+ * installed version, so the repair is an install instead.
+ */
+export class SetupAhead extends Data.TaggedError("SetupAhead")<{
+  installed: string
+  path: string
+  recorded: string
+}> {
+  override get message() {
+    return `\`${this.path}\` records the setup of Adamantite ${this.recorded}, but the project installs the older Adamantite ${this.installed}. Install the dependencies, or update the project's \`adamantite\` dependency to ${this.recorded} or newer, and run \`adamantite check\` again.`
+  }
+}
+
+/**
  * The lockfile has a schema version that this Adamantite version cannot read, because a newer
  * Adamantite wrote it. `version` is the Adamantite version that the file names, when it names one.
  * Doctor reports it as a finding, and the commands that write the lockfile fail, so they do not

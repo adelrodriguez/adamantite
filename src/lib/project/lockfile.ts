@@ -1,12 +1,21 @@
 import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
 import { Selection } from "#lib/project/selection.ts"
-import { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
+import {
+  InvalidLockfile,
+  SetupAhead,
+  SetupOutdated,
+  UnsupportedLockfile,
+} from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 
 /**
  * The lockfile, relative to the project root. In a monorepo, the root is the workspace root.
@@ -96,6 +105,88 @@ export const readSelection = (root: string) =>
     }),
     Effect.map((lockfile) => Option.map(lockfile, ({ selection }) => selection))
   )
+
+/**
+ * The version of the Adamantite package that the project at `root` installs, or none when it
+ * installs none. It resolves `adamantite/lint` as Oxlint loads the preset, so an install in a
+ * parent `node_modules`, such as at the root of a monorepo, counts.
+ */
+const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (root: string) {
+  const path = yield* Path.Path
+  const resolver = yield* ModuleResolver
+  const entry = yield* resolver.resolve(root, publicImport("./lint"))
+
+  if (Option.isNone(entry)) {
+    return Option.none<string>()
+  }
+
+  for (
+    let directory = path.dirname(entry.value);
+    directory !== path.dirname(directory);
+    directory = path.dirname(directory)
+  ) {
+    const manifest = yield* readPackageJson(directory).pipe(Effect.option)
+
+    if (Option.isSome(manifest) && manifest.value.name === "adamantite") {
+      return Option.fromUndefinedOr(manifest.value.version)
+    }
+  }
+
+  return Option.none<string>()
+})
+
+const RELEASE = /^(\d+)\.(\d+)\.(\d+)/u
+
+const releaseOrder = Order.Tuple([Order.Number, Order.Number, Order.Number])
+
+/**
+ * The major, minor, and patch numbers of `version`, or none when it does not start with them.
+ */
+function parseRelease(version: string) {
+  const match = RELEASE.exec(version)
+
+  return match === null
+    ? Option.none()
+    : Option.some([Number(match[1]), Number(match[2]), Number(match[3])] as const)
+}
+
+/**
+ * Verifies that the Adamantite version that the project at `root` installs wrote `lockfile`, the
+ * one comparison of the two versions. It fails with `SetupOutdated` when an older version wrote the
+ * lockfile, and with `SetupAhead` when a newer release did. It compares with the installed version,
+ * not the running one, so a CLI from another install, such as `npx`, judges the project as its own
+ * CLI does. It succeeds without a lockfile, or when the project installs no Adamantite, such as
+ * before an install.
+ */
+export const verifyLockfileVersion = Effect.fn("verifyLockfileVersion")(function* (
+  root: string,
+  lockfile: Option.Option<Lockfile>
+) {
+  if (Option.isNone(lockfile)) {
+    return
+  }
+
+  const installed = yield* readInstalledVersion(root)
+  const recorded = lockfile.value.version
+
+  if (Option.isNone(installed) || installed.value === recorded) {
+    return
+  }
+
+  const versions = { installed: installed.value, path: LOCKFILE_PATH, recorded }
+
+  // A version that is not a release, such as a Git source, compares as older, because `update`
+  // with the installed version is then the repair that ends the drift.
+  const isAhead = Option.match(
+    Option.all([parseRelease(recorded), parseRelease(installed.value)]),
+    {
+      onNone: () => false,
+      onSome: ([written, current]) => Order.isGreaterThan(releaseOrder)(written, current),
+    }
+  )
+
+  return yield* isAhead ? new SetupAhead(versions) : new SetupOutdated(versions)
+})
 
 /**
  * The JSON text of `lockfile`. Only `init` and `update` write the lockfile, through `lib/setup`,

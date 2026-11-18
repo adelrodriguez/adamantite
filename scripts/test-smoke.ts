@@ -633,6 +633,47 @@ try {
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
 
+  // `bin/adamantite` hands its compile cache folder to the tools that it starts, so Oxlint loads its
+  // compiled code from the cache. A folder that the user sets wins, and `NODE_DISABLE_COMPILE_CACHE`
+  // leaves Oxlint without a cache. Node.js logs each module that it reads or writes for the cache.
+  console.info("Checking that Oxlint gets the compile cache of the CLI...")
+  const userCache = mkdtempSync(join(tmpdir(), "adamantite-smoke-compile-cache-"))
+
+  try {
+    for (const { cacheFolder, env } of [
+      { cacheFolder: join(tmpdir(), "node-compile-cache"), env: {} },
+      { cacheFolder: userCache, env: { NODE_COMPILE_CACHE: userCache } },
+      { cacheFolder: undefined, env: { NODE_DISABLE_COMPILE_CACHE: "1" } },
+    ]) {
+      const result = spawn(process.execPath, [cliPath, "check", "--only", "lint"], {
+        cwd: fixture,
+        env: { ...fixtureEnv, ...env, NODE_DEBUG_NATIVE: "COMPILE_CACHE" },
+      })
+
+      if (result.status !== 0) {
+        throw new Error(`Command failed: ${result.description}\n${result.output}`)
+      }
+
+      const oxlintCacheLines = result.output
+        .split("\n")
+        .filter(
+          (line) => line.startsWith("[compile cache]") && line.includes("/oxlint/dist/cli.js")
+        )
+
+      const usesFolder =
+        cacheFolder !== undefined
+        && oxlintCacheLines.some((line) => line.includes(`reading cache from ${cacheFolder}`))
+
+      if (cacheFolder === undefined ? oxlintCacheLines.length > 0 : !usesFolder) {
+        throw new Error(
+          `Expected Oxlint to use the compile cache folder ${String(cacheFolder)} with ${JSON.stringify(env)}, received:\n${result.output}`
+        )
+      }
+    }
+  } finally {
+    rmSync(userCache, { force: true, recursive: true })
+  }
+
   // `adamantite/typescript` loads the type resets by a path inside the installed
   // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
   // Outside Windows, the Oxlint launch sets no backend variable, so the lint error also proves that

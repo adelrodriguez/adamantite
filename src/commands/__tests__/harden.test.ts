@@ -157,7 +157,10 @@ const REQUIRED_PHRASES = {
     "An approved candidate needs no line, because its rule or instruction is the trace.",
     "and each candidate or decision that step 7 matched with a decision of the record",
     "Never edit or delete an earlier line.",
-    "To change a decision, append a line with the same `id`.",
+    "A line replaces only the earlier line that has the same `id` and the same `scope`",
+    "To change a decision that the Decisions section shows, write its `id` and its scope",
+    "To end a decision that the Decisions section shows, append a line with its `id`, its scope, and the decision `approved`.",
+    "A decision that this session does not cover stays",
     "one JSON object on one line",
     "no trailing comma",
     "Leave out a key that has no value.",
@@ -1536,11 +1539,47 @@ describe("harden", () => {
     })
   )
 
+  it.effect("show two decisions that have one id, each with its scope, in the prompt and as JSON", () =>
+    Effect.gen(function* () {
+      // The same standard, which an earlier session rejected for the whole project.
+      const project = {
+        at: DEFERRED.at,
+        decision: "rejected",
+        id: DEFERRED.id,
+        rule: DEFERRED.rule,
+        standard: DEFERRED.standard,
+      }
+
+      const api = { ...DEFERRED, scope: "packages/api" }
+
+      const files = {
+        ...MONOREPO_FILES,
+        // The session of `packages/api` wrote its line last, with the `id` of the standard.
+        [RECORD]: makeRecord([project, DEFERRED, api]),
+      }
+
+      const prompt = yield* runHardenPrompt(files, ["--path", "packages/web"])
+      const { logLines } = yield* runHarden(files, ["--json", "--path", "packages/web"])
+
+      expect(getListItems(getSection(prompt, "### Decisions"))).toStrictEqual([
+        "- `default-exports`, rejected 2026-03-14: Ban default exports. Proposed: `import/no-default-export`.",
+        "- `default-exports`, deferred 2026-03-14, in `packages/web`: Ban default exports. Proposed: `import/no-default-export`.",
+      ])
+      expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
+        project,
+        DEFERRED,
+      ])
+    })
+  )
+
   it.effect.each([
     {
       args: ["--path", "packages/web"],
       name: "the scope of --path",
-      phrase: 'Write `"scope":"packages/web"` on each line, the folder of this session.',
+      phrases: [
+        'A line of this session has `"scope":"packages/web"`, the folder of this session.',
+        "This session covers a decision in `packages/web` or in a folder inside it.",
+      ],
       processes: RECORD_PROCESSES,
       scope: "packages/web",
       session: { head: HEAD_COMMIT, scope: "packages/web", session: "2026-03-14" },
@@ -1549,7 +1588,10 @@ describe("harden", () => {
     {
       args: [],
       name: "no scope without --path",
-      phrase: "Leave out `scope`, because this session covers the whole project.",
+      phrases: [
+        "A line of this session has no `scope`, because this session covers the whole project.",
+        "This session covers each decision that the section shows.",
+      ],
       processes: RECORD_PROCESSES,
       scope: undefined,
       session: { head: HEAD_COMMIT, session: "2026-03-14" },
@@ -1559,7 +1601,10 @@ describe("harden", () => {
       // A session that reads a requested number of commits did not read the history up to `HEAD`.
       args: ["--commits", "30"],
       name: "no head with --commits",
-      phrase: "Leave out `scope`, because this session covers the whole project.",
+      phrases: [
+        "A line of this session has no `scope`, because this session covers the whole project.",
+        "This session covers each decision that the section shows.",
+      ],
       processes: RECORD_PROCESSES,
       scope: undefined,
       session: { session: "2026-03-14" },
@@ -1568,7 +1613,10 @@ describe("harden", () => {
     {
       args: ["--path", "packages/web", "--commits", "30"],
       name: "the scope of --path and no head with --commits",
-      phrase: 'Write `"scope":"packages/web"` on each line, the folder of this session.',
+      phrases: [
+        'A line of this session has `"scope":"packages/web"`, the folder of this session.',
+        "This session covers a decision in `packages/web` or in a folder inside it.",
+      ],
       processes: RECORD_PROCESSES,
       scope: "packages/web",
       session: { scope: "packages/web", session: "2026-03-14" },
@@ -1577,7 +1625,10 @@ describe("harden", () => {
     {
       args: [],
       name: "no head when git cannot name HEAD",
-      phrase: "Leave out `scope`, because this session covers the whole project.",
+      phrases: [
+        "A line of this session has no `scope`, because this session covers the whole project.",
+        "This session covers each decision that the section shows.",
+      ],
       processes: {},
       scope: undefined,
       session: { session: "2026-03-14" },
@@ -1607,7 +1658,7 @@ describe("harden", () => {
 
         expect(copied).toBe(expected.sessionLine)
         expect(
-          getMissingPhrases(step, [expected.phrase, "`at` is `2026-03-14`, the date of today."])
+          getMissingPhrases(step, [...expected.phrases, "`at` is `2026-03-14`, the date of today."])
         ).toStrictEqual([])
         expect(report).toHaveProperty("decisionsRecord.undecodableLines", [])
         expect(report).toHaveProperty("decisionsRecord.sessions", [expected.session])

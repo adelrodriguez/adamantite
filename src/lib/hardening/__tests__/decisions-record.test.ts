@@ -100,7 +100,7 @@ describe("readDecisionsRecord", () => {
     })
   )
 
-  it.effect("keep the last line of each id", () =>
+  it.effect("keep the last line of each id and scope", () =>
     Effect.gen(function* () {
       const other = { ...REQUIRED, id: "default-exports", standard: "Ban default exports" }
       const later = { ...REQUIRED, at: "2026-06-01", decision: "deferred", reason: "After 2.0" }
@@ -111,11 +111,73 @@ describe("readDecisionsRecord", () => {
     })
   )
 
+  // A session of `packages/web` keeps the `id` of a standard and writes its own scope, so its line
+  // must not replace the decision that a session of `packages/api` recorded for the same standard.
+  it.effect("keep a decision of each scope that has the same id", () =>
+    Effect.gen(function* () {
+      const api = { ...REQUIRED, scope: "packages/api" }
+      const web = { ...REQUIRED, at: "2026-04-01", decision: "deferred", scope: "packages/web" }
+      const project = { ...REQUIRED, at: "2026-05-01" }
+      const record = toLines([api, web, project])
+
+      expect(yield* readEncodedRecord(record)).toHaveProperty("decisions", [api, web, project])
+      expect(yield* readEncodedRecord(record, "packages/api")).toHaveProperty("decisions", [
+        api,
+        project,
+      ])
+      expect(yield* readEncodedRecord(record, "packages/web")).toHaveProperty("decisions", [
+        web,
+        project,
+      ])
+    })
+  )
+
+  it.effect("replace a line of a scope only with a later line of the same id and scope", () =>
+    Effect.gen(function* () {
+      const api = { ...REQUIRED, scope: "packages/api" }
+      const web = { ...REQUIRED, scope: "packages/web" }
+      const later = { ...web, at: "2026-06-01", decision: "deferred" }
+
+      expect(yield* readEncodedRecord(toLines([api, web, later]))).toHaveProperty("decisions", [
+        api,
+        later,
+      ])
+    })
+  )
+
   it.effect.each([
     {
       decisions: [],
       lines: [REQUIRED, { ...REQUIRED, at: "2026-06-01", decision: "approved" }],
       name: "leave out an id whose last line is approved",
+    },
+    {
+      // The user approves, for the whole project, what a session of `packages/web` rejected. The
+      // agent appends the `approved` line with the scope of the decision that it ends.
+      decisions: [],
+      lines: [
+        { ...REQUIRED, scope: "packages/web" },
+        { ...REQUIRED, at: "2026-06-01", decision: "approved", scope: "packages/web" },
+      ],
+      name: "leave out the decision of a folder when an approved line has its id and its scope",
+    },
+    {
+      decisions: [REQUIRED, { ...REQUIRED, scope: "packages/api" }],
+      lines: [
+        REQUIRED,
+        { ...REQUIRED, scope: "packages/api" },
+        { ...REQUIRED, scope: "packages/web" },
+        { ...REQUIRED, at: "2026-06-01", decision: "approved", scope: "packages/web" },
+      ],
+      name: "keep the decisions of the other scopes when an approved line ends one scope",
+    },
+    {
+      decisions: [{ ...REQUIRED, scope: "packages/web" }],
+      lines: [
+        { ...REQUIRED, scope: "packages/web" },
+        { ...REQUIRED, at: "2026-06-01", decision: "approved" },
+      ],
+      name: "keep the decision of a folder when an approved line has no scope",
     },
     {
       decisions: [{ ...REQUIRED, at: "2026-09-01" }],

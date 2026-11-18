@@ -1,4 +1,4 @@
-import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
+import { definePackageTooling } from "#lib/integrations/oxlint/package-tooling.ts"
 import { getScriptsThatRun } from "#lib/project/package-json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 

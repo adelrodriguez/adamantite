@@ -1,6 +1,7 @@
 import type { ESTree, Rule } from "@oxlint/plugins"
 
 import { staticKeyName } from "../../shared/ast.ts"
+import { resolveVariable } from "../../shared/scope.ts"
 
 // The functions whose callback is a test or a hook, by the name at the root of the call, such as
 // `it` in `it.effect("loads", ...)` or `test` in `test.each([1])("loads %i", ...)`.
@@ -290,7 +291,13 @@ const rule: Rule = {
       },
       // `TestClock` moves the time of an Effect test, as fake timers do.
       MemberExpression(node) {
-        if (node.object.type === "Identifier" && testClockNames.has(node.object.name)) {
+        const { object } = node
+
+        if (
+          object.type === "Identifier"
+          && testClockNames.has(object.name)
+          && resolveVariable(context.sourceCode, object)?.defs[0]?.type === "ImportBinding"
+        ) {
           fakeTime = true
         }
       },

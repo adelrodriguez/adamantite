@@ -80,6 +80,11 @@ tester.run("no-fixed-sleep", plugin.rules["no-fixed-sleep"], {
       name: "a sleep that a test callback returns",
     },
     {
+      code: 'import { TestClock as Clock } from "effect"; function now(Clock) { return Clock.now(); } test("x", async () => { await scheduler.wait(1); });',
+      errors: [sleep],
+      name: "a parameter that shadows the TestClock import",
+    },
+    {
       code: 'const TestClock = { adjust() {} }; TestClock.adjust(); test("x", async () => { await scheduler.wait(1); });',
       errors: [sleep],
       name: "a local object named TestClock",

@@ -141,6 +141,8 @@ describe("lockfile", () => {
       { installed: "0.47.0", recorded: "0.48.0" },
       { installed: "0.47.0", recorded: "1.0.0" },
       { installed: "0.9.0", recorded: "0.10.0" },
+      // A release comes after its prereleases.
+      { installed: "0.48.0-next.1", recorded: "0.48.0" },
     ])(
       "fail with SetupAhead when Adamantite $recorded wrote the lockfile and $installed is installed",
       ({ installed, recorded }) =>
@@ -154,7 +156,7 @@ describe("lockfile", () => {
     // `update` with the installed version is the repair that ends the drift.
     it.effect.each([
       { installed: "0.48.0", recorded: "0.48.0-next.1" },
-      { installed: "0.48.0-next.1", recorded: "0.48.0" },
+      { installed: "0.48.0-next.2", recorded: "0.48.0-next.1" },
       { installed: "0.47.0", recorded: "github:adelrodriguez/adamantite" },
     ])(
       "fail with SetupOutdated when Adamantite $recorded wrote the lockfile and $installed is installed",

@@ -104,19 +104,25 @@ export const readSelection = (root: string) =>
     Effect.map((lockfile) => Option.map(lockfile, ({ selection }) => selection))
   )
 
-const RELEASE = /^(\d+)\.(\d+)\.(\d+)/u
+const RELEASE = /^(\d+)\.(\d+)\.(\d+)(-)?/u
 
-const releaseOrder = Order.Tuple([Order.Number, Order.Number, Order.Number])
+const releaseOrder = Order.Tuple([Order.Number, Order.Number, Order.Number, Order.Number])
 
 /**
- * The major, minor, and patch numbers of `version`, or none when it does not start with them.
+ * The major, minor, and patch numbers of `version`, then 1 for a release and 0 for a prerelease,
+ * which comes before its release. None when `version` does not start with the numbers.
  */
 function parseRelease(version: string) {
   const match = RELEASE.exec(version)
 
   return match === null
     ? Option.none()
-    : Option.some([Number(match[1]), Number(match[2]), Number(match[3])] as const)
+    : Option.some([
+        Number(match[1]),
+        Number(match[2]),
+        Number(match[3]),
+        match[4] === undefined ? 1 : 0,
+      ] as const)
 }
 
 /**
@@ -144,8 +150,9 @@ export const verifyLockfileVersion = Effect.fn("verifyLockfileVersion")(function
 
   const versions = { installed: installed.value, path: LOCKFILE_PATH, recorded }
 
-  // A version that is not a release, such as a Git source, compares as older, because `update`
-  // with the installed version is then the repair that ends the drift.
+  // A version that does not start with release numbers, such as a Git source, and a prerelease of
+  // the installed prerelease's release compare as older, because `update` with the installed
+  // version is then the repair that ends the drift.
   const isAhead = Option.match(
     Option.all([parseRelease(recorded), parseRelease(installed.value)]),
     {

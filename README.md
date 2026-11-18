@@ -571,15 +571,16 @@ So a setting in your top-level `rules` has no effect on a rule that a preset set
 for the files of that override. Oxlint does not tell you that the setting has no effect. These
 presets set rules in an override:
 
-| Preset           | Files                                                     | Rules                                                                                                                                                                  |
-| ---------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                         |
-| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                   |
-| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                |
-| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `quality/no-object-parameters`, `quality/no-unknown-parameters`, `quality/no-unknown-returns`, and `quality/no-unsafe-dictionary-type`                                 |
-| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `quality/no-chained-type-assertions`, `quality/no-widen-then-assert`, `quality/require-safety-comment-for-type-assertion`, and `typescript/consistent-type-assertions` |
-| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                 |
-| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                              |
+| Preset           | Files                                                     | Rules                                                                                                                                                                                              |
+| ---------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                                                     |
+| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                                               |
+| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                                            |
+| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `quality/no-object-parameters`, `quality/no-unknown-parameters`, `quality/no-unknown-returns`, and `quality/no-unsafe-dictionary-type`                                                             |
+| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `quality/no-chained-type-assertions`, `quality/no-widen-then-assert`, `quality/require-safety-comment-for-type-assertion`, `testing/no-flake-masking`, and `typescript/consistent-type-assertions` |
+| `strict`         | `**/{vite,vitest}.config.{js,mjs,cjs,ts,mts,cts}`         | `testing/no-flake-masking`                                                                                                                                                                         |
+| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                                             |
+| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                          |
 
 To change one of these rules for these files, set it in an `overrides` entry of your config with
 the same files. For example, this config turns off the `SAFETY:` comment rule of strict in test
@@ -1013,6 +1014,16 @@ It needs no extra package. Most of its type rules started as
   `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
   one of these rules in test files, use an `overrides` entry. See
   [change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
+- In test files, `testing/no-flake-masking` reports a test retry and a raised test timeout. A
+  test that passes only on a retry is flaky, and a raised timeout hides a slow or stuck test. The
+  rule reports a `retry` or `timeout` option of a test or suite, a timeout after the test
+  function, such as `it("loads", fn, 60_000)`, `vi.setConfig()` with `retry`, `testTimeout`, or
+  `hookTimeout`, `jest.retryTimes()`, `jest.setTimeout()`, and `flakyTest` of `@effect/vitest`.
+  In a Vite or Vitest config, it reports `retry` in the `test` options. A hook timeout, a timeout
+  of `expect.poll` or `vi.waitFor`, a `testTimeout` in the config, and a timeout in a benchmark
+  file, such as `index.bench.ts`, stay allowed. Await the
+  event that the test depends on, or control time with `TestClock` or fake timers. The rule
+  started as a copy of the [landmines](https://github.com/interfere-inc/landmines) rule.
 - In declaration files (`*.d.ts`), the preset turns off `quality/no-unknown-parameters`,
   `quality/no-unknown-returns`, `quality/no-object-parameters`, and
   `quality/no-unsafe-dictionary-type`. A declaration file states the types of code that it does

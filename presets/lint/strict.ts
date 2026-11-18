@@ -12,10 +12,18 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // access, no module mocking, and readable spacing. Its rules started as a copy of
 // https://github.com/dmmulroy/anti-slop and now live in plugins/quality/ as first-party code. They
 // use the `quality` namespace.
+//
+// The testing plugin holds the rules that keep tests honest in test files: no retries or raised
+// timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
+// in plugins/testing/ as first-party code. They use the `testing` namespace.
 
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,
-  jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("quality")],
+  jsPlugins: [
+    firstPartyPlugin("adamantite"),
+    firstPartyPlugin("quality"),
+    firstPartyPlugin("testing"),
+  ],
   overrides: [
     {
       // A declaration file states the types of code that it does not hold, such as a built-in API or
@@ -39,8 +47,16 @@ const config: OxlintConfig = {
         "quality/no-chained-type-assertions": "error",
         "quality/no-widen-then-assert": "error",
         "quality/require-safety-comment-for-type-assertion": "error",
+        // A test that passes only on a retry or with a raised timeout is flaky or slow. The rule
+        // asks the test to await the event that it depends on.
+        "testing/no-flake-masking": "error",
         "typescript/consistent-type-assertions": "error",
       },
+    },
+    {
+      // A Vitest config can retry every test in its `test` options, also in a project.
+      files: ["**/{vite,vitest}.config.{js,mjs,cjs,ts,mts,cts}"],
+      rules: { "testing/no-flake-masking": "error" },
     },
   ],
   rules: {

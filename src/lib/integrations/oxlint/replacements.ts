@@ -16,6 +16,7 @@ import { publicImport } from "#lib/shared/package-exports.ts"
 import adamantite from "#presets/lint/plugins/adamantite/index.ts"
 import qualityEffect from "#presets/lint/plugins/quality-effect/index.ts"
 import quality from "#presets/lint/plugins/quality/index.ts"
+import testing from "#presets/lint/plugins/testing/index.ts"
 
 // Each first-party plugin by its name. Presets load a plugin by file URL through `entry.ts`, so the
 // CLI imports the plugin modules here to read the metadata of their rules.
@@ -23,6 +24,7 @@ const plugins: Readonly<Record<FirstPartyPlugin, Plugin>> = {
   adamantite,
   quality,
   "quality-effect": qualityEffect,
+  testing,
 }
 
 // The type of the declaration checks this Schema, so the two cannot drift apart.

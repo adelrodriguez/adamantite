@@ -121,7 +121,7 @@ const printFindings = Effect.fn("printFindings")(function* (findings: readonly F
  * The resolution menu, then the handoff and its verification. It returns the agent whose session
  * left nothing to resolve, or none when no agent session ran.
  */
-const resolve = <E, R>(options: Offer<E, R>) => {
+function resolve<E, R>(options: Offer<E, R>) {
   const name = String.capitalize(options.command)
 
   const fail = Output.outro(`⚠️ ${name} found issues.`).pipe(
@@ -206,7 +206,7 @@ function hasPrompt(work: Work) {
  * printed instead. The command fails while a `Repair` has something left. It returns the agent
  * whose session left nothing to resolve, or none when no agent session ran.
  */
-export const offer = <E, R>(options: Offer<E, R>) => {
+export function offer<E, R>(options: Offer<E, R>) {
   // Without a menu, nothing hands off, so the work stays as the command found it.
   const unattended = isPending(options.work)
     ? Effect.fail(

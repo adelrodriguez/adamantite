@@ -19,10 +19,10 @@ export const stringifyJson = Schema.encodeEffect(JsonText)
  */
 export const formatJson = Schema.encodeEffect(IndentedJsonText)
 
-export const checkIsJsonObject = (
-  value: JsonValue | Schema.Json | undefined
-): value is JsonObject => Predicate.isObject(value)
+export function checkIsJsonObject(value: JsonValue | Schema.Json | undefined): value is JsonObject {
+  return Predicate.isObject(value)
+}
 
-export const checkIsJsonArray = (
-  value: JsonValue | Schema.Json | undefined
-): value is JsonValue[] => Array.isArray(value)
+export function checkIsJsonArray(value: JsonValue | Schema.Json | undefined): value is JsonValue[] {
+  return Array.isArray(value)
+}

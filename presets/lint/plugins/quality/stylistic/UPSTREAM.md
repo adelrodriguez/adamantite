@@ -38,6 +38,8 @@ Adamantite copied this folder from anti-slop and lints it with its own presets:
   `multiline-` entries.
 - The `@private` JSDoc tags are removed, and `padding-line-options.d.ts` is now
   `padding-line-options.ts`, so the build emits it.
+- The helpers of `padding-line-ast.ts` are function declarations, which
+  `project/standalone-functions` requires of a module-level function that returns a plain value.
 - `getActualLastToken` moved to `padding-line-ast.ts`, and `isSingleLine` uses it to find the end
   of a statement. Upstream reads the end from the node location, so the semicolon-less style's
   semicolon in `const b = 2\n;[a, b].forEach(f)` made `const b = 2` a multiline statement.

@@ -32,7 +32,14 @@
       }
     ]
   },
-  "include": [".adamantite/lint", "src", "presets/**/*.ts", "scripts", "*.config.ts"],
+  "include": [
+    ".adamantite/lint",
+    "src",
+    "presets/**/*.ts",
+    "scripts",
+    "*.config.ts",
+    "process-run-tests.ts"
+  ],
   // Adamantite publishes declaration files, so it extends the plain preset without the type resets.
   "exclude": ["presets/typescript/resets", "src/__tests__/presets/fixtures"]
 }

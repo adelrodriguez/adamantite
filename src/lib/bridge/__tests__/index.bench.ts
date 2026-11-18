@@ -187,12 +187,13 @@ function spawn(command: string, args: readonly string[], cwd: string, env?: Node
   return result
 }
 
-const readRuntime = (root: string) =>
-  Effect.runPromise(
+function readRuntime(root: string) {
+  return Effect.runPromise(
     resolveOxlintRuntime(root).pipe(
       Effect.provide([NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer])
     )
   )
+}
 
 /**
  * Write a target project for the stack in a temporary folder: the idioms of the stack in

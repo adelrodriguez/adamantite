@@ -128,17 +128,19 @@ const renderSettings = Effect.fn("renderSettings")(function* (cwd: string) {
   })
 })
 
-const missingFileFinding = (file: string, id: string, title: string, reference: string) => ({
-  currentState: `The selection includes VS Code, and \`${file}\` does not exist.`,
-  goal: [
-    `Run \`adamantite update\`. It writes \`${file}\`.`,
-    "Run `adamantite doctor` again. It must not report this finding.",
-  ],
-  id,
-  integration: "vscode",
-  reference: { content: reference, language: "json" as const },
-  title,
-})
+function missingFileFinding(file: string, id: string, title: string, reference: string) {
+  return {
+    currentState: `The selection includes VS Code, and \`${file}\` does not exist.`,
+    goal: [
+      `Run \`adamantite update\`. It writes \`${file}\`.`,
+      "Run `adamantite doctor` again. It must not report this finding.",
+    ],
+    id,
+    integration: "vscode",
+    reference: { content: reference, language: "json" as const },
+    title,
+  }
+}
 
 /**
  * The findings for `.vscode/settings.json`: the Oxlint entry, and the Effect language server when

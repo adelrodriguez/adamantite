@@ -11,33 +11,41 @@ export const LINEBREAKS: ReadonlySet<string> = new Set(["\r\n", "\r", "\n", "\u2
 /**
  * Test a closing brace without treating comment text as punctuation.
  */
-export const isClosingBraceToken = (token: Token): boolean =>
-  token.type === "Punctuator" && token.value === "}"
+export function isClosingBraceToken(token: Token): boolean {
+  return token.type === "Punctuator" && token.value === "}"
+}
 
 /**
  * Test a semicolon without treating comment text as punctuation.
  */
-export const isSemicolonToken = (token: Token): boolean =>
-  token.type === "Punctuator" && token.value === ";"
+export function isSemicolonToken(token: Token): boolean {
+  return token.type === "Punctuator" && token.value === ";"
+}
 
 /**
  * Filter the optional final semicolon when identifying block-like statements.
  */
-export const isNotSemicolonToken = (token: Token): boolean => !isSemicolonToken(token)
+export function isNotSemicolonToken(token: Token): boolean {
+  return !isSemicolonToken(token)
+}
 
 /**
  * Compare token/node boundaries, including attached comments.
  */
-export const isTokenOnSameLine = (left: { loc: Location }, right: { loc: Location }): boolean =>
-  left.loc.end.line === right.loc.start.line
+export function isTokenOnSameLine(left: { loc: Location }, right: { loc: Location }): boolean {
+  return left.loc.end.line === right.loc.start.line
+}
 
 /**
  * Recognize declarations and expressions used by the upstream IIFE matcher.
  */
-export const isFunction = (node: ESTree.Node): boolean =>
-  node.type === "FunctionDeclaration"
-  || node.type === "FunctionExpression"
-  || node.type === "ArrowFunctionExpression"
+export function isFunction(node: ESTree.Node): boolean {
+  return (
+    node.type === "FunctionDeclaration"
+    || node.type === "FunctionExpression"
+    || node.type === "ArrowFunctionExpression"
+  )
+}
 
 /**
  * Gets the actual last token.
@@ -77,8 +85,9 @@ export function getActualLastToken(node: ESTree.Node, sourceCode: SourceCode): T
  * Test whether a statement fits on one line. The statement ends at its actual last token, so the
  * semicolon-less style's semicolon on the line of the next statement does not count.
  */
-export const isSingleLine = (node: ESTree.Node, sourceCode: SourceCode): boolean =>
-  node.loc.start.line === getActualLastToken(node, sourceCode).loc.end.line
+export function isSingleLine(node: ESTree.Node, sourceCode: SourceCode): boolean {
+  return node.loc.start.line === getActualLastToken(node, sourceCode).loc.end.line
+}
 
 /**
  * Test whether a statement stays on one line after formatting. It must be on one line, as
@@ -98,18 +107,22 @@ export function fitsOnOneLine(
 /**
  * Unwrap optional chaining before checking IIFE syntax.
  */
-export const skipChainExpression = (node: ESTree.Node): ESTree.Node =>
-  node.type === "ChainExpression" ? node.expression : node
+export function skipChainExpression(node: ESTree.Node): ESTree.Node {
+  return node.type === "ChainExpression" ? node.expression : node
+}
 
 /**
  * Only a program or function-body expression can begin a directive prologue.
  */
-export const isTopLevelExpressionStatement = (
+export function isTopLevelExpressionStatement(
   node: ESTree.Node
-): node is ESTree.ExpressionStatement =>
-  node.type === "ExpressionStatement"
-  && (node.parent.type === "Program"
-    || (node.parent.type === "BlockStatement" && isFunction(node.parent.parent)))
+): node is ESTree.ExpressionStatement {
+  return (
+    node.type === "ExpressionStatement"
+    && (node.parent.type === "Program"
+      || (node.parent.type === "BlockStatement" && isFunction(node.parent.parent)))
+  )
+}
 
 /**
  * A single wrapping pair suffices to exclude a string from directive syntax.

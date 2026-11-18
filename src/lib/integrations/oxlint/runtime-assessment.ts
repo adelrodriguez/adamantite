@@ -27,9 +27,8 @@ function finding(currentState: string, goal: readonly string[]): readonly Findin
  * a package finding checks the declarations and the managed versions. Package assessment reports a
  * package that `package.json` does not declare, so this assessment skips it. A project that
  * declares tsrs, but whose backend does not resolve, gets a finding, although the entry still runs
- * stock Oxlint without tsrs. It does not predict which platform
- * binding Oxlint or tsrs loads, because their loaders name a missing platform package when the
- * check runs.
+ * stock Oxlint without tsrs. It does not predict which platform binding Oxlint or tsrs loads,
+ * because their loaders name a missing platform package when the check runs.
  */
 export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
   project: Project.Snapshot

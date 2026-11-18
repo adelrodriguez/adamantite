@@ -646,9 +646,9 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
  * import, including `#` imports and `tsconfig.json` `paths`.
  *
  * A nested map activates from the concrete folder that its parent matches, before any exemption of
- * the parent. Each active map checks an import with its own entries, ignores, isolation, type-import
- * policy, and resolver conditions. Two maps with the same concrete root fail lint. A diagnostic
- * names the concrete root and the declaration path.
+ * the parent. Each active map checks an import with its own entries, ignores, isolation,
+ * type-import policy, and resolver conditions. Two maps with the same concrete root fail lint. A
+ * diagnostic names the concrete root and the declaration path.
  */
 export function createLayersRule(modules: Modules): Rule {
   return {

@@ -24,9 +24,9 @@ const CURRENT: PackageAssessment = { findings: [], packageActions: [], warnings:
 /**
  * Compare the version that the project declares for a managed package with the version that
  * Adamantite requires. `adamantite update` installs a missing or outdated package from the package
- * action, and Doctor reports the finding, which says to run `update`. A version from a
- * pnpm catalog needs a change to the catalog, which `update` does not make, because `pnpm add`
- * replaces the `catalog:` specifier.
+ * action, and Doctor reports the finding, which says to run `update`. A version from a pnpm catalog
+ * needs a change to the catalog, which `update` does not make, because `pnpm add` replaces the
+ * `catalog:` specifier.
  */
 export function assessPackage(
   { packageJson, workspace: { catalogs } }: Pick<Project.Snapshot, "packageJson" | "workspace">,

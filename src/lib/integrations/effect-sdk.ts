@@ -18,8 +18,8 @@ import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts
 import { checkIsJsonObject, formatJson } from "#lib/shared/json.ts"
 
 /**
- * The copy of the Effect editor SDK that VS Code starts, from the project root. The `prepare` of the
- * `vscode` integration builds it in `init` and `update`.
+ * The copy of the Effect editor SDK that VS Code starts, from the project root. The `prepare` of
+ * the `vscode` integration builds it in `init` and `update`.
  */
 export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
@@ -139,8 +139,8 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
 })
 
 /**
- * Whether the SDK copy holds the build that `source` names, with each of its files. Doctor reports a
- * stale or incomplete copy, and writes no file.
+ * Whether the SDK copy holds the build that `source` names, with each of its files. Doctor reports
+ * a stale or incomplete copy, and writes no file.
  */
 const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
   cwd: string,

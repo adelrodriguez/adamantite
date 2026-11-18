@@ -35,8 +35,9 @@ function explainMissingTool(selection: Option.Option<Selection>) {
 
 /**
  * Checks the formatting with Oxfmt and lints with Oxlint at the same time, and prints the format
- * stage first. Both stages run, and the operation fails with the first failure. The forwarded
- * arguments go to the lint stage, or to the stage that `only` selects.
+ * stage first. Both stages run. The operation fails with a missing Oxlint before a failed stage,
+ * since a failed stage already printed why, or else with the first failure. The forwarded arguments
+ * go to the lint stage, or to the stage that `only` selects.
  */
 export const check = Effect.fn("Bridge.check")(function* (
   options: {

@@ -84,10 +84,11 @@ interface CommandRunnerService {
     steps: ReadonlyArray<Step<E, R>>
   ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R>
   /**
-   * Starts every step at once, then fails with the first failure in step order, as `runAll` does.
-   * The output keeps the order of `runAll`: each step's heading and output print after the steps
-   * before it end, and the output of the first running step prints as it comes. Every step finds
-   * its command before any command starts.
+   * Starts every step at once, then fails with the first step that found no command, or else with
+   * the first failure in step order. A step that finds no command prints no section, so its failure
+   * comes first, and the CLI prints it. The output keeps the order of `runAll`: each step's heading
+   * and output print after the steps before it end, and the output of the first running step prints
+   * as it comes. Every step finds its command before any command starts.
    */
   readonly runConcurrently: <E, R>(
     steps: ReadonlyArray<Step<E, R>>
@@ -200,6 +201,7 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
 
         const [results] = yield* Effect.all([runs, print], { concurrency: "unbounded" })
 
+        yield* Effect.fromResult(Result.all(sections.map(({ found }) => found)))
         yield* Effect.fromResult(Result.all(results))
       }),
       runUntilFailure: Effect.fn("CommandRunner.runUntilFailure")(function* <E, R>(

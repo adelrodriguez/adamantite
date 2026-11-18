@@ -231,11 +231,13 @@ describe("check", () => {
     )
 
     // The CLI resolves the Oxlint runtime before it starts Oxlint, so the format stage still runs.
-    it.effect(
-      "check the formatting, then name the init command when the lockfile selects no script and Oxlint is missing",
-      () =>
+    // The CLI prints the failure that the check returns, so the missing Oxlint stays that failure
+    // when the format stage fails too.
+    it.effect.each([0, 1])(
+      "check the formatting, then name the init command when the lockfile selects no script and Oxlint is missing, with Oxfmt exit %i",
+      (formatExit) =>
         Effect.gen(function* () {
-          const runner = createRunnerTestContext()
+          const runner = createRunnerTestContext([formatExit])
 
           const exit = yield* runCommand(checkCommand, [], {
             files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),

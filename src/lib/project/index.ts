@@ -308,7 +308,8 @@ export interface Snapshot {
    */
   readonly lintConfig: Option.Option<Result.Result<LintConfig, ConfigLoadFailed>>
   /**
-   * The lockfile that `init` or `update` wrote, or none when the project has no lockfile.
+   * The lockfile that `init` or `update` wrote, or none when the project has no lockfile. `read`
+   * decodes the lockfile one time, and the rest of the code trusts this value.
    */
   readonly lockfile: Option.Option<Lockfile>
   readonly packageJson: PackageJson

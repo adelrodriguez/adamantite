@@ -65,8 +65,7 @@ const encodeLockfile = Schema.encodeEffect(Schema.fromJsonString(Lockfile, { spa
 /**
  * Reads the lockfile of the project at `root`. None when the project has no lockfile. A lockfile
  * with a schema version that this Adamantite version does not know fails with
- * `UnsupportedLockfile`, and one that does not decode fails with `InvalidLockfile`. `Project.read`
- * decodes the lockfile one time into the snapshot, and the rest of the code trusts that value.
+ * `UnsupportedLockfile`, and one that does not decode fails with `InvalidLockfile`.
  */
 export const readLockfile = Effect.fn("readLockfile")(function* (root: string) {
   const path = yield* Path.Path

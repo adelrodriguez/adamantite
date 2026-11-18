@@ -62,14 +62,18 @@ const HEADING =
 // An id that a docs site reads from the end of a heading, such as `## Tests {#tests}`.
 const HEADING_ID = /\s*\{#([^\s}]+)\}\s*$/u
 const HTML_ID = /<[a-z][^>]*\s(?:id|name)=["']([^"']+)["']/giu
+
+// A code span: a run of backticks, its text, and a run of the same length.
+const HEADING_CODE_SPAN = /(`+)(.+?)(?<!`)\1(?!`)/gu
 const LINK_TEXT = /!?\[([^\]]*)\](?:\([^)]*\)|\[[^\]]*\])/gu
 const HTML_TAG = /<\/?[a-z][^>]*>/giu
 
 // An underscore that opens or closes emphasis, and not one inside a name such as `snake_case`.
 const EMPHASIS_UNDERSCORE = /(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu
 
-// GitHub keeps letters, marks, numbers, connector punctuation, spaces, and hyphens.
-const SLUG_REMOVED = /[^\p{L}\p{M}\p{N}\p{Pc} -]/gu
+// GitHub keeps letters and other alphabetic characters, marks, decimal digits, connector
+// punctuation such as `_`, spaces, and hyphens, as `github-slugger` does. A number such as `²` goes.
+const SLUG_REMOVED = /[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc} -]/gu
 
 // An anchor that every page has: the top of the page, or a line of the source view.
 const BUILT_IN_ANCHOR = /^(?:top|L\d+(?:-L\d+)?)$/iu
@@ -96,6 +100,47 @@ function matchAll(content: string, pattern: RegExp) {
 }
 
 /**
+ * Text outside a code span without its Markdown and HTML markup: a link keeps its text.
+ */
+function removeMarkup(text: string) {
+  return text
+    .replaceAll(LINK_TEXT, "$1")
+    .replaceAll(HTML_TAG, "")
+    .replaceAll(EMPHASIS_UNDERSCORE, "")
+}
+
+/**
+ * The text of a heading as GitHub renders it. Links keep their text and lose their target, and HTML
+ * tags and emphasis underscores go. A code span keeps its text as it is, such as `Option<A>` or
+ * `__tests__`, without one space at each end when it has both, as CommonMark says.
+ */
+function readHeadingText(heading: string) {
+  let text = ""
+  let end = 0
+
+  for (const match of heading.matchAll(HEADING_CODE_SPAN)) {
+    const code = match[2] ?? ""
+    const padded = code.startsWith(" ") && code.endsWith(" ") && code.trim() !== ""
+
+    text += removeMarkup(heading.slice(end, match.index)) + (padded ? code.slice(1, -1) : code)
+    end = match.index + match[0].length
+  }
+
+  return text + removeMarkup(heading.slice(end))
+}
+
+/**
+ * The anchor that GitHub makes from the text of a heading, before the suffix of a repeated heading.
+ */
+function toSlug(heading: string) {
+  return readHeadingText(heading)
+    .trim()
+    .toLowerCase()
+    .replaceAll(SLUG_REMOVED, "")
+    .replaceAll(" ", "-")
+}
+
+/**
  * The anchors of the headings of a Markdown file, as GitHub makes them: the text in lower case,
  * without punctuation, with a hyphen for each space, and `-1`, `-2`, and so on for a heading that
  * repeats. An explicit id, such as `{#tests}` or an HTML `id`, is an anchor too.
@@ -108,19 +153,13 @@ function readAnchors(prose: string) {
     const heading = (match[1] ?? match[2] ?? "").trim()
     const id = HEADING_ID.exec(heading)?.[1]
 
+    // GitHub keeps the id in the text of the heading, and a docs site makes the id the anchor.
     if (id !== undefined) {
       anchors.add(id.toLowerCase())
+      anchors.add(toSlug(heading.replace(HEADING_ID, "")))
     }
 
-    const slug = heading
-      .replace(HEADING_ID, "")
-      .replaceAll(LINK_TEXT, "$1")
-      .replaceAll(HTML_TAG, "")
-      .replaceAll(EMPHASIS_UNDERSCORE, "")
-      .trim()
-      .toLowerCase()
-      .replaceAll(SLUG_REMOVED, "")
-      .replaceAll(" ", "-")
+    const slug = toSlug(heading)
 
     let anchor = slug
 
@@ -290,6 +329,8 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       return Option.match(anchor, {
         onNone: () => [],
         onSome: (name) => {
+          // GitHub makes lower-case anchors. Whether it also finds a heading for a link in another
+          // case is not confirmed, so such a link passes, and a session never fails on it.
           const decoded = decode(name, decodeURIComponent).toLowerCase()
 
           return known === undefined

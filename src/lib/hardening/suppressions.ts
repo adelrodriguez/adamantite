@@ -51,9 +51,11 @@ function readDisabledRules(comment: string): ReadonlyArray<string | undefined> {
 /**
  * The TypeScript directives that turn type checks off, as TypeScript reads them. In a `//` comment,
  * `@ts-expect-error` and `@ts-ignore` come first, after an optional third `/`. In a `/* *\/`
- * comment, as in JSX, they start the last line, after optional `/` and `*` characters.
- * `@ts-nocheck` is a `//` comment before the first code of the file, and its name ignores case.
- * TypeScript matches a prefix, so `@ts-ignored` turns checks off too.
+ * comment, as in JSX, they start the last line of the comment's source text, after optional `/` and
+ * `*` characters. On a single line, that text starts with `/*`, so `/* * @ts-ignore *\/` has a
+ * space between the markers and the directive, and is no directive. `@ts-nocheck` is a `//` comment
+ * before the first code of the file, and its name ignores case. TypeScript matches a prefix, so
+ * `@ts-ignored` turns checks off too.
  */
 const LINE_DIRECTIVE = /^\/?\s*@(ts-expect-error|ts-ignore)/u
 const BLOCK_DIRECTIVE = /^[*/]*\s*@(ts-expect-error|ts-ignore)/u
@@ -80,12 +82,23 @@ interface ProbedComment {
 }
 
 /**
+ * The last line of the source text of a `/* *\/` comment, as TypeScript reads it. Oxlint gives the
+ * text without its markers, and the opening marker is on the last line when the comment has one
+ * line. The closing marker comes after the directive, so it does not change the match.
+ */
+function readLastLine(value: string) {
+  const lines = value.split(LINE_BREAK)
+
+  return lines.length === 1 ? `/*${value}` : (lines.at(-1) ?? "")
+}
+
+/**
  * The TypeScript directive of a comment, or none when TypeScript reads no directive in it.
  */
 function readTypeScriptDirective({ leading, type, value }: ProbedComment) {
   const name =
     type === "Block"
-      ? BLOCK_DIRECTIVE.exec((value.split(LINE_BREAK).at(-1) ?? "").trimStart())?.[1]
+      ? BLOCK_DIRECTIVE.exec(readLastLine(value).trimStart())?.[1]
       : LINE_DIRECTIVE.exec(value)?.[1]
 
   if (name !== undefined) {

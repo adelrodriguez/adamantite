@@ -18,6 +18,13 @@ const CONTRIBUTOR_DOCS = [
 ]
 
 /**
+ * The agent docs. They follow a convention that other repositories share, so a code span in them
+ * can name a folder that the convention expects later, such as `docs/adr/`. Only their links are
+ * checked.
+ */
+const CONVENTION_DOCS = ["docs/agents/*.md"]
+
+/**
  * The docs that describe a target project to a user. A path in a code span of them, such as
  * `src/components/ui`, is a path of the target project, so only their links are checked.
  */
@@ -44,8 +51,8 @@ function readProse(file: string) {
     })
 }
 
-function listDocs(patterns: readonly string[]) {
-  return globSync(patterns, { cwd: REPO_ROOT }).map((file) => file.split(sep).join("/"))
+function listDocs(patterns: readonly string[], exclude: readonly string[] = []) {
+  return globSync(patterns, { cwd: REPO_ROOT, exclude }).map((file) => file.split(sep).join("/"))
 }
 
 /**
@@ -160,10 +167,11 @@ function isDeadPath(span: string) {
 }
 
 /**
- * The code spans of the contributor docs that name a dead path, each with its file and its line.
+ * The code spans of the contributor docs, without the agent docs, that name a dead path, each with
+ * its file and its line.
  */
 function listDeadPaths() {
-  return listDocs(CONTRIBUTOR_DOCS).flatMap((file) =>
+  return listDocs(CONTRIBUTOR_DOCS, CONVENTION_DOCS).flatMap((file) =>
     readProse(file).flatMap(({ line, text }) =>
       [...text.matchAll(/`([^`]+)`/gu)].flatMap(([, span = ""]) =>
         isDeadPath(span) ? [`${file}:${line} names \`${span}\`, which does not exist`] : []

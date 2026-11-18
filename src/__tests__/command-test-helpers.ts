@@ -69,7 +69,7 @@ export function makeLockfileFile(
 }
 
 /**
- * The Adamantite skill in `.agents/skills`, as Setup writes it in a project without Oxfmt.
+ * The Adamantite skills in `.agents/skills`, as Setup writes them in a project without Oxfmt.
  */
 export const SKILL_FILES: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(getShippedSkillFiles()).map(([file, content]) => [

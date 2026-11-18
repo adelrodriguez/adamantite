@@ -54,7 +54,7 @@ import { printTitle } from "#terminal/title.ts"
  */
 export interface InitOptions {
   /**
-   * Add the Adamantite section to `AGENTS.md` and the Adamantite skill.
+   * Add the Adamantite section to `AGENTS.md` and the Adamantite skills.
    */
   readonly agents: boolean
   /**
@@ -285,7 +285,7 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
   const shouldSetupAgents = yield* Prompt.Confirm({
     initial: true,
     message:
-      "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skill.",
+      "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skills.",
   })
 
   return {
@@ -339,7 +339,7 @@ const githubActions = Flag.Boolean("github-actions").pipe(
 const agents = Flag.Boolean("agents").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
-    "Add Adamantite guidance to AGENTS.md and the Adamantite skill to the skill folders of your coding agents"
+    "Add Adamantite guidance to AGENTS.md and the Adamantite skills to the skill folders of your coding agents"
   )
 )
 
@@ -365,7 +365,7 @@ export default Command.make("init", {
       command:
         "adamantite init --non-interactive --script check --preset react --editor vscode --typescript typescript --github-actions --agents",
       description:
-        "Configure a React project with VS Code, TypeScript, CI, agent guidance, and the Adamantite skill",
+        "Configure a React project with VS Code, TypeScript, CI, agent guidance, and the Adamantite skills",
     },
     {
       command: "adamantite init --non-interactive --script analyze",

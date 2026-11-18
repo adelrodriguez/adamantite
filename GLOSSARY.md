@@ -164,10 +164,12 @@ hands off only through `Resolution.offer`, and never with `--json`.
 _Avoid_: Delegation, agent launch
 
 **Adamantite skill**:
-The agent skill that the Adamantite package ships in `skills/adamantite/`. It teaches coding
-agents how to use Adamantite and how to write custom rules. The CLI bundles it. `init` writes it
-to the skill folders of the agents that the project uses as managed files, and `update` writes the
-skill of a new version over each copy that nobody changed.
+An agent skill that the Adamantite package ships in a folder of `skills/`. The `adamantite` skill
+teaches coding agents how to set up, check, repair, and update a target project. The
+`adamantite-hardening` skill teaches them how to keep, place, and enforce its coding standards,
+with custom rules among the ways. The CLI bundles both. `init` writes them to the skill folders of
+the agents that the project uses as managed files, and `update` writes the skills of a new version
+over each copy that nobody changed.
 _Avoid_: Plugin, agent guidance
 
 **Resolution menu**:
@@ -225,7 +227,7 @@ _Avoid_: Style guide, conventions doc
 The order of the places that can hold a coding standard, from strongest to weakest: a type
 or structure, a preset rule, an import rule, a project check, a custom rule, and an instruction. A
 standard goes on the highest step that can hold it.
-`skills/adamantite/references/enforcement-ladder.md` defines each step, and the harden prompt
+`skills/adamantite-hardening/references/enforcement-ladder.md` defines each step, and the harden prompt
 shows that file.
 _Avoid_: Pyramid, enforcement level
 

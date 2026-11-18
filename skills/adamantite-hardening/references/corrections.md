@@ -12,8 +12,8 @@ Follow this step only when you came to this guide before you add a disable comme
 fix or a review correction, start at the next step.
 
 When a rule reports code that you wrote, fix the code. When a suppression is necessary, state
-after `--` why the rule does not apply, as
-[How to repair preset rule reports](lint-rules.md#repair-the-reported-code) says.
+after `--` why the rule does not apply, such as
+`// oxlint-disable-next-line no-console -- the CLI writes its report to stdout`.
 `adamantite/require-suppression-reason` reports a suppression without a reason.
 
 Before you add the comment, search the code for disable comments of the same rule, such as with
@@ -43,7 +43,7 @@ note "none found", and one similar case that is correct.
 
 When a lint rule can report the mistake, run
 `adamantite rule try <rule> --current --report <case>` with the case that failed, as
-[Try a rule setting](lint-rules.md#try-a-rule-setting) says. The project file already holds the
+[How to try a rule setting](rule-trials.md) says. The project file already holds the
 fix, so give the code before the fix as `<path>=<file>`, with the file outside the project. Try
 each rule of the config that can report the mistake. When the config reports the case, a tool already holds the standard:
 fix the code, and stop. A repeated suppression is the exception, because its rule reports the
@@ -62,7 +62,7 @@ mistake and accepts the similar correct case:
 - For an invalid value that reaches an API, change the type or the constructor of that value.
 - For a package or module that only one file or folder may import, set
   `adamantite/import-owners`, as
-  [How to repair preset rule reports](lint-rules.md#configure-layer-maps-and-import-owners) says.
+  [How to configure layer maps and import owners](import-rules.md) says.
 - For a mistake that has one syntax, write a custom rule, as
   [How to write and verify custom rules](custom-rules.md) says.
 - For a rule that needed the same suppression more than once, state the exception once, in an
@@ -95,7 +95,7 @@ Prove that the choice prevents the mistake and accepts the similar correct case:
   only the test proves it. The test must pass on the fixed code.
 - For a rule or a rule option, run
   `adamantite rule try <rule> --report <mistake> --accept <correct case>`, as
-  [Try a rule setting](lint-rules.md#try-a-rule-setting) says. It must exit 0. For a custom
+  [How to try a rule setting](rule-trials.md) says. It must exit 0. For a custom
   rule, complete the verification and cleanup of its guide.
 - For an instruction, run `adamantite harden --json` and read `agentReach`. Its `unreached`
   list must not name the file that holds the instruction, and `brokenLinks` must be empty for

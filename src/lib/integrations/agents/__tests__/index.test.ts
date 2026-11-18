@@ -1,6 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { findingsLeft, getFailure } from "#__tests__/command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { runLifecycle } from "#__tests__/lifecycle.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
@@ -8,6 +14,8 @@ import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" w
 const AGENTS = "AGENTS.md"
 
 const SKILL = ".agents/skills/adamantite/SKILL.md"
+
+const HARDENING_SKILL = ".agents/skills/adamantite-hardening/SKILL.md"
 
 const PACKAGE_JSON = '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" } }\n'
 
@@ -20,7 +28,7 @@ function makeProject(files: Record<string, string> = {}) {
 }
 
 describe("agent guidance setup", () => {
-  it.effect("create AGENTS.md and the skill", () =>
+  it.effect("create AGENTS.md and each skill", () =>
     Effect.gen(function* () {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
@@ -28,6 +36,12 @@ describe("agent guidance setup", () => {
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(AGENTS)).toContain("- Run `bun run check` to catch formatting")
       expect(files.read(SKILL)).toBe(shippedSkill["adamantite/SKILL.md"])
+      expect(
+        files
+          .list()
+          .filter((file) => file.startsWith(".agents/skills/"))
+          .map((file) => file.slice(".agents/skills/".length))
+      ).toStrictEqual(Object.keys(shippedSkill))
       expect(output).toContain(`✔ \`${AGENTS}\` created.`)
     })
   )
@@ -114,7 +128,7 @@ describe("agent guidance setup", () => {
       const doctor = yield* runLifecycle("doctor", files)
 
       expect(files.read("skills-lock.json")).toBe(lock)
-      expect(update.output).toContain("The skills lock records the Adamantite skill")
+      expect(update.output).toContain("The skills lock records an Adamantite skill")
       expect(doctor.output).toContain(
         "Remove the `adamantite` entry from `skills` in `skills-lock.json`."
       )
@@ -130,8 +144,112 @@ describe("agent guidance setup", () => {
       yield* runLifecycle("init", files, INIT_ARGS)
 
       expect(files.read(AGENTS)).toContain(
-        '- After you fix a regression or a mistake that a reviewer corrected before, or before you add a disable comment, follow the "Keep a fixed mistake from recurring" section of the Adamantite skill.'
+        '- After you fix a regression or a mistake that a reviewer corrected before, or before you add a disable comment, follow the "Keep a fixed mistake from recurring" section of the `adamantite-hardening` skill.'
       )
+    })
+  )
+
+  it.effect("report each skill that the skills lock records", () =>
+    Effect.gen(function* () {
+      const files = makeProject({
+        "skills-lock.json":
+          '{ "skills": { "adamantite": {}, "adamantite-hardening": {}, "other": {} } }\n',
+      })
+
+      yield* runLifecycle("init", files, INIT_ARGS)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(doctor.output).toContain("Remove the `adamantite` entry from `skills`")
+      expect(doctor.output).toContain("Remove the `adamantite-hardening` entry from `skills`")
+      expect(doctor.output).not.toContain("Remove the `other` entry")
+    })
+  )
+
+  it.effect("report a missing copy of one skill by its folder, and write it again in update", () =>
+    Effect.gen(function* () {
+      const initialized = makeProject()
+      yield* runLifecycle("init", initialized, INIT_ARGS)
+
+      // The project after the user deleted the hardening skill.
+      const files = createFileSystemTestContext({
+        files: Object.fromEntries(
+          initialized
+            .list()
+            .filter((file) => !file.startsWith(".agents/skills/adamantite-hardening/"))
+            .map((file) => [file, initialized.read(file)])
+        ),
+      })
+
+      const doctor = yield* runLifecycle("doctor", files)
+      yield* runLifecycle("update", files)
+
+      expect(doctor.output).toContain(
+        "The selection includes agent guidance, and `.agents/skills/adamantite-hardening` has no `SKILL.md`,"
+      )
+      expect(doctor.output).not.toContain("`.agents/skills/adamantite` has no")
+      expect(files.read(HARDENING_SKILL)).toBe(shippedSkill["adamantite-hardening/SKILL.md"])
+    })
+  )
+
+  // An earlier version shipped one skill. Its guides for coding standards moved to the hardening
+  // skill, so update deletes each one that is unchanged since Adamantite wrote it.
+  it.effect("move a project from one skill to two in update", () =>
+    Effect.gen(function* () {
+      const initialized = makeProject()
+      yield* runLifecycle("init", initialized, INIT_ARGS)
+
+      const moved = ".agents/skills/adamantite/references/corrections.md"
+      const lockfile = readLockfile(initialized)
+
+      // The project as the earlier version left it: one skill, with a guide that has moved.
+      const files = createFileSystemTestContext({
+        files: {
+          ...Object.fromEntries(
+            initialized
+              .list()
+              .filter((file) => !file.startsWith(".agents/skills/adamantite-hardening/"))
+              .map((file) => [file, initialized.read(file)])
+          ),
+          ...makeLockfileFile(lockfile.selection, {
+            ...Object.fromEntries(
+              Object.entries(lockfile.written).filter(
+                ([file]) => !file.startsWith(".agents/skills/adamantite-hardening/")
+              )
+            ),
+            [moved]: hashContent("# An earlier guide\n"),
+          }),
+          [moved]: "# An earlier guide\n",
+        },
+      })
+
+      const update = yield* runLifecycle("update", files)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(files.list()).not.toContain(moved)
+      expect(update.output).toContain(`\`${moved}\` deleted`)
+      expect(files.read(HARDENING_SKILL)).toBe(shippedSkill["adamantite-hardening/SKILL.md"])
+      expect(doctor.output).not.toContain("Adamantite skill")
+    })
+  )
+
+  // Update keeps a file that the project changed, also when the skill no longer ships it. Nothing
+  // links to that file any more, so Doctor reports it.
+  it.effect("report a changed guide that the skill no longer ships, and keep it in update", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+
+      const moved = ".agents/skills/adamantite/references/custom-rules.md"
+      files.write(moved, "# A guide that the project changed\n")
+
+      yield* runLifecycle("update", files)
+      const doctor = yield* runLifecycle("doctor", files)
+
+      expect(files.read(moved)).toBe("# A guide that the project changed\n")
+      expect(doctor.output).toContain(
+        "`.agents/skills/adamantite` differs from the `adamantite` skill of the installed Adamantite version. It holds `references/custom-rules.md`, which that version does not ship."
+      )
+      expect(doctor.output).not.toContain("`.agents/skills/adamantite-hardening` differs")
     })
   )
 })

@@ -74,7 +74,7 @@ The folders inside the layers belong to the layer that holds them:
 
 | Folder                                            | Job                                                                                                                                                                                                  |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/integrations/agents`                     | The `agents` integration: `AGENTS.md` with the Adamantite section, and the Adamantite skill in each skill folder.                                                                                    |
+| `src/lib/integrations/agents`                     | The `agents` integration: `AGENTS.md` with the Adamantite section, and each Adamantite skill in each skill folder.                                                                                   |
 | `src/lib/integrations/github`                     | The `github` integration: `.github/workflows/adamantite.yml`.                                                                                                                                        |
 | `src/lib/integrations/knip`                       | The `knip` integration: `knip.config.ts`, its Knip config schema, and the Knip command builder.                                                                                                      |
 | `src/lib/integrations/oxfmt`                      | The `oxfmt` integration: `oxfmt.config.ts`, the plugin languages, and the Oxfmt command builder.                                                                                                     |
@@ -341,10 +341,11 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
 - `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
   runs `applySetup`, as "Setup and the write rule" describes. `init --json` takes the selection
   from the flags and asks nothing. When the selection includes coding agents, the `agents`
-  integration renders `AGENTS.md` with the Adamantite section, and the Adamantite skill in
+  integration renders `AGENTS.md` with the Adamantite section, and each Adamantite skill in
   `.agents/skills` and in each other skill folder whose agent folder exists, such as
-  `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the copy matches the
-  running Adamantite version without `node_modules` or the network. Doctor reports an `AGENTS.md`
+  `.claude/skills`. A build macro bundles each folder of `skills/` into the CLI, so a copy matches
+  the running Adamantite version without `node_modules` or the network. A new skill is a new folder
+  there, and the integration writes and assesses it without a code change. Doctor reports an `AGENTS.md`
   without the section, and a skill copy that differs from the bundled skill.
 - `doctor` assesses the integrations, reports the findings, and offers their repair through
   `Resolution.offer`, which assesses again after a handoff. The Oxlint assessment resolves the
@@ -353,8 +354,8 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to move the project's coding standards up
   the enforcement ladder, and offers it through `Resolution.offer`. A build macro inlines the
-  ladder from `skills/adamantite/references/enforcement-ladder.md`, so the prompt and the
-  Adamantite skill state it from one file. Its `verify` runs
+  ladder from `skills/adamantite-hardening/references/enforcement-ladder.md`, so the prompt and the
+  hardening skill state it from one file. Its `verify` runs
   Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
   The agent verifies new and changed custom rules with temporary RuleTester cases during the
   session and removes the cases before handback. Harden never produces findings, so it never
@@ -673,5 +674,5 @@ extensions. `presets/__tests__/custom.test.ts` lints temporary projects in real 
 runs, including a monorepo with a shared tooling package, and runs `custom()` under Bun
 when Bun is installed.
 
-The "Custom rules" section of `skills/adamantite/SKILL.md` links to the authoring guidance in
-`skills/adamantite/references/custom-rules.md`.
+The "Custom rules" section of `skills/adamantite-hardening/SKILL.md` links to the authoring
+guidance in `skills/adamantite-hardening/references/custom-rules.md`.

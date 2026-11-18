@@ -9,12 +9,15 @@ export function getHardenPromptTemplate(): string {
 }
 
 /**
- * Build-time macro that inlines the enforcement ladder of the shipped Adamantite skill, without its
+ * Build-time macro that inlines the enforcement ladder of the shipped hardening skill, without its
  * title, so the harden prompt and the skill state the ladder from one file.
  */
 export function getEnforcementLadder(): string {
   const reference = readFileSync(
-    new URL("../../../skills/adamantite/references/enforcement-ladder.md", import.meta.url),
+    new URL(
+      "../../../skills/adamantite-hardening/references/enforcement-ladder.md",
+      import.meta.url
+    ),
     "utf8"
   )
 

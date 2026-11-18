@@ -28,7 +28,7 @@ import * as Project from "#lib/project/index.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
-import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import { CUSTOM_RULES_SECTION, HARDENING_SKILL } from "#lib/shared/skill.ts"
 import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
@@ -85,7 +85,7 @@ const testPath = Flag.String("path").pipe(
 
 const add = Command.make("add", { dir, name: ruleName }).pipe(
   Command.withDescription(
-    "Create a custom rule file. See the Adamantite skill for authoring instructions"
+    `Create a custom rule file. See the ${HARDENING_SKILL} skill for authoring instructions`
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
@@ -95,7 +95,7 @@ const add = Command.make("add", { dir, name: ruleName }).pipe(
 
       yield* Output.success(`Wrote ${path.relative(cwd, rulePath)}.`)
       yield* Output.info(
-        `\`custom()\` from \`adamantite/rules\` loads the rule. Run \`adamantite doctor\` to check the wiring. The "${CUSTOM_RULES_SECTION}" section of the Adamantite skill tells agents how to verify the rule with temporary cases.`
+        `\`custom()\` from \`adamantite/rules\` loads the rule. Run \`adamantite doctor\` to check the wiring. The "${CUSTOM_RULES_SECTION}" section of the \`${HARDENING_SKILL}\` skill tells agents how to verify the rule with temporary cases.`
       )
     })
   )

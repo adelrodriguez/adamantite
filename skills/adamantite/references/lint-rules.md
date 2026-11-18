@@ -27,100 +27,15 @@ Read the rule message and apply the section below that matches it.
   only to silence the report leaves the preload problem unresolved.
 - For `adamantite/no-query-data-in-state`, read query data from the query result and keep
   only the user's edits in state.
+- For `adamantite/layers` and `adamantite/import-owners`, use what the owner exports, or move the
+  code to its layer or owner. Adding an owner, a layer dependency, or an `ignore` glob only to
+  pass the check weakens the standard. To change a layer map or the import owners, use the
+  `adamantite-hardening` skill.
 - For `effecttsgo/unstable-api-usage`, add a deliberately accepted module or package to
   `allowedUnstableApis` in the `@effect/language-service` tsconfig entry. For example, list
   `"effect/cli"` to allow that module instead of disabling the rule for every unstable API.
 
 Continue when the reported code follows the rule's repair and the affected lint check passes.
-
-## Configure layer maps and import owners
-
-If the task changes import rules, use the first-party plugin loaded by `architecture` or
-`strict`. The `architecture` preset enables no rules until the project configures them.
-
-Set `adamantite/layers` with a layer map. Give each layer an `imports` list of sibling
-layers. Imports are transitive. Put a child map in the containing layer's `layers` property:
-
-```ts
-import architecture from "adamantite/lint/architecture"
-import { defineConfig } from "oxlint"
-
-export default defineConfig({
-  extends: [architecture],
-  rules: {
-    "adamantite/layers": [
-      "error",
-      {
-        root: "src",
-        layers: {
-          lib: {
-            imports: [],
-            layers: {
-              shared: { imports: [] },
-              services: { imports: ["shared"] },
-            },
-          },
-          terminal: { imports: ["lib"] },
-          commands: { imports: ["terminal"] },
-        },
-      },
-    ],
-  },
-})
-```
-
-Resolve `root` from the nearest `package.json` folder. The `lib` child map has the root
-`src/lib`, and its dependency names are local to that map. Every containing map checks a
-file independently. A child permission cannot override a parent prohibition. Declaration
-order does not change permissions.
-
-Use `entries` for composition files, `isolate` for layers whose child folders cannot import
-each other, and `ignoreTypes` when type-only imports do not count. Add import `conditions`
-explicitly when resolution needs them. The rule does not read tsconfig `customConditions`.
-An unresolved import is not checked. A folder missing from the map is reported. Move a
-loose root file into a layer or declare it as an entry.
-
-When Doctor warns that a config states import layers by hand in `no-restricted-imports`
-overrides, follow the steps in the warning to state those layers in layer maps.
-
-Place child settings beside the child's `layers`. Settings do not inherit. A parent's
-`ignore`, `entries`, or `ignoreTypes` does not skip child checks. A child root uses the
-parent's actual matched folder, including when the top root is a glob. Declare each
-concrete scope once. Keep separate option objects for roots that cannot nest without a
-new intermediate map.
-
-For an import that belongs to one file or folder, set `adamantite/import-owners`:
-
-```ts
-import architecture from "adamantite/lint/architecture"
-import { defineConfig } from "oxlint"
-
-export default defineConfig({
-  extends: [architecture],
-  rules: {
-    "adamantite/import-owners": [
-      "error",
-      { import: "giget", owners: ["src/services/download.ts"] },
-      { import: "react-native", names: ["Alert"], owners: ["src/shared/alerts.ts"] },
-      { import: "#lib/database.ts", owners: ["src/lib/repositories"] },
-    ],
-  },
-})
-```
-
-Resolve owners from the workspace root, or the `package.json` folder outside a workspace.
-An owner folder covers every file below it. A package name covers its subpaths.
-Use `names` to restrict selected exports. Namespace imports and `export *` are also reported
-when names are restricted. An `import` that starts with `#`, `.`, or `/` names a file or folder of
-the project, resolved from the same root as the owners. The rule resolves each import of a linted
-file, so a relative path or another alias to that module counts too. An import that names a `#`
-module as the option states it also counts, as for a package. In a monorepo, a `#` option restricts
-that alias in every package. To restrict a folder of one package, name its path from the workspace
-root, such as `./apps/web/src/lib/db`. Use layer maps for the dependencies between folders.
-
-Repair a report by using what the owner exports or moving the code to its layer or owner.
-Adding an owner, layer dependency, or `ignore` glob only to pass the check weakens the standard.
-Continue when the configured maps and owners match the project's intended imports.
 
 ## Change test rule configuration
 
@@ -145,19 +60,23 @@ gets two reports. If one package runs both test runners, use each preset in an o
 paths that do not overlap.
 Continue when the intended test files receive the configured rules.
 
-## Try a rule setting
+## Repair an existing rules folder
 
-Before changing a rule setting, run `adamantite rule try <rule> --report <case> --accept <case>`
-when the task requires evidence from cases. Use `--options '<json array>'` for options after
-the severity, or `--current` for the setting in the config. A case is a project path, or
-`<path>=<file>` to lint the content of `<file>` at `<path>` in a copy of the project. Add `--json`
-to read the reports of each case as JSON.
+When Doctor reports that Oxlint cannot load a config or a rule file, read the error that it
+names. Load the rules folder with the default import from `adamantite/rules`, and import
+`definePlugin`, `defineRule`, and the authoring types from `adamantite/rules/plugin`. For a name
+that the installed package does not export, use the replacement that the changelog names. A rule
+file must load with type stripping, so replace TypeScript that Node.js cannot erase, such as an
+`enum`.
 
-Continue when every case gives the expected result. Exit code 1 means a case differs.
-Exit code 2 means the trial could not supply evidence, such as when the rule does not exist.
+When Doctor reports a rules folder that no `custom()` call loads, load it with `custom()`, and set
+its path with `dir` when it is not `.adamantite/lint`.
+Preserve rule behavior, plugin names, severity, and options.
+
+Continue when Doctor reports no custom-rule findings and no config load failure.
 
 ## Check the repair
 
 - The changed code or configuration follows the project's coding standard.
 - The affected lint check passes without a broader exception added only to silence it.
-- Each requested trial ran successfully and gave the expected results.
+- Doctor reports no custom-rule finding and no config load failure after a rules folder repair.

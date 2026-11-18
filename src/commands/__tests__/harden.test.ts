@@ -37,7 +37,7 @@ import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import glossary from "../../../GLOSSARY.md?raw"
-import ladder from "../../../skills/adamantite/references/enforcement-ladder.md?raw"
+import ladder from "../../../skills/adamantite-hardening/references/enforcement-ladder.md?raw"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -172,7 +172,7 @@ const REQUIRED_PHRASES = {
     "Do not change a rule that a preset or plugin ships.",
     "remove only the files that no longer break the rule",
     "`adamantite rule add <name>`",
-    "skills/adamantite/SKILL.md",
+    "skills/adamantite-hardening/SKILL.md",
     "pass it with `--dir`",
     "states the standard and why it exists",
     "delete the text that only repeats what the rule now reports",
@@ -904,7 +904,7 @@ describe("harden", () => {
   )
 
   // A coding agent finds the skills of its skill folder on its own, so harden lists none of them.
-  it.effect("list no copy of the Adamantite skill in a project that init set up", () =>
+  it.effect("list no copy of an Adamantite skill in a project that init set up", () =>
     Effect.gen(function* () {
       const project = createFileSystemTestContext({
         files: {
@@ -926,6 +926,7 @@ describe("harden", () => {
       const { agentReach, documentationFiles } = decodeReport(logLines[0])
 
       expect(project.list()).toContain(".claude/skills/adamantite/SKILL.md")
+      expect(project.list()).toContain(".claude/skills/adamantite-hardening/SKILL.md")
       expect(documentationFiles).toStrictEqual(Option.some(["AGENTS.md"]))
       expect(agentReach).toStrictEqual(Option.some({ brokenLinks: [], unreached: [] }))
     })

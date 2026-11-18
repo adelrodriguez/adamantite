@@ -18,7 +18,7 @@ import { detectSkillFolders } from "#lib/integrations/agents/skill.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import * as Project from "#lib/project/index.ts"
 import { hashContent } from "#lib/project/lockfile.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { readDirectoryIfExists, readFileIfExists, readFileIfFile } from "#lib/shared/filesystem.ts"
 
 const AGENTS_PATH = "AGENTS.md"
 
@@ -87,9 +87,9 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
 
   return [
     {
-      currentState: `\`${AGENTS_PATH}\` has no Adamantite section, so coding agents do not learn the Adamantite skill and commands.`,
+      currentState: `\`${AGENTS_PATH}\` has no Adamantite section, so coding agents do not learn the Adamantite skills and commands.`,
       goal: [
-        `Add a section between \`${ADAMANTITE_AGENTS_START_MARKER}\` and \`${ADAMANTITE_AGENTS_END_MARKER}\` to \`${AGENTS_PATH}\`. It tells coding agents to use the Adamantite skill, to run the managed scripts, and to run \`adamantite doctor\` for setup findings. Keep the rest of the file.`,
+        `Add a section between \`${ADAMANTITE_AGENTS_START_MARKER}\` and \`${ADAMANTITE_AGENTS_END_MARKER}\` to \`${AGENTS_PATH}\`. It tells coding agents to use the Adamantite skills, to run the managed scripts, and to run \`adamantite doctor\` for setup findings. Keep the rest of the file.`,
         "Run `adamantite doctor` again. It must not report this finding.",
       ],
       id: "missing-agents-section",
@@ -126,10 +126,49 @@ const readSkillFile = Effect.fn("readSkillFile")(function* (
 })
 
 /**
+ * The files of a skill copy that the shipped skill does not have, and that `update` keeps: a file
+ * that the project added, or a file of an earlier version that the project changed. `update`
+ * deletes a file of an earlier version that is unchanged since Adamantite wrote it, so that file is
+ * not one.
+ */
+const readKeptExtraFiles = Effect.fn("readKeptExtraFiles")(function* (
+  { lockfile }: Project.Snapshot,
+  copy: string,
+  shipped: readonly string[]
+) {
+  const cwd = yield* Project.Directory
+  const path = yield* Path.Path
+  const entries = yield* readDirectoryIfExists(path.join(cwd, copy), { recursive: true })
+
+  const extras = Option.getOrElse(entries, () => [])
+    .map((entry) => entry.split(path.sep).join("/"))
+    .filter((entry) => !shipped.some((file) => file === entry || file.startsWith(`${entry}/`)))
+
+  return yield* Effect.filter(
+    extras,
+    Effect.fnUntraced(function* (entry) {
+      // A folder holds no content of its own. Its files are entries too.
+      const content = yield* readFileIfFile(path.join(cwd, copy, entry))
+
+      const recorded = Option.flatMapNullishOr(
+        lockfile,
+        ({ written }) => written[`${copy}/${entry}`]
+      )
+
+      return (
+        Option.isSome(content)
+        && !(Option.isSome(recorded) && recorded.value === (yield* hashContent(content.value)))
+      )
+    }),
+    { concurrency: "unbounded" }
+  )
+})
+
+/**
  * The findings for each copy of a shipped skill in the skill folders of the agents that the project
  * uses: a copy that misses a file of the skill, which `update` writes, and a copy with a changed
- * file. An earlier version wrote that file before the lockfile recorded it, or the project changed
- * it, so `update` keeps it.
+ * file, or with a file that the skill does not ship. An earlier version wrote that file before the
+ * lockfile recorded it, or the project changed it, so `update` keeps it.
  */
 const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapshot) {
   const folders = yield* detectSkillFolders(yield* Project.Directory)
@@ -139,22 +178,31 @@ const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapsho
       shippedSkills.map((skill) => ({ copy: `${folder}/${skill.name}`, skill }))
     ),
     ({ copy, skill }) =>
-      Effect.map(
-        Effect.forEach(
-          skill.files,
-          ({ content, file }) =>
-            Effect.map(readSkillFile(project, `${copy}/${file}`, content), (state) => ({
-              file,
-              state,
-            })),
-          { concurrency: "unbounded" }
-        ),
-        (files) => ({ copy, files, name: skill.name })
+      Effect.all(
+        {
+          copy: Effect.succeed(copy),
+          extras: readKeptExtraFiles(
+            project,
+            copy,
+            skill.files.map(({ file }) => file)
+          ),
+          files: Effect.forEach(
+            skill.files,
+            ({ content, file }) =>
+              Effect.map(readSkillFile(project, `${copy}/${file}`, content), (state) => ({
+                file,
+                state,
+              })),
+            { concurrency: "unbounded" }
+          ),
+          name: Effect.succeed(skill.name),
+        },
+        { concurrency: "unbounded" }
       ),
     { concurrency: "unbounded" }
   )
 
-  return copies.flatMap(({ copy, files, name }): Finding[] => {
+  return copies.flatMap(({ copy, extras, files, name }): Finding[] => {
     const missing = files
       .filter(({ state }) => state === "missing")
       .map(({ file }) => `\`${file}\``)
@@ -174,10 +222,17 @@ const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapsho
               title: "Missing Adamantite skill",
             },
           ]),
-      ...(files.some(({ state }) => state === "changed")
+      ...(extras.length > 0 || files.some(({ state }) => state === "changed")
         ? [
             {
-              currentState: `\`${copy}\` differs from the \`${name}\` skill of the installed Adamantite version.`,
+              currentState: [
+                `\`${copy}\` differs from the \`${name}\` skill of the installed Adamantite version.`,
+                ...(extras.length === 0
+                  ? []
+                  : [
+                      `It holds ${extras.map((file) => `\`${file}\``).join(", ")}, which that version does not ship.`,
+                    ]),
+              ].join(" "),
               goal: [
                 `Delete \`${copy}\`, then run \`adamantite update\`. It writes the skill of the installed version.`,
                 "Run `adamantite doctor` again. It must not report this finding.",
@@ -234,7 +289,7 @@ const assessSkillsLock = Effect.fn("assessSkillsLock")(function* (cwd: string) {
     ],
     id: "skills-lock-adamantite-entry",
     integration: "agents",
-    title: "The skills lock records the Adamantite skill",
+    title: "The skills lock records an Adamantite skill",
   }))
 })
 

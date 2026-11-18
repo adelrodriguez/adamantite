@@ -237,8 +237,8 @@ export function removeFixtureProject(project: string): void {
 
 /**
  * Lint the `fixtures/` folder of a fixture project in one real Oxlint run, and return each report
- * and the number of files that Oxlint linted. The run goes through the Oxlint entry, as `adamantite
- * check` does, so a preset that needs the Effect build of Oxlint loads too.
+ * and the number of files that Oxlint linted. The run goes through the Oxlint entry, as the run of
+ * an editor does, so a preset that needs the Effect build of Oxlint loads too.
  */
 export function lintFixtureProject(project: string): FixtureLint {
   const result = spawnSync(

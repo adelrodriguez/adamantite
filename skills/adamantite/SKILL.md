@@ -1,6 +1,6 @@
 ---
 name: adamantite
-description: Use when setting up Adamantite, running its checks, repairing Doctor findings, updating managed dependencies, keeping a fixed mistake from recurring, hardening coding standards, or writing and testing custom rules.
+description: Use when setting up Adamantite, running its checks, repairing Doctor findings, updating managed dependencies, keeping a fixed mistake from recurring, deciding whether to add a lint disable comment, hardening coding standards, or writing and testing custom rules.
 metadata:
   type: core
   library: adamantite
@@ -111,9 +111,10 @@ the project's checks pass.
 ## Keep a fixed mistake from recurring
 
 After you fix a regression, a mistake that a reviewer corrected before, or a break of a project
-standard that no check reported, follow
+standard that no check reported, and before you add a disable comment, follow
 [How to keep a fixed mistake from recurring](references/corrections.md). It starts from that one
-mistake, and decides whether the project keeps a test, a type, a rule, an instruction, or nothing.
+mistake, checks whether a tool already reports it, and decides whether the project keeps a test,
+a type, a rule, an instruction, or nothing.
 
 The task is complete when the guide's checks pass.
 

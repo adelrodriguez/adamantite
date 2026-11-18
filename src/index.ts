@@ -1,7 +1,7 @@
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
+import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Runtime from "effect/Runtime"
 import * as Stdio from "effect/Stdio"
 import { makeAppLayer, runCli } from "#cli.ts"
@@ -18,10 +18,8 @@ const program = Effect.gen(function* () {
   yield* runCli(args, version)
 }).pipe(
   Effect.as(0),
-  Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
-  Effect.catch((error) =>
-    Output.failure(error.message).pipe(Effect.as(ChildProcessSpawner.ExitCode(1)))
-  ),
+  // A defect or an interruption keeps the runtime's report.
+  Effect.catchCauseIf(Cause.hasFails, Output.failures),
   Effect.provide(makeAppLayer(CommandRunner.layer))
 )
 

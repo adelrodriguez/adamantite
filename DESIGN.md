@@ -72,7 +72,10 @@ and messages.
 
 A step prints one line when it finishes, such as `✔ Dependencies installed.` No spinner or
 progress line runs while a step works. A step that fails ends the command with a tagged error, and
-the runtime boundary prints that error once, as an `✖` line on standard error. Every other line
+the runtime boundary prints that error once, as an `✖` line on standard error. A command that fails
+for several reasons, such as `check` with a stage that did not start and an outdated setup, prints
+one line for each, in order, and the first decides the exit code. A tool that failed after it
+printed its report adds no line, and its exit code stands. Every other line
 goes to standard output, so the lines and the prompts keep their order. With `--json`, standard
 output holds only the JSON document, and every other line goes to standard error.
 

@@ -2,6 +2,7 @@ import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
@@ -27,7 +28,8 @@ const allowWarnings = Flag.Boolean("allow-warnings").pipe(
 
 // A setup that an older Adamantite wrote checks the code with presets that it was not written for,
 // so `check` fails until `adamantite update` runs. The stages run first, so an agent that runs
-// `check` after an edit reads the reports of its code, and the last line names the repair.
+// `check` after an edit reads the reports of its code. The CLI then prints the error of a stage
+// that did not start, and the setup repair last.
 export default Command.make("check", { allowWarnings, files, only }).pipe(
   Command.withDescription("Check formatting, lint issues, and TypeScript types"),
   Command.withHandler(({ allowWarnings, files, only }) =>
@@ -47,9 +49,11 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
         selection: Option.map(lockfile, ({ selection }) => selection),
       }).pipe(Effect.exit)
 
-      yield* verifyLockfileVersion(root, lockfile)
+      const setup = yield* verifyLockfileVersion(root, lockfile).pipe(Effect.exit)
 
-      return yield* stages
+      // Both failures reach the CLI, the stage's first, so a stage that did not start still says
+      // why, and the drift still fails the run.
+      return yield* Exit.asVoidAll([stages, setup])
     })
   )
 )

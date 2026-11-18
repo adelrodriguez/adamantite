@@ -1,8 +1,11 @@
 import { styleText } from "node:util"
+import * as Cause from "effect/Cause"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import { CommandFailed } from "#lib/shared/errors.ts"
 import { CurrentMode, is } from "#terminal/mode.ts"
 
 /**
@@ -67,6 +70,30 @@ export const cancel = (message: string) =>
  */
 export const failure = (message: string) =>
   Effect.flatMap(renderStatus("error", message), (line) => Console.error(line))
+
+/**
+ * Reports each error that ended the command, in order, and returns the exit code of the first. A
+ * command can fail for several reasons, such as a stage that did not start and a setup to update,
+ * and each one needs its repair. A `CommandFailed` prints no line, because its command already
+ * printed its report, and its exit code stands.
+ */
+export const failures = Effect.fn("Output.failures")(function* (
+  cause: Cause.Cause<{ readonly message: string }>
+) {
+  const errors = cause.reasons
+    .filter((reason) => Cause.isFailReason(reason))
+    .map(({ error }) => error)
+
+  yield* Effect.forEach(
+    errors,
+    (error) => (error instanceof CommandFailed ? Effect.void : failure(error.message)),
+    { concurrency: 1, discard: true }
+  )
+
+  const [first] = errors
+
+  return first instanceof CommandFailed ? first.exitCode : ChildProcessSpawner.ExitCode(1)
+})
 
 // A heading frames an interactive session, so the other modes print none.
 const heading = (text: string) =>

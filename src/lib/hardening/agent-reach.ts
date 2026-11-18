@@ -64,8 +64,10 @@ const HEADING = /^ {0,3}#{1,6}(?:[\t ]([^\n]*))?$|^ {0,3}(\S[^\n]*)\n {0,3}(?:=+
 // An id that a docs site reads from the end of a heading, such as `## Tests {#tests}`.
 const HEADING_ID = /\{#([^\s{}]+)\}$/u
 
-// An `id` or `name` attribute of an HTML tag, each one on its own, so a tag can give two anchors.
-const HTML_ID = /\s(?:id|name)\s*=\s*["']([^"'<>]+)["']/giu
+// An HTML opening tag, and each `id` or `name` attribute in it, so a tag can give two anchors. The
+// tag stops at the next `<` or `>`, so both patterns take time linear in the file.
+const OPENING_TAG = /<[a-z][^<>]*>/giu
+const ANCHOR_ATTRIBUTE = /\s(?:id|name)\s*=\s*["']([^"'<>]+)["']/giu
 
 // The markup that the second candidate anchor of a heading leaves out: the target or reference of
 // a link, an HTML tag, and an underscore that opens or closes emphasis. Each pattern stops at the
@@ -177,7 +179,11 @@ function readAnchors(prose: string) {
     )
   }
 
-  for (const id of matchAll(prose, HTML_ID)) {
+  const htmlIds = [...prose.matchAll(OPENING_TAG)].flatMap(([tag]) =>
+    matchAll(tag, ANCHOR_ATTRIBUTE)
+  )
+
+  for (const id of htmlIds) {
     anchors.add(id.toLowerCase())
   }
 

@@ -4,8 +4,8 @@ These standards cover choices that require review. The [architecture](docs/archi
 describes the module boundaries and lifecycle. [Oxlint](oxlint.config.ts),
 [Vitest](vitest.config.ts), and the [build](tsdown.config.ts) enforce the constraints they can
 check. A standard that a rule checks has no section here. The rule and the comment beside it, in
-[oxlint.config.ts](oxlint.config.ts) or in [.adamantite/lint](.adamantite/lint), are its only
-source. A section that names a rule states only the part of its standard that the rule cannot
+[oxlint.config.ts](oxlint.config.ts), in the [config](config) modules that it imports, or in
+[.adamantite/lint](.adamantite/lint), are its only source. A section that names a rule states only the part of its standard that the rule cannot
 check. Domain terms belong in [GLOSSARY.md](GLOSSARY.md).
 
 ## Tests

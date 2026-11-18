@@ -712,7 +712,7 @@ describe("harden", () => {
         configs: ["oxlint.config.ts"],
         decisionsRecord: DecisionsRecord.cases.Missing.make({ path: RECORD }),
         documentationFiles: Option.some(["AGENTS.md", "docs/unreached.md"]),
-        fixHistory: FixHistory.cases.Last.make({ count: 20 }),
+        fixHistory: FixHistory.cases.Requested.make({ count: 20 }),
         head: Option.none(),
         instructionFiles: ["AGENTS.md"],
         overrides: new LintedOverrides({ rules: [] }),
@@ -760,8 +760,23 @@ describe("harden", () => {
       })
   )
 
+  it.effect("print the default fix history as the last 200 commits, apart from a requested count", () =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden(INSTALLED, ["--json"])
+      const requested = yield* runHarden(INSTALLED, ["--json", "--commits", "200"])
+
+      expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
+        FixHistory.cases.Last.make({ count: 200 })
+      )
+      expect(decodeReport(requested.logLines[0]).fixHistory).toStrictEqual(
+        FixHistory.cases.Requested.make({ count: 200 })
+      )
+    })
+  )
+
   it("give the fix history a number of commits, or a boundary with its session, and never both", () => {
     expectTypeOf<{ _tag: "Last"; count: number }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Requested"; count: number }>().toExtend<typeof FixHistory.Type>()
     expectTypeOf<{
       _tag: "Since"
       boundary: string
@@ -1342,6 +1357,10 @@ describe("harden", () => {
             "When it lists no commit, record that the history has no commit after that session",
           ])
         ).toStrictEqual([])
+        // This session reads from the earlier session on, so its line records the commit of `HEAD`.
+        expect(getSection(prompt, "## 8. Show the candidates and wait for approval")).toContain(
+          `{"session":"1970-01-01","head":"${HEAD_COMMIT}"}`
+        )
       })
   )
 
@@ -1533,6 +1552,25 @@ describe("harden", () => {
       scope: undefined,
       session: { head: HEAD_COMMIT, session: "2026-03-14" },
       sessionLine: `{"session":"2026-03-14","head":"${HEAD_COMMIT}"}`,
+    },
+    {
+      // A session that reads a requested number of commits did not read the history up to `HEAD`.
+      args: ["--commits", "30"],
+      name: "no head with --commits",
+      phrase: "Leave out `scope`, because this session covers the whole project.",
+      processes: RECORD_PROCESSES,
+      scope: undefined,
+      session: { session: "2026-03-14" },
+      sessionLine: '{"session":"2026-03-14"}',
+    },
+    {
+      args: ["--path", "packages/web", "--commits", "30"],
+      name: "the scope of --path and no head with --commits",
+      phrase: 'Write `"scope":"packages/web"` on each line, the folder of this session.',
+      processes: RECORD_PROCESSES,
+      scope: "packages/web",
+      session: { scope: "packages/web", session: "2026-03-14" },
+      sessionLine: '{"session":"2026-03-14","scope":"packages/web"}',
     },
     {
       args: [],

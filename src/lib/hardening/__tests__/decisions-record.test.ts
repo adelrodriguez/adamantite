@@ -71,17 +71,17 @@ interface ReadOptions {
 }
 
 /**
- * Reads a record that has one `lines` entry on each line, as `harden --json` prints it. A line is
- * an object, which the record holds as JSON, or the text of the line.
+ * The text of a record that has one of `decisions` on each line.
  */
-function readRecord(lines: readonly (object | string)[], options: ReadOptions = {}) {
-  const context = createFileSystemTestContext({
-    files: {
-      [DECISIONS_RECORD_PATH]: lines
-        .map((line) => `${typeof line === "string" ? line : JSON.stringify(line)}\n`)
-        .join(""),
-    },
-  })
+function toLines(decisions: readonly object[]) {
+  return decisions.map((decision) => `${JSON.stringify(decision)}\n`).join("")
+}
+
+/**
+ * Reads a record with `content`, as `harden --json` prints it.
+ */
+function readRecord(content: string, options: ReadOptions = {}) {
+  const context = createFileSystemTestContext({ files: { [DECISIONS_RECORD_PATH]: content } })
 
   return readDecisionsRecord(
     context.root,
@@ -108,7 +108,7 @@ describe("readDecisionsRecord", () => {
 
   it.effect("decode a line that has only the required keys", () =>
     Effect.gen(function* () {
-      const record = yield* readRecord([REQUIRED])
+      const record = yield* readRecord(toLines([REQUIRED]))
 
       expect(record).toHaveProperty("decisions", [REQUIRED])
       expect(record).toHaveProperty("undecodableLines", [])
@@ -117,7 +117,7 @@ describe("readDecisionsRecord", () => {
 
   it.effect("decode a line that has each optional key", () =>
     Effect.gen(function* () {
-      const record = yield* readRecord([{ ...REQUIRED, ...OPTIONAL }])
+      const record = yield* readRecord(toLines([{ ...REQUIRED, ...OPTIONAL }]))
 
       expect(record).toHaveProperty("decisions", [{ ...REQUIRED, ...OPTIONAL }])
     })
@@ -125,7 +125,7 @@ describe("readDecisionsRecord", () => {
 
   it.effect("accept a line with a key that the schema does not know, and leave the key out", () =>
     Effect.gen(function* () {
-      const record = yield* readRecord([{ ...REQUIRED, reviewer: "maintainer" }])
+      const record = yield* readRecord(toLines([{ ...REQUIRED, reviewer: "maintainer" }]))
 
       expect(record).toHaveProperty("decisions", [REQUIRED])
       expect(record).toHaveProperty("undecodableLines", [])
@@ -137,7 +137,7 @@ describe("readDecisionsRecord", () => {
       const other = { ...REQUIRED, id: "default-exports", standard: "Ban default exports" }
       const later = { ...REQUIRED, at: "2026-06-01", decision: "deferred", reason: "After 2.0" }
 
-      const record = yield* readRecord([REQUIRED, other, later])
+      const record = yield* readRecord(toLines([REQUIRED, other, later]))
 
       expect(record).toHaveProperty("decisions", [later, other])
     })
@@ -160,7 +160,7 @@ describe("readDecisionsRecord", () => {
     },
   ])("$name", ({ decisions, lines }) =>
     Effect.gen(function* () {
-      expect(yield* readRecord(lines)).toHaveProperty("decisions", decisions)
+      expect(yield* readRecord(toLines(lines))).toHaveProperty("decisions", decisions)
     })
   )
 
@@ -168,7 +168,7 @@ describe("readDecisionsRecord", () => {
     Effect.gen(function* () {
       const scoped = { ...REQUIRED, scope: "packages/web" }
 
-      expect(yield* readRecord([scoped])).toHaveProperty("decisions", [scoped])
+      expect(yield* readRecord(toLines([scoped]))).toHaveProperty("decisions", [scoped])
     })
   )
 
@@ -186,7 +186,7 @@ describe("readDecisionsRecord", () => {
   ])("$name, in a session of packages/web", ({ kept, scope }) =>
     Effect.gen(function* () {
       const line = scope === undefined ? REQUIRED : { ...REQUIRED, scope }
-      const record = yield* readRecord([line], { scope: "packages/web" })
+      const record = yield* readRecord(toLines([line]), { scope: "packages/web" })
 
       expect(record).toHaveProperty("decisions", kept ? [line] : [])
     })
@@ -197,7 +197,10 @@ describe("readDecisionsRecord", () => {
     { name: "has a trailing comma", text: '{"id":"a","at":"2026-03-14","standard":"S",}' },
     { name: "is not an object", text: '["tests-beside-module"]' },
     { name: "has no `at`", text: JSON.stringify({ ...REQUIRED, at: undefined }) },
-    { name: "has an `id` that is not kebab-case", text: JSON.stringify({ ...REQUIRED, id: "A b" }) },
+    {
+      name: "has an `id` that is not kebab-case",
+      text: JSON.stringify({ ...REQUIRED, id: "A b" }),
+    },
     { name: "has an `at` that is not a date", text: JSON.stringify({ ...REQUIRED, at: "March" }) },
     {
       name: "has a decision that the schema does not know",
@@ -217,7 +220,7 @@ describe("readDecisionsRecord", () => {
       const other = { ...REQUIRED, id: "default-exports" }
 
       // The blank line is not a decision, and it keeps its place in the line numbers.
-      const record = yield* readRecord([REQUIRED, "", text, other])
+      const record = yield* readRecord(`${toLines([REQUIRED])}\n${text}\n${toLines([other])}`)
 
       expect(record).toHaveProperty("decisions", [REQUIRED, other])
       expect(record).toHaveProperty("undecodableLines", [
@@ -228,17 +231,21 @@ describe("readDecisionsRecord", () => {
 
   it.effect.each([
     { lastChange: { commit: COMMIT, date: "2026-11-02" }, output: `${COMMIT} 2026-11-02\n` },
+    { lastChange: { commit: COMMIT, date: "2026-11-02" }, output: `${COMMIT} 2026-11-02\r\n` },
     { lastChange: null, output: "" },
-  ])("give the commit that last changed the record, or none: $lastChange", ({ lastChange, output }) =>
-    Effect.gen(function* () {
-      const record = yield* readRecord([REQUIRED], { lastChange: output })
+  ])(
+    "give the commit that last changed the record, or none: $lastChange",
+    ({ lastChange, output }) =>
+      Effect.gen(function* () {
+        const record = yield* readRecord(toLines([REQUIRED]), { lastChange: output })
 
-      expect(record).toHaveProperty("lastChange", lastChange)
-    })
+        expect(record).toHaveProperty("lastChange", lastChange)
+      })
   )
 
   it("give only a record that exists its decisions, its lines, and its commit", () => {
     type Missing = Extract<DecisionsRecord, { _tag: "Missing" }>
+
     type Present = Extract<DecisionsRecord, { _tag: "Present" }>
 
     expectTypeOf<Missing>().not.toHaveProperty("decisions")

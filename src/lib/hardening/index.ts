@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema"
 import type * as Project from "#lib/project/index.ts"
 import { AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import {
-  DECISIONS_RECORD_PATH,
+  type Decision,
   DecisionsRecord,
   readDecisionsRecord,
 } from "#lib/hardening/decisions-record.ts"
@@ -32,10 +32,9 @@ const hardenPromptTemplate = getHardenPromptTemplate()
 const AGENTS_FILE = "AGENTS.md"
 
 /**
- * Changesets and changelogs record releases, and the decisions record holds decisions, so none of
- * them states a coding standard. A coding agent finds the skills in its skill folder on its own,
- * also in a workspace package, so no `AGENTS.md` has to reach them. `file` is relative to the
- * project root, and git separates the folders of a path with `/` on each platform.
+ * Changesets and changelogs record releases, not coding standards. A coding agent finds the skills
+ * in its skill folder on its own, also in a workspace package, so no `AGENTS.md` has to reach them.
+ * Git separates the folders of a path with `/` on each platform.
  */
 function isDocumentation(file: string) {
   const segments = file.split("/")
@@ -44,7 +43,6 @@ function isDocumentation(file: string) {
     !segments.includes(".changeset")
     && segments.at(-1) !== "CHANGELOG.md"
     && !skillFolders.some((folder) => `/${file}`.includes(`/${folder}/`))
-    && file !== DECISIONS_RECORD_PATH
   )
 }
 
@@ -232,9 +230,10 @@ export const readHardenReach = Effect.fn("readHardenReach")(function* (
  * that lint those packages, an ancestor config included, and the rules folders that those configs
  * load, also when they are outside the scope. A scope also keeps the Markdown files outside each
  * workspace package, because the root documentation applies to every package. The project has one
- * decisions record, which a scope does not move. `commits` is the value of `--commits`: without it,
- * the fix history starts after the commit that last changed the decisions record, or is the last
- * `DEFAULT_FIX_HISTORY_COMMITS` commits when no such commit is known.
+ * decisions record, and a scope leaves out its decisions of other folders. `commits` is the value
+ * of `--commits`: without it, the fix history starts after the commit that last changed the
+ * decisions record, or is the last `DEFAULT_FIX_HISTORY_COMMITS` commits when no such commit is
+ * known.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
@@ -245,6 +244,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
   const { packageDirectories, selectedPackages } = selectPackages(path, cwd, workspace, scope)
+  const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
 
   // The root instructions apply to every package, so a scope keeps them.
   const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
@@ -260,13 +260,12 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
           concurrency: "unbounded",
         }),
         readScopedDocumentation(cwd, workspace, scope),
-        readDecisionsRecord(cwd),
+        readDecisionsRecord(cwd, projectScope),
       ],
       { concurrency: "unbounded" }
     )
 
   const projectConfigs = configs.map((config) => toProjectPath(path, cwd, config))
-  const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
 
   // These reads change no file in the project, so they run together.
   const [overrides, suppressions] = yield* Effect.all(
@@ -284,9 +283,15 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     documentationFiles: documentation.documentationFiles,
     fixHistory: Option.match(commits, {
       onNone: () =>
-        DecisionsRecord.guards.Committed(decisionsRecord)
-          ? Since({ commit: decisionsRecord.commit })
-          : Last({ count: DEFAULT_FIX_HISTORY_COMMITS }),
+        DecisionsRecord.match(decisionsRecord, {
+          Missing: () => Option.none(),
+          Present: ({ lastChange }) => lastChange,
+        }).pipe(
+          Option.match({
+            onNone: () => Last({ count: DEFAULT_FIX_HISTORY_COMMITS }),
+            onSome: ({ commit }) => Since({ commit }),
+          })
+        ),
       onSome: (count) => Last({ count }),
     }),
     instructionFiles: instructionFiles.map((file) => relative(file)),
@@ -425,15 +430,108 @@ function renderOverrides(report: OverridesReport) {
   ].join("\n")
 }
 
-function renderDecisionsRecord(record: DecisionsRecord) {
+/**
+ * What comes before the reason of a decision: the user gave a reason for a candidate, and made a
+ * choice for an item of the Decisions list.
+ */
+const REASON_LABELS = {
+  decided: "Choice",
+  deferred: "Reason",
+  rejected: "Reason",
+} as const satisfies Record<Decision["decision"], string>
+
+/**
+ * Ends `text` as a sentence, without a second period.
+ */
+function endSentence(text: string) {
+  return /[!.?]$/u.test(text) ? text : `${text}.`
+}
+
+/**
+ * One decision as one list item, with only the parts that its line has: the `id`, the decision and
+ * its date, the scope, the standard, the reason, the proposed rule, and after `Then` what the
+ * session counted.
+ */
+function renderDecision(decision: Decision) {
+  const evidence = Array.getSomes([
+    Option.map(decision.follow, (count) => `${count} follow`),
+    Option.map(decision.break, (count) => `${count} break`),
+    decision.fixes.pipe(
+      Option.filter((fixes) => fixes.length > 0),
+      Option.map((fixes) => `fixes ${fixes.join(", ")}`)
+    ),
+  ])
+
+  const scope = Option.match(decision.scope, {
+    onNone: () => "",
+    onSome: (folder) => `, in \`${folder}\``,
+  })
+
+  return [
+    `- \`${decision.id}\`, ${decision.decision} ${decision.at}${scope}: ${endSentence(decision.standard)}`,
+    ...Array.getSomes([
+      Option.map(
+        decision.reason,
+        (reason) => `${REASON_LABELS[decision.decision]}: ${endSentence(reason)}`
+      ),
+      Option.map(decision.rule, (rule) => `Proposed: \`${rule}\`.`),
+      Option.liftPredicate(`Then: ${evidence.join(", ")}.`, () => evidence.length > 0),
+    ]),
+  ].join(" ")
+}
+
+/**
+ * The "Decisions" section: the decisions that the record holds for the scope of the session, and
+ * the lines that do not decode. The agent works from this text and does not read the file.
+ */
+function renderDecisionsRecord(record: DecisionsRecord, scope: HardenContext["scope"]) {
   const name = `The decisions record is \`${record.path}\`.`
 
   return DecisionsRecord.match(record, {
-    Committed: ({ commit, date }) => `${name} Commit \`${commit}\` last changed it, on ${date}.`,
-    Missing: () => `${name} It does not exist yet. Step 8 creates it with the first entry.`,
-    Uncommitted: () =>
-      `${name} Git names no commit that changed it, because the record is not committed or git cannot read the history.`,
+    Missing: () =>
+      `${name} It does not exist yet, so no earlier session recorded a decision. Step 8 creates it with the first line.`,
+    Present: ({ decisions, lastChange, undecodableLines }) => {
+      const change = Option.match(lastChange, {
+        onNone: () =>
+          "Git names no commit that changed it, because the record is not committed or git cannot read the history.",
+        onSome: ({ commit, date }) => `Commit \`${commit}\` last changed it, on ${date}.`,
+      })
+
+      const folder = scope === null ? "" : ` for \`${scope}\``
+
+      const held =
+        decisions.length === 0
+          ? `It holds no decision${folder}.`
+          : [
+              `It holds these decisions${folder}${scope === null ? "" : ", without the decisions of other folders"}. After \`Then\`, a line gives what the session of that date counted: the places that follow and break the standard, and its fix commits.`,
+              "",
+              ...decisions.map((decision) => renderDecision(decision)),
+            ].join("\n")
+
+      const undecodable =
+        undecodableLines.length === 0
+          ? []
+          : [
+              [
+                "Adamantite could not decode these lines of the record, and left them out. Repair each one when you append to the record in step 8.",
+                "",
+                ...undecodableLines.map(({ issue, line }) => `- Line ${line}: ${issue}`),
+              ].join("\n"),
+            ]
+
+      return [`${name} ${change}`, held, ...undecodable].join("\n\n")
+    },
   })
+}
+
+/**
+ * The line that step 8 gives the agent to copy, with each key of a line once. It has the date of
+ * today and the scope of this session, so the agent computes neither.
+ */
+function renderDecisionExample(today: string, scope: HardenContext["scope"]) {
+  const scopeKey = scope === null ? "" : `"scope":${JSON.stringify(scope)},`
+
+  return `{"id":"default-exports","at":"${today}","standard":"Modules have no default export","decision":"rejected","reason":"The router loads each page by its default export","rule":"import/no-default-export",${scopeKey}"follow":41,"break":7,"fixes":["1a2b3c4"]}`
 }
 
 /**
@@ -463,8 +561,14 @@ function renderFixHistory(history: FixHistory, folder: string) {
 /**
  * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
  * files, the facts that Adamantite computes, and the commands; `harden-prompt.md` holds the rest.
+ * `today` is the date of the session as `YYYY-MM-DD`, which step 8 gives the agent for the `at` of
+ * each line that it appends to the decisions record.
  */
-export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
+export function renderHardenPrompt(
+  context: HardenContext,
+  adamantiteVersion: string,
+  today: string
+): string {
   return fillTemplate(hardenPromptTemplate, {
     agentReach: Option.match(context.agentReach, {
       onNone: () =>
@@ -476,7 +580,12 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
       "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 9."
     ),
     customRulesSection: CUSTOM_RULES_SECTION,
-    decisionsRecord: renderDecisionsRecord(context.decisionsRecord),
+    decisionExample: renderDecisionExample(today, context.scope),
+    decisionScope:
+      context.scope === null
+        ? "Leave out `scope`, because this session covers the whole project."
+        : `Write \`"scope":${JSON.stringify(context.scope)}\` on each line, the folder of this session.`,
+    decisionsRecord: renderDecisionsRecord(context.decisionsRecord, context.scope),
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
         "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, changelogs, and agent skill folders such as `.agents/skills`. Record the search scope and report this fallback with the missing sources.",
@@ -496,6 +605,7 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
         ? "Adamantite found these files in the project and its workspace packages. Paths are relative to the project root."
         : `Adamantite found these files for \`${context.scope}\`, the folder that \`--path\` selects. Survey only the code in this folder. Paths are relative to the project root.`,
     suppressions: renderSuppressions(context.suppressions),
+    today,
     version: adamantiteVersion,
   })
 }

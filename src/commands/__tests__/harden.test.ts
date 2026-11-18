@@ -125,7 +125,7 @@ const REQUIRED_PHRASES = {
     "one case that the rule must report and one similar case that it must accept",
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
-    "One that matches a decision is settled: do not propose it or ask about it again.",
+    "One that matches a recorded decision is settled: do not propose it or ask about it again.",
     "List it under **Also considered** in step 8, with the `id` of the decision.",
     "evidence that is newer than the date of the decision, such as fix commits after it",
     "Continue when every remaining candidate has a proposed step, evidence, limits, and cases",
@@ -604,16 +604,30 @@ const DECIDED = {
 
 const BROKEN_LINE = '{"id":"layers","standard":"Keep src/lib in layers",}'
 
-function makeRecord(lines: readonly (object | string)[]) {
-  return lines
-    .map((line) => `${typeof line === "string" ? line : JSON.stringify(line)}\n`)
-    .join("")
+/**
+ * The text of a record that has one of `decisions` on each line.
+ */
+function makeRecord(decisions: readonly object[]) {
+  return decisions.map((decision) => `${JSON.stringify(decision)}\n`).join("")
 }
 
 const RECORD_CONTENT = makeRecord([REJECTED, DEFERRED, DECIDED])
 
 // A decisions record that commit `RECORD_COMMIT` last changed.
 const RECORD_FILES = { [RECORD]: RECORD_CONTENT }
+
+// The line that step 8 gives the agent to copy, without the scope of the session.
+const EXAMPLE = {
+  at: "2026-03-14",
+  break: 7,
+  decision: "rejected",
+  fixes: ["1a2b3c4"],
+  follow: 41,
+  id: "default-exports",
+  reason: "The router loads each page by its default export",
+  rule: "import/no-default-export",
+  standard: "Modules have no default export",
+}
 
 const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
 
@@ -681,7 +695,10 @@ describe("harden", () => {
     () =>
       Effect.gen(function* () {
         const { logLines } = yield* runHarden(
-          { ...INSTALLED, [RECORD]: makeRecord([REJECTED, BROKEN_LINE, DEFERRED]) },
+          {
+            ...INSTALLED,
+            [RECORD]: `${makeRecord([REJECTED])}${BROKEN_LINE}\n${makeRecord([DEFERRED])}`,
+          },
           ["--json"],
           RECORD_PROCESSES
         )
@@ -1258,7 +1275,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         ...INSTALLED,
-        [RECORD]: makeRecord([REJECTED, BROKEN_LINE]),
+        [RECORD]: `${makeRecord([REJECTED])}${BROKEN_LINE}\n`,
       })
 
       const decisions = getSection(prompt, "### Decisions")
@@ -1391,7 +1408,7 @@ describe("harden", () => {
         expect(step).toContain("`at` is `2026-03-14`, the date of today.")
         expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.undecodableLines", [])
         expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
-          expect.objectContaining({ at: "2026-03-14", scope }),
+          scope === undefined ? EXAMPLE : { ...EXAMPLE, scope },
         ])
       })
   )
@@ -1757,7 +1774,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
         // The line that did not decode before the session does not fail it.
-        files: { ...HEALTHY_FILES, [RECORD]: makeRecord([BROKEN_LINE]) },
+        files: { ...HEALTHY_FILES, [RECORD]: `${BROKEN_LINE}\n` },
         keys: ["enter"],
         onSession: (files) => {
           files.write(RECORD, `${files.read(RECORD)}${makeRecord([REJECTED])}`)
@@ -1775,7 +1792,7 @@ describe("harden", () => {
         files: { ...HEALTHY_FILES, [RECORD]: makeRecord([REJECTED]) },
         keys: ["enter"],
         onSession: (files) => {
-          files.write(RECORD, `${files.read(RECORD)}${makeRecord([BROKEN_LINE])}`)
+          files.write(RECORD, `${files.read(RECORD)}${BROKEN_LINE}\n`)
         },
       })
 

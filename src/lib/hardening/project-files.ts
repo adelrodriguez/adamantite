@@ -94,7 +94,7 @@ export function listIgnoredFiles(cwd: string, folder: string) {
 }
 
 // A commit hash, of SHA-1 or SHA-256, and a date as `YYYY-MM-DD`.
-const LAST_CHANGE = /^([\da-f]{40}|[\da-f]{64}) (\d{4}-\d{2}-\d{2})\n?$/u
+const LAST_CHANGE = /^([\da-f]{40}|[\da-f]{64}) (\d{4}-\d{2}-\d{2})$/u
 
 /**
  * The commit of the history of `HEAD` that last changed `file`, a path relative to `cwd`, with the
@@ -102,10 +102,13 @@ const LAST_CHANGE = /^([\da-f]{40}|[\da-f]{64}) (\d{4}-\d{2}-\d{2})\n?$/u
  * not committed yet, or when git cannot read the history.
  */
 export function readLastChange(cwd: string, file: string) {
-  return readGit(cwd, ["log", "-1", "--format=%H %cs", "--", file]).pipe(
+  // `log.showSignature` adds the signature of the commit to the output, which `%H %cs` does not ask
+  // for.
+  return readGit(cwd, ["log", "-1", "--no-show-signature", "--format=%H %cs", "--", file]).pipe(
     Effect.map(
       Option.flatMap((output) => {
-        const [, commit, date] = LAST_CHANGE.exec(output) ?? []
+        // Git ends the line with a line feed, or with a carriage return and a line feed.
+        const [, commit, date] = LAST_CHANGE.exec(output.trim()) ?? []
 
         return commit !== undefined && date !== undefined
           ? Option.some({ commit, date })

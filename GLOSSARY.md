@@ -241,9 +241,10 @@ renders its prompt. Harden is not an assessment and produces no findings.
 _Avoid_: Scan, codify, audit
 
 **Decisions record**:
-`.adamantite/decisions.md` at the root of a target project, or at the workspace root of a
-monorepo. It holds each candidate that the user did not approve in a harden session, and each
-decision that the user resolved, so a later session does not propose them again. The coding agent
-writes it, and the project commits it. Adamantite reads only whether it exists and which commit
-last changed it, and never its entries.
+`.adamantite/decisions.jsonl` at the root of a target project, or at the workspace root of a
+monorepo. It is a JSON Lines log with one decision on each line: a candidate that the user did not
+approve in a harden session, or a decision that the user resolved. A later line with the same `id`
+replaces an earlier one. The coding agent appends the lines, and the project commits the file.
+Adamantite never writes it. Adamantite decodes it and shows its decisions in the harden prompt, so
+a later session does not propose them again.
 _Avoid_: ADR, decision log, harden state

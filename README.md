@@ -335,21 +335,45 @@ commits of the last 200 commits, and a mistake that the fixes repeat becomes a c
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 
-After you answer, the agent writes each candidate that you did not approve, and each decision that
-you made, to the decisions record: `.adamantite/decisions.md` at the project root, or at the
-workspace root of a monorepo. Commit the record. The next session reads it and does not propose
-those candidates again, unless it has evidence that is newer than the entry. That session also
-reads only the commits since the commit that last changed the record, in place of the last 200
-commits. `--commits` gives a number of commits to read instead, with or without a record.
-Adamantite never writes the record and never reads its entries. To get a candidate proposed
-again, delete its entry.
+After you answer, the agent appends one line to the decisions record for each candidate that you
+did not approve, and for each decision that you made. The decisions record is
+`.adamantite/decisions.jsonl` at the project root, or at the workspace root of a monorepo. It is
+a JSON Lines log with one decision on each line. Commit the record. Adamantite never writes it.
+
+```jsonl
+{"id":"tests-beside-module","at":"2026-03-14","standard":"Test files sit beside the module that they test","decision":"rejected","reason":"Integration tests stay in tests/","follow":41,"break":7,"fixes":["1a2b3c4"]}
+{"id":"default-exports","at":"2026-03-14","standard":"Ban default exports","decision":"deferred","rule":"import/no-default-export","scope":"packages/web","follow":14,"break":9}
+```
+
+| Key               | Required | Meaning                                                                                                                                                      |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`              | Yes      | The key of the standard, in kebab-case. A later line with the same `id` replaces the earlier one.                                                            |
+| `at`              | Yes      | The date of the decision, as `YYYY-MM-DD`.                                                                                                                   |
+| `standard`        | Yes      | The standard in one sentence.                                                                                                                                |
+| `decision`        | Yes      | `rejected`, `deferred`, `decided` for a decision that you made, with the choice in `reason`, or `approved`, which ends an earlier decision of the same `id`. |
+| `reason`          | No       | The reason or the choice that you gave.                                                                                                                      |
+| `rule`            | No       | The rule or the step of the enforcement ladder that the session proposed.                                                                                    |
+| `scope`           | No       | The `--path` of the session, as a folder from the project root.                                                                                              |
+| `follow`, `break` | No       | How many places followed and broke the standard.                                                                                                             |
+| `fixes`           | No       | The short hashes of the fix commits that the session saw.                                                                                                    |
+
+Adamantite decodes the record and keeps the last line of each `id`. The next prompt shows those
+decisions, so the agent does not propose them again, unless it has evidence that is newer than the
+decision. With `--path`, the prompt leaves out the decisions of other folders. Adamantite ignores a
+key that it does not know. The prompt lists each line that does not decode, with its line number,
+for the agent to repair. To let harden propose a candidate again, delete its line.
+
+With a committed record, the agent reads only the commits since the commit that last changed the
+record, in place of the last 200 commits. `--commits` gives a number of commits to read instead,
+with or without a record.
 
 In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
 installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,
 `harden` runs `check`, then the Doctor assessment, and exits 1 when either fails.
 During the session, the agent verifies each new or changed custom rule with temporary
 RuleTester cases and removes the cases before handback.
-Harden also exits 1 when the session added a link to a Markdown file that does not exist. A copy or "do nothing"
+Harden also exits 1 when the session added a link to a Markdown file that does not exist, or a line
+to the decisions record that does not decode. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings.
 `harden --json` prints what the prompt is built from as one JSON document, and starts no agent.
 

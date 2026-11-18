@@ -1,13 +1,15 @@
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { AgentReach, BrokenLink } from "#lib/hardening/agent-reach.ts"
+import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import * as Bridge from "#lib/bridge/index.ts"
+import { DecisionsRecord, readDecisionsRecord } from "#lib/hardening/decisions-record.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   HardenContext,
@@ -94,16 +96,24 @@ const commits = Flag.Int("commits").pipe(
 )
 
 /**
+ * The lines of the decisions record that do not decode. A project without a record has none.
+ */
+function listUndecodableLines(record: DecisionsRecord) {
+  return DecisionsRecord.match(record, {
+    Missing: () => [],
+    Present: ({ undecodableLines }) => undecodableLines,
+  })
+}
+
+/**
  * What remains after a harden session. The agent verifies custom rules during the session with
  * temporary cases, and the project must still pass check and Doctor after it. A link that was
  * broken before the session is a gap that the user may not have approved, so only a link that the
- * session added remains.
+ * session added remains. The same holds for a line of the decisions record that does not decode:
+ * only a line that the session added remains. `before` is the context that the session started
+ * from.
  */
-const verify = Effect.fn("verify")(function* (
-  cwd: string,
-  scope: string,
-  reachBefore: Option.Option<AgentReach>
-) {
+const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before: HardenContext) {
   const CHECK_FAILED = "`adamantite check` failed."
 
   // A failed command already printed why it failed. Any other failure, such as a missing tool,
@@ -117,13 +127,17 @@ const verify = Effect.fn("verify")(function* (
   // The session can change the project, so agent reach and assessment share a new read.
   const project = yield* Project.read()
 
-  const [reachAfter, assessment] = yield* Effect.all(
-    [readHardenReach(cwd, project.workspace, scope), assessProject(project)],
+  const [reachAfter, assessment, recordAfter] = yield* Effect.all(
+    [
+      readHardenReach(cwd, project.workspace, scope),
+      assessProject(project),
+      readDecisionsRecord(cwd, before.scope),
+    ],
     { concurrency: "unbounded" }
   )
 
   const brokenBefore = new Set(
-    Option.match(reachBefore, {
+    Option.match(before.agentReach, {
       onNone: () => [],
       onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
     })
@@ -134,12 +148,22 @@ const verify = Effect.fn("verify")(function* (
     onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
   })
 
+  // A line has no key that survives a repair, so its text tells whether the session added it.
+  const undecodableBefore = new Set(
+    listUndecodableLines(before.decisionsRecord).map(({ text }) => text)
+  )
+
   return {
     failures: [
       ...checkFailures,
       ...addedBrokenLinks.map(
         (link) => `\`${link.file}\` links to \`${link.target}\`, which does not exist.`
       ),
+      ...listUndecodableLines(recordAfter)
+        .filter(({ text }) => !undecodableBefore.has(text))
+        .map(
+          ({ issue, line }) => `Line ${line} of \`${recordAfter.path}\` does not decode: ${issue}`
+        ),
     ],
     findings: assessment.findings,
     warnings: assessment.warnings,
@@ -215,9 +239,13 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
         command: "harden",
         document: Output.json(Report, { schemaVersion: 1, ...context }),
         message: "How do you want to harden this project?",
-        prompt: renderHardenPrompt(context, version),
+        prompt: renderHardenPrompt(
+          context,
+          version,
+          DateTime.formatIsoDate(yield* DateTime.nowInCurrentZone)
+        ),
         subject: "the prompt",
-        verify: verify(cwd, scopeDirectory, context.agentReach),
+        verify: verify(cwd, scopeDirectory, context),
         work: Resolution.Task(),
       })
 

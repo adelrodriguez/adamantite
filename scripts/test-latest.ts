@@ -305,7 +305,7 @@ function readPackageJson(path: string) {
 function readVersions(worktree: string): Record<string, string> {
   const fixtures = readPackageJson(join(worktree, FIXTURE_PACKAGES, "package.json"))
 
-  const installed = (folder: string, name: string) => {
+  function installed(folder: string, name: string) {
     const manifest = join(folder, "node_modules", name, "package.json")
 
     return existsSync(manifest) ? (readPackageJson(manifest).version ?? "unknown") : "missing"
@@ -656,12 +656,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
   const worktree = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-latest-")))
   const steps: Step[] = []
 
-  const step = (
-    name: StepName,
-    command: string,
-    args: string[],
-    env: Record<string, string> = {}
-  ) => {
+  function step(name: StepName, command: string, args: string[], env: Record<string, string> = {}) {
     const result = runStep(name, command, args, {
       cwd: worktree,
       env,

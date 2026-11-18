@@ -422,7 +422,7 @@ const rule: Rule = {
       return reference?.identifier.end === identifier.end ? reference.resolved : null
     }
 
-    const checkAssertion = (node: Assertion, expression: ESTree.IdentifierReference) => {
+    function checkAssertion(node: Assertion, expression: ESTree.IdentifierReference) {
       const variable = resolve(expression)
 
       if (variable === null) {
@@ -452,7 +452,7 @@ const rule: Rule = {
       })
     }
 
-    const collectAssertion = (node: Assertion) => {
+    function collectAssertion(node: Assertion) {
       const expression = assertedExpression(node)
 
       if (expression.type === "Identifier") {

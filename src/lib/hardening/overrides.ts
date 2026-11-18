@@ -149,8 +149,9 @@ export const readOverrides = Effect.fn("readOverrides")(
   ) {
     const path = yield* Path.Path
 
-    const isInScope = (file: string) =>
-      scope === null || scope === "." || file === scope || file.startsWith(`${scope}/`)
+    function isInScope(file: string) {
+      return scope === null || scope === "." || file === scope || file.startsWith(`${scope}/`)
+    }
 
     const toProjectPath = (config: string, file: string) =>
       path

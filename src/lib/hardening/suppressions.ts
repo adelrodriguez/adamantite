@@ -178,8 +178,9 @@ export const readSuppressions = Effect.fn("readSuppressions")(function* (
     return Option.none<Suppressions>()
   }
 
-  const isInScope = (file: string) =>
-    scope === null || scope === "." || file.startsWith(`${scope}/`)
+  function isInScope(file: string) {
+    return scope === null || scope === "." || file.startsWith(`${scope}/`)
+  }
 
   // Most files have no such comment, so Oxlint parses only the files that can have one.
   const candidates = yield* Effect.filter(

@@ -10,7 +10,7 @@ function isLiteral(node: ESTree.Node): boolean {
 
 const rule: Rule = {
   createOnce(context) {
-    const comparedValue = (node: ESTree.Expression): string | undefined => {
+    function comparedValue(node: ESTree.Expression): string | undefined {
       if (node.type !== "BinaryExpression" || !equalityOperators.has(node.operator)) {
         return undefined
       }

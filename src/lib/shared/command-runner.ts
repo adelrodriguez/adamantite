@@ -145,8 +145,9 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
 
         // A child writes to a pipe here, so it prints color only when told to. Oxlint and Oxfmt
         // read `FORCE_COLOR`.
-        const toColored = (step: CommandRunOptions) =>
-          canColor ? { ...step, env: { ...step.env, FORCE_COLOR: "1" } } : step
+        function toColored(step: CommandRunOptions) {
+          return canColor ? { ...step, env: { ...step.env, FORCE_COLOR: "1" } } : step
+        }
 
         const write = (chunk: OutputChunk) =>
           Stream.run(Stream.succeed(chunk.bytes), stdio[chunk.stream]())

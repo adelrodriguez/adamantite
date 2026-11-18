@@ -127,7 +127,7 @@ function addsNothingOnSomeBranch(sourceCode: SourceCode, node: ESTree.Expression
  */
 const rule: Rule = {
   createOnce(context) {
-    const check = (node: ESTree.JSXSpreadAttribute | ESTree.SpreadElement) => {
+    function check(node: ESTree.JSXSpreadAttribute | ESTree.SpreadElement) {
       if (addsNothingOnSomeBranch(context.sourceCode, node.argument)) {
         context.report({ messageId: "avoid", node })
       }

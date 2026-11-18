@@ -149,7 +149,9 @@ function toMedian(sorted: readonly number[]): number {
  * timed each command of the metadata exactly `runs` times.
  */
 export function toBenchmarkResult(test: ReportedTest): BenchmarkResult {
-  const invalid = (reason: string) => ({ id: test.id, kind: "invalid", reason }) as const
+  function invalid(reason: string) {
+    return { id: test.id, kind: "invalid", reason } as const
+  }
 
   if (test.state !== "passed") {
     return invalid(

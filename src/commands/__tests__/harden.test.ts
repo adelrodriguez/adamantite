@@ -324,7 +324,7 @@ function makeProcessLayer(files: FileSystemTestContext, processes: ProcessOption
       Order.String
     )
 
-  const getGitOutput = (args: ChildProcess.StandardCommand["args"]) => {
+  function getGitOutput(args: ChildProcess.StandardCommand["args"]) {
     if (args[0] === "rev-parse") {
       return processes.head ?? ""
     }

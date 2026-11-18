@@ -18,7 +18,7 @@ type FunctionWithReturnType =
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => {
-      const checkReturnType = (node: FunctionWithReturnType) => {
+      function checkReturnType(node: FunctionWithReturnType) {
         const annotation = node.returnType
 
         if (annotation === null || annotation === undefined) {

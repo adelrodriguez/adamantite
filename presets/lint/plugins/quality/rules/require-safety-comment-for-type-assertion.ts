@@ -103,7 +103,7 @@ const rule: Rule = {
   createOnce(context) {
     const patterns = new Map<string, RegExp>()
 
-    const checkAssertion = (node: TypeAssertion) => {
+    function checkAssertion(node: TypeAssertion) {
       if (isConstAssertion(node)) {
         return
       }

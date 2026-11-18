@@ -222,27 +222,22 @@ The tests in `src/commands/__tests__` hold these invariants:
 
 ## Reading configs, comments, and syntax trees
 
-Adamantite reads a tool config the way the tool reads it, and does not parse its source. The
-`ConfigLoader` service in `src/lib/project/config-loader.ts` imports the config with Node.js in a
-separate process, as Oxlint imports it, and prints the default export as JSON. The process runs in
-the project root, where `adamantite check` starts Oxlint, so a nested config that reads a file
-through `process.cwd()` reads the same file as when Oxlint loads it. The process keeps
-the output of the config apart, and reads the files again after a coding agent changes a module
-that the config imports. Each reader decodes the JSON with a Schema: `lint-config.ts` for Oxlint,
-and `config.ts` of `oxfmt/` and `knip/`. The trials of `harden` decode the overrides the same way.
-Each preset object, and each `custom()` result, names itself under the `adamantite.preset` symbol of
-`presets/identity.ts`, and the loader writes that identity into the JSON. A spread keeps the key,
-and every installed copy of Adamantite shares it, so a preset counts also through a spread or a
-shared config package. The `rules` of the jest and vitest presets name the preset too, so an
-override that spreads them counts as applying the preset. The tools ignore symbol keys. The unit
-tests evaluate the in-memory configs in process with `src/__tests__/config-loader.ts`, and the
-process tests run the real loader.
+Adamantite takes each fact about the target project from the tool that owns it, and does not parse
+source text. Nothing enforces it.
 
-The disable comments of a file and its syntax tree come from Oxlint itself, because only the parser
-knows them. `src/oxlint/probe.ts`, built as `dist/probe.js`, is the probe plugin: a small JS plugin whose
-rules report the comments or the tree of each source that Oxlint parses, as JSON.
-`integrations/oxlint/probe.ts` runs Oxlint with a config that loads only that plugin, and decodes
-the reports. `harden` counts the suppressions from them, and `rule ast` prints the tree.
+- A tool config comes from the `ConfigLoader` service in `src/lib/project/config-loader.ts`, which
+  imports the config with Node.js in a separate process, as Oxlint imports it. Each reader decodes
+  the result with a Schema, such as `src/lib/project/lint-config.ts`. Each preset and each
+  `custom()` result names itself under the symbol of `presets/identity.ts`, so a preset counts also
+  through a spread or a shared config package. `src/lib/project/__tests__/config-loader.test.ts`
+  runs the real loader, and the unit tests load in-memory configs with
+  `src/__tests__/config-loader.ts`.
+- The disable comments and the syntax tree of a file come from Oxlint's parser. The probe plugin,
+  `src/oxlint/probe.ts`, reports them, and `src/lib/integrations/oxlint/probe.ts` runs Oxlint with
+  only that plugin. `src/lib/hardening/__tests__/suppressions.test.ts` and
+  `src/commands/__tests__/rule.test.ts` run it.
+- The files that Oxlint lints and its reports come from `src/lib/integrations/oxlint/files.ts`,
+  which holds the Oxlint process operations that Doctor, `harden`, and the trials share.
 
 ## Command boundaries
 

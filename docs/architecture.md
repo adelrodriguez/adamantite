@@ -294,8 +294,8 @@ plugin replaces.
 ## First-party plugins
 
 Adamantite has four Oxlint plugins of its own in `presets/lint/plugins`: `adamantite`, `quality`
-and `testing` for the `strict` preset, and `quality-effect` for the `effect` preset. A preset gets the
-`jsPlugins` entry of a plugin from `firstPartyPlugin` in `presets/lint/plugins/entry.ts`. The
+and `testing` for the `strict` preset, and `quality-effect` for the `effect` preset. A preset gets
+the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `presets/lint/plugins/entry.ts`. The
 `architecture` preset loads the `adamantite` plugin without enabling rules, because
 `adamantite/layers` and `adamantite/import-owners` need options from the target project.
 
@@ -326,4 +326,4 @@ a rule.
 | `custom()` and the loader use only the Node.js APIs that Bun also provides.                                                                                       | `presets/__tests__/custom.test.ts`, in real Oxlint runs under Node.js, and the `test` workflow, with the minimum Bun |
 | A project type-checks its rules without `@oxlint/plugins`, because the build inlines the authoring types.                                                         | `scripts/test-smoke.ts`                                                                                              |
 | `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json` extend the root config, so type-aware lint sees the Node.js types and the `.ts` import extensions. | `pnpm run check`                                                                                                     |
-| Only `adamantite rule test` runs a saved test, and no temporary verification case stays in the target project.                                                    | Nothing. The skill asks it of the agent.                                                                             |
+| Only `adamantite rule test` runs a saved test, and no temporary verification case stays in the target project.                                                    | Nothing. The hardening skill asks it of the agent.                                                                   |

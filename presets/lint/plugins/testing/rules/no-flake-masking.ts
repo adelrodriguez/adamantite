@@ -24,6 +24,9 @@ const benchmarkFile = /\.(?:bench|benchmark)\.[cm]?[jt]sx?$/u
 // The option key of a test or a suite that raises its timeout.
 const testTimeouts: ReadonlySet<string> = new Set(["timeout"])
 
+// A Vitest config sets its timeouts on purpose, so only its retries count.
+const noTimeouts: ReadonlySet<string> = new Set()
+
 // The option keys of `vi.setConfig` that raise the timeout of every later test or hook.
 const configTimeouts: ReadonlySet<string> = new Set(["hookTimeout", "testTimeout"])
 
@@ -162,9 +165,16 @@ const rule: Rule = {
     // The local names of `flakyTest` that the file imports from @effect/vitest.
     const flakyTestNames = new Set<string>()
     let isConfig = false
-    // The options that a `const` binding holds can reach several tests, so each option gets one
+    // The options that a `const` binding holds can reach several calls, so each option gets one
     // report.
     const reported = new Set<ESTree.Node>()
+
+    function report(messageId: "retry" | "timeout", property: ESTree.Node) {
+      if (!reported.has(property)) {
+        reported.add(property)
+        context.report({ messageId, node: property })
+      }
+    }
 
     function reportOptions(node: ESTree.Node | undefined, timeoutKeys: ReadonlySet<string>) {
       if (node === undefined) {
@@ -173,19 +183,17 @@ const rule: Rule = {
 
       const options = constValue(context.sourceCode, node)
 
-      if (options.type !== "ObjectExpression" || reported.has(options)) {
+      if (options.type !== "ObjectExpression") {
         return
       }
-
-      reported.add(options)
 
       for (const property of options.properties) {
         const key = propertyName(property)
 
         if (key === "retry") {
-          context.report({ messageId: "retry", node: property })
+          report("retry", property)
         } else if (key !== null && timeoutKeys.has(key)) {
-          context.report({ messageId: "timeout", node: property })
+          report("timeout", property)
         }
       }
     }
@@ -264,14 +272,8 @@ const rule: Rule = {
       },
       // A Vitest config sets the retries of every test in its `test` options, also in a project.
       Property(node) {
-        if (!isConfig || propertyName(node) !== "test" || node.value.type !== "ObjectExpression") {
-          return
-        }
-
-        for (const property of node.value.properties) {
-          if (propertyName(property) === "retry") {
-            context.report({ messageId: "retry", node: property })
-          }
+        if (isConfig && propertyName(node) === "test") {
+          reportOptions(node.value, noTimeouts)
         }
       },
       // A benchmark is slow by design, so its timeout hides no flaky test.

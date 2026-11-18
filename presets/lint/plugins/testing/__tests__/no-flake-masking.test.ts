@@ -67,6 +67,17 @@ tester.run("no-flake-masking", plugin.rules["no-flake-masking"], {
       name: "options in a binding after the test function",
     },
     {
+      code: "const options = { retry: 2 }; export default defineConfig({ test: options });",
+      errors: [retry],
+      filename: "vitest.config.ts",
+      name: "Vitest config options in a binding",
+    },
+    {
+      code: 'const options = { timeout: 60_000, testTimeout: 60_000 }; test("loads", options, body); vi.setConfig(options);',
+      errors: [timeout, timeout],
+      name: "one binding that a test and vi.setConfig read for different keys",
+    },
+    {
       code: "const config = { testTimeout: 45_000 }; vi.setConfig(config);",
       errors: [timeout],
       name: "vi.setConfig options in a binding",

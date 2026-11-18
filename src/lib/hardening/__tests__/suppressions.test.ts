@@ -129,6 +129,11 @@ describe("readSuppressions", () => {
           "/* @ts-nocheck */",
           'export const text = "// @ts-ignore"',
           "// @ts-nocheck after code",
+          "/* * @ts-ignore */",
+          "/* * @ts-expect-error */",
+          "/** @ts-expect-error */",
+          "/**",
+          " * @ts-expect-error -- the JSDoc form, on the last line */",
           "",
         ].join("\n")
       )
@@ -139,10 +144,13 @@ describe("readSuppressions", () => {
 
       expect((yield* read()).directives).toStrictEqual([
         {
+          directive: "@ts-expect-error",
+          locations: ["src/a.ts:4", "src/a.ts:19", "src/a.ts:20", "src/b.tsx:4"],
+        },
+        {
           directive: "@ts-ignore",
           locations: ["src/a.ts:5", "src/a.ts:6", "src/a.ts:10", "src/a.ts:12"],
         },
-        { directive: "@ts-expect-error", locations: ["src/a.ts:4", "src/b.tsx:4"] },
         { directive: "@ts-nocheck", locations: ["src/a.ts:3", "src/b.tsx:1"] },
       ])
     })

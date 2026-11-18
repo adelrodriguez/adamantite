@@ -68,11 +68,17 @@ many for RuleTester. During harden, use `adamantite rule test add <name>` to pre
 cases, adapt them, and run `adamantite rule test --path <test-file>`.
 If a saved test already exists, preserve it and use stdin for additional temporary cases.
 
-Run lint and read all output. A rule that throws can print an error for every file while
-Oxlint still exits 0. Restart the editor language server after changing a rule, because
-Oxlint caches rules for each run.
+Run lint and read all output. A rule that throws in a visitor, or in `before` or `after`, fails
+the lint run. Oxlint reports `Error running JS plugin`, with the stack of the throw, for each
+file in which the rule throws. For those files, Oxlint omits the reports of every other rule that
+a JavaScript plugin provides, such as the other custom rules and `adamantite/layers`. Fix the
+throw first, then run lint again before you trust the remaining reports. A throw in the
+`createOnce` body, or while the rule file loads, stops Oxlint with `Failed to load JS plugin`
+before it lints a file. Restart the editor language server after changing a rule, because Oxlint
+caches rules for each run.
 
-Continue when every valid and invalid case passes and lint output contains no rule errors.
+Continue when every valid and invalid case passes and lint output contains no
+`Error running JS plugin` or `Failed to load JS plugin` error.
 
 ## Keep saved tests when requested
 
@@ -108,6 +114,6 @@ Continue when both commands pass and no temporary verification files remain.
 ## Check the rule
 
 - Every valid and invalid case passes, including the regression case for a bug fix.
-- Lint output contains no rule errors, regardless of its exit code.
+- Lint output contains no `Error running JS plugin` or `Failed to load JS plugin` error.
 - Doctor reports no findings, and the project's checks pass.
 - Temporary verification files are removed, and user-owned tests and CI steps remain.

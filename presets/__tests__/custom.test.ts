@@ -29,6 +29,7 @@ const OxlintJsonOutput = Schema.Struct({
     Schema.Struct({
       code: Schema.optional(Schema.String),
       filename: Schema.String,
+      message: Schema.String,
       severity: Schema.String,
     })
   ),
@@ -60,6 +61,25 @@ function makeRule(message: string) {
   ].join("\n")
 }
 
+/**
+ * A rule that throws in its visitor for every `debugger` statement.
+ */
+const THROWING_RULE = [
+  `import { defineRule } from ${JSON.stringify(RULES_MODULE)}`,
+  "",
+  "export default defineRule({",
+  '  meta: { type: "problem" },',
+  "  createOnce() {",
+  "    return {",
+  "      DebuggerStatement() {",
+  '        throw new Error("The rule failed.")',
+  "      },",
+  "    }",
+  "  },",
+  "})",
+  "",
+].join("\n")
+
 function makeConfig(customCall: string, imports: readonly string[] = []) {
   return [
     'import { defineConfig } from "oxlint"',
@@ -79,21 +99,29 @@ describe("custom preset", () => {
     writeFileSync(join(project, path), content)
   }
 
-  function lint(...args: string[]) {
+  /**
+   * Runs Oxlint in the project, and returns its exit code with the diagnostics that it prints.
+   */
+  function run(...args: string[]) {
     const result = spawnSync(join(REPO_ROOT, "node_modules/.bin/oxlint"), ["-f", "json", ...args], {
       cwd: project,
       encoding: "utf8",
     })
 
     try {
-      return decodeOxlintJsonOutput(result.stdout).diagnostics.map(
-        (diagnostic) => `${diagnostic.code}:${diagnostic.severity}`
-      )
+      return {
+        diagnostics: decodeOxlintJsonOutput(result.stdout).diagnostics,
+        status: result.status,
+      }
     } catch (error) {
       throw new Error(`Oxlint did not print JSON diagnostics.\n${result.stdout}${result.stderr}`, {
         cause: error,
       })
     }
+  }
+
+  function lint(...args: string[]) {
+    return run(...args).diagnostics.map((diagnostic) => `${diagnostic.code}:${diagnostic.severity}`)
   }
 
   beforeEach(() => {
@@ -135,6 +163,22 @@ describe("custom preset", () => {
     write("oxlint.config.ts", makeConfig('custom({ rules: { "no-debugger-here": "warn" } })'))
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):warning"])
+  })
+
+  // The `adamantite-hardening` skill tells agents that a rule that throws in a visitor fails the
+  // lint run, and names the error that they must look for.
+  it("fail the run with a plugin error for the file where a rule throws in a visitor", () => {
+    write(".adamantite/lint/throw-on-debugger.ts", THROWING_RULE)
+    write("oxlint.config.ts", makeConfig("custom()"))
+
+    const { diagnostics, status } = run("src")
+
+    expect(status).toBe(1)
+    expect(
+      diagnostics.map(
+        ({ filename, message, severity }) => `${filename}:${severity}:${message.split("\n", 1)[0]}`
+      )
+    ).toStrictEqual(["src/index.ts:error:Error running JS plugin."])
   })
 
   it("return an empty config without a rules folder", () => {

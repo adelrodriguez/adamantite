@@ -2,7 +2,7 @@ import { join } from "node:path"
 import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { configDefaults, defineConfig } from "vitest/config"
-import { PROCESS_RUN_TESTS } from "./process-run-tests.ts"
+import { PROCESS_RUN_TESTS } from "./config/tests.ts"
 
 // An Oxlint package folder, such as `<folder>/node_modules/oxlint`, that replaces the Oxlint of the
 // repository. CI sets it to test the rules with the minimum Oxlint version that `peerDependencies`

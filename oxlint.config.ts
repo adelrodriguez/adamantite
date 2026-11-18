@@ -4,15 +4,12 @@ import { defineConfig } from "oxlint"
 // reports the entry module that `custom()` writes to `node_modules/.cache` as the unlisted package
 // `.cache`.
 import custom from "#presets/rules/custom.ts"
+import { inMemoryTests } from "./config/tests.ts"
 import architecture from "./presets/lint/architecture.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
 import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
-import { PROCESS_RUN_TESTS } from "./process-run-tests.ts"
-
-const IN_MEMORY =
-  "Keep the files of a unit test in memory: provide the layer of `createFileSystemTestContext` from `#__tests__/filesystem.ts` with `Path.layer`. A test that needs the host filesystem starts a real process, and its file belongs in `PROCESS_RUN_TESTS` in `process-run-tests.ts`."
 
 export default defineConfig({
   // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
@@ -28,36 +25,7 @@ export default defineConfig({
     typeCheck: true,
   },
   overrides: [
-    // A unit test keeps its files in memory, so it gives the same result on each machine and beside
-    // each other test. Every file in a `__tests__` folder is a unit test or its helper, except the
-    // process-run tests, the helpers beside the preset tests, and the benchmarks, which run only in
-    // the `presets` Vitest project. A unit test gets no host layer, and no `node:fs` function except
-    // the ones that read the repository, so it creates no temporary folder and writes no file.
-    // `unicorn/prefer-node-protocol` reports the same modules without `node:`, and
-    // `eslint/no-restricted-properties` below reports a `process.chdir()` call in every file.
-    {
-      excludeFiles: [...PROCESS_RUN_TESTS, "presets/__tests__/**", "**/*.bench.ts"],
-      files: ["**/__tests__/**"],
-      rules: {
-        "eslint/no-restricted-imports": [
-          "error",
-          {
-            paths: [
-              { message: IN_MEMORY, name: "@effect/platform-node" },
-              { message: IN_MEMORY, name: "@effect/platform-node/NodeFileSystem" },
-              { message: IN_MEMORY, name: "@effect/platform-node/NodeServices" },
-              {
-                allowImportNames: ["existsSync", "globSync", "readFileSync", "readdirSync"],
-                message: IN_MEMORY,
-                name: "node:fs",
-              },
-              { message: IN_MEMORY, name: "node:fs/promises" },
-              { importNames: ["tmpdir"], message: IN_MEMORY, name: "node:os" },
-            ],
-          },
-        ],
-      },
-    },
+    inMemoryTests,
     // `RuleTester` from `oxlint/plugins-dev` and `describeModelFixtures` declare their own
     // `describe` and `it` blocks, so their calls are tests, not setup code.
     {

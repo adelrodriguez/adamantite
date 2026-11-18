@@ -121,7 +121,9 @@ function isIIFEStatement(node: ASTNode): boolean {
   if (node.type === "ExpressionStatement") {
     let expression = skipChainExpression(node.expression)
 
-    if (expression.type === "UnaryExpression") expression = skipChainExpression(expression.argument)
+    if (expression.type === "UnaryExpression") {
+      expression = skipChainExpression(expression.argument)
+    }
 
     if (expression.type === "CallExpression") {
       let node: ASTNode = expression.callee
@@ -129,8 +131,10 @@ function isIIFEStatement(node: ASTNode): boolean {
       while (node.type === "SequenceExpression") {
         const lastExpression = node.expressions.at(-1)
 
-        if (lastExpression === undefined)
+        if (lastExpression === undefined) {
           throw new Error("Padding rule invariant: sequence expression is empty")
+        }
+
         node = lastExpression
       }
 
@@ -155,7 +159,9 @@ function isCJSRequire(node: ASTNode): boolean {
     if (declaration?.init) {
       let call = declaration.init
 
-      while (call.type === "MemberExpression") call = call.object
+      while (call.type === "MemberExpression") {
+        call = call.object
+      }
 
       if (call.type === "CallExpression" && call.callee.type === "Identifier") {
         return call.callee.name === "require"
@@ -184,7 +190,9 @@ function isBlockLikeStatement(node: ASTNode, sourceCode: SourceCode): boolean {
   /**
    * IIFE is a block-like statement specially from JSCS#disallowPaddingNewLinesAfterBlocks.
    */
-  if (isIIFEStatement(node)) return true
+  if (isIIFEStatement(node)) {
+    return true
+  }
 
   // Checks the last token is a closing brace of blocks.
   const lastToken = sourceCode.getLastToken(node, isNotSemicolonToken)
@@ -232,9 +240,13 @@ function isDirectivePrologue(node: ASTNode, sourceCode: SourceCode): boolean {
     && Array.isArray(node.parent.body)
   ) {
     for (const sibling of node.parent.body) {
-      if (sibling === node) break
+      if (sibling === node) {
+        break
+      }
 
-      if (!isDirective(sibling, sourceCode)) return false
+      if (!isDirective(sibling, sourceCode)) {
+        return false
+      }
     }
 
     return true
@@ -258,7 +270,9 @@ function isCJSExport(node: ASTNode): boolean {
       let left = expression.left
 
       if (left.type === "MemberExpression") {
-        while (left.object.type === "MemberExpression") left = left.object
+        while (left.object.type === "MemberExpression") {
+          left = left.object
+        }
 
         return (
           left.object.type === "Identifier"
@@ -304,13 +318,16 @@ function replacerToRemovePaddingLines(
 }
 
 function getReportLoc(node: ASTNode, sourceCode: SourceCode): Location {
-  if (isSingleLine(node, sourceCode)) return node.loc
+  if (isSingleLine(node, sourceCode)) {
+    return node.loc
+  }
 
   const line = node.loc.start.line
   const sourceLine = sourceCode.lines[line - 1]
 
-  if (sourceLine === undefined)
+  if (sourceLine === undefined) {
     throw new Error("Padding rule invariant: statement source line is missing")
+  }
 
   return {
     end: {
@@ -344,16 +361,22 @@ function verifyForNever(
   nextNode: ASTNode,
   paddingLines: Array<[Token, Token]>
 ): void {
-  if (paddingLines.length === 0) return
+  if (paddingLines.length === 0) {
+    return
+  }
 
   context.report({
     fix(fixer) {
-      if (paddingLines.length >= 2) return null
+      if (paddingLines.length >= 2) {
+        return null
+      }
 
       const paddingPair = paddingLines[0]
 
-      if (paddingPair === undefined)
+      if (paddingPair === undefined) {
         throw new Error("Padding rule invariant: reported padding pair is missing")
+      }
+
       const [prevToken, nextToken] = paddingPair
       const start = prevToken.range[1]
       const end = nextToken.range[0]
@@ -386,7 +409,9 @@ function verifyForAlways(
   nextNode: ASTNode,
   paddingLines: Array<[Token, Token]>
 ): void {
-  if (paddingLines.length > 0) return
+  if (paddingLines.length > 0) {
+    return
+  }
 
   context.report({
     fix(fixer) {
@@ -483,7 +508,10 @@ const BaseStatementTypes = {
   },
   "cjs-import": {
     test: (node, sourceCode) => {
-      if (node.type !== "VariableDeclaration") return false
+      if (node.type !== "VariableDeclaration") {
+        return false
+      }
+
       const init = node.declarations[0]?.init
 
       return init ? sourceCode.getText(init).startsWith("require(") : false
@@ -565,12 +593,16 @@ export default function createPaddingLineRule<Extra extends string = never>(
 
       function collectSelectorOption(option: PolicyStatementOption<Extra>): void {
         if (Array.isArray(option)) {
-          for (const item of option) collectSelectorOption(item)
+          for (const item of option) {
+            collectSelectorOption(item)
+          }
 
           return
         }
 
-        if (!isSelectorOption(option)) return
+        if (!isSelectorOption(option)) {
+          return
+        }
 
         selectorMatchedNodes.set(option.selector, new Set())
       }
@@ -601,7 +633,9 @@ export default function createPaddingLineRule<Extra extends string = never>(
        * Processes to exit from the current scope.
        */
       function exitScope(): void {
-        if (scopeInfo) scopeInfo = scopeInfo.upper
+        if (scopeInfo) {
+          scopeInfo = scopeInfo.upper
+        }
       }
 
       /**
@@ -615,30 +649,37 @@ export default function createPaddingLineRule<Extra extends string = never>(
       function match(node: ASTNode, type: PolicyStatementOption<Extra>): boolean {
         let innerStatementNode = node
 
-        while (innerStatementNode.type === "LabeledStatement")
+        while (innerStatementNode.type === "LabeledStatement") {
           innerStatementNode = innerStatementNode.body
+        }
 
-        if (Array.isArray(type)) return type.some(match.bind(null, innerStatementNode))
+        if (Array.isArray(type)) {
+          return type.some(match.bind(null, innerStatementNode))
+        }
 
         if (isSelectorOption(type)) {
           const matchedNodes = selectorMatchedNodes.get(type.selector)
 
-          if (!matchedNodes?.has(innerStatementNode)) return false
+          if (!matchedNodes?.has(innerStatementNode)) {
+            return false
+          }
 
           const lineMode = type.lineMode
 
-          if (lineMode === "singleline")
+          if (lineMode === "singleline") {
             return fitsOnOneLine(innerStatementNode, sourceCode, printWidth)
-          else if (lineMode === "multiline")
+          } else if (lineMode === "multiline") {
             return !fitsOnOneLine(innerStatementNode, sourceCode, printWidth)
+          }
 
           return true
         }
 
         const statementType = customStatementTypes[type] ?? StatementTypes.get(type)
 
-        if (statementType === undefined)
+        if (statementType === undefined) {
           throw new Error(`Padding rule invariant: unsupported statement type ${type}`)
+        }
 
         return statementType.test(innerStatementNode, sourceCode, printWidth)
       }
@@ -658,8 +699,9 @@ export default function createPaddingLineRule<Extra extends string = never>(
         let blankLine: PaddingType = "any"
 
         for (const entry of options) {
-          if (match(prevNode, entry.prev) && match(nextNode, entry.next))
+          if (match(prevNode, entry.prev) && match(nextNode, entry.next)) {
             blankLine = entry.blankLine
+          }
         }
 
         return PaddingTypes[blankLine]
@@ -685,10 +727,13 @@ export default function createPaddingLineRule<Extra extends string = never>(
           do {
             const token = sourceCode.getTokenAfter(prevToken, { includeComments: true })
 
-            if (token === null)
+            if (token === null) {
               throw new Error("Padding rule invariant: token before the next statement is missing")
+            }
 
-            if (token.loc.start.line - prevToken.loc.end.line >= 2) pairs.push([prevToken, token])
+            if (token.loc.start.line - prevToken.loc.end.line >= 2) {
+              pairs.push([prevToken, token])
+            }
 
             prevToken = token
           } while (prevToken.range[0] < nextNode.range[0])
@@ -719,13 +764,17 @@ export default function createPaddingLineRule<Extra extends string = never>(
           return
         }
 
-        if (scopeInfo === null) throw new Error("Padding rule invariant: statement outside a scope")
+        if (scopeInfo === null) {
+          throw new Error("Padding rule invariant: statement outside a scope")
+        }
 
         // Save this node as the current previous statement.
         const prevNode = scopeInfo.prevNode
 
         // Verify.
-        if (prevNode) pendingPairs.push({ nextNode: node, prevNode })
+        if (prevNode) {
+          pendingPairs.push({ nextNode: node, prevNode })
+        }
 
         scopeInfo.prevNode = node
       }

@@ -24,10 +24,16 @@ function isRuntimeFunction(node: ESTree.Node): node is RuntimeFunction {
  * the function type that annotates the variable it initializes.
  */
 function declaredReturnType(fn: RuntimeFunction): ESTree.TSType | undefined {
-  if (fn.returnType) return fn.returnType.typeAnnotation
+  if (fn.returnType) {
+    return fn.returnType.typeAnnotation
+  }
+
   const declarator = fn.parent
 
-  if (declarator.type !== "VariableDeclarator" || declarator.init !== fn) return undefined
+  if (declarator.type !== "VariableDeclarator" || declarator.init !== fn) {
+    return undefined
+  }
+
   const annotation = declarator.id.typeAnnotation?.typeAnnotation
 
   return annotation?.type === "TSFunctionType" ? annotation.returnType.typeAnnotation : undefined
@@ -53,9 +59,13 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
     if (isRuntimeFunction(current)) {
       const returnType = declaredReturnType(current)
 
-      if (returnType !== undefined) return returnType.type === "TSTypePredicate"
+      if (returnType !== undefined) {
+        return returnType.type === "TSTypePredicate"
+      }
 
-      if (!isInlineCallback(current)) return false
+      if (!isInlineCallback(current)) {
+        return false
+      }
     }
 
     current = current.parent
@@ -70,9 +80,14 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
 function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
   const parent = node.parent
 
-  if (parent.type !== "BinaryExpression") return false
+  if (parent.type !== "BinaryExpression") {
+    return false
+  }
 
-  if (!["===", "!==", "==", "!="].includes(parent.operator)) return false
+  if (!["===", "!==", "==", "!="].includes(parent.operator)) {
+    return false
+  }
+
   const other = parent.left === node ? parent.right : parent.left
 
   return other.type === "Literal" && other.value === "undefined"
@@ -126,7 +141,9 @@ function destructuringPattern(
 
   const property = value.parent
 
-  if (property.type !== "Property" || property.value !== value) return null
+  if (property.type !== "Property" || property.value !== value) {
+    return null
+  }
 
   return property.parent.type === "ObjectPattern" ? property.parent : null
 }
@@ -142,16 +159,26 @@ function declaredType(
 ): ESTree.TSType | null {
   const name = bindingName(identifier, sourceCode)
 
-  if (name === null) return null
+  if (name === null) {
+    return null
+  }
 
   const pattern = destructuringPattern(name)
 
-  if (pattern === null) return ownAnnotation(name)
+  if (pattern === null) {
+    return ownAnnotation(name)
+  }
 
-  if (pattern.typeAnnotation) return pattern.typeAnnotation.typeAnnotation
+  if (pattern.typeAnnotation) {
+    return pattern.typeAnnotation.typeAnnotation
+  }
+
   const declarator = pattern.parent
 
-  if (declarator.type !== "VariableDeclarator" || declarator.init === null) return null
+  if (declarator.type !== "VariableDeclarator" || declarator.init === null) {
+    return null
+  }
+
   const root = operandRoot(declarator.init)
   const source = root === null ? null : bindingName(root, sourceCode)
 
@@ -190,7 +217,9 @@ const PASS_THROUGH_TYPES: ReadonlySet<string> = new Set(["Awaited", "NoInfer", "
  */
 function addsNothing(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
   return resolvedTypeMatches(type, environment, (resolved, matches) => {
-    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+    if (resolved.type === "TSParenthesizedType") {
+      return matches(resolved.typeAnnotation)
+    }
 
     return (
       resolved.type === "TSObjectKeyword"
@@ -206,9 +235,13 @@ function isUncheckedTypeParameter(
   seen: ReadonlySet<ESTree.TSTypeParameter>
 ): boolean {
   return resolvedTypeMatches(type, environment, (resolved, matches) => {
-    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+    if (resolved.type === "TSParenthesizedType") {
+      return matches(resolved.typeAnnotation)
+    }
 
-    if (resolved.type === "TSUnionType") return resolved.types.some(matches)
+    if (resolved.type === "TSUnionType") {
+      return resolved.types.some(matches)
+    }
 
     if (resolved.type === "TSIntersectionType") {
       return (
@@ -217,7 +250,10 @@ function isUncheckedTypeParameter(
       )
     }
 
-    if (resolved.type !== "TSTypeReference") return false
+    if (resolved.type !== "TSTypeReference") {
+      return false
+    }
+
     const wrapper = builtInTypeName(resolved, environment)
     const argument = resolved.typeArguments?.params[0]
 
@@ -227,7 +263,10 @@ function isUncheckedTypeParameter(
 
     const parameter = referencedTypeParameter(resolved, environment)
 
-    if (parameter === null || seen.has(parameter)) return false
+    if (parameter === null || seen.has(parameter)) {
+      return false
+    }
+
     const constraint = parameter.constraint
 
     return (
@@ -266,12 +305,21 @@ const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => ({
       UnaryExpression(node) {
-        if (node.operator !== "typeof" || isExistenceProbe(node)) return
+        if (node.operator !== "typeof" || isExistenceProbe(node)) {
+          return
+        }
+
         const allowInTypeGuards = readBooleanOption(context.options, "allowInTypeGuards") === true
 
-        if (allowInTypeGuards && isInsideTypeGuard(node)) return
+        if (allowInTypeGuards && isInsideTypeGuard(node)) {
+          return
+        }
+
         defer((environment) => {
-          if (hasOwnedType(node.argument, context.sourceCode, environment)) return
+          if (hasOwnedType(node.argument, context.sourceCode, environment)) {
+            return
+          }
+
           context.report({ messageId: "runtimeTypeof", node })
         })
       },

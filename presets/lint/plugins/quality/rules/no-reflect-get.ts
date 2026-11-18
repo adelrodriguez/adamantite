@@ -17,7 +17,9 @@ function hasDistinctReceiver(
     return false
   }
 
-  if (target.type === "SpreadElement" || receiver.type === "SpreadElement") return false
+  if (target.type === "SpreadElement" || receiver.type === "SpreadElement") {
+    return false
+  }
 
   return sourceCode.getText(receiver) !== sourceCode.getText(target)
 }
@@ -31,10 +33,14 @@ const rule: Rule = {
       CallExpression(node) {
         const call = matchReflectMethodCall(context.sourceCode, node, "get")
 
-        if (call === null) return
-
-        if (call.kind === "listed" && hasDistinctReceiver(context.sourceCode, call.arguments))
+        if (call === null) {
           return
+        }
+
+        if (call.kind === "listed" && hasDistinctReceiver(context.sourceCode, call.arguments)) {
+          return
+        }
+
         context.report({ messageId: "reflectGet", node })
       },
     }

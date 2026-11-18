@@ -22,7 +22,10 @@ describe("assessPackage", () => {
     )
   ).pipe(
     Arbitrary.map((parts) => {
-      if (parts === null) return null
+      if (parts === null) {
+        return null
+      }
+
       const [workspacePrefix, rangePrefix, version] = parts
 
       return { version, written: `${workspacePrefix}${rangePrefix}${version}` }

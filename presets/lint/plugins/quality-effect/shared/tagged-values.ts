@@ -12,11 +12,17 @@ export const isTagMember = (
 export const tagMemberFromComparison = (
   node: ESTree.BinaryExpression
 ): ESTree.MemberExpression | undefined => {
-  if (!equalityOperators.has(node.operator)) return undefined
+  if (!equalityOperators.has(node.operator)) {
+    return undefined
+  }
 
-  if (isTagMember(node.left) && isStringLiteral(node.right)) return node.left
+  if (isTagMember(node.left) && isStringLiteral(node.right)) {
+    return node.left
+  }
 
-  if (isTagMember(node.right) && isStringLiteral(node.left)) return node.right
+  if (isTagMember(node.right) && isStringLiteral(node.left)) {
+    return node.right
+  }
 
   return undefined
 }

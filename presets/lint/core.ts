@@ -116,6 +116,7 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "block-scoped-var": "error",
     "class-methods-use-this": "warn",
     "constructor-super": "error",
+    curly: "error",
     "default-case": "off",
     "default-case-last": "error",
     "default-param-last": "error",
@@ -124,6 +125,10 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "getter-return": "error",
     "grouped-accessor-pairs": "error",
     "import/default": "error",
+    // TypeScript reports two exports of one name in a module and two `export *` that export one
+    // name. It accepts a local export that hides a name of an `export *`, and it does not check a
+    // JavaScript file. This rule reports both.
+    "import/export": "error",
     "import/first": "error",
     "import/named": "error",
     "import/namespace": "error",
@@ -582,11 +587,17 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "unicorn/prefer-set-has": "error",
     "unicorn/prefer-set-size": "error",
     "unicorn/prefer-single-call": "error",
+    "unicorn/prefer-string-raw": "error",
     "unicorn/prefer-string-replace-all": "error",
     "unicorn/prefer-string-slice": "error",
     "unicorn/prefer-string-trim-start-end": "error",
     "unicorn/prefer-structured-clone": "error",
     "unicorn/prefer-ternary": ["error", "only-single-line"],
+    // The rule reads each `.then`, `.catch`, or `.finally` call that runs when the module loads as a
+    // promise chain, without its type. It reports a schema default such as `z.number().catch(3000)`
+    // and an `Effect.catch` in a pipeline at module scope. `typescript/no-floating-promises` reports
+    // a top-level promise that nothing handles.
+    "unicorn/prefer-top-level-await": "off",
     "unicorn/relative-url-style": "error",
     "unicorn/require-array-join-separator": "error",
     "unicorn/require-module-attributes": "error",

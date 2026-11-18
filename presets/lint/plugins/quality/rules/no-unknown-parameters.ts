@@ -96,7 +96,10 @@ function declaringTypeName(member: ESTree.Node): string | null {
 function ownerNames(owner: ParameterOwner): string[] {
   const names: string[] = []
 
-  if ("id" in owner && owner.id) names.push(owner.id.name)
+  if ("id" in owner && owner.id) {
+    names.push(owner.id.name)
+  }
+
   const holder = owner.type === "TSMethodSignature" ? owner : owner.parent
 
   if (holder.type === "VariableDeclarator" && holder.id.type === "Identifier") {
@@ -112,12 +115,16 @@ function ownerNames(owner: ParameterOwner): string[] {
   ) {
     const name = staticKeyName(holder.key, holder.computed)
 
-    if (name !== null) names.push(name)
+    if (name !== null) {
+      names.push(name)
+    }
   }
 
   const typeName = declaringTypeName(holder)
 
-  if (typeName !== null) names.push(typeName)
+  if (typeName !== null) {
+    names.push(typeName)
+  }
 
   return names
 }
@@ -148,10 +155,16 @@ const REJECTION_CALLBACK_INDEX = new Map([
 function isRejectionCallback(owner: ParameterOwner): boolean {
   const call = owner.parent
 
-  if (call.type !== "CallExpression") return false
+  if (call.type !== "CallExpression") {
+    return false
+  }
+
   const callee = call.callee
 
-  if (callee.type !== "MemberExpression") return false
+  if (callee.type !== "MemberExpression") {
+    return false
+  }
+
   const name = staticKeyName(callee.property, callee.computed)
   const index = name === null ? undefined : REJECTION_CALLBACK_INDEX.get(name)
 
@@ -182,7 +195,10 @@ const PARSERS = new Map<string, "factory" | "method">([
 ])
 
 function memberParser(callee: ESTree.Node): "factory" | "method" | undefined {
-  if (callee.type !== "MemberExpression") return undefined
+  if (callee.type !== "MemberExpression") {
+    return undefined
+  }
+
   const name = staticKeyName(callee.property, callee.computed)
 
   return name === null ? undefined : PARSERS.get(name)
@@ -211,7 +227,9 @@ function isParserConstant(callee: ESTree.IdentifierReference, sourceCode: Source
 function isParserCall(call: ESTree.CallExpression, sourceCode: SourceCode): boolean {
   const callee = call.callee
 
-  if (callee.type === "Identifier") return isParserConstant(callee, sourceCode)
+  if (callee.type === "Identifier") {
+    return isParserConstant(callee, sourceCode)
+  }
 
   return memberParser(callee) === "method" || isParserFactoryCall(callee)
 }
@@ -269,7 +287,10 @@ function isInstanceofBranch(reference: ReferenceIdentifier): boolean {
 function isParsedReference(reference: Reference, sourceCode: SourceCode): boolean {
   const identifier = reference.identifier
 
-  if (!reference.isReadOnly()) return false
+  if (!reference.isReadOnly()) {
+    return false
+  }
+
   const parent = identifier.parent
 
   return (
@@ -291,10 +312,15 @@ function isParserInput(
   parameter: FunctionParameter,
   sourceCode: SourceCode
 ): boolean {
-  if (!isRuntimeFunction(owner)) return false
+  if (!isRuntimeFunction(owner)) {
+    return false
+  }
+
   const binding = parameterIdentifier(parameter)
 
-  if (binding === null) return false
+  if (binding === null) {
+    return false
+  }
 
   const variable = sourceCode
     .getDeclaredVariables(owner)
@@ -318,18 +344,33 @@ const rule: Rule = {
         for (const [index, parameter] of node.params.entries()) {
           const annotation = functionParameterTypeAnnotation(parameter)
 
-          if (annotation === null || annotation === undefined) continue
+          if (annotation === null || annotation === undefined) {
+            continue
+          }
+
           defer((environment) => {
-            if (!resolvesToUnknown(annotation.typeAnnotation, environment)) return
+            if (!resolvesToUnknown(annotation.typeAnnotation, environment)) {
+              return
+            }
+
             const name = functionParameterBindingName(parameter, context.sourceCode)
 
-            if (name === "cause" && isErrorCauseOwner(node)) return
+            if (name === "cause" && isErrorCauseOwner(node)) {
+              return
+            }
 
-            if (isTypePredicateSubject(node, name)) return
+            if (isTypePredicateSubject(node, name)) {
+              return
+            }
 
-            if (index === 0 && isRejectionCallback(node)) return
+            if (index === 0 && isRejectionCallback(node)) {
+              return
+            }
 
-            if (isParserInput(node, parameter, context.sourceCode)) return
+            if (isParserInput(node, parameter, context.sourceCode)) {
+              return
+            }
+
             context.report({
               data: { parameter: name },
               messageId: "unknownParameter",

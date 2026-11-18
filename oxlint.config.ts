@@ -127,7 +127,7 @@ export default defineConfig({
       {
         minimumDescriptionLength: 3,
         "ts-check": false,
-        "ts-expect-error": { descriptionFormat: "^ - \\S" },
+        "ts-expect-error": { descriptionFormat: String.raw`^ - \S` },
         "ts-ignore": true,
         "ts-nocheck": "allow-with-description",
       },

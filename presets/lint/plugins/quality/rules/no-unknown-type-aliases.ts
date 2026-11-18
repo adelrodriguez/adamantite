@@ -11,7 +11,10 @@ const rule: Rule = {
     return withTypeBindings(context, (defer) => ({
       TSTypeAliasDeclaration(node) {
         defer((environment) => {
-          if (!resolvesToUnknown(node.typeAnnotation, environment)) return
+          if (!resolvesToUnknown(node.typeAnnotation, environment)) {
+            return
+          }
+
           context.report({
             data: { alias: node.id.name },
             messageId: "unknownAlias",

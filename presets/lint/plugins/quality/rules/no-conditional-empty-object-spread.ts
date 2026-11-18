@@ -34,13 +34,21 @@ function unwrapExpression(node: ESTree.Expression): ESTree.Expression {
 function isOnlySpread(node: ESTree.Node): boolean {
   const { parent } = node
 
-  if (parent === null) return false
+  if (parent === null) {
+    return false
+  }
 
-  if (parent.type === "SpreadElement") return parent.parent.type === "ObjectExpression"
+  if (parent.type === "SpreadElement") {
+    return parent.parent.type === "ObjectExpression"
+  }
 
-  if (parent.type === "JSXSpreadAttribute") return true
+  if (parent.type === "JSXSpreadAttribute") {
+    return true
+  }
 
-  if (parent.type === "ConditionalExpression") return parent.test !== node && isOnlySpread(parent)
+  if (parent.type === "ConditionalExpression") {
+    return parent.test !== node && isOnlySpread(parent)
+  }
 
   return EXPRESSION_WRAPPERS.has(parent.type) && isOnlySpread(parent)
 }
@@ -61,9 +69,14 @@ function isNullLiteral(node: ESTree.Expression): boolean {
 function isEmptyBinding(sourceCode: SourceCode, node: ESTree.IdentifierReference): boolean {
   const variable = resolveVariable(sourceCode, node)
 
-  if (node.name === "undefined" && (variable === null || variable.defs.length === 0)) return true
+  if (node.name === "undefined" && (variable === null || variable.defs.length === 0)) {
+    return true
+  }
 
-  if (variable?.defs.length !== 1) return false
+  if (variable?.defs.length !== 1) {
+    return false
+  }
+
   const [definition] = variable.defs
 
   return (
@@ -99,7 +112,9 @@ function isEmptyBranch(sourceCode: SourceCode, node: ESTree.Expression): boolean
 function addsNothingOnSomeBranch(sourceCode: SourceCode, node: ESTree.Expression): boolean {
   const spread = unwrapExpression(node)
 
-  if (spread.type === "LogicalExpression") return spread.operator === "&&"
+  if (spread.type === "LogicalExpression") {
+    return spread.operator === "&&"
+  }
 
   return (
     spread.type === "ConditionalExpression"
@@ -121,7 +136,9 @@ const rule: Rule = {
     return {
       JSXSpreadAttribute: check,
       SpreadElement(node) {
-        if (node.parent.type === "ObjectExpression") check(node)
+        if (node.parent.type === "ObjectExpression") {
+          check(node)
+        }
       },
     }
   },

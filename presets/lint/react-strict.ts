@@ -16,6 +16,9 @@ const config: OxlintConfig = {
     // `**/hooks/**`. Each name passes core's `unicorn/filename-case`. A project with another layout
     // sets the rule's `allow` option.
     "adamantite/no-react-state-hooks": "error",
+    // An effect without a dependency array runs after every render. In a hook module, where effects
+    // stay allowed, each effect states the values that it reads.
+    "adamantite/require-effect-dependencies": "error",
 
     // State values stay immutable, and updaters stay pure.
     "react-doctor/no-create-store-in-render": "error",

@@ -51,8 +51,8 @@ describe("oxlint-entry", () => {
 
     it("take the folder above node_modules for a Windows path", () => {
       expect(
-        getProjectDirectory("C:\\project\\node_modules\\adamantite\\dist\\oxlint.js", CWD)
-      ).toBe("C:\\project")
+        getProjectDirectory(String.raw`C:\project\node_modules\adamantite\dist\oxlint.js`, CWD)
+      ).toBe(String.raw`C:\project`)
     })
 
     it("take the working directory for an entry outside node_modules", () => {

@@ -14,7 +14,10 @@ export function resolveVariable(
   while (scope !== null) {
     const variable = scope.set.get(identifier.name)
 
-    if (variable !== undefined) return variable
+    if (variable !== undefined) {
+      return variable
+    }
+
     scope = scope.upper
   }
 
@@ -28,7 +31,9 @@ export function resolveVariable(
 export function constBinding(
   variable: Variable
 ): { readonly id: ESTree.BindingPattern; readonly init: ESTree.Expression } | null {
-  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return null
+  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) {
+    return null
+  }
 
   for (const definition of variable.defs) {
     if (
@@ -50,9 +55,14 @@ export function constBinding(
  * declare that name in scope.
  */
 function isGlobalIdentifier(sourceCode: SourceCode, expression: ESTree.Node, name: string) {
-  if (expression.type !== "Identifier" || expression.name !== name) return false
+  if (expression.type !== "Identifier" || expression.name !== name) {
+    return false
+  }
 
-  if (sourceCode.isGlobalReference(expression)) return true
+  if (sourceCode.isGlobalReference(expression)) {
+    return true
+  }
+
   const variable = resolveVariable(sourceCode, expression)
 
   return variable === null || variable.defs.length === 0
@@ -67,7 +77,9 @@ export function isGlobalObject(
   expression: ESTree.Node,
   name: string
 ): boolean {
-  if (isGlobalIdentifier(sourceCode, expression, name)) return true
+  if (isGlobalIdentifier(sourceCode, expression, name)) {
+    return true
+  }
 
   return (
     expression.type === "MemberExpression"
@@ -85,10 +97,16 @@ function resolveConstBinding(
   expression: ESTree.Node,
   visited: Set<Variable>
 ) {
-  if (expression.type !== "Identifier") return null
+  if (expression.type !== "Identifier") {
+    return null
+  }
+
   const variable = resolveVariable(sourceCode, expression)
 
-  if (variable === null || visited.has(variable)) return null
+  if (variable === null || visited.has(variable)) {
+    return null
+  }
+
   visited.add(variable)
 
   return constBinding(variable)
@@ -112,7 +130,10 @@ function matchesThroughAliasesFrom(
   matches: (expression: ESTree.Node) => boolean,
   visited: Set<Variable>
 ): boolean {
-  if (matches(expression)) return true
+  if (matches(expression)) {
+    return true
+  }
+
   const binding = resolveConstBinding(sourceCode, expression, visited)
 
   return (
@@ -150,16 +171,24 @@ function readsPropertyFrom(
 
   const binding = resolveConstBinding(sourceCode, expression, visited)
 
-  if (binding === null) return false
+  if (binding === null) {
+    return false
+  }
+
   const { id, init } = binding
 
-  if (id.type === "Identifier") return readsPropertyFrom(sourceCode, init, isName, isOwner, visited)
+  if (id.type === "Identifier") {
+    return readsPropertyFrom(sourceCode, init, isName, isOwner, visited)
+  }
 
   return (
     id.type === "ObjectPattern"
     && expression.type === "Identifier"
     && id.properties.some((property) => {
-      if (property.type !== "Property" || property.value.type !== "Identifier") return false
+      if (property.type !== "Property" || property.value.type !== "Identifier") {
+        return false
+      }
+
       const name = staticKeyName(property.key, property.computed)
 
       return property.value.name === expression.name && name !== null && isName(name)

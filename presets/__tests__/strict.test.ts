@@ -7,7 +7,7 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import { testFiles as jestTestFiles } from "#presets/lint/jest.ts"
 import adamantitePlugin from "#presets/lint/plugins/adamantite/index.ts"
-import antislopPlugin from "#presets/lint/plugins/antislop/index.ts"
+import qualityPlugin from "#presets/lint/plugins/quality/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
@@ -30,21 +30,21 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 
 const presetRules = getFirstPartyRules(strict.rules)
 
-// The preset enables some antislop rules for every file and the assertion rules only in tests. An
+// The preset enables some quality rules for every file and the assertion rules only in tests. An
 // override that turns a rule off, such as the override for declaration files, enables nothing.
-const antislopRules = [strict.rules, ...(strict.overrides ?? []).map((override) => override.rules)]
+const qualityRules = [strict.rules, ...(strict.overrides ?? []).map((override) => override.rules)]
   .flatMap((rules) => Object.entries(rules ?? {}))
-  .flatMap(([name, setting]) => (name.startsWith("antislop/") && setting !== "off" ? [name] : []))
+  .flatMap(([name, setting]) => (name.startsWith("quality/") && setting !== "off" ? [name] : []))
 
 // These rules need options from the target project, such as a layer map, so the project turns them
 // on.
 const PROJECT_RULES = ["import-owners", "layers"]
 
 describe("strict preset", () => {
-  it("enable each rule of the antislop plugin exactly once", () => {
-    expect(EffectArray.sort(antislopRules, Order.String)).toStrictEqual(
+  it("enable each rule of the quality plugin exactly once", () => {
+    expect(EffectArray.sort(qualityRules, Order.String)).toStrictEqual(
       EffectArray.sort(
-        Object.keys(antislopPlugin.rules).map((rule) => `antislop/${rule}`),
+        Object.keys(qualityPlugin.rules).map((rule) => `quality/${rule}`),
         Order.String
       )
     )
@@ -61,7 +61,7 @@ describe("strict preset", () => {
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
       EffectArray.sort(
-        [...presetRules.map((rule) => `${NAMESPACE}/${rule}`), ...antislopRules],
+        [...presetRules.map((rule) => `${NAMESPACE}/${rule}`), ...qualityRules],
         Order.String
       )
     )
@@ -193,16 +193,13 @@ describe("core advice with the strict preset", () => {
   it("end each chain of advice on a form that core and strict accept", () => {
     expect(reports).toStrictEqual({
       "any/1-any.ts": ["typescript/no-explicit-any"],
-      "any/2-core-advice.ts": ["antislop/no-unknown-parameters"],
+      "any/2-core-advice.ts": ["quality/no-unknown-parameters"],
       "any/3-strict-advice.ts": [],
       "instanceof/1-instanceof.ts": ["unicorn/no-instanceof-builtins"],
-      "instanceof/2-core-advice.ts": [
-        "antislop/no-runtime-typeof",
-        "antislop/no-unknown-parameters",
-      ],
+      "instanceof/2-core-advice.ts": ["quality/no-runtime-typeof", "quality/no-unknown-parameters"],
       "instanceof/3-strict-advice.ts": [],
       "object/1-wrapper.ts": ["typescript/no-wrapper-object-types"],
-      "object/2-core-advice.ts": ["antislop/no-object-parameters"],
+      "object/2-core-advice.ts": ["quality/no-object-parameters"],
       "object/3-strict-advice.ts": [],
     })
   })

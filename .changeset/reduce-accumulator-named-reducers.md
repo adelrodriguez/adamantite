@@ -2,7 +2,7 @@
 "adamantite": minor
 ---
 
-Report accumulator copies in named reducers, and accept copies with a fixed size, in `antislop/no-reduce-accumulator-copy`
+Report accumulator copies in named reducers, and accept copies with a fixed size, in `quality/no-reduce-accumulator-copy`
 
 The rule now reports an accumulator copy in a function declaration or a `const` function that a `reduce` call in the same file uses as its reducer, such as `items.reduce(append, [])`. It also reports an accumulator passed to `concat` on a new array, such as `[item].concat(acc)`, `globalThis.Object.assign` and `globalThis.Array.from`, and a copy in a callback that the reducer passes to another call, such as `forEach`. A copy in a stored callback is still allowed.
 

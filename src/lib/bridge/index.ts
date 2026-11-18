@@ -129,7 +129,7 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
     }),
   }
 
-  // Lint runs before Oxfmt wraps long lines, so `antislop/require-readable-spacing` counts a line
+  // Lint runs before Oxfmt wraps long lines, so `quality/require-readable-spacing` counts a line
   // past the print width as multiline. Oxlint applies one pass of fixes, so a fix that causes a new
   // report still needs a second `fix` until Oxlint repeats its passes:
   // https://github.com/oxc-project/oxc/issues/16118

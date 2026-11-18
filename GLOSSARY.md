@@ -238,3 +238,11 @@ Find the coding standards that a target project follows, and move each one up th
 enforcement ladder after the user approves it. A coding agent does the work, and Adamantite
 renders its prompt. Harden is not an assessment and produces no findings.
 _Avoid_: Scan, codify, audit
+
+**Decisions record**:
+`.adamantite/decisions.md` at the root of a target project, or at the workspace root of a
+monorepo. It holds each candidate that the user did not approve in a harden session, and each
+decision that the user resolved, so a later session does not propose them again. The coding agent
+writes it, and the project commits it. Adamantite reads only whether it exists and which commit
+last changed it, and never its entries.
+_Avoid_: ADR, decision log, harden state

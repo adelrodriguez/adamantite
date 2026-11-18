@@ -1,4 +1,5 @@
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
@@ -6,6 +7,11 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type * as Project from "#lib/project/index.ts"
 import { AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
+import {
+  DECISIONS_RECORD_PATH,
+  DecisionsRecord,
+  readDecisionsRecord,
+} from "#lib/hardening/decisions-record.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
 import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
@@ -25,14 +31,46 @@ const hardenPromptTemplate = getHardenPromptTemplate()
 const AGENTS_FILE = "AGENTS.md"
 
 /**
- * Changesets and changelogs record releases, not coding standards. Git separates the folders of a
- * path with `/` on each platform.
+ * Changesets and changelogs record releases, and the decisions record holds decisions, so none of
+ * them states a coding standard. `file` is relative to the project root, and git separates the
+ * folders of a path with `/` on each platform.
  */
 function isDocumentation(file: string) {
   const segments = file.split("/")
 
-  return !segments.includes(".changeset") && segments.at(-1) !== "CHANGELOG.md"
+  return (
+    !segments.includes(".changeset")
+    && segments.at(-1) !== "CHANGELOG.md"
+    && file !== DECISIONS_RECORD_PATH
+  )
 }
+
+/**
+ * The number of recent commits that the agent reads for fixed mistakes when `--commits` is not set
+ * and no commit of the decisions record gives a start.
+ */
+export const DEFAULT_FIX_HISTORY_COMMITS = 200
+
+/**
+ * The commits that the agent reads for fixed mistakes. The scope has no stored state: the commit
+ * that last changed the decisions record is the start, because the session that wrote the record
+ * read the history before it. `--commits` gives a number of commits instead.
+ */
+const FixHistory = Schema.TaggedUnion({
+  /**
+   * The last `count` commits: the number that `--commits` gives, or the default when the project
+   * has no decisions record or git names no commit that changed it.
+   */
+  Last: { count: Schema.Int },
+  /**
+   * The commits after `commit`, the commit that last changed the decisions record.
+   */
+  Since: { commit: Schema.String },
+})
+
+type FixHistory = typeof FixHistory.Type
+
+const { Last, Since } = Data.taggedEnum<FixHistory>()
 
 /**
  * What a harden session starts from: the files that Adamantite found, and what it computed about
@@ -44,15 +82,13 @@ export const HardenContext = Schema.Struct({
    * Which Markdown files each `AGENTS.md` reaches, or none when git cannot list them.
    */
   agentReach: Schema.OptionFromNullOr(AgentReach),
-  /**
-   * The number of recent commits that the agent reads for fixed mistakes.
-   */
-  commits: Schema.Int,
   configs: Schema.Array(ProjectPath),
+  decisionsRecord: DecisionsRecord,
   /**
    * The Markdown files of the project, or none when git cannot list them.
    */
   documentationFiles: Schema.OptionFromNullOr(Schema.Array(Schema.String)),
+  fixHistory: FixHistory,
   instructionFiles: Schema.Array(Schema.String),
   /**
    * The trial of each override that turns a rule off.
@@ -192,14 +228,16 @@ export const readHardenReach = Effect.fn("readHardenReach")(function* (
  * the packages inside that folder, or the package that contains it. The context keeps the configs
  * that lint those packages, an ancestor config included, and the rules folders that those configs
  * load, also when they are outside the scope. A scope also keeps the Markdown files outside each
- * workspace package, because the root documentation applies to every package. `commits` is the
- * number of recent commits that the agent reads for fixed mistakes.
+ * workspace package, because the root documentation applies to every package. The project has one
+ * decisions record, which a scope does not move. `commits` is the value of `--commits`: without it,
+ * the fix history starts after the commit that last changed the decisions record, or is the last
+ * `DEFAULT_FIX_HISTORY_COMMITS` commits when no such commit is known.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
   workspace: Project.Workspace,
   scope: string,
-  commits: number
+  commits: Option.Option<number>
 ) {
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
@@ -211,16 +249,18 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   )
 
   // Git lists the Markdown files while discovery reads the workspace packages.
-  const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation] = yield* Effect.all(
-    [
-      discoverCustomRules(cwd, packageDirectories, selectedPackages),
-      Effect.filter(instructionCandidates, (file) => checkExists(file), {
-        concurrency: "unbounded",
-      }),
-      readScopedDocumentation(cwd, workspace, scope),
-    ],
-    { concurrency: "unbounded" }
-  )
+  const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation, decisionsRecord] =
+    yield* Effect.all(
+      [
+        discoverCustomRules(cwd, packageDirectories, selectedPackages),
+        Effect.filter(instructionCandidates, (file) => checkExists(file), {
+          concurrency: "unbounded",
+        }),
+        readScopedDocumentation(cwd, workspace, scope),
+        readDecisionsRecord(cwd),
+      ],
+      { concurrency: "unbounded" }
+    )
 
   const projectConfigs = configs.map((config) => toProjectPath(path, cwd, config))
   const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
@@ -236,9 +276,16 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
 
   return {
     agentReach: documentation.agentReach,
-    commits,
     configs: projectConfigs,
+    decisionsRecord,
     documentationFiles: documentation.documentationFiles,
+    fixHistory: Option.match(commits, {
+      onNone: () =>
+        DecisionsRecord.guards.Committed(decisionsRecord)
+          ? Since({ commit: decisionsRecord.commit })
+          : Last({ count: DEFAULT_FIX_HISTORY_COMMITS }),
+      onSome: (count) => Last({ count }),
+    }),
     instructionFiles: instructionFiles.map((file) => relative(file)),
     overrides,
     rulesFolders: Array.sort(Array.dedupe(calls.map((call) => relative(call.dir))), Order.String),
@@ -375,19 +422,46 @@ function renderOverrides(report: OverridesReport) {
   ].join("\n")
 }
 
+function renderDecisionsRecord(record: DecisionsRecord) {
+  const name = `The decisions record is \`${record.path}\`.`
+
+  return DecisionsRecord.match(record, {
+    Committed: ({ commit, date }) => `${name} Commit \`${commit}\` last changed it, on ${date}.`,
+    Missing: () => `${name} It does not exist yet. Step 8 creates it with the first entry.`,
+    Uncommitted: () =>
+      `${name} Git names no commit that changed it, because the record is not committed or git cannot read the history.`,
+  })
+}
+
 /**
- * The number of recent commits that the agent reads for fixed mistakes when `--commits` is not set.
+ * The commits that step 4 reads, as the text before the command and the `git log` command. `folder`
+ * keeps the history to the folder that the session surveys.
  */
-export const DEFAULT_FIX_HISTORY_COMMITS = 200
+function renderFixHistory(history: FixHistory, folder: string) {
+  const command = (range: string) =>
+    `\`git log ${range} --no-merges --format="%h %s" -- ${folder}\``
+
+  return FixHistory.match(history, {
+    Last: ({ count }) =>
+      [
+        "Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.",
+        "",
+        command(`-n ${count}`),
+      ].join("\n"),
+    Since: ({ commit }) =>
+      [
+        `The session that wrote the decisions record read the history before commit \`${commit}\`, which last changed the record. Run this command from the project root, and read the commits that it lists, which are the commits after that one. When it lists no commit, record that the history has no commit after the record, and continue with step 5. To read older history, the user runs \`adamantite harden --commits <number>\`.`,
+        "",
+        command(`${commit}..HEAD`),
+      ].join("\n"),
+  })
+}
 
 /**
  * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
  * files, the facts that Adamantite computes, and the commands; `harden-prompt.md` holds the rest.
  */
 export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
-  // `.` keeps the history to the project folder when the project is a folder of a larger repository.
-  const fixHistoryPath = quoteShellArgument(context.scope ?? ".")
-
   return fillTemplate(hardenPromptTemplate, {
     agentReach: Option.match(context.agentReach, {
       onNone: () =>
@@ -399,12 +473,15 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
       "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 9."
     ),
     customRulesSection: CUSTOM_RULES_SECTION,
+    decisionsRecord: renderDecisionsRecord(context.decisionsRecord),
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
         "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, and changelogs. Record the search scope and report this fallback with the missing sources.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
-    fixHistoryCommand: `\`git log -n ${context.commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,
+    // `.` keeps the history to the project folder when the project is a folder of a larger
+    // repository.
+    fixHistory: renderFixHistory(context.fixHistory, quoteShellArgument(context.scope ?? ".")),
     instructionFiles: renderList(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."

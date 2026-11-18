@@ -1,5 +1,5 @@
 import type { PackageJson } from "type-fest"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -29,6 +29,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import hardenCommand, { Report } from "#commands/harden.ts"
 import { LintedOverrides } from "#lib/hardening/overrides.ts"
+import { ProjectPath } from "#lib/hardening/project-files.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -145,7 +146,7 @@ const REQUIRED_PHRASES = {
     "After the user answers, write the decisions record, also when the user approves none.",
     "one for each item of the Decisions list that the user resolved",
     "An approved candidate needs no entry, because its rule or instruction is the trace.",
-    "and each candidate that step 7 matched with an entry of the decisions record",
+    "and each candidate or decision that step 7 matched with an entry of the decisions record",
     "- Decision: rejected",
     "- Date: ",
     "- Reason: ",
@@ -172,6 +173,9 @@ const REQUIRED_PHRASES = {
     "When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.",
     "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
+  "## Check the result": [
+    "The decisions record has an entry for each candidate that the user did not approve and each decision that the user resolved",
+  ],
   "## Verify": [
     "no temporary verification cases, fixtures, or verification-only helpers remain",
     "Do not add saved rule tests or CI steps unless the user requests them",
@@ -181,9 +185,6 @@ const REQUIRED_PHRASES = {
     "When you changed a project check, also run that check with the project's own command",
     "add the file to the override as step 9 says, not a disable comment",
     "If a check is blocked, record its command and reason instead of claiming completion.",
-  ],
-  "## Check the result": [
-    "The decisions record has an entry for each candidate that the user did not approve and each decision that the user resolved",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 
@@ -283,17 +284,15 @@ function makeHandle(exitCode: number, stdout: string) {
   })
 }
 
-function makeProcessLayer(
-  files: FileSystemTestContext,
-  {
+function makeProcessLayer(files: FileSystemTestContext, processes: ProcessOptions = {}) {
+  const {
     exitCode = 0,
     indexOnlyFiles = [],
-    lastChanges = {},
     lintIgnoredFiles = [],
     oxlintExitCode = 0,
     probeReport = '{ "diagnostics": [], "number_of_files": 0 }',
-  }: ProcessOptions = {}
-) {
+  } = processes
+
   const listFiles = () =>
     Array.sort(
       files.list().filter((file) => !file.startsWith("../")),
@@ -302,7 +301,8 @@ function makeProcessLayer(
 
   const getGitOutput = (args: ChildProcess.StandardCommand["args"]) =>
     args[0] === "log"
-      ? (lastChanges[args.at(-1) ?? ""] ?? "")
+      ? (Object.entries(processes.lastChanges ?? {}).find(([file]) => args.at(-1) === file)?.[1]
+        ?? "")
       : Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
           .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
           .map((file) => `${file}\0`)
@@ -565,14 +565,16 @@ function getContext(prompt: string) {
 }
 
 const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
+const { decisionsRecord: DecisionsRecord, fixHistory: FixHistory } = Report.fields
 
-const RECORD = ".adamantite/decisions.md"
+const RECORD = ProjectPath.make(".adamantite/decisions.md")
 const RECORD_COMMIT = "4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d"
 
+const RECORD_CONTENT =
+  "# Decisions\n\n## Test files sit beside their module\n\n- Decision: rejected\n"
+
 // A decisions record that commit `RECORD_COMMIT` last changed.
-const RECORD_FILES = {
-  [RECORD]: "# Decisions\n\n## Test files sit beside their module\n\n- Decision: rejected\n",
-}
+const RECORD_FILES = { [RECORD]: RECORD_CONTENT }
 
 const RECORD_PROCESSES = { lastChanges: { [RECORD]: `${RECORD_COMMIT} 2026-11-02\n` } }
 
@@ -617,9 +619,9 @@ describe("harden", () => {
           unreached: ["docs/unreached.md"],
         }),
         configs: ["oxlint.config.ts"],
-        decisionsRecord: { _tag: "Missing", path: RECORD },
+        decisionsRecord: DecisionsRecord.cases.Missing.make({ path: RECORD }),
         documentationFiles: Option.some(["AGENTS.md", "docs/unreached.md"]),
-        fixHistory: { _tag: "Last", count: 20 },
+        fixHistory: FixHistory.cases.Last.make({ count: 20 }),
         instructionFiles: ["AGENTS.md"],
         overrides: new LintedOverrides({ rules: [] }),
         rulesFolders: [".adamantite/lint"],
@@ -642,16 +644,21 @@ describe("harden", () => {
       )
 
       expect(decodeReport(logLines[0])).toMatchObject({
-        decisionsRecord: {
-          _tag: "Committed",
+        decisionsRecord: DecisionsRecord.cases.Committed.make({
           commit: RECORD_COMMIT,
           date: "2026-11-02",
           path: RECORD,
-        },
-        fixHistory: { _tag: "Since", commit: RECORD_COMMIT },
+        }),
+        fixHistory: FixHistory.cases.Since.make({ commit: RECORD_COMMIT }),
       })
     })
   )
+
+  it("give the fix history a number of commits or a start commit, and never both", () => {
+    expectTypeOf<{ _tag: "Last"; count: number }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Since"; commit: string }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Last"; commit: string }>().not.toExtend<typeof FixHistory.Type>()
+  })
 
   it.effect("open no menu and start no agent with --json in an interactive terminal", () =>
     Effect.gen(function* () {
@@ -1165,7 +1172,7 @@ describe("harden", () => {
       expect(
         getMissingPhrases(getSection(prompt, "### Decisions"), [
           "The decisions record is `.adamantite/decisions.md`.",
-          "It does not exist yet. Step 8 creates it.",
+          "It does not exist yet. Step 8 creates it with the first entry.",
         ])
       ).toStrictEqual([])
     })
@@ -1596,7 +1603,7 @@ describe("harden", () => {
       const { exit, logLines } = yield* runInteractiveHarden({
         keys: ["enter"],
         onSession: (files) => {
-          files.write(RECORD, RECORD_FILES[RECORD])
+          files.write(RECORD, RECORD_CONTENT)
         },
       })
 

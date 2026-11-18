@@ -87,8 +87,10 @@ const commits = Flag.Int("commits").pipe(
       Schema.check(Schema.isGreaterThan(0, { message: "`--commits` must be a positive number" }))
     )
   ),
-  Flag.withDefault(DEFAULT_FIX_HISTORY_COMMITS),
-  Flag.withDescription("Set how many recent commits the agent reads to find past fixes")
+  Flag.optional,
+  Flag.withDescription(
+    `Read the last <commits> commits to find past fixes. By default, the agent reads the commits since the decisions record last changed, or the last ${DEFAULT_FIX_HISTORY_COMMITS} commits`
+  )
 )
 
 /**

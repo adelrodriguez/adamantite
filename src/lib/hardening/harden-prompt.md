@@ -2,7 +2,7 @@
 
 Find the coding standards that this target project already follows. Propose the highest step of the enforcement ladder that can enforce each standard. The project uses Adamantite {{version}}.
 
-Steps 1 to 8 are read-only for the target project. Keep trial case files outside the project and use stdin for RuleTester cases. Change project files only in step 9, for the candidates that the user approves.
+Steps 1 to 8 are read-only for the target project. Keep trial case files outside the project and use stdin for RuleTester cases. Change project files only in step 9, for the candidates that the user approves. The one exception is the decisions record, which you write after the user answers in step 8.
 
 ## Context
 
@@ -30,6 +30,12 @@ These are the Markdown files of the project, without the changesets and the chan
 
 {{agentReach}}
 
+### Decisions
+
+The decisions record holds each candidate that the user did not approve, and each decision that the user resolved, in an earlier session. You write it, and Adamantite does not read its entries.
+
+{{decisionsRecord}}
+
 ### Suppressions
 
 {{suppressions}}
@@ -40,7 +46,7 @@ These are the Markdown files of the project, without the changesets and the chan
 
 ## 1. Explore the documentation
 
-Start with each `AGENTS.md` above, then read each file in the documentation list. Follow the files that the instructions link to or tell agents to read, including files absent from the list. Read the comments in the Oxlint config. Read a linked file outside `--path`, but keep the code survey inside the selected scope. Read each file once.
+Start with each `AGENTS.md` above, then read each file in the documentation list. Follow the files that the instructions link to or tell agents to read, including files absent from the list. Read the comments in the Oxlint config. Read a linked file outside `--path`, but keep the code survey inside the selected scope. Read each file once. When the decisions record above exists, read it too. It holds decisions, not standards, so it gets no mark.
 
 Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to.
 
@@ -66,9 +72,9 @@ This step is done when each area has its candidates or the note "none found".
 
 ## 4. Read the fix history
 
-A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold. Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.
+A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold.
 
-{{fixHistoryCommand}}
+{{fixHistory}}
 
 - Find the commits that fix a mistake: a bug fix, a revert, or a correction after a review. Read the diff of each one with `git show <commit>`.
 - Name the mistake in one sentence, in terms of the code, such as "an `await` in a `forEach` callback" or "a date that the code parses without a time zone". Skip the fixes of logic that only one place has.
@@ -112,6 +118,8 @@ This step is done when each rule has its gaps or the note "none found".
 
 ## 7. Place each candidate on the enforcement ladder
 
+Before you place a candidate, compare it with the entries of the decisions record, and do the same for each decision from steps 3 and 6, and for each choice that this step finds. One that matches an entry is settled: do not propose it or ask about it again. List it under **Also considered** in step 8, with the heading of its entry. The exception is evidence that is newer than the date of the entry, such as fix commits after it: then show the candidate or the decision again, with the entry and the new evidence.
+
 Put each remaining candidate on the highest step that works:
 
 1. **Type or structure:** a type, a schema, a module boundary, or a stricter TypeScript option makes the mistake impossible.
@@ -125,7 +133,7 @@ For each rule, give one case that the rule must report and one similar case that
 
 A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 8, and propose no rule for it.
 
-Continue when every remaining candidate has a proposed step, evidence, limits, and cases, or is recorded as a decision.
+Continue when every remaining candidate has a proposed step, evidence, limits, and cases, is recorded as a decision, or is settled by an entry of the decisions record.
 
 ## 8. Show the candidates and wait for approval
 
@@ -153,11 +161,30 @@ Then show three short lists:
 
 - **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 7, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to. For a broken link, propose the correct target.
-- **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
+- **Also considered:** the candidates with a score of 3 or lower, and each candidate or decision that step 7 matched with an entry of the decisions record, one line for each, with the reason or the heading of the entry.
 
-When no human can approve, for example in CI or in an unattended session, report the candidates and stop after this step.
+When no human can approve, for example in CI or in an unattended session, report the candidates and stop after this step. Write no file, also not the decisions record.
 
-Otherwise, put the approval question last in the report, with no text after it. Ask the user which named candidates to write. Wait until the user names the candidates to write or approves none. If the user approves none, stop without changing project files.
+Otherwise, put the approval question last in the report, with no text after it. Ask the user which named candidates to write. Wait until the user names the candidates to write or approves none.
+
+After the user answers, write the decisions record, also when the user approves none. It is the only project file that you change before step 9.
+
+- Add one entry for each candidate that you showed and that the user did not approve, and one for each item of the Decisions list that the user resolved. An approved candidate needs no entry, because its rule or instruction is the trace.
+- Create the file when it does not exist, with the heading `# Decisions`. Replace the entry of a standard that the user decided again, and keep the other entries.
+- Write each entry in the form below. The decision is `rejected`, `deferred` when the user wants to decide later, or the choice that the user made. The date is today. The reason is the one that the user gave, or "not given". The evidence is what this session saw, such as counts or commits.
+
+  ```markdown
+  ## Test files sit beside the module that they test
+
+  - Decision: rejected
+  - Date: 2026-03-14
+  - Reason: Integration tests stay in `tests/`, apart from the modules.
+  - Evidence: 41 of 48 test files follow it, with 7 counterexamples in `tests/`, and fix commit `1a2b3c4`.
+  ```
+
+- Tell the user to commit the record with the other changes of the session, because the next session reads the fix history from the commit that last changed it.
+
+If the user approves none, run `adamantite check` through the project's package runner, because it also checks the format of the record. Fix what it reports for the record, and stop without another change to the project files.
 
 ## 9. Write the approved standards
 
@@ -187,13 +214,14 @@ Continue when the required checks pass, the approved discovery gaps are closed, 
 
 ## Report the result
 
-Use the missing-source report format from step 8. Report the approved candidates implemented, changed files, verification cases and results, commands run, and remaining violations or decisions. State whether temporary verification files were removed. Keep unverified results separate from successful checks.
+Use the missing-source report format from step 8. Report the approved candidates implemented, the entries that you wrote to the decisions record, changed files, verification cases and results, commands run, and remaining violations or decisions. State whether temporary verification files were removed. Keep unverified results separate from successful checks.
 
 The report is complete when each approved candidate has a verified result or an explicit blocker. Use this report only after approval and implementation. Before approval, use the proposal and closing question in step 8.
 
 ## Check the result
 
-- Every project change implements an approved candidate and stays inside the selected scope.
+- Every project change implements an approved candidate and stays inside the selected scope, or is an entry of the decisions record.
+- The decisions record has an entry for each candidate that the user did not approve and each decision that the user resolved, and is unchanged when no human answered.
 - Each new or changed custom rule passed valid and invalid cases, including a regression case for a bug fix.
 - Temporary verification files are removed, and user-owned tests and CI steps remain.
 - Project checks and Doctor pass, or the report names each blocked check and remaining finding.

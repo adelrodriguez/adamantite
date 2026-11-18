@@ -328,11 +328,20 @@ one.
 packages in that folder, or of the package that contains it, the rules folders that those configs
 load, the `AGENTS.md` of the root and of those packages, and the Markdown files of those packages
 and of the root. The prompt also lists the Markdown files that no chain of links or code-span paths
-from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix commits of the last 200 commits, or of the number
-that `--commits` gives, and a mistake that the fixes repeat becomes a candidate. With `--path`, it
-reads only the commits that change that folder.
+from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix
+commits of the last 200 commits, and a mistake that the fixes repeat becomes a candidate. With
+`--path`, it reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
+
+After you answer, the agent writes each candidate that you did not approve, and each decision that
+you made, to the decisions record: `.adamantite/decisions.md` at the project root, or at the
+workspace root of a monorepo. Commit the record. The next session reads it and does not propose
+those candidates again, unless it has evidence that is newer than the entry. That session also
+reads only the commits since the commit that last changed the record, in place of the last 200
+commits. `--commits` gives a number of commits to read instead, with or without a record.
+Adamantite never writes the record and never reads its entries. To get a candidate proposed
+again, delete its entry.
 
 In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
 installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,
@@ -424,13 +433,13 @@ JSON document on standard output, and its other lines on standard error. With `-
 never asks a question and never starts an agent. The exit codes stay the same. Each document has a
 `schemaVersion`:
 
-| Command          | Document                                                                                                                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`. |
-| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, and commits of the prompt.             |
-| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                   |
-| `rule ast`       | The `file` and its `program`.                                                                                                                      |
-| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                            |
+| Command          | Document                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`.           |
+| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, decisions record, and fix history of the prompt. |
+| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                             |
+| `rule ast`       | The `file` and its `program`.                                                                                                                                |
+| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                                      |
 
 Each finding keeps its `id`, `integration`, `title`, `currentState`, and `goal`, and its `notes`
 and `reference` when it has them. The `setup` of `update` is `null` in a project that has no

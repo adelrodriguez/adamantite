@@ -2,10 +2,10 @@ import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
 import { readBooleanOption } from "../../shared/options.ts"
 import { resolveVariable } from "../shared/scope.ts"
 import {
-  createTypeAliasEnvironment,
   resolvedTypeMatches,
   visibleTypeParameter,
   type TypeAliasEnvironment,
+  withTypeBindings,
 } from "../shared/type-alias-resolution.ts"
 import { builtInTypeName, mentionsUncheckedType } from "../shared/unknown-type.ts"
 
@@ -264,26 +264,18 @@ function hasOwnedType(
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeAliasEnvironment | null = null
-
-    return {
-      Program(node) {
-        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
-      },
+    return withTypeBindings(context, (defer) => ({
       UnaryExpression(node) {
+        if (node.operator !== "typeof" || isExistenceProbe(node)) return
         const allowInTypeGuards = readBooleanOption(context.options, "allowInTypeGuards") === true
 
-        if (
-          environment !== null
-          && node.operator === "typeof"
-          && !isExistenceProbe(node)
-          && !hasOwnedType(node.argument, context.sourceCode, environment)
-          && (!allowInTypeGuards || !isInsideTypeGuard(node))
-        ) {
+        if (allowInTypeGuards && isInsideTypeGuard(node)) return
+        defer((environment) => {
+          if (hasOwnedType(node.argument, context.sourceCode, environment)) return
           context.report({ messageId: "runtimeTypeof", node })
-        }
+        })
       },
-    }
+    }))
   },
   meta: {
     defaultOptions: [{ allowInTypeGuards: false }],

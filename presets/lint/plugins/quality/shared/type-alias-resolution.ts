@@ -1,18 +1,13 @@
-import type { ESTree } from "@oxlint/plugins"
+import type { Context, ESTree, Visitor } from "@oxlint/plugins"
 
-import { childNodes, type VisitorKeys } from "../../shared/ast.ts"
-import { lexicalTypeParameters, type LexicalTypeParameter } from "./lexical-type-parameters.ts"
+import type { VisitorKeys } from "../../shared/ast.ts"
+import { nearestTypeParameter, type LexicalTypeParameter } from "./lexical-type-parameters.ts"
 
 type TypeScope = ESTree.Node
 
-type DeclaredTypeBinding = {
+type TypeBinding = {
   readonly alias: ESTree.TSTypeAliasDeclaration | null
   readonly declaration: ESTree.Node
-  readonly name: string
-}
-
-type TypeBinding = DeclaredTypeBinding & {
-  readonly scope: TypeScope
 }
 
 type Substitution = {
@@ -23,8 +18,10 @@ type Substitution = {
 type Substitutions = ReadonlyMap<string, Substitution>
 
 export type TypeAliasEnvironment = {
-  readonly aliases: readonly ESTree.TSTypeAliasDeclaration[]
-  readonly bindingsByName: ReadonlyMap<string, readonly TypeBinding[]>
+  /**
+   * The type bindings of each name, by the scope that declares them, in source order.
+   */
+  readonly bindingsByName: ReadonlyMap<string, ReadonlyMap<TypeScope, readonly TypeBinding[]>>
   readonly visitorKeys: VisitorKeys
 }
 
@@ -32,6 +29,23 @@ export type ResolvedTypeMatcher = (
   type: ESTree.TSType,
   matches: (child: ESTree.TSType) => boolean
 ) => boolean
+
+/**
+ * Run a check at the end of the file, when the environment holds every type binding of the file,
+ * including the declarations after the check's node.
+ */
+export type DeferCheck = (check: (environment: TypeAliasEnvironment) => void) => void
+
+type TypeBindingNode =
+  | ESTree.Class
+  | ESTree.ImportDefaultSpecifier
+  | ESTree.ImportNamespaceSpecifier
+  | ESTree.ImportSpecifier
+  | ESTree.TSEnumDeclaration
+  | ESTree.TSInterfaceDeclaration
+  | ESTree.TSTypeAliasDeclaration
+
+type BindingIndex = Map<string, Map<TypeScope, TypeBinding[]>>
 
 const environmentsByProgram = new WeakMap<ESTree.Program, TypeAliasEnvironment>()
 
@@ -55,82 +69,112 @@ function enclosingTypeScope(node: ESTree.Node): TypeScope {
   return node
 }
 
-function declaredTypeBinding(node: ESTree.Node): DeclaredTypeBinding | null {
-  if (node.type === "TSTypeAliasDeclaration") {
-    return { alias: node, declaration: node, name: node.id.name }
-  }
-
-  if (
-    node.type === "TSInterfaceDeclaration"
-    || node.type === "TSEnumDeclaration"
-    || node.type === "ClassDeclaration"
-    || node.type === "ClassExpression"
-  ) {
-    return node.id === null ? null : { alias: null, declaration: node, name: node.id.name }
-  }
-
+function declaredName(node: TypeBindingNode): string | null {
   if (
     node.type === "ImportSpecifier"
     || node.type === "ImportDefaultSpecifier"
     || node.type === "ImportNamespaceSpecifier"
   ) {
-    return { alias: null, declaration: node, name: node.local.name }
+    return node.local.name
   }
 
-  return null
+  return node.id?.name ?? null
 }
 
-function collectTypeBindings(
-  node: ESTree.Node,
-  visitorKeys: VisitorKeys,
-  bindingsByName: Map<string, TypeBinding[]>,
-  aliases: ESTree.TSTypeAliasDeclaration[]
-): void {
-  const declared = declaredTypeBinding(node)
+function recordBinding(node: TypeBindingNode, bindingsByName: BindingIndex): void {
+  const name = declaredName(node)
 
-  if (declared !== null) {
-    const bindings = bindingsByName.get(declared.name) ?? []
-    bindings.push({ ...declared, scope: enclosingTypeScope(node) })
-    bindingsByName.set(declared.name, bindings)
-
-    if (declared.alias !== null) aliases.push(declared.alias)
-  }
-
-  for (const child of childNodes(node, visitorKeys)) {
-    collectTypeBindings(child, visitorKeys, bindingsByName, aliases)
-  }
+  if (name === null) return
+  const scope = enclosingTypeScope(node)
+  const scopes = bindingsByName.get(name) ?? new Map<TypeScope, TypeBinding[]>()
+  const bindings = scopes.get(scope) ?? []
+  bindings.push({ alias: node.type === "TSTypeAliasDeclaration" ? node : null, declaration: node })
+  scopes.set(scope, bindings)
+  bindingsByName.set(name, scopes)
 }
 
 /**
- * Collect every lexical type alias and competing type binding in a program.
+ * Build a rule's visitors on the type bindings of each file. Oxlint's own traversal records the
+ * bindings, so no rule walks the file again. The first rule that visits a file records them for
+ * every rule that uses this function. A rule passes each check that reads the bindings to `defer`,
+ * which runs it at the end of the file, when a type declared after its use is known too.
  */
-export function createTypeAliasEnvironment(
-  program: ESTree.Program,
-  visitorKeys: VisitorKeys
-): TypeAliasEnvironment {
-  const cached = environmentsByProgram.get(program)
+export function withTypeBindings(
+  context: Context,
+  createVisitors: (defer: DeferCheck) => Visitor
+): Visitor {
+  const checks: Array<(environment: TypeAliasEnvironment) => void> = []
 
-  if (cached !== undefined) return cached
-  const bindingsByName = new Map<string, TypeBinding[]>()
-  const aliases: ESTree.TSTypeAliasDeclaration[] = []
-  collectTypeBindings(program, visitorKeys, bindingsByName, aliases)
-  const environment = { aliases, bindingsByName, visitorKeys }
-  environmentsByProgram.set(program, environment)
+  const visitors = createVisitors((check) => {
+    checks.push(check)
+  })
 
-  return environment
-}
+  let bindingsByName: BindingIndex | null = null
+  let environment: TypeAliasEnvironment | null = null
 
-function ancestorDistance(ancestor: ESTree.Node, node: ESTree.Node): number | null {
-  let current: ESTree.Node | null = node
-  let distance = 0
-
-  while (current !== null) {
-    if (current === ancestor) return distance
-    current = current.parent
-    distance += 1
+  const record = (node: TypeBindingNode) => {
+    if (bindingsByName !== null) recordBinding(node, bindingsByName)
   }
 
-  return null
+  return {
+    ...visitors,
+    ClassDeclaration(node) {
+      record(node)
+      visitors.ClassDeclaration?.(node)
+    },
+    ClassExpression(node) {
+      record(node)
+      visitors.ClassExpression?.(node)
+    },
+    ImportDefaultSpecifier(node) {
+      record(node)
+      visitors.ImportDefaultSpecifier?.(node)
+    },
+    ImportNamespaceSpecifier(node) {
+      record(node)
+      visitors.ImportNamespaceSpecifier?.(node)
+    },
+    ImportSpecifier(node) {
+      record(node)
+      visitors.ImportSpecifier?.(node)
+    },
+    Program(node) {
+      checks.length = 0
+      environment = environmentsByProgram.get(node) ?? null
+      bindingsByName = null
+
+      if (environment === null) {
+        bindingsByName = new Map()
+        environment = { bindingsByName, visitorKeys: context.sourceCode.visitorKeys }
+        environmentsByProgram.set(node, environment)
+      }
+
+      visitors.Program?.(node)
+    },
+    "Program:exit"(node) {
+      visitors["Program:exit"]?.(node)
+
+      if (environment !== null) {
+        for (const check of checks) check(environment)
+      }
+
+      checks.length = 0
+      bindingsByName = null
+      environment = null
+    },
+    TSEnumDeclaration(node) {
+      record(node)
+      visitors.TSEnumDeclaration?.(node)
+    },
+    TSInterfaceDeclaration(node) {
+      record(node)
+      visitors.TSInterfaceDeclaration?.(node)
+    },
+    TSTypeAliasDeclaration(node) {
+      record(node)
+      visitors.TSTypeAliasDeclaration?.(node)
+    },
+  }
 }
 
 /**
@@ -151,30 +195,28 @@ type DeclaredBindings = {
   readonly distance: number
 }
 
+const NO_DECLARED_BINDINGS: DeclaredBindings = { bindings: [], distance: Number.POSITIVE_INFINITY }
+
 function nearestDeclaredBindings(
   name: string,
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): DeclaredBindings {
-  const candidates = environment.bindingsByName.get(name) ?? []
-  let nearestDistance = Number.POSITIVE_INFINITY
-  let nearest: TypeBinding[] = []
+  const scopes = environment.bindingsByName.get(name)
 
-  for (const candidate of candidates) {
-    const distance = ancestorDistance(candidate.scope, use)
+  if (scopes === undefined) return NO_DECLARED_BINDINGS
+  let current: ESTree.Node | null = use
+  let distance = 0
 
-    if (distance === null || distance > nearestDistance) continue
+  while (current !== null) {
+    const bindings = scopes.get(current)
 
-    if (distance === nearestDistance) {
-      nearest.push(candidate)
-      continue
-    }
-
-    nearestDistance = distance
-    nearest = [candidate]
+    if (bindings !== undefined) return { bindings, distance }
+    current = current.parent
+    distance += 1
   }
 
-  return { bindings: nearest, distance: nearestDistance }
+  return NO_DECLARED_BINDINGS
 }
 
 /**
@@ -186,10 +228,7 @@ function nearestTypeBinding(
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): NearestTypeBinding {
-  const parameter = lexicalTypeParameters(use, environment.visitorKeys).find(
-    (candidate) => candidate.name === name
-  )
-
+  const parameter = nearestTypeParameter(name, use, environment.visitorKeys)
   const declared = nearestDeclaredBindings(name, use, environment)
 
   if (parameter !== undefined && parameter.distance < declared.distance) {

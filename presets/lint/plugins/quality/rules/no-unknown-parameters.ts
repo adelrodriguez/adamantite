@@ -7,10 +7,7 @@ import {
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
 import { resolveVariable } from "../shared/scope.ts"
-import {
-  createTypeAliasEnvironment,
-  type TypeAliasEnvironment,
-} from "../shared/type-alias-resolution.ts"
+import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
 type ParameterOwner =
@@ -316,49 +313,45 @@ function isParserInput(
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeAliasEnvironment | null = null
+    return withTypeBindings(context, (defer) => {
+      const checkParameters = (node: ParameterOwner) => {
+        for (const [index, parameter] of node.params.entries()) {
+          const annotation = functionParameterTypeAnnotation(parameter)
 
-    const checkParameters = (node: ParameterOwner) => {
-      if (environment === null) return
+          if (annotation === null || annotation === undefined) continue
+          defer((environment) => {
+            if (!resolvesToUnknown(annotation.typeAnnotation, environment)) return
+            const name = functionParameterBindingName(parameter, context.sourceCode)
 
-      for (const [index, parameter] of node.params.entries()) {
-        const annotation = functionParameterTypeAnnotation(parameter)
+            if (name === "cause" && isErrorCauseOwner(node)) return
 
-        if (annotation === null || annotation === undefined) continue
+            if (isTypePredicateSubject(node, name)) return
 
-        if (!resolvesToUnknown(annotation.typeAnnotation, environment)) continue
-        const name = functionParameterBindingName(parameter, context.sourceCode)
+            if (index === 0 && isRejectionCallback(node)) return
 
-        if (name === "cause" && isErrorCauseOwner(node)) continue
-
-        if (isTypePredicateSubject(node, name)) continue
-
-        if (index === 0 && isRejectionCallback(node)) continue
-
-        if (isParserInput(node, parameter, context.sourceCode)) continue
-        context.report({
-          data: { parameter: name },
-          messageId: "unknownParameter",
-          node: annotation.typeAnnotation,
-        })
+            if (isParserInput(node, parameter, context.sourceCode)) return
+            context.report({
+              data: { parameter: name },
+              messageId: "unknownParameter",
+              node: annotation.typeAnnotation,
+            })
+          })
+        }
       }
-    }
 
-    return {
-      ArrowFunctionExpression: checkParameters,
-      FunctionDeclaration: checkParameters,
-      FunctionExpression: checkParameters,
-      Program(node) {
-        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
-      },
-      TSCallSignatureDeclaration: checkParameters,
-      TSConstructSignatureDeclaration: checkParameters,
-      TSConstructorType: checkParameters,
-      TSDeclareFunction: checkParameters,
-      TSEmptyBodyFunctionExpression: checkParameters,
-      TSFunctionType: checkParameters,
-      TSMethodSignature: checkParameters,
-    }
+      return {
+        ArrowFunctionExpression: checkParameters,
+        FunctionDeclaration: checkParameters,
+        FunctionExpression: checkParameters,
+        TSCallSignatureDeclaration: checkParameters,
+        TSConstructSignatureDeclaration: checkParameters,
+        TSConstructorType: checkParameters,
+        TSDeclareFunction: checkParameters,
+        TSEmptyBodyFunctionExpression: checkParameters,
+        TSFunctionType: checkParameters,
+        TSMethodSignature: checkParameters,
+      }
+    })
   },
   meta: {
     docs: {

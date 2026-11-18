@@ -1,9 +1,6 @@
 import type { Rule } from "@oxlint/plugins"
 
-import {
-  createTypeAliasEnvironment,
-  type TypeAliasEnvironment,
-} from "../shared/type-alias-resolution.ts"
+import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
 /**
@@ -11,21 +8,18 @@ import { resolvesToUnknown } from "../shared/unknown-type.ts"
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeAliasEnvironment | null = null
-
-    return {
-      Program(node) {
-        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
-      },
+    return withTypeBindings(context, (defer) => ({
       TSTypeAliasDeclaration(node) {
-        if (environment === null || !resolvesToUnknown(node.typeAnnotation, environment)) return
-        context.report({
-          data: { alias: node.id.name },
-          messageId: "unknownAlias",
-          node: node.id,
+        defer((environment) => {
+          if (!resolvesToUnknown(node.typeAnnotation, environment)) return
+          context.report({
+            data: { alias: node.id.name },
+            messageId: "unknownAlias",
+            node: node.id,
+          })
         })
       },
-    }
+    }))
   },
   meta: {
     docs: {

@@ -5,11 +5,11 @@ import {
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
 import {
-  createTypeAliasEnvironment,
   hasVisibleTypeBinding,
   namedTypeReference,
   resolvedTypeMatches,
   type TypeAliasEnvironment,
+  withTypeBindings,
 } from "../shared/type-alias-resolution.ts"
 
 type ParameterOwner =
@@ -81,38 +81,36 @@ function resolvesToObject(type: ESTree.TSType, environment: TypeAliasEnvironment
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeAliasEnvironment | null = null
+    return withTypeBindings(context, (defer) => {
+      const checkParameters = (node: ParameterOwner) => {
+        for (const parameter of node.params) {
+          const annotation = functionParameterTypeAnnotation(parameter)
 
-    const checkParameters = (node: ParameterOwner) => {
-      for (const parameter of node.params) {
-        const annotation = functionParameterTypeAnnotation(parameter)
-
-        if (annotation === null || annotation === undefined || environment === null) continue
-
-        if (!resolvesToObject(annotation.typeAnnotation, environment)) continue
-        context.report({
-          data: { parameter: functionParameterBindingName(parameter, context.sourceCode) },
-          messageId: "objectParameter",
-          node: annotation.typeAnnotation,
-        })
+          if (annotation === null || annotation === undefined) continue
+          defer((environment) => {
+            if (!resolvesToObject(annotation.typeAnnotation, environment)) return
+            context.report({
+              data: { parameter: functionParameterBindingName(parameter, context.sourceCode) },
+              messageId: "objectParameter",
+              node: annotation.typeAnnotation,
+            })
+          })
+        }
       }
-    }
 
-    return {
-      ArrowFunctionExpression: checkParameters,
-      FunctionDeclaration: checkParameters,
-      FunctionExpression: checkParameters,
-      Program(node) {
-        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
-      },
-      TSCallSignatureDeclaration: checkParameters,
-      TSConstructSignatureDeclaration: checkParameters,
-      TSConstructorType: checkParameters,
-      TSDeclareFunction: checkParameters,
-      TSEmptyBodyFunctionExpression: checkParameters,
-      TSFunctionType: checkParameters,
-      TSMethodSignature: checkParameters,
-    }
+      return {
+        ArrowFunctionExpression: checkParameters,
+        FunctionDeclaration: checkParameters,
+        FunctionExpression: checkParameters,
+        TSCallSignatureDeclaration: checkParameters,
+        TSConstructSignatureDeclaration: checkParameters,
+        TSConstructorType: checkParameters,
+        TSDeclareFunction: checkParameters,
+        TSEmptyBodyFunctionExpression: checkParameters,
+        TSFunctionType: checkParameters,
+        TSMethodSignature: checkParameters,
+      }
+    })
   },
   meta: {
     docs: {

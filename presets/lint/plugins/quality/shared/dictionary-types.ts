@@ -2,7 +2,6 @@ import type { ESTree } from "@oxlint/plugins"
 
 import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts"
 import {
-  createTypeAliasEnvironment,
   hasVisibleTypeBinding,
   namedTypeReference,
   visibleTypeAlias,
@@ -62,13 +61,6 @@ export type WideningTarget = {
 
 export type TypeEnvironment = {
   readonly typeAliases: LexicalTypeAliasEnvironment
-}
-
-export function createTypeEnvironment(
-  program: ESTree.Program,
-  visitorKeys: Readonly<Record<string, readonly string[]>>
-): TypeEnvironment {
-  return { typeAliases: createTypeAliasEnvironment(program, visitorKeys) }
 }
 
 function isBuiltIn(

@@ -273,7 +273,16 @@ const rule: Rule = {
       CallExpression(node) {
         const method = arrayMethodTarget(node.callee)
 
-        if (method === null) return
+        // Only these methods copy, so other calls skip the search for an enclosing reducer.
+        if (
+          method === null
+          || (method.name !== "assign"
+            && method.name !== "from"
+            && !ARRAY_COPY_LENGTH.has(method.name))
+        ) {
+          return
+        }
+
         const reducer = enclosingReducer(context.sourceCode, node)
 
         if (reducer === null) return

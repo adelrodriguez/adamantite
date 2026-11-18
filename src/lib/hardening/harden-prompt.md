@@ -112,16 +112,9 @@ This step is done when each rule has its gaps or the note "none found".
 
 ## 7. Place each candidate on the enforcement ladder
 
-Put each remaining candidate on the highest step that works:
+{{ladder}}
 
-1. **Type or structure:** a type, a schema, a module boundary, or a stricter TypeScript option makes the mistake impossible.
-2. **Preset rule:** a rule in an Oxlint preset or plugin that the project can turn on, or an option of a rule that is already on. A native rule, such as a file-name rule, comes before a custom rule that checks the same thing.
-3. **Import rule:** `adamantite/layers` for one-way imports between the folders of a root, `adamantite/import-owners` for a package that only one file or folder imports, or `no-restricted-imports` with an override for the files that the standard applies to. In Oxlint, a later override replaces the options of a rule that an earlier override set for the same files. Write one combined `no-restricted-imports` for each set of files, with the paths of the existing overrides.
-4. **Project check:** a check that the project already runs, such as Turbo boundaries, Knip, or a script that reads `package.json`.
-5. **Custom rule:** a rule in the rules folder that checks the AST.
-6. **Instruction:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.
-
-For each rule, give one case that the rule must report and one similar case that it must accept. For a candidate from step 4, use the code before and after one of its fixes. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
+For each rule, give one case that the rule must report and one similar case that it must accept. For a type, a project check, or an instruction, give the mistake that it prevents and the similar valid code that it accepts. For a candidate from step 4, use the code before and after one of its fixes. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
 
 A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 8, and propose no rule for it.
 
@@ -133,11 +126,13 @@ If a tool or source was unavailable, name it on the first line of the report and
 
 Score each candidate from 1 to 5:
 
-- **5:** a real standard, with correct counts, that no tool enforces, on the right step, with a precise rule. The maintainer can approve it as it is.
+- **5:** a real standard, with correct counts, that no tool enforces, on the right step. Its proposal prevents the mistake and accepts the similar valid case. The maintainer can approve it as it is.
 - **4:** real and useful, with one small problem, such as a count that is not exact.
 - **3:** real but of low value.
 - **2:** mostly enforced already, wrong evidence, or many false positives.
 - **1:** not a standard.
+
+Score the mistake that a proposal prevents and the valid code that it accepts, not its step. An instruction with a reason and an example can score 5, and a rule that reports valid code scores 2.
 
 Show the candidates with a score of 4 or 5, from the highest score to the lowest. Show each one with:
 
@@ -145,9 +140,9 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 - its source: the instruction file and line, the code only, or the fix commits
 - the number of places that follow it, its scope, and the counterexamples
 - its step on the ladder, and the rule, option, or instruction that you propose
-- the case that the rule must report, and the case that it must accept
+- the case that the proposal must prevent, and the similar case that it must accept
 - the part of the standard that stays an instruction, if a part stays
-- the existing code that the new rule would report
+- the existing code that the new rule would report, and whether you propose to fix it in the same change
 
 Then show three short lists:
 
@@ -168,9 +163,9 @@ Write only the approved candidates:
 - **Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail. Follow the custom-rule guide above until all valid and invalid cases pass and cleanup is complete.
 - **Gap in the config of a rule,** such as a layer map, an import-owners option, a `no-restricted-imports` path, or an override glob: change the Oxlint config. Then lint a file that has the missed form, and read the report. When no file has the form, tell the user that the change is not verified. Do not change a rule that a preset or plugin ships.
 - **Override that can shrink:** remove only the files that no longer break the rule.
-- **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
-- **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule. A separate change fixes the violations and removes each file from the override.
-- **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
+- **Instruction that became a rule:** delete the text that only repeats what the rule now reports. The rule is the source of that part. Keep the reason and the example of a standard that shapes a design, such as which module owns an import, because an agent needs them before it writes the code. Keep the part of the standard that the rule does not check.
+- **Existing violations:** fix the code that a new rule reports in the same change when the user approved the fixes with the candidate and each fix keeps the behavior of the code. The rule then needs no override. Otherwise, keep the code as it is, keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. A file in the override can gain new violations without a report. In a comment above the entry, state the change that removes each file from it, and list the files and their violations for the user. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule.
+- **Instruction:** write each approved standard that needs judgment, or that no tool can check, to `CODING_STANDARDS.md` as one entry. The entry states the standard, the reason for it, how to spot the mistake, and one example from the project of the code to avoid and the code to prefer. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
 - **Discovery gap:** add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link. Fix each approved broken link.
 
 Continue when every approved candidate is implemented and each changed custom rule has passed the guide's verification and cleanup checks.
@@ -179,7 +174,7 @@ Continue when every approved candidate is implemented and each changed custom ru
 
 Run `adamantite check` and `adamantite doctor` in this order, through the project's package runner. Both must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it. Read the output of every check.
 
-When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment. Do not add saved rule tests or CI steps unless the user requests them. Preserve user-owned tests and CI steps.
+When a new rule makes `check` fail, fix the rule, fix the code, or add the file to the override as step 9 says, not a disable comment. Do not add saved rule tests or CI steps unless the user requests them. Preserve user-owned tests and CI steps.
 
 When you changed the documentation, run `adamantite harden` again without a terminal and read its agent reach. Do not restart this procedure. Each discovery gap that you closed must be gone, and no link that you added may go to a file that does not exist.
 

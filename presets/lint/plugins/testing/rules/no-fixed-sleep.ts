@@ -208,6 +208,9 @@ const rule: Rule = {
     // The local names of a timer module that the file imports whole, such as `timers` in
     // `import timers from "node:timers/promises"`.
     const timerModuleNames = new Set<string>()
+    // The local names of Effect's `TestClock` that the file imports, such as `Clock` in
+    // `import { TestClock as Clock } from "effect"`.
+    const testClockNames = new Set<string>()
     const sleeps: ESTree.Node[] = []
     let fakeTime = false
 
@@ -235,6 +238,12 @@ const rule: Rule = {
     }
 
     return {
+      // `it("waits", () => delay(100))` returns the sleep, and the runner awaits it.
+      ArrowFunctionExpression(node) {
+        if (node.expression && isSleep(node.body) && isTestCallback(node)) {
+          sleeps.push(node.body)
+        }
+      },
       AwaitExpression(node) {
         if (isSleep(node.argument) && inTestBody(node)) {
           sleeps.push(node)
@@ -253,7 +262,21 @@ const rule: Rule = {
         }
       },
       ImportDeclaration(node) {
-        if (!timerModules.has(node.source.value)) {
+        const source = node.source.value
+
+        if (source === "effect" || source.startsWith("effect/")) {
+          for (const specifier of node.specifiers) {
+            if (
+              specifier.type === "ImportSpecifier"
+                ? staticKeyName(specifier.imported, false) === "TestClock"
+                : source.endsWith("/TestClock")
+            ) {
+              testClockNames.add(specifier.local.name)
+            }
+          }
+        }
+
+        if (!timerModules.has(source)) {
           return
         }
 
@@ -267,7 +290,7 @@ const rule: Rule = {
       },
       // `TestClock` moves the time of an Effect test, as fake timers do.
       MemberExpression(node) {
-        if (node.object.type === "Identifier" && node.object.name === "TestClock") {
+        if (node.object.type === "Identifier" && testClockNames.has(node.object.name)) {
           fakeTime = true
         }
       },
@@ -278,6 +301,11 @@ const rule: Rule = {
 
         for (const node of sleeps) {
           context.report({ messageId: "sleep", node })
+        }
+      },
+      ReturnStatement(node) {
+        if (node.argument && isSleep(node.argument) && inTestBody(node)) {
+          sleeps.push(node.argument)
         }
       },
       YieldExpression(node) {
@@ -295,6 +323,7 @@ const rule: Rule = {
       before() {
         timers.clear()
         timerModuleNames.clear()
+        testClockNames.clear()
         sleeps.length = 0
         fakeTime = false
       },

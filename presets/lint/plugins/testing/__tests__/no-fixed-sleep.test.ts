@@ -70,6 +70,21 @@ tester.run("no-fixed-sleep", plugin.rules["no-fixed-sleep"], {
       name: "Effect.sleep in an Effect test that returns its generator",
     },
     {
+      code: 'import { setTimeout as delay } from "node:timers/promises"; test("x", () => delay(1000));',
+      errors: [sleep],
+      name: "a sleep that a concise test callback returns",
+    },
+    {
+      code: "test('x', () => { return new Promise((resolve) => setTimeout(resolve, 100)); });",
+      errors: [sleep],
+      name: "a sleep that a test callback returns",
+    },
+    {
+      code: 'const TestClock = { adjust() {} }; TestClock.adjust(); test("x", async () => { await scheduler.wait(1); });',
+      errors: [sleep],
+      name: "a local object named TestClock",
+    },
+    {
       code: 'it.live("x", () => Effect.gen(function* () { yield* Effect.sleep("100 millis"); }).pipe(Effect.provide(Layer.empty)));',
       errors: [sleep],
       name: "Effect.sleep in an Effect test that pipes its generator",
@@ -88,16 +103,24 @@ tester.run("no-fixed-sleep", plugin.rules["no-fixed-sleep"], {
     'import { setImmediate } from "node:timers/promises"; test("x", async () => { await setImmediate(); });',
     "test('x', async () => { const timer = setTimeout(cancel, 10); await work(); clearTimeout(timer); });",
     {
-      code: 'it.effect("x", () => Effect.gen(function* () { const fiber = yield* Effect.fork(Effect.sleep("1 second")); yield* TestClock.adjust("1 second"); yield* Fiber.join(fiber); }));',
+      code: 'import { TestClock } from "effect"; it.effect("x", () => Effect.gen(function* () { const fiber = yield* Effect.fork(Effect.sleep("1 second")); yield* TestClock.adjust("1 second"); yield* Fiber.join(fiber); }));',
       name: "an Effect test that moves time with TestClock",
     },
     {
-      code: 'it.effect("x", () => Effect.gen(function* () { yield* Effect.sleep("1 second"); yield* TestClock.adjust("1 second"); }));',
+      code: 'import * as TestClock from "effect/testing/TestClock"; it.effect("x", () => Effect.gen(function* () { yield* Effect.sleep("1 second"); yield* TestClock.adjust("1 second"); }));',
       name: "an Effect test file that uses TestClock",
     },
     {
       code: 'const retry = Effect.gen(function* () { yield* Effect.sleep("1 second"); }); it.effect("x", () => retry);',
       name: "Effect.sleep in a helper effect",
+    },
+    {
+      code: 'import { TestClock as Clock } from "effect"; it.effect("x", () => Effect.gen(function* () { yield* Effect.sleep("1 second"); yield* Clock.adjust("1 second"); }));',
+      name: "an aliased import of TestClock",
+    },
+    {
+      code: 'import { setTimeout as delay } from "node:timers/promises"; const later = () => delay(10); test("x", async () => { await work(); });',
+      name: "a sleep that a helper returns",
     },
     {
       code: 'it.live("x", () => Effect.void.pipe(Effect.andThen(Effect.gen(function* () { yield* Effect.sleep("1 second"); }))));',

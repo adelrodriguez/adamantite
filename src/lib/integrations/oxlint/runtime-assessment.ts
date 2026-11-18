@@ -23,8 +23,11 @@ function finding(currentState: string, goal: readonly string[]): readonly Findin
 
 /**
  * The findings for an Oxlint runtime that the installed packages cannot supply, from the resolver
- * that the entry runs before it loads Oxlint. Package assessment reports a package that
- * `package.json` does not declare, so this assessment skips it. It does not predict which platform
+ * that the entry runs before it loads Oxlint. A runtime finding checks the installed packages, and
+ * a package finding checks the declarations and the managed versions. Package assessment reports a
+ * package that `package.json` does not declare, so this assessment skips it. A project that
+ * declares tsrs, but whose backend does not resolve, gets a finding, although the entry still runs
+ * stock Oxlint without tsrs. It does not predict which platform
  * binding Oxlint or tsrs loads, because their loaders name a missing platform package when the
  * check runs.
  */

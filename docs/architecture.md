@@ -167,24 +167,11 @@ installs. `check` fails with its error after the stages, and `assessProject` rep
 
 ## Assessment
 
-An assessment reads the target project one time. `Project.read` in `src/lib/project/index.ts`
-reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
-custom rules that the Oxlint configs load, and each integration's `assess` takes that
-`Project.Snapshot`. A snapshot holds facts, not the folder, which `Project.Directory` gives. A
-reassessment after a handoff or an install reads a new snapshot. A command
-that reads the workspace outside an assessment, such as `harden` or `rule try`, reads it one time for
-each phase and passes the `Workspace` down.
-
-`assessProject` in `src/lib/assessment/` runs each integration that the lockfile's selection
-includes, so a selected integration whose file is missing gets a finding. It also compares each
-selected managed script of the root `package.json` with its command, and reports a
-`missing-managed-script` or `mismatched-managed-script` finding, which is what `update` would
-change. No integration owns the managed scripts, so these findings name `scripts`. A project without a
-lockfile gets the `lockfile-missing` finding alone, which says to run `adamantite init`. Doctor
-catches `UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
-`invalid-lockfile` finding alone, because the other assessments need the selection. A project that
-does not declare `adamantite` gets the `adamantite-not-installed` finding alone, so each case goes
-through the same offer.
+An assessment is the read-only check of the target project against the selection in its lockfile.
+`Project.read` in `src/lib/project/index.ts` reads the project one time into a `Project.Snapshot`.
+`assessProject` in `src/lib/assessment/index.ts` gives that snapshot to the `assess` of each
+integration that the selection includes, adds the findings of the managed scripts, and renders the
+repair prompt and the warning report.
 
 ```mermaid
 flowchart TD
@@ -196,21 +183,16 @@ flowchart TD
   F --> A
 ```
 
-`assess` and `doctor` are always read-only. Each finding contains the current state, the goal
-criteria, and optional reference content or notes. A coding agent or the user changes the target
-project, and a later assessment confirms whether the project reached the latest supported state.
-
-Doctor also asks Oxlint to list the files that it lints. Oxlint loads its native binding and every
-config of the project first, so a config that fails to load, or a binding that the install left out,
-fails the list. Doctor reports the error that Oxlint printed as the `oxlint-config-load-failure`
-finding, which gives the repair of each cause. The shared Oxlint process operations are in
-`integrations/oxlint/files.ts`.
-
-Runtime findings check the installed packages. Package findings check the declarations and
-the managed versions. A project that declares tsrs, but cannot resolve its backend, gets a
-runtime finding, although the entry still runs stock Oxlint without tsrs. Package drift stays
-structured as package actions, so `update` can install the managed versions, and Doctor renders it
-as findings that tell the user to run `update`.
+- `assess` and `doctor` never change the project. A coding agent or the user repairs it, and a later
+  assessment confirms the repair. `project/file-writers` in `.adamantite/lint/file-writers.ts`
+  rejects a write.
+- Each reassessment reads a new snapshot, because a handoff or an install changes the project.
+  Nothing enforces it.
+- A project without a lockfile, with a lockfile that does not read, or without `adamantite` gets one
+  finding alone, so each case goes through the same offer. `src/commands/__tests__/doctor.test.ts`
+  holds it.
+- Package drift stays structured as package actions, so `update` installs the managed versions and
+  Doctor reports them as findings. `src/commands/__tests__/update.test.ts` holds it.
 
 ## Resolution and output modes
 

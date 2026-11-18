@@ -45,13 +45,19 @@ const OxlintPackageJson = Schema.Struct({ version: Schema.String })
 const decodeOxlintPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintPackageJson))
 
 /**
- * The version of the Oxlint that lints the fixtures: the package that `ADAMANTITE_TEST_OXLINT`
+ * The package folder of the Oxlint that the tests start: the folder that `ADAMANTITE_TEST_OXLINT`
  * names, or the Oxlint of the repository.
  */
-export function readFixtureOxlintVersion(): string {
-  const folder = readOxlintOverride() ?? join(REPO_ROOT, "node_modules/oxlint")
+export function readTestOxlint(): string {
+  return readOxlintOverride() ?? join(REPO_ROOT, "node_modules/oxlint")
+}
 
-  return decodeOxlintPackageJson(readFileSync(join(folder, "package.json"), "utf8")).version
+/**
+ * The version of the Oxlint that lints the fixtures.
+ */
+export function readFixtureOxlintVersion(): string {
+  return decodeOxlintPackageJson(readFileSync(join(readTestOxlint(), "package.json"), "utf8"))
+    .version
 }
 
 /**

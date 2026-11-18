@@ -123,6 +123,7 @@
     "test:build": "node scripts/test-build.ts",
     "test:coverage": "vitest run --coverage",
     "test:dist": "pnpm run build && pnpm run test:build && pnpm run test:smoke",
+    "test:minimum-oxlint": "vitest run presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts presets/__tests__/effect.test.ts presets/__tests__/custom.test.ts src/commands/__tests__/rule.test.ts src/lib/hardening/__tests__/suppressions.test.ts",
     "test:presets": "vitest run --project presets",
     "test:smoke": "node scripts/test-smoke.ts",
     "test:unit": "vitest run --project unit",

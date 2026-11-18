@@ -162,15 +162,17 @@ jobs:
           - name: e2e
             command: pnpm run test:dist
           # The rules and the probe plugin rely on the AST shape of each Oxlint version that
-          # peerDependencies allows, so the RuleTester tests, the preset fixtures, and the probe
-          # tests also run with the minimum version.
+          # peerDependencies allows, and `custom()` relies on how each version loads a rules
+          # folder, so the RuleTester tests, the preset fixtures, the probe tests, and the
+          # `custom()` tests also run with the minimum version. The `test:minimum-oxlint` script
+          # lists the test files.
           - name: minimum-oxlint
             command: |
               oxlint_version="$(node -p "const range = JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).peerDependencies.oxlint; const match = /^>=(\d+\.\d+\.\d+)$/.exec(range); if (match === null) throw new Error('Expected peerDependencies.oxlint to be >=<version>, not ' + range); match[1]")"
               oxlint_dir="${RUNNER_TEMP}/adamantite-minimum-oxlint"
               mkdir "${oxlint_dir}"
               npm install --prefix "${oxlint_dir}" "oxlint@${oxlint_version}"
-              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts presets/__tests__/effect.test.ts src/commands/__tests__/rule.test.ts src/lib/hardening/__tests__/suppressions.test.ts
+              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm run test:minimum-oxlint
 
     steps:
       - name: Checkout

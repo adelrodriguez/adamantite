@@ -593,6 +593,11 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "unicorn/prefer-string-trim-start-end": "error",
     "unicorn/prefer-structured-clone": "error",
     "unicorn/prefer-ternary": ["error", "only-single-line"],
+    // The rule reads each `.then`, `.catch`, or `.finally` call that runs when the module loads as a
+    // promise chain, without its type. It reports a schema default such as `z.number().catch(3000)`
+    // and an `Effect.catch` in a pipeline at module scope. `typescript/no-floating-promises` reports
+    // a top-level promise that nothing handles.
+    "unicorn/prefer-top-level-await": "off",
     "unicorn/relative-url-style": "error",
     "unicorn/require-array-join-separator": "error",
     "unicorn/require-module-attributes": "error",

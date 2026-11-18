@@ -13,19 +13,18 @@ import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { PackageAction } from "#lib/integrations/base.ts"
 import { integrations } from "#lib/integrations/index.ts"
-import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
+import { findOxfmtCli, format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import * as Project from "#lib/project/index.ts"
 import { hashContent, LOCKFILE_PATH, renderLockfile } from "#lib/project/lockfile.ts"
-import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import {
   MANAGED_SCRIPT_COMMANDS,
   readPackageJson,
   SCRIPT_ORDER,
   type Script,
 } from "#lib/project/package-json.ts"
-import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
+import { FailedToFormatFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -157,10 +156,6 @@ const deleteDroppedFile = Effect.fn("deleteDroppedFile")(function* (
  */
 const OXFMT_CONFIGS = ["oxfmt.config.ts", "oxfmt.config.mts", ".oxfmtrc.json", ".oxfmtrc.jsonc"]
 
-const OxfmtManifest = Schema.fromJsonString(
-  Schema.Struct({ bin: Schema.Struct({ oxfmt: Schema.String }) })
-)
-
 /**
  * Formats `content` as the project's Oxfmt formats the file at `file`, from the project root.
  */
@@ -195,27 +190,18 @@ const findConfig = Effect.fn("findConfig")(function* (cwd: string) {
  * as rendered. The temporary config lives as long as the scope.
  */
 const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-  const oxfmt = yield* resolvePackageDirectory(cwd, "oxfmt")
+  const cli = yield* findOxfmtCli(cwd)
 
-  if (Option.isNone(oxfmt)) {
+  if (Option.isNone(cli)) {
     return ((_file, content) => Effect.succeed(content)) satisfies Format
   }
-
-  const manifestPath = path.join(oxfmt.value, "package.json")
-
-  const { bin } = yield* fs.readFileString(manifestPath).pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(OxfmtManifest)),
-    Effect.mapError((cause) => new FailedToParseFile({ cause, path: manifestPath }))
-  )
 
   const config = yield* findConfig(cwd)
 
   return ((file, content) => {
     const command = formatCommand({
-      bin: path.join(oxfmt.value, bin.oxfmt),
+      cli: cli.value,
       config,
       cwd,
       path: file,

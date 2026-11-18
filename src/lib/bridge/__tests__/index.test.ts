@@ -11,7 +11,7 @@ import * as EffectRecord from "effect/Record"
 import * as Bridge from "#lib/bridge/index.ts"
 import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
-import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { IDIOM_TREES, IDIOMS_DIR, listFiles, listTreeStacks } from "#presets/__tests__/idioms.ts"
 import {
   createFixtureProject,
@@ -21,8 +21,6 @@ import {
   removeFixtureProject,
 } from "#presets/__tests__/rule-fixtures.ts"
 import { listStackPresets, type Stack, STACK_OPTIONS, STACKS } from "#presets/__tests__/stacks.ts"
-
-const REPO_ROOT = join(import.meta.dirname, "../../../..")
 
 // Several fixes that the idioms show are suggestions, such as `eslint/no-useless-constructor` and
 // `effecttsgo/map-const-to-as`, so the test fixes as `adamantite fix --suggested` does.
@@ -39,22 +37,7 @@ const CANARY = {
   source: "export const answer: string = 42\n",
 }
 
-// Oxfmt starts from this repository's install.
-function toSource(options: CommandRunOptions): CommandRunOptions {
-  if (options.command === "oxfmt") {
-    return { ...options, command: join(REPO_ROOT, "node_modules/.bin/oxfmt") }
-  }
-
-  return options
-}
-
-const SOURCE_RUNNER = Layer.effect(CommandRunner)(
-  Effect.gen(function* () {
-    const runner = yield* CommandRunner
-
-    return CommandRunner.make((options, output) => runner.exitCode(toSource(options), output))
-  })
-).pipe(Layer.provide(CommandRunner.layer), Layer.provideMerge(NodeServices.layer))
+const RUNNER = CommandRunner.layer.pipe(Layer.provideMerge(NodeServices.layer))
 
 function readFiles(folder: string, files: readonly string[]): Record<string, string> {
   return Object.fromEntries(files.map((file) => [file, readFileSync(join(folder, file), "utf8")]))
@@ -171,7 +154,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
         )
       }).pipe(
         Effect.provideService(Project.Directory, project),
-        Effect.provide([SOURCE_RUNNER, ModuleResolver.layer])
+        Effect.provide([RUNNER, ModuleResolver.layer])
       )
     )
 
@@ -227,7 +210,7 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
         }).pipe(
           Effect.provideService(Project.Directory, project),
           // `check` prints the output of its stages through `Stdio`.
-          Effect.provide([SOURCE_RUNNER, NodeServices.layer, ModuleResolver.layer])
+          Effect.provide([RUNNER, NodeServices.layer, ModuleResolver.layer])
         )
     )
   })

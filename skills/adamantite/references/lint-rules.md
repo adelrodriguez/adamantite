@@ -7,6 +7,9 @@ Read the rule message and apply the section below that matches it.
 - For `adamantite/no-react-state-hooks`, follow the message's replacement for the hook.
   Moving the call into a hook module only to silence the report leaves the problem in place.
   Set `allow` only when the project's hook layout differs from the default.
+- For `adamantite/require-effect-dependencies`, pass every value that the effect reads as the
+  dependency array, or `[]` when the effect runs once. An array that leaves out a value that the
+  effect reads gets a `react/exhaustive-deps` report.
 - For `adamantite/no-overzealous-destructuring`, keep the object and read its members, or split
   the pattern. Raising `maxDepth` or `maxProperties` only to pass the check hides the problem.
 - For `adamantite/require-suppression-reason`, first try to fix the code. If a suppression is

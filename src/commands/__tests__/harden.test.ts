@@ -724,7 +724,7 @@ describe("harden", () => {
       expect(decodeReport(logLines[0])).toStrictEqual({
         agentReach: Option.some({
           brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
-          deadAnchors: [{ anchor: "setup", file: "AGENTS.md", target: "AGENTS.md" }],
+          unmatchedAnchors: [{ anchor: "setup", file: "AGENTS.md", target: "AGENTS.md" }],
           unreached: ["docs/unreached.md"],
         }),
         configs: ["oxlint.config.ts"],
@@ -843,7 +843,7 @@ describe("harden", () => {
       name: "reach the files that links and code spans name, also through other files",
       reach: {
         brokenLinks: [],
-        deadAnchors: [],
+        unmatchedAnchors: [],
         unreached: ["docs/plans/old.md", "src/README.md"],
       },
     },
@@ -859,7 +859,7 @@ describe("harden", () => {
       name: "start from each AGENTS.md, and not from the files of one vendor",
       reach: {
         brokenLinks: [],
-        deadAnchors: [],
+        unmatchedAnchors: [],
         unreached: [".cursor/rules/style.mdc", "CLAUDE.md", "docs/style.md", "docs/testing.md"],
       },
     },
@@ -874,7 +874,7 @@ describe("harden", () => {
       name: "reach each Markdown file directly in a folder that a file names",
       reach: {
         brokenLinks: [],
-        deadAnchors: [],
+        unmatchedAnchors: [],
         unreached: ["docs/plans/old.md", "src/lib/hardening/prompt.md"],
       },
     },
@@ -885,7 +885,7 @@ describe("harden", () => {
         "docs/testing.md": "# Testing\n",
       },
       name: "ignore a URL, an anchor, a package name, and a code span that names no file",
-      reach: { brokenLinks: [], deadAnchors: [], unreached: ["docs/testing.md"] },
+      reach: { brokenLinks: [], unmatchedAnchors: [], unreached: ["docs/testing.md"] },
     },
     {
       // A code span can name a file that a step creates later, so only a link counts as broken.
@@ -893,7 +893,7 @@ describe("harden", () => {
       name: "list a link to a Markdown file that does not exist",
       reach: {
         brokenLinks: [{ file: "AGENTS.md", target: "docs/guide.md" }],
-        deadAnchors: [],
+        unmatchedAnchors: [],
         unreached: [],
       },
     },
@@ -907,7 +907,7 @@ describe("harden", () => {
       name: "read the links after a code block that shows a fence with a language",
       reach: {
         brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
-        deadAnchors: [],
+        unmatchedAnchors: [],
         unreached: [],
       },
     },
@@ -928,7 +928,7 @@ describe("harden", () => {
         "docs/style.md": "# Style\n",
       },
       name: "ignore the links of an example in a code block or in inline code",
-      reach: { brokenLinks: [], deadAnchors: [], unreached: ["docs/style.md"] },
+      reach: { brokenLinks: [], unmatchedAnchors: [], unreached: ["docs/style.md"] },
     },
     {
       files: {
@@ -945,7 +945,7 @@ describe("harden", () => {
       name: "list a link to a heading that a Markdown file of the project does not have",
       reach: {
         brokenLinks: [],
-        deadAnchors: [
+        unmatchedAnchors: [
           { anchor: "module-seams", file: "AGENTS.md", target: "docs/architecture.md" },
           { anchor: "tests", file: "AGENTS.md", target: "AGENTS.md" },
         ],
@@ -1002,7 +1002,7 @@ describe("harden", () => {
           "",
           "[1](#the-setupapply-rule) [2](#tests) [3](#tests-1) [4](#whats-new) [5](#linked-heading)",
           "[6](#snake_case-and-emphasis) [7](#custom-id) [8](#html-anchor) [9](#setext-heading)",
-          "[10](#Tests) [11](#top) [12](#L10-L20) [13](#tests-2) [14](#fenced)",
+          "[10](#Tests) [11](#top) [12](#L10-L20) [13](#tests-9) [14](#fenced)",
           "[15](#description-front-matter-is-not-a-heading)",
           "[16](#optiona) [17](#__tests__) [18](#a_b-and-x) [19](#ctrl-key) [20](#bold-and-strong)",
           "[21](#docs-site-id-custom-id) [22](#docs-site-id) [23](#linkxmd-in-code) [24](#x-and-)",
@@ -1013,8 +1013,8 @@ describe("harden", () => {
       name: "make the anchors of headings as GitHub does",
       reach: {
         brokenLinks: [],
-        deadAnchors: [
-          { anchor: "tests-2", file: "AGENTS.md", target: "AGENTS.md" },
+        unmatchedAnchors: [
+          { anchor: "tests-9", file: "AGENTS.md", target: "AGENTS.md" },
           { anchor: "fenced", file: "AGENTS.md", target: "AGENTS.md" },
           {
             anchor: "description-front-matter-is-not-a-heading",
@@ -1027,7 +1027,8 @@ describe("harden", () => {
     },
     {
       // Each anchor is the slug that `github-slugger` makes from the text that GitHub's Markdown
-      // API renders for the heading.
+      // API renders for the heading. The simple rule cannot match a heading with an image or an
+      // entity, so the agent checks those links.
       files: {
         "AGENTS.md": [
           "## [`Setup.apply`](guide.md)",
@@ -1080,22 +1081,26 @@ describe("harden", () => {
           "[8](#tag-link) [9](#httpsexamplecom-autolink) [10](#httpsbareexamplecom-bare) [11](#escaped-_underscore_-and-star-and-tick)",
           "[12](#ref-link-and-collapsed) [13](#a-bc-d) [14](#unclosed-span) [15](#-entity--and-tag)",
           "[16](#text_with_inner_underscores-and-init) [17](#nested-emphasis-here) [18](#link-with-title) [19](#done-x)",
-          "[21](#-and-%C3%A9t%C3%A9-and-%C3%A9) [old](#setupapplyguidemd)",
+          "[21](#-and-%C3%A9t%C3%A9-and-%C3%A9)",
           "",
         ].join("\n"),
         "docs/guide.md": "# Guide\n",
         "guide.md": "# Guide\n",
       },
-      name: "make the anchors of headings with nested inline constructs as GitHub renders them",
+      name: "match the anchors of nested inline constructs, and list the ones that the rule misses",
       reach: {
         brokenLinks: [],
-        deadAnchors: [{ anchor: "setupapplyguidemd", file: "AGENTS.md", target: "AGENTS.md" }],
+        unmatchedAnchors: [
+          { anchor: "-image", file: "AGENTS.md", target: "AGENTS.md" },
+          { anchor: "-entity--and-tag", file: "AGENTS.md", target: "AGENTS.md" },
+          { anchor: "-and-%C3%A9t%C3%A9-and-%C3%A9", file: "AGENTS.md", target: "AGENTS.md" },
+        ],
         unreached: [],
       },
     },
     {
-      // GitHub renders `_lonely-underscore`, `-suits`, and `undefined-refnowhere`. Without a pair, a
-      // known entity, or a definition, the other reading of each heading passes too.
+      // GitHub renders `_lonely-underscore`, `-suits`, and `undefined-refnowhere`. The heading as
+      // written and the heading without markup give two candidates, and only the entity misses.
       files: {
         "AGENTS.md": [
           "## _lonely underscore",
@@ -1109,10 +1114,13 @@ describe("harden", () => {
           "",
         ].join("\n"),
       },
-      name: "accept each reading of a heading construct that the scanner cannot settle",
+      name: "match an anchor to either candidate of a heading",
       reach: {
         brokenLinks: [],
-        deadAnchors: [{ anchor: "lonely", file: "AGENTS.md", target: "AGENTS.md" }],
+        unmatchedAnchors: [
+          { anchor: "-suits", file: "AGENTS.md", target: "AGENTS.md" },
+          { anchor: "lonely", file: "AGENTS.md", target: "AGENTS.md" },
+        ],
         unreached: [],
       },
     },
@@ -1151,7 +1159,7 @@ describe("harden", () => {
       expect(project.list()).toContain(".claude/skills/adamantite-hardening/SKILL.md")
       expect(documentationFiles).toStrictEqual(Option.some(["AGENTS.md"]))
       expect(agentReach).toStrictEqual(
-        Option.some({ brokenLinks: [], deadAnchors: [], unreached: [] })
+        Option.some({ brokenLinks: [], unmatchedAnchors: [], unreached: [] })
       )
     })
   )
@@ -1304,7 +1312,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("list a link to a heading that does not exist", () =>
+  it.effect("list a link whose anchor matches no heading, for the agent to check", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         "AGENTS.md": "Read [the seams](docs/architecture.md#module-seams).\n",
@@ -1312,9 +1320,19 @@ describe("harden", () => {
         ...INSTALLED,
       })
 
-      expect(getSection(prompt, "### Agent reach")).toContain(
-        "These links go to headings that do not exist in their Markdown file:\n\n- `AGENTS.md` links to `docs/architecture.md#module-seams`"
-      )
+      const section = getSection(prompt, "### Agent reach")
+
+      expect(getListItems(section)).toStrictEqual([
+        "- `AGENTS.md` links to `docs/architecture.md` at the anchor `#module-seams`",
+      ])
+      expect(
+        getMissingPhrases(section, [
+          "It matches an anchor with a simple rule",
+          "so it can list a link that works",
+          "open the target file, find the heading that the link means, and decide whether the link is broken",
+          "A broken link is a discovery gap, as step 1 describes. A link that works needs no change.",
+        ])
+      ).toStrictEqual([])
     })
   )
 
@@ -2092,7 +2110,7 @@ describe("harden", () => {
             { file: "AGENTS.md", target: "docs/plan.md" },
             { file: "packages/web/AGENTS.md", target: "packages/web/guide.md" },
           ],
-          deadAnchors: [
+          unmatchedAnchors: [
             { anchor: "layers", file: "AGENTS.md", target: "docs/architecture.md" },
             { anchor: "setup", file: "packages/web/AGENTS.md", target: "packages/web/AGENTS.md" },
           ],
@@ -2510,25 +2528,17 @@ describe("harden", () => {
     })
   )
 
-  it.effect("fail and name the link when the session adds a link to a missing heading", () =>
+  it.effect("pass the verification when the session adds a link that no heading matches", () =>
     Effect.gen(function* () {
-      const { exit, logLines } = yield* runInteractiveHarden({
-        // The link to a missing heading that the project had before the session does not fail it.
-        files: { "AGENTS.md": "Read [the setup](#setup).\n", ...HEALTHY_FILES },
+      // The agent decides whether such a link works, so it does not fail the session.
+      const { exit } = yield* runInteractiveHarden({
         keys: ["enter"],
         onSession: (files) => {
-          files.write("AGENTS.md", `${files.read("AGENTS.md")}Read [the tests](#tests).\n`)
+          files.write("AGENTS.md", "# Acme\n\nRead [the tests](#tests).\n")
         },
       })
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "💠 adamantite harden",
-        "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
-        ...CHECK_TITLES,
-        "✖ `AGENTS.md` links to `AGENTS.md#tests`, a heading that `AGENTS.md` does not have.",
-        "⚠️ Harden found issues.",
-      ])
+      expect(Exit.isSuccess(exit)).toBe(true)
     })
   )
 

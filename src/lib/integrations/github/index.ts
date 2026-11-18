@@ -44,7 +44,9 @@ const workflowTemplate = getWorkflowTemplate()
 const WORKFLOWS_DIRECTORY = ".github/workflows"
 
 /**
- * The workflow that Adamantite writes.
+ * The workflow that Adamantite writes whole, with a job for each check and analyze script of the
+ * selection. It has no step that runs the saved rule tests, and Doctor requires none. A project can
+ * add one, and the write rule keeps the changed workflow.
  */
 const WORKFLOW_PATH = `${WORKFLOWS_DIRECTORY}/adamantite.yml`
 

@@ -35,6 +35,12 @@ const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
   )
 })
 
+/**
+ * The `oxlint-custom` integration, which only assesses. It reports a rules folder that no
+ * `custom()` call loads, a `dir` that names a missing folder, and rules folders that share a plugin
+ * name. A rule file that does not load stops Oxlint, so the `oxlint-config-load-failure` finding of
+ * the Oxlint integration reports it. A saved test is the user's choice, so it gets no finding.
+ */
 export default {
   assess: ({ customRules, workspace }: Project.Snapshot) =>
     Effect.gen(function* () {

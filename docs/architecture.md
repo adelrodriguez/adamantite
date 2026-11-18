@@ -401,55 +401,31 @@ target project.
 ## Custom rules
 
 Custom rules are Oxlint rules that the target project writes in a rules folder, by default
-`.adamantite/lint`. These modules carry them:
+`.adamantite/lint`.
 
-- `presets/rules/custom.ts` implements `custom()`, which runs while Oxlint loads the config. It
-  finds the calling file in the call stack, resolves the rules folder from it, lists the
-  rule files, and enables each one. It writes one entry module for each rules folder to
-  `node_modules/.cache/adamantite/`, or to a folder in the OS temporary directory that only the
-  current user can write, and returns a `jsPlugins` entry that points to it. Without a rules folder it returns an empty config.
-- `presets/rules/index.ts` is published as `adamantite/rules`. Its default export is `custom()`
-  from `presets/rules/custom.ts`. `presets/rules/load.ts` holds the internal `loadRules`, which
-  the entry module calls to import every rule file and assemble them with `definePlugin`.
-  `presets/rules/plugin.ts`, published as
-  `adamantite/rules/plugin`, defines `definePlugin` and `defineRule`, which return their
-  argument, and re-exports all authoring types from `@oxlint/plugins`. The build inlines those
-  types into the published declarations, so `@oxlint/plugins` stays a devDependency. `presets/rules/folder.ts` says what a rules folder
-  holds: the default folder and plugin name, and which files are rules. `custom()`, `loadRules`,
-  and the CLI read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
-  `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with
-  the test types in its namespace, connected to `node:test`.
-- `src/lib/project/custom-rules/` holds the target project's custom-rules state. `discover.ts`
-  finds the Oxlint config of each package, loads it with the `ConfigLoader`, and reads the
-  identity that each `custom()` result holds under `PRESET` of `presets/identity.ts`: the rules
-  folder, the plugin name, and the calling file. A call in a module that the config imports counts,
-  and a call that no config reaches loads no rules. A config that does not load leaves the
-  discovery incomplete, and Doctor and `rule test` warn about it. `harden` uses it too, to list the
-  configs and rules folders in its prompt. The CLI imports the default folder and the rule file
-  test from `presets/rules/folder.ts`.
-  `index.ts` writes only the rule stub for `adamantite rule add`, from the template beside it.
-  It also lists existing rules for `rule test add`, writes an optional sibling `<name>.test.ts`
-  or the file that `--path` names, and finds `.test.*` files in each loaded rules folder for
-  `adamantite rule test`. The command accepts `--path` to run a test saved elsewhere.
-  The shipped skill tells the agent how to run temporary
-  RuleTester cases, remove its temporary files, and preserve user-owned tests.
-- The `oxlint-custom` integration in `src/lib/integrations/oxlint/custom.ts` uses
-  that module to report rules folders that no `custom()` call loads, a `dir` that names a missing
-  folder, and rules folders that share a plugin name. A
-  rule file that cannot load stops Oxlint, so the `oxlint-config-load-failure` finding reports it.
-  Optional saved tests do not produce a finding.
-- The `github` integration in `src/lib/integrations/github/index.ts` renders
-  `.github/workflows/adamantite.yml` whole, with a job for each check and analyze script of the
-  selection. It does not add or require a rule-test step. Users can add one themselves, and the
-  write rule keeps the changed workflow. Doctor then checks that a job of the workflow runs each
-  CI script of the selection.
+- `presets/rules` is the published side: `custom()` in `presets/rules/custom.ts`, the loader in
+  `presets/rules/load.ts`, the authoring API in `presets/rules/plugin.ts`, the test API in
+  `presets/rules/testing.ts`, and what a rules folder holds in `presets/rules/folder.ts`.
+- `src/lib/project/custom-rules` is the CLI side: the discovery of the `custom()` calls that the
+  loaded configs reach, the stub of `rule add`, and the saved tests of `rule test`.
+- `src/lib/integrations/oxlint/custom.ts` is the `oxlint-custom` integration, which reports the
+  rules folders that no config loads.
+- The "Custom rules" section of `skills/adamantite-hardening/SKILL.md` links to the authoring
+  guidance in `skills/adamantite-hardening/references/custom-rules.md`, which tells an agent how to
+  verify a rule with
+  temporary RuleTester cases.
 
-The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
-APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`
-extend the root config, so type-aware lint sees the Node.js types and the `.ts` import
-extensions. `presets/__tests__/custom.test.ts` lints temporary projects in real Oxlint
-runs, including a monorepo with a shared tooling package, and runs `custom()` under Bun
-when Bun is installed.
+These invariants hold:
 
-The "Custom rules" section of `skills/adamantite-hardening/SKILL.md` links to the authoring
-guidance in `skills/adamantite-hardening/references/custom-rules.md`.
+- `custom()` and the loader run under the runtime that executes Oxlint, so they use only the
+  Node.js APIs that Bun also provides. `presets/__tests__/custom.test.ts` lints projects that call
+  `custom()` in real Oxlint runs under Node.js, and the `test` workflow runs `custom()` with the
+  minimum Bun.
+- A project type-checks its rules without `@oxlint/plugins`, because the build inlines the
+  authoring types into the published declarations. `scripts/test-smoke.ts` holds it.
+- `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json` extend the root config, so
+  type-aware lint sees the Node.js types and the `.ts` import extensions. `pnpm run check` holds
+  it.
+- Adamantite keeps no temporary verification case in the target project, and only
+  `adamantite rule test` runs a saved test. Nothing enforces the first part, which the skill asks
+  of the agent.

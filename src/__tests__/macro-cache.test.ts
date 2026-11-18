@@ -91,5 +91,5 @@ describe("macro module cache", () => {
     const second = runVitest(tempDir)
 
     expect(second).toMatchObject({ status: 0 })
-  }, 30_000)
+  })
 })

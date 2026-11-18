@@ -59,7 +59,7 @@ const FORMATTED_FILES = [
   ".zed/settings.json",
   ".github/workflows/adamantite.yml",
   "AGENTS.md",
-  ...Object.keys(getShippedSkillFiles()).map((file) => `.agents/skills/adamantite/${file}`),
+  ...Object.keys(getShippedSkillFiles()).map((file) => `.agents/skills/${file}`),
 ]
 
 // Every part of the selection that makes Setup write a file, with the longest renders: the VS Code
@@ -384,7 +384,7 @@ describe("the files that Setup writes", () => {
         Effect.provide(layer)
       )
 
-      expect(readFileSync(skill, "utf8")).not.toBe(getShippedSkillFiles()["SKILL.md"])
+      expect(readFileSync(skill, "utf8")).not.toBe(getShippedSkillFiles()["adamantite/SKILL.md"])
       expect(yield* assessSkill).toStrictEqual([])
 
       writeFileSync(skill, `${readFileSync(skill, "utf8")}\nA change of the user.\n`)

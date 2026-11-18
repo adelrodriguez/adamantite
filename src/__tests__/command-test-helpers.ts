@@ -73,7 +73,7 @@ export function makeLockfileFile(
  */
 export const SKILL_FILES: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(getShippedSkillFiles()).map(([file, content]) => [
-    `.agents/skills/adamantite/${file}`,
+    `.agents/skills/${file}`,
     content,
   ])
 )

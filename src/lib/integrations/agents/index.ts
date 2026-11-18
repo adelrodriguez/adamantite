@@ -1,3 +1,4 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Jsonc from "effect/encoding/Jsonc"
 import * as Option from "effect/Option"
@@ -22,9 +23,20 @@ import { readFileIfExists } from "#lib/shared/filesystem.ts"
 const AGENTS_PATH = "AGENTS.md"
 
 /**
- * The skill that this Adamantite build ships, keyed by POSIX paths relative to the skill folder.
+ * The files of the skills that this Adamantite build ships, keyed by POSIX paths relative to a
+ * skill folder of an agent, such as `adamantite/SKILL.md`.
  */
-const shippedSkill = getShippedSkillFiles()
+const shippedSkillFiles = getShippedSkillFiles()
+
+/**
+ * Each shipped skill, with its files keyed by POSIX paths relative to its own folder.
+ */
+const shippedSkills = Object.entries(
+  Array.groupBy(Object.entries(shippedSkillFiles), ([file]) => file.slice(0, file.indexOf("/")))
+).map(([name, files]) => ({
+  files: files.map(([file, content]) => ({ content, file: file.slice(name.length + 1) })),
+  name,
+}))
 
 /**
  * The Adamantite section of `AGENTS.md` for the selection, with the commands of the project's
@@ -114,33 +126,35 @@ const readSkillFile = Effect.fn("readSkillFile")(function* (
 })
 
 /**
- * The findings for each copy of the Adamantite skill in the skill folders of the agents that the
- * project uses: a copy that misses a file of the skill, which `update` writes, and a copy with a
- * changed file. An earlier version wrote that file before the lockfile recorded it, or the project
- * changed it, so `update` keeps it.
+ * The findings for each copy of a shipped skill in the skill folders of the agents that the project
+ * uses: a copy that misses a file of the skill, which `update` writes, and a copy with a changed
+ * file. An earlier version wrote that file before the lockfile recorded it, or the project changed
+ * it, so `update` keeps it.
  */
 const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapshot) {
   const folders = yield* detectSkillFolders(yield* Project.Directory)
 
   const copies = yield* Effect.forEach(
-    folders,
-    (folder) =>
+    folders.flatMap((folder) =>
+      shippedSkills.map((skill) => ({ copy: `${folder}/${skill.name}`, skill }))
+    ),
+    ({ copy, skill }) =>
       Effect.map(
         Effect.forEach(
-          Object.entries(shippedSkill),
-          ([file, content]) =>
-            Effect.map(
-              readSkillFile(project, `${folder}/adamantite/${file}`, content),
-              (state) => ({ file, state })
-            ),
+          skill.files,
+          ({ content, file }) =>
+            Effect.map(readSkillFile(project, `${copy}/${file}`, content), (state) => ({
+              file,
+              state,
+            })),
           { concurrency: "unbounded" }
         ),
-        (files) => ({ files, folder })
+        (files) => ({ copy, files, name: skill.name })
       ),
     { concurrency: "unbounded" }
   )
 
-  return copies.flatMap(({ files, folder }): Finding[] => {
+  return copies.flatMap(({ copy, files, name }): Finding[] => {
     const missing = files
       .filter(({ state }) => state === "missing")
       .map(({ file }) => `\`${file}\``)
@@ -150,9 +164,9 @@ const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapsho
         ? []
         : [
             {
-              currentState: `The selection includes agent guidance, and \`${folder}/adamantite\` has no ${missing.join(", ")}.`,
+              currentState: `The selection includes agent guidance, and \`${copy}\` has no ${missing.join(", ")}.`,
               goal: [
-                `Run \`adamantite update\`. It writes the missing files of the skill to \`${folder}/adamantite\`.`,
+                `Run \`adamantite update\`. It writes the missing files of the skill to \`${copy}\`.`,
                 "Run `adamantite doctor` again. It must not report this finding.",
               ],
               id: "missing-adamantite-skill",
@@ -163,9 +177,9 @@ const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapsho
       ...(files.some(({ state }) => state === "changed")
         ? [
             {
-              currentState: `\`${folder}/adamantite\` differs from the Adamantite skill of the installed version.`,
+              currentState: `\`${copy}\` differs from the \`${name}\` skill of the installed Adamantite version.`,
               goal: [
-                `Delete \`${folder}/adamantite\`, then run \`adamantite update\`. It writes the skill of the installed version.`,
+                `Delete \`${copy}\`, then run \`adamantite update\`. It writes the skill of the installed version.`,
                 "Run `adamantite doctor` again. It must not report this finding.",
               ],
               id: "stale-adamantite-skill",
@@ -185,39 +199,43 @@ const SKILLS_LOCK_PATH = "skills-lock.json"
 
 // Only the part of the `skills` CLI's lock that the assessment reads.
 const SkillsLock = Schema.Struct({
-  skills: Schema.Struct({ adamantite: Schema.Unknown }),
+  skills: Schema.Record(Schema.String, Schema.Unknown),
 })
 
 /**
- * The finding for an `adamantite` entry in `skills-lock.json`. `npx skills add` records the skill
- * there, and `skills update` would then write the skill folders that Adamantite owns. Adamantite
- * does not edit a file that another tool owns, so a lock that does not decode gets no finding.
+ * The finding for each entry of a shipped skill in `skills-lock.json`. `npx skills add` records the
+ * skill there, and `skills update` would then write the skill folders that Adamantite owns.
+ * Adamantite does not edit a file that another tool owns, so a lock that does not decode gets no
+ * finding.
  */
 const assessSkillsLock = Effect.fn("assessSkillsLock")(function* (cwd: string) {
   const path = yield* Path.Path
   const content = yield* readFileIfExists(path.join(cwd, SKILLS_LOCK_PATH))
 
-  const recorded = Option.exists(content, (text) =>
-    Result.match(Jsonc.parse(text), {
-      onFailure: () => false,
-      onSuccess: Schema.is(SkillsLock),
-    })
-  )
+  const recorded = Option.match(content, {
+    onNone: () => [],
+    onSome: (text) =>
+      Result.match(Jsonc.parse(text), {
+        onFailure: () => [],
+        onSuccess: (lock) =>
+          Schema.is(SkillsLock)(lock)
+            ? shippedSkills
+                .map((skill) => skill.name)
+                .filter((name) => Object.hasOwn(lock.skills, name))
+            : [],
+      }),
+  })
 
-  return recorded
-    ? [
-        {
-          currentState: `\`${SKILLS_LOCK_PATH}\` records the \`adamantite\` skill, so \`npx skills update\` would write the skill folders that \`adamantite update\` writes.`,
-          goal: [
-            `Remove the \`adamantite\` entry from \`skills\` in \`${SKILLS_LOCK_PATH}\`. Delete the file when that entry was its only one.`,
-            "Run `adamantite doctor` again. It must not report this finding.",
-          ],
-          id: "skills-lock-adamantite-entry",
-          integration: "agents",
-          title: "The skills lock records the Adamantite skill",
-        } satisfies Finding,
-      ]
-    : []
+  return recorded.map((name): Finding => ({
+    currentState: `\`${SKILLS_LOCK_PATH}\` records the \`${name}\` skill, so \`npx skills update\` would write the skill folders that \`adamantite update\` writes.`,
+    goal: [
+      `Remove the \`${name}\` entry from \`skills\` in \`${SKILLS_LOCK_PATH}\`. Delete the file when that entry was its only one.`,
+      "Run `adamantite doctor` again. It must not report this finding.",
+    ],
+    id: "skills-lock-adamantite-entry",
+    integration: "agents",
+    title: "The skills lock records the Adamantite skill",
+  }))
 })
 
 export default {
@@ -244,9 +262,9 @@ export default {
           onSome: (content) => [{ content, path: AGENTS_PATH }],
         }),
         ...folders.flatMap((folder) =>
-          Object.entries(shippedSkill).map(([file, content]) => ({
+          Object.entries(shippedSkillFiles).map(([file, content]) => ({
             content,
-            path: `${folder}/adamantite/${file}`,
+            path: `${folder}/${file}`,
           }))
         ),
       ]

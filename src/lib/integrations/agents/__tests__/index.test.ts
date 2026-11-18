@@ -27,7 +27,7 @@ describe("agent guidance setup", () => {
 
       expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(AGENTS)).toContain("- Run `bun run check` to catch formatting")
-      expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
+      expect(files.read(SKILL)).toBe(shippedSkill["adamantite/SKILL.md"])
       expect(output).toContain(`✔ \`${AGENTS}\` created.`)
     })
   )
@@ -38,7 +38,9 @@ describe("agent guidance setup", () => {
 
       yield* runLifecycle("init", files, INIT_ARGS)
 
-      expect(files.read(".claude/skills/adamantite/SKILL.md")).toBe(shippedSkill["SKILL.md"])
+      expect(files.read(".claude/skills/adamantite/SKILL.md")).toBe(
+        shippedSkill["adamantite/SKILL.md"]
+      )
     })
   )
 
@@ -67,7 +69,7 @@ describe("agent guidance setup", () => {
 
       expect(files.read(SKILL)).toBe("# An older skill\n")
       expect(doctor.output).toContain(
-        "`.agents/skills/adamantite` differs from the Adamantite skill of the installed version."
+        "`.agents/skills/adamantite` differs from the `adamantite` skill of the installed Adamantite version."
       )
     })
   )
@@ -93,7 +95,7 @@ describe("agent guidance setup", () => {
       expect(doctor.output).toContain(
         "The selection includes agent guidance, and `.agents/skills/adamantite` has no `SKILL.md`."
       )
-      expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
+      expect(files.read(SKILL)).toBe(shippedSkill["adamantite/SKILL.md"])
       expect(update.output).toContain(`✔ \`${SKILL}\` created.`)
     })
   )

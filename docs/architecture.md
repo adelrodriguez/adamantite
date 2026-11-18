@@ -225,7 +225,10 @@ that reads the workspace outside an assessment, such as `harden` or `rule try`, 
 each phase and passes the `Workspace` down.
 
 `assessProject` in `src/lib/assessment/` runs each integration that the lockfile's selection
-includes, so a selected integration whose file is missing gets a finding. A project without a
+includes, so a selected integration whose file is missing gets a finding. It also compares each
+selected managed script of the root `package.json` with its command, and reports a
+`missing-managed-script` or `mismatched-managed-script` finding, which is what `update` would
+change. No integration owns the managed scripts, so these findings name `scripts`. A project without a
 lockfile gets the `lockfile-missing` finding alone, which says to run `adamantite init`. Doctor
 catches `UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
 `invalid-lockfile` finding alone, because the other assessments need the selection. A project that

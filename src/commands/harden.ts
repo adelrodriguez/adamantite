@@ -144,9 +144,9 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
  * Renders the prompt that tells a coding agent to move the project's coding standards up the
  * enforcement ladder, and offers it through `Resolution.offer` as a `Task`. The prompt shows what
  * `src/lib/hardening` computes as data: each Markdown file that git lists outside the skill
- * folders, the discovery gaps, the disable comments of each rule, each file of an override that
- * turns a rule off, and the decisions of the decisions record. Harden produces no findings, so it
- * never changes Doctor's result.
+ * folders, the discovery gaps, the disable comments of each rule, the TypeScript directives, each
+ * file of an override that turns a rule off, and the decisions of the decisions record. Harden
+ * produces no findings, so it never changes Doctor's result.
  */
 export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   Command.withDescription(

@@ -139,14 +139,11 @@ Each file gets a `FileWrite`:
 `src/lib/project/lockfile.ts` owns `.adamantite/adamantite-lock.json`: its schema, its read, and
 the hash of a managed file.
 
-| Invariant                                                                                                                                              | Held by                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| A lockfile that does not decode, or that has a schema version that this Adamantite does not know, fails `init` and `update` before they change a file. | `src/commands/__tests__/init.test.ts` and `src/commands/__tests__/update.test.ts` |
-| `Project.read` decodes the lockfile one time, and the rest of the code trusts `project.lockfile`.                                                      | Nothing                                                                           |
-
-`verifyLockfileVersion` compares the lockfile's `version` with the Adamantite that the project
-installs. `check` fails with its error after the stages, and `assessProject` reports it as the
-`setup-outdated` or `setup-ahead` finding.
+| Invariant                                                                                                                                                                                                      | Held by                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| A lockfile that does not decode, or that has a schema version that this Adamantite does not know, fails `init` and `update` before they change a file.                                                         | `src/commands/__tests__/init.test.ts` and `src/commands/__tests__/update.test.ts`  |
+| A lockfile that another Adamantite version than the installed one wrote fails `check` after its stages, and Doctor reports it as a finding. `verifyLockfileVersion` is the one comparison of the two versions. | `src/commands/__tests__/check.test.ts` and `src/commands/__tests__/doctor.test.ts` |
+| `Project.read` decodes the lockfile one time, and the rest of the code trusts `project.lockfile`.                                                                                                              | Nothing                                                                            |
 
 ## Assessment
 

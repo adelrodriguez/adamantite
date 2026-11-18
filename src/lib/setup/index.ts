@@ -91,8 +91,10 @@ const ScriptWrites = Data.taggedEnum<ScriptWrite>()
 
 /**
  * Applies the write rule to one managed file: write it when it does not exist, or when its hash
- * equals the hash that the lockfile recorded. `hash` is what `written` records, and none for a file
- * that the user changed.
+ * equals the hash that the lockfile recorded. It writes the file whole, and never merges or edits
+ * it. `hash` is what `written` records, and none for a file that the user changed. Without a
+ * recorded hash, such as in a project without a lockfile, a file that exists gets a hash only when
+ * it already holds the current version.
  */
 const writeManagedFile = Effect.fn("writeManagedFile")(function* (
   cwd: string,
@@ -320,12 +322,12 @@ export type Result = typeof Result.Type
 
 /**
  * Sets up `selection` in `project`, the backend of `init` and `update`, and the only code that
- * writes target-project files. It installs `adamantite` and the packages of every selected
- * integration in one install, sets the managed scripts, prepares what the integrations need in
- * `node_modules`, formats their managed files with the project's Oxfmt, writes them under the write
- * rule, deletes the managed files that the selection dropped, and writes the lockfile last,
- * formatted the same way. Each hash in `written` is the hash of the bytes on disk. Running it twice
- * leaves the project unchanged.
+ * writes target-project files. In this order, it installs `adamantite` and the packages of every
+ * selected integration in one install, prepares what the integrations need in `node_modules`,
+ * formats their managed files with the project's Oxfmt, sets the managed scripts, writes the files
+ * under the write rule, deletes the managed files that the selection dropped, and writes the
+ * lockfile last, formatted the same way. Each hash in `written` is the hash of the bytes on disk.
+ * Running it twice leaves the project unchanged.
  */
 export const apply = Effect.fn("Setup.apply")(function* (
   project: Project.Snapshot,

@@ -120,49 +120,31 @@ The list holds `oxlint`, `oxfmt`, `knip`, `sherif`, `tsconfig`, `vscode`, `zed`,
 
 ## Setup and the write rule
 
-`init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
-or the flags and adds it to the recorded selection. `update` takes it from the lockfile. Without a
-lockfile, `update` runs no setup and offers the `lockfile-missing` finding. Both hand the selection to
-`applySetup` in `src/commands/setup.ts`, which runs `Setup.apply` from `src/lib/setup/`, prints
-what it did through `src/terminal/setup.ts`, and offers the repair of the findings that remain
-through `Resolution.offer`. Both exit 1 while findings remain.
+`init` and `update` share one backend, and differ only in where the selection comes from: the
+prompts or the flags for `init`, and the lockfile for `update`. `applySetup` in
+`src/commands/setup.ts` runs `Setup.apply` from `src/lib/setup/index.ts`, prints what it did through
+`src/terminal/setup.ts`, and offers the repair of the findings that remain.
 
-`Setup.apply` is the only code that writes the managed files and the lockfile. It takes the
-integrations that the selection includes, and does these steps in order:
-
-1. Install `adamantite`, when the project does not depend on it, and the packages of every selected
-   integration in one install. It installs only the packages that `package.json` does not declare
-   at the managed version, and leaves a pnpm catalog entry to the integration's finding.
-2. Run the `prepare` of each integration that has one.
-3. Render the managed files, and format each one with the project's Oxfmt from stdin, with the
-   project's Oxfmt config, or with a copy of the format preset in a temporary folder when the
-   project has none. A project without Oxfmt gets the file as rendered. A config that Oxfmt cannot
-   load fails `apply` with `FailedToFormatFile` before any write.
-4. Set the managed scripts.
-5. Apply the write rule to each managed file, and delete each recorded file that the selection no
-   longer renders.
-6. Write the lockfile.
-
-The write rule: `apply` writes a managed file only whole, and only when the file does not exist or
-its hash equals the hash in the lockfile's `written` map. It never merges or edits a file. Each file
-gets a `FileWrite`:
+The write rule: `Setup.apply` writes a managed file only whole, and only when the file does not
+exist or its hash equals the hash in the lockfile's `written` map. It never merges or edits a file.
+Each file gets a `FileWrite`:
 
 - `Created` when the file did not exist.
 - `Replaced` when its hash equaled the recorded hash, so `apply` wrote the current version over it.
 - `Unchanged` when it already held the current version.
-- `Kept` when the user changed it. `apply` does not hand it off. Its integration's `assess` reads it
-  and reports only a change that breaks the setup.
+- `Kept` when the user changed it. Its integration's `assess` reads it and reports only a change
+  that breaks the setup.
 - `Deleted` when the selection no longer renders it and its hash still matched.
 
-Formatting makes `adamantite fix` leave each written file unchanged, so its hash still matches on
-the next run. In a project without a lockfile, a file that already exists gets a hash only when it
-equals what this version renders.
+`src/lib/setup/__tests__/index.test.ts` holds the write rule and these invariants:
 
-A managed script is the one exception to whole files. `apply` sets each selected `check`, `fix`, or
-`analyze` key of the root `package.json` to its command, overwrites what it held, and returns a
-`ScriptWrite` for each: `Added`, `Replaced` with the command that it held, or `Unchanged`. It
-writes `package.json`, formatted like a managed file, only when a script changed or the install
-changed it.
+- `Setup.apply` is the only code that writes the managed files and the lockfile. `project/file-writers`
+  in `.adamantite/lint/file-writers.ts` holds it too.
+- A second run changes no file. `apply` formats each file with the project's Oxfmt, so
+  `adamantite fix` leaves the file as written and its hash still matches.
+- A config that Oxfmt cannot load fails `apply` before any write.
+- A managed script is the one exception to whole files: `apply` sets each selected script of the
+  root `package.json` to its command and overwrites what it held.
 
 ## Lockfile
 

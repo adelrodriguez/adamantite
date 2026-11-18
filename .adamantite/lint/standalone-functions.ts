@@ -1,16 +1,15 @@
 // `adamantite/rules/plugin` resolves to `dist`, which the tests and the editor Oxlint do not build first.
 import { defineRule, type ESTree } from "#presets/rules/plugin.ts"
 
-// A standalone function is a function declaration. An arrow is for a callback, an object method, or
-// a function that directly returns an Effect chain, such as
-// `(path: string) => FileSystem.FileSystem.pipe(Effect.flatMap((fs) => fs.exists(path)))`. The two
-// forms keep the plain helpers apart from the Effect composition.
+// A standalone function is a function declaration, in a module and inside another function. An
+// arrow is for a callback, an object method, or a function that directly returns an Effect chain,
+// such as `(path: string) => FileSystem.FileSystem.pipe(Effect.flatMap((fs) => fs.exists(path)))`.
+// The two forms keep the plain helpers apart from the Effect composition.
 //
-// The rule reports a module-level variable whose value is a function that cannot directly return an
-// Effect chain: a function expression, an async arrow, an arrow with a block body, and an arrow that
-// can return a plain value, such as an object or a comparison. A rule gets no types, so the rule
-// accepts an arrow that returns anything else, such as a call. `CODING_STANDARDS.md` keeps that
-// part of the standard.
+// The rule reports a variable whose value is a function that cannot directly return an Effect chain:
+// a function expression, an async arrow, an arrow with a block body, and an arrow that can return a
+// plain value, such as an object or a comparison. A rule gets no types, so the rule accepts an arrow
+// that returns anything else, such as a call. `CODING_STANDARDS.md` keeps that part of the standard.
 
 // The expressions whose value is never an Effect.
 const PLAIN_VALUES = new Set([
@@ -78,12 +77,6 @@ export default defineRule({
   createOnce(context) {
     return {
       VariableDeclarator(node) {
-        const scope = node.parent.parent
-
-        if (scope?.type !== "Program" && scope?.type !== "ExportNamedDeclaration") {
-          return
-        }
-
         if (node.id.type !== "Identifier" || node.init === null || !isPlainFunction(node.init)) {
           return
         }
@@ -95,7 +88,7 @@ export default defineRule({
   meta: {
     docs: {
       description:
-        "Require a function declaration for a module-level function that cannot directly return an Effect chain.",
+        "Require a function declaration for a function that a variable holds and that cannot directly return an Effect chain.",
     },
     messages: {
       declare:

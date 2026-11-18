@@ -11,3 +11,9 @@ minimumReleaseAgeExclude:
   - "@effect/tsgo-linux-x64@0.70.0"
   - "@effect/tsgo-win32-arm64@0.70.0"
   - "@effect/tsgo-win32-x64@0.70.0"
+# The CLI bundle includes Effect, so this patch ships to users. Effect creates its grapheme
+# segmenter when `effect/cli` loads, and the first `Intl` object loads ICU's data, which slows
+# every command. The patch creates the segmenter on its first use. Remove it when Effect does
+# the same.
+patchedDependencies:
+  effect@4.1.2: patches/effect@4.1.2.patch

@@ -329,10 +329,12 @@ const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
   )
 )
 
+// The CLI builds this description at startup, and the first `Intl` formatter loads ICU's data, so
+// the list joins its items by hand.
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
-    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${new Intl.ListFormat("en-US", { type: "disjunction" }).format(SUPPORTED_PACKAGE_MANAGERS)}`
+    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${Array.initNonEmpty(SUPPORTED_PACKAGE_MANAGERS).join(", ")}, or ${Array.lastNonEmpty(SUPPORTED_PACKAGE_MANAGERS)}`
   )
 )
 

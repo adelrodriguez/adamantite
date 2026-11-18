@@ -83,9 +83,33 @@ function isTestCallback(fn: FunctionNode): boolean {
 }
 
 /**
+ * Return the outermost `.pipe(...)` call that starts from an effect, such as the whole of
+ * `Effect.gen(...).pipe(Effect.provide(layer))`, or the effect itself when no pipe follows it.
+ */
+function pipedEffect(effect: ESTree.CallExpression): ESTree.CallExpression {
+  let current = effect
+
+  for (;;) {
+    const member = current.parent
+
+    if (
+      member.type !== "MemberExpression"
+      || member.object !== current
+      || staticKeyName(member.property, member.computed) !== "pipe"
+      || member.parent.type !== "CallExpression"
+      || member.parent.callee !== member
+    ) {
+      return current
+    }
+
+    current = member.parent
+  }
+}
+
+/**
  * Reports whether a generator is the body of an Effect test, as in `it.effect("loads", () =>
  * Effect.gen(function* () { ... }))`: the test callback returns the `Effect.gen` call of the
- * generator.
+ * generator, also through `.pipe(...)`.
  */
 function isEffectTestBody(fn: FunctionNode): boolean {
   const gen = fn.parent
@@ -94,7 +118,10 @@ function isEffectTestBody(fn: FunctionNode): boolean {
     return false
   }
 
-  const owner = gen.parent.type === "ReturnStatement" ? enclosingFunction(gen.parent) : gen.parent
+  const body = pipedEffect(gen)
+
+  const owner =
+    body.parent.type === "ReturnStatement" ? enclosingFunction(body.parent) : body.parent
 
   return owner !== null && isFunctionNode(owner) && isTestCallback(owner)
 }

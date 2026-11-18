@@ -69,6 +69,11 @@ tester.run("no-fixed-sleep", plugin.rules["no-fixed-sleep"], {
       errors: [sleep],
       name: "Effect.sleep in an Effect test that returns its generator",
     },
+    {
+      code: 'it.live("x", () => Effect.gen(function* () { yield* Effect.sleep("100 millis"); }).pipe(Effect.provide(Layer.empty)));',
+      errors: [sleep],
+      name: "Effect.sleep in an Effect test that pipes its generator",
+    },
   ],
   valid: [
     "test('x', async () => { await operation(); });",
@@ -93,6 +98,10 @@ tester.run("no-fixed-sleep", plugin.rules["no-fixed-sleep"], {
     {
       code: 'const retry = Effect.gen(function* () { yield* Effect.sleep("1 second"); }); it.effect("x", () => retry);',
       name: "Effect.sleep in a helper effect",
+    },
+    {
+      code: 'it.live("x", () => Effect.void.pipe(Effect.andThen(Effect.gen(function* () { yield* Effect.sleep("1 second"); }))));',
+      name: "Effect.sleep in an effect that a pipe step builds",
     },
   ],
 })

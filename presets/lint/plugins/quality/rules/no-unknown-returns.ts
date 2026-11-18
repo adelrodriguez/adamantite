@@ -1,9 +1,6 @@
 import type { ESTree, Rule } from "@oxlint/plugins"
 
-import {
-  createTypeAliasEnvironment,
-  type TypeAliasEnvironment,
-} from "../shared/type-alias-resolution.ts"
+import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { exposesUnknown } from "../shared/unknown-type.ts"
 
 type FunctionWithReturnType =
@@ -20,32 +17,30 @@ type FunctionWithReturnType =
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeAliasEnvironment | null = null
+    return withTypeBindings(context, (defer) => {
+      const checkReturnType = (node: FunctionWithReturnType) => {
+        const annotation = node.returnType
 
-    const checkReturnType = (node: FunctionWithReturnType) => {
-      const annotation = node.returnType
+        if (annotation === null || annotation === undefined) return
+        defer((environment) => {
+          if (!exposesUnknown(annotation.typeAnnotation, environment)) return
+          context.report({ messageId: "unknownReturn", node: annotation.typeAnnotation })
+        })
+      }
 
-      if (annotation === null || annotation === undefined || environment === null) return
-
-      if (!exposesUnknown(annotation.typeAnnotation, environment)) return
-      context.report({ messageId: "unknownReturn", node: annotation.typeAnnotation })
-    }
-
-    return {
-      ArrowFunctionExpression: checkReturnType,
-      FunctionDeclaration: checkReturnType,
-      FunctionExpression: checkReturnType,
-      Program(node) {
-        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
-      },
-      TSCallSignatureDeclaration: checkReturnType,
-      TSConstructSignatureDeclaration: checkReturnType,
-      TSConstructorType: checkReturnType,
-      TSDeclareFunction: checkReturnType,
-      TSEmptyBodyFunctionExpression: checkReturnType,
-      TSFunctionType: checkReturnType,
-      TSMethodSignature: checkReturnType,
-    }
+      return {
+        ArrowFunctionExpression: checkReturnType,
+        FunctionDeclaration: checkReturnType,
+        FunctionExpression: checkReturnType,
+        TSCallSignatureDeclaration: checkReturnType,
+        TSConstructSignatureDeclaration: checkReturnType,
+        TSConstructorType: checkReturnType,
+        TSDeclareFunction: checkReturnType,
+        TSEmptyBodyFunctionExpression: checkReturnType,
+        TSFunctionType: checkReturnType,
+        TSMethodSignature: checkReturnType,
+      }
+    })
   },
   meta: {
     docs: {

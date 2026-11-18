@@ -2,7 +2,6 @@ import type { ESTree, Rule, SourceCode, Variable } from "@oxlint/plugins"
 
 import {
   classifyWideningTarget,
-  createTypeEnvironment,
   isKnownEvidenceExpression,
   type TypeEnvironment,
   type WideningTarget,
@@ -12,6 +11,7 @@ import {
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
 import { resolveVariable } from "../shared/scope.ts"
+import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
 type FunctionExpression = ESTree.ArrowFunctionExpression | ESTree.Function
@@ -196,11 +196,38 @@ function hasParentAssertion(node: ESTree.Node): boolean {
 }
 
 /**
+ * Return the expression that holds a function as a value, past the wrappers that `unwrapExpression`
+ * removes, as `(isUser as Guard)` around `isUser`.
+ */
+function outermostWrapper(expression: ESTree.Node): ESTree.Node {
+  let current = expression
+  let parent = current.parent
+
+  while (
+    (parent?.type === "ParenthesizedExpression"
+      || parent?.type === "TSAsExpression"
+      || parent?.type === "TSSatisfiesExpression"
+      || parent?.type === "TSTypeAssertion"
+      || parent?.type === "TSNonNullExpression")
+    && parent.expression === current
+  ) {
+    current = parent
+    parent = current.parent
+  }
+
+  return current
+}
+
+/**
  * Detect sound syntactic cases where a known value is explicitly widened and loses evidence.
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeEnvironment | null = null
+    // The names that a call or an assignment must use to have a type predicate or an annotated
+    // binding as its target. Other calls and assignments never resolve their names, so most files
+    // never build the scope analysis.
+    const predicateNames = new Set<string>()
+    const annotatedNames = new Set<string>()
 
     const reportFlow = (
       expression: ESTree.Expression,
@@ -221,127 +248,176 @@ const rule: Rule = {
       })
     }
 
-    const targetFromAnnotation = (annotation: ESTree.TSTypeAnnotation | null | undefined) =>
-      environment === null ? null : annotationTarget(annotation, environment)
+    const checkAssignment = (node: ESTree.AssignmentExpression, environment: TypeEnvironment) => {
+      if (node.left.type !== "Identifier" || !annotatedNames.has(node.left.name)) return
+      const variable = resolveVariable(context.sourceCode, node.left)
 
-    return {
-      AccessorProperty(node) {
-        if (node.value === null) return
-        reportFlow(
-          node.value,
-          targetFromAnnotation(node.typeAnnotation),
-          `property \`${sourceKeyName(context.sourceCode, node.key)}\``
-        )
-      },
-      ArrowFunctionExpression(node) {
-        if (node.body.type === "BlockStatement") return
-        reportFlow(
-          node.body,
-          targetFromAnnotation(node.returnType),
-          `return value of \`${functionName(context.sourceCode, node)}\``
-        )
-      },
-      AssignmentExpression(node) {
-        if (node.operator !== "=" || node.left.type !== "Identifier") return
-        const variable = resolveVariable(context.sourceCode, node.left)
+      if (variable === null) return
+      const declarator = variableDeclarator(variable)
 
-        if (variable === null) return
-        const declarator = variableDeclarator(variable)
-
-        if (declarator?.id.type !== "Identifier") return
-        reportFlow(
-          node.right,
-          targetFromAnnotation(declarator.id.typeAnnotation),
-          `binding \`${declarator.id.name}\``
-        )
-      },
-      CallExpression(node) {
-        const owner = localFunctionForCall(context.sourceCode, node.callee)
-
-        if (owner === null) return
-        const parameterIndex = typePredicateSubjectIndex(context.sourceCode, owner)
-
-        if (parameterIndex === null) return
-        const parameter = owner.params[parameterIndex]
-        const argument = node.arguments[parameterIndex]
-
-        if (
-          parameter === undefined
-          || argument === undefined
-          || argument.type === "SpreadElement"
-        ) {
-          return
-        }
-
-        const parameterAnnotation = functionParameterTypeAnnotation(parameter)
-
-        if (
-          environment === null
-          || parameterAnnotation === null
-          || parameterAnnotation === undefined
-          || !resolvesToUnknown(parameterAnnotation.typeAnnotation, environment.typeAliases)
-        ) {
-          return
-        }
-
-        // TypeScript narrows the caller's binding at a guard call, so a declared type, such as
-        // a union, is not evidence. Only a literal or object value makes the guard pointless.
-        if (!hasKnownEvidence(context.sourceCode, argument)) return
-
-        context.report({
-          data: {
-            subject: `argument for parameter \`${functionParameterBindingName(parameter, context.sourceCode)}\` of \`${functionName(context.sourceCode, owner)}\``,
-            target: "unknown",
-          },
-          messageId: "widening",
-          node: argument,
-        })
-      },
-      Program(node) {
-        environment = createTypeEnvironment(node, context.sourceCode.visitorKeys)
-      },
-      PropertyDefinition(node) {
-        if (node.value === null) return
-        reportFlow(
-          node.value,
-          targetFromAnnotation(node.typeAnnotation),
-          `property \`${sourceKeyName(context.sourceCode, node.key)}\``
-        )
-      },
-      ReturnStatement(node) {
-        if (node.argument === null) return
-        const owner = enclosingFunction(node)
-        reportFlow(
-          node.argument,
-          targetFromAnnotation(owner?.returnType),
-          `return value of \`${functionName(context.sourceCode, owner)}\``
-        )
-      },
-      TSAsExpression(node) {
-        if (environment === null || hasParentAssertion(node)) return
-        reportFlow(
-          node.expression,
-          classifyWideningTarget(node.typeAnnotation, environment),
-          "assertion"
-        )
-      },
-      TSTypeAssertion(node) {
-        if (environment === null || hasParentAssertion(node)) return
-        reportFlow(
-          node.expression,
-          classifyWideningTarget(node.typeAnnotation, environment),
-          "assertion"
-        )
-      },
-      VariableDeclarator(node) {
-        if (node.init === null || node.id.type !== "Identifier") return
-        reportFlow(
-          node.init,
-          targetFromAnnotation(node.id.typeAnnotation),
-          `binding \`${node.id.name}\``
-        )
-      },
+      if (declarator?.id.type !== "Identifier") return
+      reportFlow(
+        node.right,
+        annotationTarget(declarator.id.typeAnnotation, environment),
+        `binding \`${declarator.id.name}\``
+      )
     }
+
+    const checkPredicateCall = (node: ESTree.CallExpression, environment: TypeEnvironment) => {
+      const callee = unwrapExpression(node.callee)
+
+      if (callee.type === "Identifier" && !predicateNames.has(callee.name)) return
+      const owner = localFunctionForCall(context.sourceCode, node.callee)
+
+      if (owner === null) return
+      const parameterIndex = typePredicateSubjectIndex(context.sourceCode, owner)
+
+      if (parameterIndex === null) return
+      const parameter = owner.params[parameterIndex]
+      const argument = node.arguments[parameterIndex]
+
+      if (parameter === undefined || argument === undefined || argument.type === "SpreadElement") {
+        return
+      }
+
+      const parameterAnnotation = functionParameterTypeAnnotation(parameter)
+
+      if (
+        parameterAnnotation === null
+        || parameterAnnotation === undefined
+        || !resolvesToUnknown(parameterAnnotation.typeAnnotation, environment.typeAliases)
+      ) {
+        return
+      }
+
+      // TypeScript narrows the caller's binding at a guard call, so a declared type, such as
+      // a union, is not evidence. Only a literal or object value makes the guard pointless.
+      if (!hasKnownEvidence(context.sourceCode, argument)) return
+
+      context.report({
+        data: {
+          subject: `argument for parameter \`${functionParameterBindingName(parameter, context.sourceCode)}\` of \`${functionName(context.sourceCode, owner)}\``,
+          target: "unknown",
+        },
+        messageId: "widening",
+        node: argument,
+      })
+    }
+
+    const recordPredicateOwner = (node: ESTree.TSTypePredicate) => {
+      const owner = node.parent.parent
+
+      if (
+        owner === null
+        || !isFunctionExpression(owner)
+        || owner.returnType?.typeAnnotation !== node
+      ) {
+        return
+      }
+
+      if (owner.id !== null) predicateNames.add(owner.id.name)
+      const value = outermostWrapper(owner)
+      const declarator = value.parent
+
+      if (declarator?.type !== "VariableDeclarator" || declarator.init !== value) return
+
+      if (declarator.id.type === "Identifier") {
+        predicateNames.add(declarator.id.name)
+
+        return
+      }
+
+      for (const variable of context.sourceCode.getDeclaredVariables(declarator)) {
+        predicateNames.add(variable.name)
+      }
+    }
+
+    return withTypeBindings(context, (defer) => {
+      const checkAnnotated = (
+        expression: ESTree.Expression,
+        annotation: ESTree.TSTypeAnnotation | null | undefined,
+        subject: () => string
+      ) => {
+        if (annotation === null || annotation === undefined) return
+        defer((typeAliases) => {
+          reportFlow(expression, annotationTarget(annotation, { typeAliases }), subject())
+        })
+      }
+
+      const checkAssertion = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion) => {
+        if (hasParentAssertion(node)) return
+        defer((typeAliases) => {
+          reportFlow(
+            node.expression,
+            classifyWideningTarget(node.typeAnnotation, { typeAliases }),
+            "assertion"
+          )
+        })
+      }
+
+      const checkProperty = (node: ESTree.AccessorProperty | ESTree.PropertyDefinition) => {
+        if (node.value === null) return
+        checkAnnotated(
+          node.value,
+          node.typeAnnotation,
+          () => `property \`${sourceKeyName(context.sourceCode, node.key)}\``
+        )
+      }
+
+      return {
+        AccessorProperty: checkProperty,
+        ArrowFunctionExpression(node) {
+          if (node.body.type === "BlockStatement") return
+          checkAnnotated(
+            node.body,
+            node.returnType,
+            () => `return value of \`${functionName(context.sourceCode, node)}\``
+          )
+        },
+        AssignmentExpression(node) {
+          if (node.operator !== "=" || node.left.type !== "Identifier") return
+          defer((typeAliases) => {
+            checkAssignment(node, { typeAliases })
+          })
+        },
+        CallExpression(node) {
+          const callee = unwrapExpression(node.callee)
+
+          if (callee.type !== "Identifier" && !isFunctionExpression(callee)) return
+          defer((typeAliases) => {
+            checkPredicateCall(node, { typeAliases })
+          })
+        },
+        Program() {
+          predicateNames.clear()
+          annotatedNames.clear()
+        },
+        PropertyDefinition: checkProperty,
+        ReturnStatement(node) {
+          if (node.argument === null) return
+          const owner = enclosingFunction(node)
+          checkAnnotated(
+            node.argument,
+            owner?.returnType,
+            () => `return value of \`${functionName(context.sourceCode, owner)}\``
+          )
+        },
+        TSAsExpression: checkAssertion,
+        TSTypeAssertion: checkAssertion,
+        TSTypePredicate: recordPredicateOwner,
+        VariableDeclarator(node) {
+          if (node.id.type !== "Identifier") return
+          const { name, typeAnnotation } = node.id
+
+          if (typeAnnotation === null || typeAnnotation === undefined) return
+          annotatedNames.add(name)
+
+          if (node.init !== null) {
+            checkAnnotated(node.init, typeAnnotation, () => `binding \`${name}\``)
+          }
+        },
+      }
+    })
   },
   meta: {
     docs: {

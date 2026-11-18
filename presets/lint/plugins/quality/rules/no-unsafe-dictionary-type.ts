@@ -4,7 +4,6 @@ import {
   classifyUnsafeDictionary,
   classifyUnsafeDictionaryValue,
   classifyUnsafeHeritage,
-  createTypeEnvironment,
   type TypeEnvironment,
 } from "../shared/dictionary-types.ts"
 import {
@@ -12,6 +11,7 @@ import {
   namedTypeReference,
   visibleInterfaces,
   visibleTypeAlias,
+  withTypeBindings,
 } from "../shared/type-alias-resolution.ts"
 
 const typeNodeKinds: ReadonlySet<string> = new Set([
@@ -134,12 +134,13 @@ function isInsideTypeTest(node: ESTree.TSType, environment: TypeEnvironment): bo
   return false
 }
 
+/**
+ * Return whether to report an unsafe dictionary type, which the caller has classified.
+ */
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (isInsideTypeTest(node, environment)) return false
 
   if (isPlainNamedConsumerUse(node, environment)) return false
-
-  if (classifyUnsafeDictionary(node, environment) === null) return false
   let current: ESTree.Node = node.parent
 
   while (current.type !== "Program") {
@@ -157,47 +158,54 @@ function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): bo
  */
 const rule: Rule = {
   createOnce(context) {
-    let environment: TypeEnvironment | null = null
-
     const report = (node: ESTree.Node, value: string) => {
       context.report({ data: { value }, messageId: "unsafeDictionary", node })
     }
 
-    const reportIfUnsafe = (node: ESTree.TSType) => {
-      if (environment === null || !shouldReportType(node, environment)) return
+    const reportIfUnsafe = (node: ESTree.TSType, environment: TypeEnvironment) => {
       const unsafe = classifyUnsafeDictionary(node, environment)
 
-      if (unsafe === null) return
+      if (unsafe === null || !shouldReportType(node, environment)) return
       report(node, unsafe.unsafeValue)
     }
 
-    const reportUnsafeHeritage = (node: Heritage) => {
-      if (environment === null) return
+    const reportUnsafeHeritage = (node: Heritage, environment: TypeEnvironment) => {
       const unsafe = classifyUnsafeHeritage(node, environment)
 
       if (unsafe !== null) report(node, unsafe.unsafeValue)
     }
 
-    return {
-      Program(node) {
-        environment = createTypeEnvironment(node, context.sourceCode.visitorKeys)
-      },
-      TSClassImplements: reportUnsafeHeritage,
-      TSIndexSignature(node) {
-        if (environment === null || node.parent.type === "TSTypeLiteral") return
+    return withTypeBindings(context, (defer) => {
+      const checkType = (node: ESTree.TSType) => {
+        defer((typeAliases) => {
+          reportIfUnsafe(node, { typeAliases })
+        })
+      }
 
-        const unsafe = classifyUnsafeDictionaryValue(
-          node.typeAnnotation.typeAnnotation,
-          environment
-        )
+      const checkHeritage = (node: Heritage) => {
+        defer((typeAliases) => {
+          reportUnsafeHeritage(node, { typeAliases })
+        })
+      }
 
-        if (unsafe !== null) report(node, unsafe.unsafeValue)
-      },
-      TSInterfaceHeritage: reportUnsafeHeritage,
-      TSMappedType: reportIfUnsafe,
-      TSTypeLiteral: reportIfUnsafe,
-      TSTypeReference: reportIfUnsafe,
-    }
+      return {
+        TSClassImplements: checkHeritage,
+        TSIndexSignature(node) {
+          if (node.parent.type === "TSTypeLiteral") return
+          defer((typeAliases) => {
+            const unsafe = classifyUnsafeDictionaryValue(node.typeAnnotation.typeAnnotation, {
+              typeAliases,
+            })
+
+            if (unsafe !== null) report(node, unsafe.unsafeValue)
+          })
+        },
+        TSInterfaceHeritage: checkHeritage,
+        TSMappedType: checkType,
+        TSTypeLiteral: checkType,
+        TSTypeReference: checkType,
+      }
+    })
   },
   meta: {
     docs: {

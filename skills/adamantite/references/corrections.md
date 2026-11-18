@@ -52,8 +52,11 @@ Prove that the choice prevents the mistake and accepts the similar correct case:
 
 - For a test, read its failure on the code before the fix, then run it on the fixed code. It
   must pass.
-- For a type or a constructor, put the mistake back in a temporary edit and run
-  `adamantite check`. It must fail on that edit. Remove the edit.
+- For a type, put the mistake back in a temporary edit and run `adamantite check`. The type
+  check must fail on that edit. Remove the edit.
+- For a constructor or a schema that rejects a value at run time, keep a test that gives it the
+  invalid value and the similar valid value. `adamantite check` does not run the constructor, so
+  only the test proves it. The test must pass on the fixed code.
 - For a rule or a rule option, run
   `adamantite rule try <rule> --report <mistake> --accept <correct case>`, as
   [Try a rule setting](lint-rules.md#try-a-rule-setting) says. It must exit 0. For a custom

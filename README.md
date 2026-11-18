@@ -571,16 +571,16 @@ So a setting in your top-level `rules` has no effect on a rule that a preset set
 for the files of that override. Oxlint does not tell you that the setting has no effect. These
 presets set rules in an override:
 
-| Preset           | Files                                                     | Rules                                                                                                                                                                                              |
-| ---------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                                                     |
-| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                                               |
-| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                                            |
-| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `quality/no-object-parameters`, `quality/no-unknown-parameters`, `quality/no-unknown-returns`, and `quality/no-unsafe-dictionary-type`                                                             |
-| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `quality/no-chained-type-assertions`, `quality/no-widen-then-assert`, `quality/require-safety-comment-for-type-assertion`, `testing/no-flake-masking`, and `typescript/consistent-type-assertions` |
-| `strict`         | `**/{vite,vitest}.config.{js,mjs,cjs,ts,mts,cts}`         | `testing/no-flake-masking`                                                                                                                                                                         |
-| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                                             |
-| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                          |
+| Preset           | Files                                                     | Rules                                                                                                                                                                                                                        |
+| ---------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                                                                               |
+| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                                                                         |
+| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                                                                      |
+| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `quality/no-object-parameters`, `quality/no-unknown-parameters`, `quality/no-unknown-returns`, and `quality/no-unsafe-dictionary-type`                                                                                       |
+| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `quality/no-chained-type-assertions`, `quality/no-widen-then-assert`, `quality/require-safety-comment-for-type-assertion`, `testing/no-fixed-sleep`, `testing/no-flake-masking`, and `typescript/consistent-type-assertions` |
+| `strict`         | `**/{vite,vitest}.config.{js,mjs,cjs,ts,mts,cts}`         | `testing/no-flake-masking`                                                                                                                                                                                                   |
+| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                                                                       |
+| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                    |
 
 To change one of these rules for these files, set it in an `overrides` entry of your config with
 the same files. For example, this config turns off the `SAFETY:` comment rule of strict in test
@@ -1024,6 +1024,13 @@ It needs no extra package. Most of its type rules started as
   file, such as `index.bench.ts`, stay allowed. Await the
   event that the test depends on, or control time with `TestClock` or fake timers. The rule
   started as a copy of the [landmines](https://github.com/interfere-inc/landmines) rule.
+- In test files, `testing/no-fixed-sleep` reports a fixed sleep in the body of a test or a hook,
+  such as `await new Promise((resolve) => setTimeout(resolve, 100))`, `await setTimeout(100)` of
+  `node:timers/promises`, `scheduler.wait()`, `Bun.sleep()`, and `yield* Effect.sleep()` in the
+  generator of an Effect test. A sleep guesses how long the work takes, and fails under load.
+  Await the operation, or a promise that its handler resolves. A file that uses fake timers or
+  `TestClock` moves time without waiting, so the rule reports nothing in it. A sleep in a helper
+  or a handler, such as simulated latency in a mock server, stays allowed.
 - In declaration files (`*.d.ts`), the preset turns off `quality/no-unknown-parameters`,
   `quality/no-unknown-returns`, `quality/no-object-parameters`, and
   `quality/no-unsafe-dictionary-type`. A declaration file states the types of code that it does

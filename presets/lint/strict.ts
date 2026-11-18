@@ -13,8 +13,8 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // https://github.com/dmmulroy/anti-slop and now live in plugins/quality/ as first-party code. They
 // use the `quality` namespace.
 //
-// The testing plugin holds the rules that keep tests honest in test files: no retries or raised
-// timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
+// The testing plugin holds the rules that keep tests honest in test files: no fixed sleeps,
+// retries, or raised timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
 // in plugins/testing/ as first-party code. They use the `testing` namespace.
 
 const config: OxlintConfig = {
@@ -47,8 +47,9 @@ const config: OxlintConfig = {
         "quality/no-chained-type-assertions": "error",
         "quality/no-widen-then-assert": "error",
         "quality/require-safety-comment-for-type-assertion": "error",
-        // A test that passes only on a retry or with a raised timeout is flaky or slow. The rule
-        // asks the test to await the event that it depends on.
+        // A fixed sleep, a retry, or a raised timeout guesses how long the work takes. The rules
+        // ask the test to await the event that it depends on.
+        "testing/no-fixed-sleep": "error",
         "testing/no-flake-masking": "error",
         "typescript/consistent-type-assertions": "error",
       },

@@ -16,7 +16,8 @@ import { readFileIfExists } from "#lib/shared/filesystem.ts"
 export const DECISIONS_RECORD_PATH = ".adamantite/decisions.jsonl"
 
 /**
- * The key of a standard in the record. A later line with the same key replaces the earlier one.
+ * The key of a standard in the record. A decision is this key together with the scope of its line,
+ * so one standard can have a decision for the project and another for a folder.
  */
 const DecisionId = Schema.String.check(
   Schema.isPattern(/^[\da-z]+(?:-[\da-z]+)*$/u, {
@@ -95,6 +96,11 @@ const decisionFields = {
    * The rule or the step of the enforcement ladder that the session proposed.
    */
   rule: Schema.OptionFromOptionalKey(Sentence),
+  /**
+   * The folder that the decision applies to, absent for the whole project. A session of one folder
+   * keeps the `id` of a standard and writes its own scope, so its line leaves the decision that
+   * another folder has for the same standard.
+   */
   scope: Schema.OptionFromOptionalKey(Scope),
   /**
    * The standard in one sentence.
@@ -104,8 +110,10 @@ const decisionFields = {
 
 /**
  * A decision line of the record, as the coding agent appends it. An `approved` line only replaces
- * an earlier line of the same `id`: the user approved what an earlier session rejected or deferred,
- * so the rule or the instruction is the trace from then on.
+ * an earlier line of the same `id` and the same scope: the user approved what an earlier session
+ * rejected or deferred there, so the rule or the instruction is the trace from then on. To end the
+ * decision of a folder after an approval for the whole project, the agent appends the `approved`
+ * line with the scope of that decision, which the prompt shows.
  */
 const DecisionLine = Schema.Struct({
   ...decisionFields,
@@ -113,8 +121,8 @@ const DecisionLine = Schema.Struct({
 })
 
 /**
- * A decision that still applies: the last line of its `id`, which is not `approved`. `decided` is a
- * resolved item of the Decisions list, with the choice in `reason`.
+ * A decision that still applies: the last line of its `id` and scope, which is not `approved`.
+ * `decided` is a resolved item of the Decisions list, with the choice in `reason`.
  */
 const Decision = Schema.Struct({
   ...decisionFields,
@@ -151,14 +159,15 @@ const UndecodableLine = Schema.Struct({
 /**
  * What Adamantite knows about the decisions record, the memory of harden. The record is a JSON
  * Lines log with two kinds of lines, which their keys tell apart. A decision line has an `id`, and
- * a later line replaces an earlier line of the same `id`. A session line has a `session`. After the
- * user answers a session, the coding agent appends the session line, and a decision line for each
- * candidate that the user did not approve and for each decision that the user resolved. An approved
- * candidate needs no line, because its rule or instruction is the trace.
+ * a later line replaces an earlier line of the same `id` and the same scope. A session line has a
+ * `session`. After the user answers a session, the coding agent appends the session line, and a
+ * decision line for each candidate that the user did not approve and for each decision that the
+ * user resolved. An approved candidate needs no line, because its rule or instruction is the
+ * trace.
  *
- * Adamantite never writes the record. It decodes each line, keeps the last line of each `id`, and
- * leaves out an `id` whose last line is `approved`, and the decisions of another `--path`. The
- * harden prompt shows the kept decisions, so the agent does not read the file, and it does not
+ * Adamantite never writes the record. It decodes each line, keeps the last line of each `id` and
+ * scope, and leaves out one whose last line is `approved`, and the decisions of another `--path`.
+ * The harden prompt shows the kept decisions, so the agent does not read the file, and it does not
  * propose again what a decision settles. A line that does not decode is a fact for the agent to
  * repair, and it does not hide the other lines.
  *
@@ -302,8 +311,14 @@ export const readDecisionsRecord = Effect.fn("readDecisionsRecord")(function* (
 
   const decisionLines = lines.filter(Lines.$is("DecisionLine")).map(({ value }) => value)
 
-  // A map keeps the place of the first line of an `id`, and the value of its last line.
-  const decisions = [...new Map(decisionLines.map((line) => [line.id, line])).values()]
+  // A decision is its `id` together with its scope. A scope has no line break, and a line without
+  // a scope has an empty second part. A map keeps the place of the first line of a key, and the
+  // value of its last line.
+  const decisions = [
+    ...new Map(
+      decisionLines.map((line) => [`${line.id}\n${Option.getOrElse(line.scope, () => "")}`, line])
+    ).values(),
+  ]
     .flatMap((line): Decision[] =>
       line.decision === "approved" ? [] : [{ ...line, decision: line.decision }]
     )

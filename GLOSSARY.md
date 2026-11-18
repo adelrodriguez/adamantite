@@ -248,7 +248,7 @@ _Avoid_: Scan, codify, audit
 `.adamantite/decisions.jsonl` at the root of a target project, or at the workspace root of a
 monorepo. It is a JSON Lines log with two kinds of lines. A decision line is a candidate that the
 user did not approve in a harden session, or a decision that the user resolved, and a later line
-with the same `id` replaces an earlier one. A session line records one session that the user
+with the same `id` and the same `scope` replaces an earlier one. A session line records one session that the user
 answered, with the commit that it read the history up to. A session with `--commits` records no
 commit, because it reads only the number of commits that the user asked for. The coding agent appends the lines, and
 the project commits the file. Adamantite never writes it. Adamantite decodes it, shows its

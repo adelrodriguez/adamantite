@@ -350,20 +350,26 @@ record is a JSON Lines log. Commit it. Adamantite never writes it.
 The agent appends one decision line for each candidate that you did not approve, and for each
 decision that you made:
 
-| Key               | Required | Meaning                                                                                                                                                      |
-| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`              | Yes      | The key of the standard, in kebab-case. A later line with the same `id` replaces the earlier one.                                                            |
-| `at`              | Yes      | The date of the decision, as `YYYY-MM-DD`.                                                                                                                   |
-| `standard`        | Yes      | The standard in one sentence.                                                                                                                                |
-| `decision`        | Yes      | `rejected`, `deferred`, `decided` for a decision that you made, with the choice in `reason`, or `approved`, which ends an earlier decision of the same `id`. |
-| `reason`          | No       | The reason or the choice that you gave.                                                                                                                      |
-| `rule`            | No       | The rule or the step of the enforcement ladder that the session proposed.                                                                                    |
-| `scope`           | No       | The `--path` of the session, as a folder from the project root.                                                                                              |
-| `follow`, `break` | No       | How many places followed and broke the standard.                                                                                                             |
-| `fixes`           | No       | The short hashes of the fix commits that the session saw.                                                                                                    |
+| Key               | Required | Meaning                                                                                                                                                                  |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`              | Yes      | The key of the standard, in kebab-case. A later line with the same `id` and the same `scope` replaces the earlier one.                                                   |
+| `at`              | Yes      | The date of the decision, as `YYYY-MM-DD`.                                                                                                                               |
+| `standard`        | Yes      | The standard in one sentence.                                                                                                                                            |
+| `decision`        | Yes      | `rejected`, `deferred`, `decided` for a decision that you made, with the choice in `reason`, or `approved`, which ends an earlier decision of the same `id` and `scope`. |
+| `reason`          | No       | The reason or the choice that you gave.                                                                                                                                  |
+| `rule`            | No       | The rule or the step of the enforcement ladder that the session proposed.                                                                                                |
+| `scope`           | No       | The folder that the decision applies to, from the project root. A session with `--path` writes its folder.                                                               |
+| `follow`, `break` | No       | How many places followed and broke the standard.                                                                                                                         |
+| `fixes`           | No       | The short hashes of the fix commits that the session saw.                                                                                                                |
 
-Adamantite decodes the record and keeps the last line of each `id`. The next prompt shows those
-decisions, so the agent does not propose them again, unless it has evidence that is newer than the
+A decision is its `id` together with its `scope`, so one standard can have a decision for the
+project and another for a folder. A session of `packages/web` does not replace the decision that a
+session of `packages/api` recorded for the same `id`. To end the decision of a folder after you
+approve the standard for the whole project, the agent appends an `approved` line with the `id` and
+the `scope` of that decision.
+
+Adamantite decodes the record and keeps the last line of each `id` and `scope`. The next prompt
+shows those decisions, so the agent does not propose them again, unless it has evidence that is newer than the
 decision. With `--path`, the prompt leaves out the decisions of other folders. Adamantite ignores a
 key that it does not know. The prompt lists each line that does not decode, with its line number,
 for the agent to repair. To let harden propose a candidate again, delete its decision line. A

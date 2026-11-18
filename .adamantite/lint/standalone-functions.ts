@@ -22,8 +22,20 @@ const PLAIN_VALUES = new Set([
   "UnaryExpression",
 ])
 
+// The expression that a TypeScript expression wraps, such as `value` in `value as const`. The
+// wrapper keeps the value, so the rule reads through it.
+function unwrap(node: ESTree.Node): ESTree.Node {
+  return node.type === "TSAsExpression"
+    || node.type === "TSNonNullExpression"
+    || node.type === "TSSatisfiesExpression"
+    ? unwrap(node.expression)
+    : node
+}
+
 // Whether `node` is a function that cannot directly return an Effect chain.
-function isPlainFunction(node: ESTree.Node): boolean {
+function isPlainFunction(wrapped: ESTree.Node): boolean {
+  const node = unwrap(wrapped)
+
   if (node.type === "FunctionExpression") {
     return true
   }
@@ -37,19 +49,15 @@ function isPlainFunction(node: ESTree.Node): boolean {
 }
 
 // Whether `node` can give a value that is not an Effect.
-function canBePlain(node: ESTree.Node): boolean {
+function canBePlain(wrapped: ESTree.Node): boolean {
+  const node = unwrap(wrapped)
+
   if (PLAIN_VALUES.has(node.type)) {
     return true
   }
 
-  // A TypeScript expression keeps the value of the expression that it wraps, such as
-  // `value as const`.
-  if (
-    node.type === "TSAsExpression"
-    || node.type === "TSNonNullExpression"
-    || node.type === "TSSatisfiesExpression"
-  ) {
-    return canBePlain(node.expression)
+  if (node.type === "Identifier" && node.name === "undefined") {
+    return true
   }
 
   if (node.type === "ConditionalExpression") {

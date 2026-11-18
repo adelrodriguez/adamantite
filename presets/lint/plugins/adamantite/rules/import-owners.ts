@@ -283,6 +283,11 @@ function listAliasNames(path: string) {
   return [...new Set([path, ...bareNames, ...folders])].filter((name) => name !== ".")
 }
 
+/**
+ * The rule, with what it reads from the file system as `project`, so its RuleTester test passes a
+ * fake. It needs its options from the target project, so no preset turns it on. It reads
+ * `package.json` and `pnpm-workspace.yaml` files to find the root that owner paths are relative to.
+ */
 export function createImportOwnersRule(project: Project): Rule {
   // Whether a project module covers a resolved path, by module, root, path, and mode. Oxlint loads
   // the rule one time for a lint run, so the answers carry over between files.

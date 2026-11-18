@@ -350,136 +350,53 @@ parts that a plugin replaces.
 
 ## Type resets
 
-`adamantite/typescript` loads the type resets in `presets/typescript/resets/`. Each file merges a
-declaration into one built-in interface, and `index.d.ts` references every file. The preset lists
-`index.d.ts` in `files`. The build copies the folder into `dist`, and `scripts/test-build.ts` fails
-when a file that the built preset loads is missing.
+`adamantite/typescript` loads the type resets in `presets/typescript/resets`, through
+`presets/typescript/resets/index.d.ts`. `src/lib/integrations/typescript/index.ts` asks the
+project's TypeScript which configs load them, so Doctor reports a library that does.
 
-The fixtures in `src/__tests__/presets/fixtures/typescript/` hold one file of type tests for each
-reset. `presets/__tests__/typescript.test.ts` type checks them in one run with
-`adamantite/typescript`, where they must pass, and in one run with `adamantite/tsconfig`, where
-every fixture must fail. The second run proves that each fixture tests a reset. The tests also
-fail when a reset has no fixture or `index.d.ts` does not reference it. `license.md` keeps the
-MIT notice of ts-reset, which the resets and the fixtures derive from.
-
-Doctor's `typescript` integration, in `integrations/typescript/`, asks the project's TypeScript which files a config loads. For each
-package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
-`ChildProcessSpawner`, and it reports a library that loads the type resets.
+- Each reset has a fixture of type tests in `src/__tests__/presets/fixtures/typescript` that passes
+  with `adamantite/typescript` and fails with `adamantite/tsconfig`, and `index.d.ts` references
+  each reset. `presets/__tests__/typescript.test.ts` holds it.
+- The build ships each file that the built preset loads. `scripts/test-build.ts` holds it.
 
 ## First-party plugins
 
-Adamantite has four Oxlint plugins of its own under `presets/lint/plugins/`: `adamantite`,
-`quality`, `quality-effect`, and `testing`. Each plugin has one folder, and the folder name is the rule
-namespace, the `meta.name` of the plugin, and the name of its fixture folder. In a plugin folder,
-`index.ts` registers the rules, `rules/` holds one module for each rule, and `shared/` holds the
-helpers that only this plugin uses. `adamantite/shared/imports.ts`, for example, finds calls of
-imported functions, such as `useState` and `React.useState`.
+Adamantite has four Oxlint plugins of its own in `presets/lint/plugins`: `adamantite`, `quality`
+and `testing`, which ship in the `strict` preset, and `quality-effect`, which ships in the `effect`
+preset. A
+preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in
+`presets/lint/plugins/entry.ts`. The `architecture` preset loads the `adamantite` plugin without
+enabling rules, because `adamantite/layers` and `adamantite/import-owners` need options from the
+target project.
 
-`plugins/shared/` holds the helpers that more than one plugin uses: `options.ts` reads rule
-options, `ast.ts` holds the AST helpers, such as the key reader, and `scope.ts` resolves a name to
-its binding and follows `const` aliases. A helper moves there only
-when a second plugin needs it. `replacement.d.ts` holds the `Replacement` type that any rule can
-declare. It is a declaration file, so the build ships no module for it.
-
-A rule that states in its options what projects write by hand in another rule declares that
-config in `meta.docs.replaces`, where Oxlint keeps a rule's own properties. `adamantite/layers`
-declares the `no-restricted-imports` overrides with `patterns` that state a layer map by hand.
-Doctor's `integrations/oxlint/replacements.ts` imports each plugin module, reads every
-declaration, counts the overrides of each loaded config, and warns with the steps of the rule. The Oxlint integration names no rule, so a new declaration needs no change
-outside its rule.
-
-A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
-such as `firstPartyPlugin("quality")`. The function builds a file URL from its own location.
-The source tree has `<name>/index.ts` and the dist tree has `<name>/index.js`, so it takes the
-extension from its own module URL. Its parameter type accepts only the four namespaces.
-`entry.ts` imports no plugin code, so a preset loads no rule module.
-`presets/lint/plugins/__tests__/entry.test.ts` loads each plugin from its entry and fails when a plugin
-name and its folder name disagree. Tsdown builds the plugins with the presets, so the
-`adamantite` plugin ships at `dist/presets/lint/plugins/adamantite/index.js`.
-
-Rule code runs under the runtime that executes Oxlint in the target project, so it uses only
-runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned
-to the Oxlint version. The one runtime package is `oxc-resolver`, which `adamantite/layers`
-uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugins/tsconfig.json`
-lets the source import rule modules with their `.ts` extension, which Node.js needs to load the
-source plugin.
-
-Each rule has a `RuleTester` test under
-`presets/lint/plugins/<namespace>/__tests__/<rule>.test.ts` for messages, locations, and options,
-and `valid/` and `invalid/` fixtures under
-`src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
-Oxlint run. The fixtures stay below `src/`: below `presets/`, the published `presets/tsconfig.json`
-would include them, and the Oxlint type check of `presets/analyze.ts` reports each file of that
-project, also a file that `ignorePatterns` ignores. Each fixture file holds one case. The namespace folder, such as `quality`, lets one
-preset hold fixtures for several plugins. The harness in `presets/__tests__/rule-fixtures.ts`
-starts the Oxlint entry `src/oxlint/index.ts`, as editors do, so the effect preset loads the
-Effect build of Oxlint.
-
-A valid fixture is code that a target project can keep. `presets/__tests__/stacks.ts` lists the
-stacks, and `stacks.test.ts` lints each fixture tree with each stack that has its preset, with the
-options that init writes. Each invalid fixture must still get the report of its rule, and no rule of
-the stack can report a valid fixture. A report that stays is in the `knownReports` list of the tree,
-with the issue of the conflict. A case that some other rule always reports belongs only in the
-`RuleTester` test. Files in a `modules/` folder beside `valid/` are the modules that the fixtures
-import.
-
-A fixture that imports a package, such as React or TanStack Query, gets the real types of the
-package from the fixture packages. `presets/__tests__/fixture-packages/` has its own
-`package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml`, so pnpm installs it as a separate
-workspace, and the root manifest lists only what Adamantite builds, publishes, and tests itself
-against. Its `pnpm-workspace.yaml` holds the pnpm settings of the fixture packages, such as
-`allowBuilds`, and never a `packages` key. The `globalSetup` of the `presets` Vitest
-project installs the fixture packages from their lockfile. `createFixtureProject` links the packages
-of the repository and the fixture packages into the `node_modules` of each fixture project.
-`fixture-packages.test.ts` fails when a package is in both manifests.
-
-`overlap.test.ts` fails when two presets set one rule, unless one of the presets is core. A preset
-cannot see the other presets of a config, and only core has a known position in `extends`. Each
-rule of core that a preset changes has fixtures under
-`src/__tests__/presets/fixtures/overlap/<preset>/<namespace>/<rule>/`. At least one fixture must get
-a result that differs from the result of core alone, so the test fails when the change has no
-effect.
-
-The rules in `presets/lint/plugins/quality/` ship in the `strict` preset, and the rules in
-`presets/lint/plugins/quality-effect/` ship in the `effect` preset. Their rules follow the same conventions as the
-`adamantite` rules. The RuleTester cases of `require-readable-spacing` fix each output again with
-`recursive`, so a fix that a second run would change fails. Each `license.md`, and `quality/stylistic/license.md`, keeps the MIT notice of the
-code that its folder derives from. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
-`dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
-ship.
-
-The rules in `presets/lint/plugins/testing/` ship in the `strict` preset. `no-flake-masking` and
-`no-fixed-sleep` run in the override for the test files of the jest and vitest presets, and
-`no-flake-masking` also runs in Vite and Vitest configs. `no-doubles` runs in every file, so a
-setup file cannot mock a module either. They started as a copy of
-[landmines](https://github.com/interfere-inc/landmines) at commit `92084b1`, and `license.md` keeps
-its MIT notice. Adamantite drops the per-file allowlists of landmines: a file that needs an
-exception suppresses the rule with a reason, as `adamantite/require-suppression-reason` asks.
-The jest and vitest presets load no first-party plugin, because a project can copy their `plugins`
-and `rules` into an override of its own, and that override would not load the plugin.
-
-The `architecture` preset loads the `adamantite` plugin without enabling rules. Init offers it
-for projects that configure layer maps and import owners without the other rules of `strict`.
-The `strict` preset continues to load the same plugin.
-
-`adamantite/layers` needs a layer map from the target project, so no preset turns it on.
-It is the one rule that resolves imports: it resolves each
-import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
-takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
-`src/__tests__/presets/fixtures/layers/`, one for each layer model, and
-`presets/__tests__/layers.test.ts` lints each one in a real Oxlint run.
-
-Nested maps activate from the concrete matched parent folder before any parent exemption.
-Each active map checks imports with its own entries, ignores, isolation, type-import policy,
-and resolver conditions. A duplicate concrete scope fails lint. Diagnostics name the concrete
-root and the declaration path.
-
-`adamantite/import-owners` also needs options from the target project. It matches each import
-as written, so it reads no module, but it reads `package.json` and `pnpm-workspace.yaml` files to
-find the workspace root that owner paths are relative to. `createImportOwnersRule` takes that
-lookup, so its `RuleTester` test passes a fake. Its fixtures are small projects under
-`src/__tests__/presets/fixtures/import-owners/`. `presets/__tests__/model-fixtures.ts` lints
-the fixture projects of both rules.
+- The folder name of a plugin is its rule namespace and its `meta.name`.
+  `presets/lint/plugins/__tests__/entry.test.ts` holds it.
+- Rule code runs under the runtime that executes Oxlint in the target project, so it uses only
+  runtime-neutral APIs. It imports only types from `@oxlint/plugins`, and its one runtime package
+  is `oxc-resolver`, in `presets/lint/plugins/adamantite/shared/resolver.ts`. The preset build in
+  `tsdown.config.ts` fails when it bundles another package, and `scripts/test-smoke.ts` installs
+  the package without `@oxlint/plugins`. Nothing rejects an API that only one runtime has.
+- `presets/lint/plugins/tsconfig.json` lets the source import rule modules with their `.ts`
+  extension, which Node.js needs to load a plugin from source. The `presets` tests hold it.
+- Each rule has a RuleTester test, and `valid` and `invalid` fixtures that a real Oxlint run lints
+  through the Oxlint entry. [Place a test](../CONTRIBUTING.md#place-a-test) names the folders, and
+  `presets/__tests__/rule-fixtures.ts` is the harness.
+- A valid fixture is code that a target project can keep: no rule of a stack reports it, and each
+  invalid fixture still gets the report of its rule. `presets/__tests__/stacks.test.ts` holds it,
+  and lists each report that stays in `knownReports`.
+- No two presets set one rule, unless one of them is core, and each core rule that a preset changes
+  has a fixture that gets a different result from core alone. `presets/__tests__/overlap.test.ts`
+  holds it.
+- The fixture packages in `presets/__tests__/fixture-packages` are a separate pnpm workspace, and no
+  package is in both manifests. `presets/__tests__/fixture-packages.test.ts` holds it.
+- The fixtures of `adamantite/layers` and `adamantite/import-owners` are small projects, which
+  `presets/__tests__/model-fixtures.ts` lints for `presets/__tests__/layers.test.ts` and
+  `presets/__tests__/import-owners.test.ts`.
+- A rule declares the hand-written config that it replaces in `meta.docs.replaces`, and
+  `src/lib/integrations/oxlint/replacements.ts` reads every declaration, so Doctor names no rule.
+  `src/lib/integrations/oxlint/__tests__/replacements.test.ts` holds it.
+- Each `license.md` below `presets` ships at the same path in `dist/presets`.
+  `scripts/test-build.ts` holds it.
 
 ## Custom rules
 

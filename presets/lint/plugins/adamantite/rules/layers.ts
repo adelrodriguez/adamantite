@@ -640,6 +640,16 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
   })
 }
 
+/**
+ * The rule, with what it reads from the file system as `modules`, so its RuleTester test passes
+ * fakes. It needs a layer map from the target project, so no preset turns it on. It resolves each
+ * import, including `#` imports and `tsconfig.json` `paths`.
+ *
+ * A nested map activates from the concrete folder that its parent matches, before any exemption of
+ * the parent. Each active map checks an import with its own entries, ignores, isolation, type-import
+ * policy, and resolver conditions. Two maps with the same concrete root fail lint. A diagnostic
+ * names the concrete root and the declaration path.
+ */
 export function createLayersRule(modules: Modules): Rule {
   return {
     create(context): Visitor {

@@ -1,5 +1,7 @@
 // Adamantite's type resets, which `adamantite/typescript` loads. Each file replaces the type of
-// one built-in API. The resets started from ts-reset at commit f36610ba441b8ea1c7cf7349dd71bee26c2e6a3b. See license.md.
+// one built-in API: it merges a declaration into one built-in interface. This file references every
+// file, and the preset lists this file in `files`. The resets started from ts-reset at commit
+// f36610ba441b8ea1c7cf7349dd71bee26c2e6a3b. See license.md.
 
 /// <reference path="fetch.d.ts" />
 /// <reference path="filter-boolean.d.ts" />

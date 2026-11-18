@@ -15,7 +15,9 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 //
 // The testing plugin holds the rules that keep tests honest: no module mocks, fixed sleeps,
 // retries, or raised timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
-// in plugins/testing/ as first-party code. They use the `testing` namespace.
+// in plugins/testing/ as first-party code. They use the `testing` namespace. The jest and vitest
+// presets load no first-party plugin, because a project can copy their `plugins` and `rules` into
+// an override of its own, and that override would not load the plugin.
 
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,

@@ -50,7 +50,8 @@ interface Declaration {
 
 /**
  * Each first-party rule that declares `meta.docs.replaces`. Oxlint lets a rule keep its own
- * properties in `meta.docs`, so the value is unknown until it decodes.
+ * properties in `meta.docs`, so the value is unknown until it decodes. This module names no rule,
+ * so a new declaration needs no change outside its rule.
  */
 export const declarations: readonly Declaration[] = Struct.keys(plugins).flatMap((plugin) =>
   Object.entries(plugins[plugin].rules).flatMap(([name, rule]) =>

@@ -22,7 +22,7 @@ Steps 1 to 8 are read-only for the target project. Keep trial case files outside
 
 ### Documentation
 
-These are the Markdown files of the project, without the changesets and the changelogs.
+These are the Markdown files of the project, without the changesets, the changelogs, and the agent skills. A coding agent finds the skills in its skill folder, such as `.agents/skills`, on its own.
 
 {{documentationFiles}}
 

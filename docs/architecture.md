@@ -357,7 +357,8 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   The agent verifies new and changed custom rules with temporary RuleTester cases during the
   session and removes the cases before handback. Harden never produces findings, so it never
   changes Doctor's result. The prompt lists each Markdown file that `git ls-files` gives, except
-  the changesets and the changelogs, so the agent reads all the documentation.
+  the changesets, the changelogs, and the files in the skill folders of the coding agents, so the
+  agent reads all the documentation. An agent finds its skills on its own, so they need no reach.
   `hardening/agent-reach.ts` finds the discovery gaps: the files that no chain of links from an
   `AGENTS.md` reaches, and the links to missing files. After a handoff, a link to a missing file
   that the session added fails the verification. `hardening/suppressions.ts` counts the disable

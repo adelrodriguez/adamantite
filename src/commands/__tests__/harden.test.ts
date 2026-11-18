@@ -25,6 +25,7 @@ import {
   SKILL_FILES,
 } from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { runLifecycle } from "#__tests__/lifecycle.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import hardenCommand, { Report } from "#commands/harden.ts"
@@ -774,6 +775,34 @@ describe("harden", () => {
     })
   )
 
+  // A coding agent finds the skills of its skill folder on its own, so harden lists none of them.
+  it.effect("list no copy of the Adamantite skill in a project that init set up", () =>
+    Effect.gen(function* () {
+      const project = createFileSystemTestContext({
+        files: {
+          ".claude/settings.json": "{}\n",
+          "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+        },
+      })
+
+      yield* runLifecycle("init", project, ["--non-interactive", "--script", "check", "--agents"])
+
+      const { logLines } = yield* runHarden(
+        {
+          ...ADAMANTITE_MODULE,
+          ...Object.fromEntries(project.list().map((file) => [file, project.read(file)])),
+        },
+        ["--json"]
+      )
+
+      const { agentReach, documentationFiles } = decodeReport(logLines[0])
+
+      expect(project.list()).toContain(".claude/skills/adamantite/SKILL.md")
+      expect(documentationFiles).toStrictEqual(Option.some(["AGENTS.md"]))
+      expect(agentReach).toStrictEqual(Option.some({ brokenLinks: [], unreached: [] }))
+    })
+  )
+
   it.effect("print the prompt and succeed in a non-interactive terminal", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden({
@@ -854,30 +883,38 @@ describe("harden", () => {
       })
   )
 
-  it.effect("list each Markdown file that git lists, except changesets and changelogs", () =>
-    Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({
-        ".changeset/add-cart.md": '---\n"acme": patch\n---\n',
-        "CHANGELOG.md": "# acme\n",
-        "CONTRIBUTING.md": "# Contributing\n",
-        "docs/guides/errors.mdx": "# Errors\n",
-        "packages/cart/CHANGELOG.md": "# cart\n",
-        "src/cart/README.md": "# Cart\n",
-        ...INSTALLED,
-      })
+  it.effect(
+    "list each Markdown file that git lists, except changesets, changelogs, and skills",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt({
+          ".agents/skills/review/SKILL.md": "# Review\n",
+          ".changeset/add-cart.md": '---\n"acme": patch\n---\n',
+          ".claude/skills/review/references/checks.md": "# Checks\n",
+          "CHANGELOG.md": "# acme\n",
+          "CONTRIBUTING.md": "# Contributing\n",
+          "docs/guides/errors.mdx": "# Errors\n",
+          "docs/skills/writing.md": "# Writing\n",
+          "packages/cart/.grok/skills/review/SKILL.md": "# Review\n",
+          "packages/cart/CHANGELOG.md": "# cart\n",
+          "src/cart/README.md": "# Cart\n",
+          ...INSTALLED,
+        })
 
-      expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
-        "- `CONTRIBUTING.md`",
-        "- `docs/guides/errors.mdx`",
-        "- `src/cart/README.md`",
-      ])
-      expect(
-        getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
-          "read each file in the documentation list",
-          "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
+        // `docs/skills` is not a skill folder of an agent, so its files stay.
+        expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
+          "- `CONTRIBUTING.md`",
+          "- `docs/guides/errors.mdx`",
+          "- `docs/skills/writing.md`",
+          "- `src/cart/README.md`",
         ])
-      ).toStrictEqual([])
-    })
+        expect(
+          getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
+            "read each file in the documentation list",
+            "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
+          ])
+        ).toStrictEqual([])
+      })
   )
 
   it.effect("leave out a file that the git index has and the working tree does not", () =>

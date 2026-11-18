@@ -3,8 +3,13 @@
 import module from "node:module"
 
 // V8 keeps the compiled code of the bundle in a folder of the system's temporary directory, so a
-// later start skips compiling it. Child processes, such as Oxlint, do not inherit the cache. Bun
-// added the function in 1.4, and an older Bun starts without the cache.
-module.enableCompileCache?.()
+// later start skips compiling it. Bun added the function in 1.4, and an older Bun starts without
+// the cache. A child process does not inherit the cache, so `NODE_COMPILE_CACHE` hands the folder
+// to the Node.js tools that the CLI starts, such as Oxlint and Oxfmt. A folder the user set wins.
+const cache = module.enableCompileCache?.()
+
+if (cache?.directory !== undefined) {
+  process.env.NODE_COMPILE_CACHE ??= cache.directory
+}
 
 import("../dist/index.js")

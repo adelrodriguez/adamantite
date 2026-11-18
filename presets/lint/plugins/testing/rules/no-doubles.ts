@@ -23,8 +23,8 @@ const moduleMockMethods: ReadonlySet<string> = new Set([
 ])
 
 // The methods of the test framework object that replace a global or a property with a value of the
-// test.
-const replacementMethods: ReadonlySet<string> = new Set(["replaceProperty", "stubGlobal"])
+// test, or what a spy returns for some arguments, as `vi.when(spy).calledWith(1).thenReturn(2)`.
+const replacementMethods: ReadonlySet<string> = new Set(["replaceProperty", "stubGlobal", "when"])
 
 // The methods of a mock or a spy that replace what the function does. A spy without them only
 // observes the real function.

@@ -1014,8 +1014,8 @@ It needs no extra package. Most of its type rules started as
   one of these rules in test files, use an `overrides` entry. See
   [change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
 - `testing/no-doubles` reports a Vitest or Jest test double that replaces what a dependency does:
-  a module mock, such as `vi.mock("./store")`, a mock implementation, such as `vi.fn(() => 1)` or
-  `mockReturnValue(1)`, and a stubbed global, such as `vi.stubGlobal("fetch", fake)`. It also
+  a module mock, such as `vi.mock("./store")`, a mock implementation, such as `vi.fn(() => 1)`,
+  `mockReturnValue(1)`, or `vi.when(spy).calledWith(1).thenReturn(2)`, and a stubbed global, such as `vi.stubGlobal("fetch", fake)`. It also
   finds `vi` and `jest` through a namespace import, a destructured method, or a `const` alias. A
   test replaces a dependency through its interface, such as an Effect `Layer` or a function
   parameter. A spy, such as `vi.spyOn(store, "save")`, and `vi.fn()` without an implementation

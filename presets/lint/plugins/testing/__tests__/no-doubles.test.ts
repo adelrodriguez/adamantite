@@ -79,6 +79,7 @@ tester.run("no-doubles", plugin.rules["no-doubles"], {
     { code: "jest.setMock('./user-store', store);", errors: [error] },
     { code: "jest.enableAutomock();", errors: [error] },
     { code: "vi.stubGlobal('fetch', fakeFetch);", errors: [replacement] },
+    { code: "vi.when(spy).calledWith(1).thenReturn(2);", errors: [replacement] },
     { code: "jest.replaceProperty(process, 'platform', 'win32');", errors: [replacement] },
     {
       code: "import { vi } from 'vitest'; const { stubGlobal } = vi; stubGlobal('fetch', fakeFetch);",
@@ -111,6 +112,7 @@ tester.run("no-doubles", plugin.rules["no-doubles"], {
     "const save = vi.spyOn(store, 'save'); expect(save).toHaveBeenCalledOnce();",
     "vi.useFakeTimers();",
     "vi.stubEnv('NODE_ENV', 'test');",
+    "const when = (spy) => spy; when(save);",
     "const fn = { fn() {} }; fn.fn(() => 1);",
     {
       code: "it.effect('loads', () => load.pipe(Effect.provide(Layer.succeed(Store, testStore))));",

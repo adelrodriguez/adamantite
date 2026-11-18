@@ -8,6 +8,7 @@ Report mock implementations and stubbed globals in the strict preset with `testi
 
 - A mock implementation: `vi.fn(impl)`, `jest.fn(impl)`, and `mockImplementation`, `mockReturnValue`, `mockResolvedValue`, `mockRejectedValue`, their `Once` forms, `mockReturnThis`, and `withImplementation`.
 - A stubbed global or property: `vi.stubGlobal()` and `jest.replaceProperty()`.
+- A spy result for some arguments: `vi.when()`.
 - A module or an object of mocks: `vi.importMock()`, `vi.mockObject()`, `jest.createMockFromModule()`, `jest.genMockFromModule()`, `jest.setMock()`, and `jest.enableAutomock()`.
 
 A spy, such as `vi.spyOn(store, "save")`, and `vi.fn()` without an implementation only observe the real code, so they stay allowed. To fix a report, pass a test implementation through the dependency's interface, such as an Effect `Layer` or a function parameter.

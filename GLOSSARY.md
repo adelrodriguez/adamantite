@@ -212,7 +212,8 @@ _Avoid_: Prose, docs
 **Discovery gap**:
 A file that states a coding standard, but that no chain of links or code-span paths from an
 `AGENTS.md` reaches, so a coding agent that starts from `AGENTS.md` never finds the standard. A link
-to a file that does not exist is a discovery gap too.
+to a file that does not exist is a discovery gap too. A file in a skill folder, such as
+`.agents/skills`, is never one, because a coding agent finds its skills on its own.
 _Avoid_: Orphan doc, missing pointer
 
 **Standards file**:

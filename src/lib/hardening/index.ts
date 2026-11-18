@@ -10,6 +10,7 @@ import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" 
 import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
 import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
+import { skillFolders } from "#lib/integrations/agents/skill.ts"
 import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
@@ -25,13 +26,18 @@ const hardenPromptTemplate = getHardenPromptTemplate()
 const AGENTS_FILE = "AGENTS.md"
 
 /**
- * Changesets and changelogs record releases, not coding standards. Git separates the folders of a
- * path with `/` on each platform.
+ * Changesets and changelogs record releases, not coding standards. A coding agent finds the skills
+ * in its skill folder on its own, also in a workspace package, so no `AGENTS.md` has to reach them.
+ * Git separates the folders of a path with `/` on each platform.
  */
 function isDocumentation(file: string) {
   const segments = file.split("/")
 
-  return !segments.includes(".changeset") && segments.at(-1) !== "CHANGELOG.md"
+  return (
+    !segments.includes(".changeset")
+    && segments.at(-1) !== "CHANGELOG.md"
+    && !skillFolders.some((folder) => `/${file}`.includes(`/${folder}/`))
+  )
 }
 
 /**
@@ -401,7 +407,7 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
     customRulesSection: CUSTOM_RULES_SECTION,
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
-        "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, and changelogs. Record the search scope and report this fallback with the missing sources.",
+        "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, changelogs, and agent skill folders such as `.agents/skills`. Record the search scope and report this fallback with the missing sources.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
     fixHistoryCommand: `\`git log -n ${context.commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,

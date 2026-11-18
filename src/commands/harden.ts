@@ -17,8 +17,8 @@ import {
   readHardenReach,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
+import { readInstalledVersion } from "#lib/project/adamantite-version.ts"
 import * as Project from "#lib/project/index.ts"
-import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import {
   AdamantiteNotInNodeModules,
@@ -27,7 +27,6 @@ import {
   FailedToReadFile,
   ScopeOutsideProject,
 } from "#lib/shared/errors.ts"
-import { publicImport } from "#lib/shared/package-exports.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
@@ -46,35 +45,6 @@ export const Report = Schema.Struct({
 function getLinkKey(link: BrokenLink) {
   return `${link.file}\0${link.target}`
 }
-
-/**
- * The version of the Adamantite that the project at `cwd` loads, or none when it is not installed.
- * It resolves `adamantite/lint` as Oxlint loads the preset, so an install in a parent
- * `node_modules` counts.
- */
-const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (cwd: string) {
-  const path = yield* Path.Path
-  const resolver = yield* ModuleResolver
-  const entry = yield* resolver.resolve(cwd, publicImport("./lint"))
-
-  if (Option.isNone(entry)) {
-    return Option.none<string>()
-  }
-
-  for (
-    let directory = path.dirname(entry.value);
-    directory !== path.dirname(directory);
-    directory = path.dirname(directory)
-  ) {
-    const manifest = yield* readPackageJson(directory).pipe(Effect.option)
-
-    if (Option.isSome(manifest) && manifest.value.name === "adamantite") {
-      return Option.fromUndefinedOr(manifest.value.version)
-    }
-  }
-
-  return Option.none<string>()
-})
 
 const scope = Flag.Directory("path", { mustExist: true }).pipe(
   Flag.optional,

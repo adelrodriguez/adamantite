@@ -8,7 +8,38 @@ import {
   resolveVariable,
 } from "../../shared/scope.ts"
 
-const moduleMockMethods = new Set(["doMock", "mock", "unstable_mockModule"])
+// The methods of the test framework object that replace a module, or build a module or an object
+// of mocks in place of the real one.
+const moduleMockMethods: ReadonlySet<string> = new Set([
+  "createMockFromModule",
+  "doMock",
+  "enableAutomock",
+  "genMockFromModule",
+  "importMock",
+  "mock",
+  "mockObject",
+  "setMock",
+  "unstable_mockModule",
+])
+
+// The methods of the test framework object that replace a global or a property with a value of the
+// test.
+const replacementMethods: ReadonlySet<string> = new Set(["replaceProperty", "stubGlobal"])
+
+// The methods of a mock or a spy that replace what the function does. A spy without them only
+// observes the real function.
+const behaviorMethods: ReadonlySet<string> = new Set([
+  "mockImplementation",
+  "mockImplementationOnce",
+  "mockRejectedValue",
+  "mockRejectedValueOnce",
+  "mockResolvedValue",
+  "mockResolvedValueOnce",
+  "mockReturnThis",
+  "mockReturnValue",
+  "mockReturnValueOnce",
+  "withImplementation",
+])
 
 /**
  * The test framework object that each test package exports. Vitest and Jest also make the object a
@@ -80,28 +111,61 @@ function isTestFrameworkObject(sourceCode: SourceCode, expression: ESTree.Node) 
 }
 
 /**
- * Reports whether a call target reads a module mock method of the test framework object, such as
- * `vi.mock`, `vitest.vi.mock`, or `doMock` after `const { doMock } = vi`.
+ * Reports whether a call target reads a method of the test framework object that `isName` accepts,
+ * such as `vi.mock`, `vitest.vi.mock`, or `doMock` after `const { doMock } = vi`.
  */
-function isModuleMockMethod(sourceCode: SourceCode, callee: ESTree.Node) {
-  return readsProperty(
-    sourceCode,
-    callee,
-    (name) => moduleMockMethods.has(name),
-    (owner) =>
-      matchesThroughAliases(sourceCode, owner, (node) => isTestFrameworkObject(sourceCode, node))
+function isFrameworkMethod(
+  sourceCode: SourceCode,
+  callee: ESTree.Node,
+  isName: (name: string) => boolean
+) {
+  return readsProperty(sourceCode, callee, isName, (owner) =>
+    matchesThroughAliases(sourceCode, owner, (node) => isTestFrameworkObject(sourceCode, node))
   )
 }
 
 /**
- * Ban test framework module mocking in favor of real dependency seams.
+ * Reports whether a call passes a function its implementation, as `vi.fn(() => 1)` does. `vi.fn()`
+ * and `vi.fn(undefined)` build a function that only records its calls.
+ */
+function passesImplementation(sourceCode: SourceCode, node: ESTree.CallExpression) {
+  const [implementation] = node.arguments
+
+  return (
+    implementation !== undefined
+    && !isGlobalObject(sourceCode, implementation, "undefined")
+    && isFrameworkMethod(sourceCode, node.callee, (name) => name === "fn")
+  )
+}
+
+function isBehaviorMethod(callee: ESTree.Node) {
+  if (callee.type !== "MemberExpression") {
+    return false
+  }
+
+  const name = staticKeyName(callee.property, callee.computed)
+
+  return name !== null && behaviorMethods.has(name)
+}
+
+/**
+ * Ban test doubles that replace what a dependency does: module mocks, mock implementations, and
+ * stubbed globals. A spy that only observes the real function stays allowed.
  */
 const rule: Rule = {
   createOnce(context) {
     return {
       CallExpression(node) {
-        if (isModuleMockMethod(context.sourceCode, node.callee)) {
+        const { sourceCode } = context
+
+        if (isFrameworkMethod(sourceCode, node.callee, (name) => moduleMockMethods.has(name))) {
           context.report({ messageId: "moduleMock", node })
+        } else if (
+          isBehaviorMethod(node.callee)
+          || passesImplementation(sourceCode, node)
+          || isFrameworkMethod(sourceCode, node.callee, (name) => replacementMethods.has(name))
+        ) {
+          context.report({ messageId: "replacement", node })
         }
       },
     }
@@ -109,11 +173,13 @@ const rule: Rule = {
   meta: {
     docs: {
       description:
-        "Disallow Vitest and Jest module mocking; tests must replace dependencies through real interfaces.",
+        "Disallow Vitest and Jest test doubles that replace what a dependency does; tests replace a dependency through its interface.",
     },
     messages: {
       moduleMock:
         "Replace module mocking with dependency injection through a real interface, service layer, or faithful test implementation.",
+      replacement:
+        "Do not replace what a dependency does with a mock implementation or a stubbed global. Pass a test implementation through the dependency's interface, such as an Effect `Layer` or a function parameter. A spy may only observe the real function.",
     },
     type: "problem",
   },

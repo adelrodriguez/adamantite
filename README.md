@@ -1013,10 +1013,15 @@ It needs no extra package. Most of its type rules started as
   `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
   one of these rules in test files, use an `overrides` entry. See
   [change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
-- `testing/no-doubles` reports a Vitest or Jest module mock, such as `vi.mock("./store")`, also
-  through a namespace import, a destructured method, or a `const` alias. A test replaces a
-  dependency through its interface, such as an Effect `Layer` or a function parameter. The rule runs
-  in every file, so a setup file cannot mock a module for every test either.
+- `testing/no-doubles` reports a Vitest or Jest test double that replaces what a dependency does:
+  a module mock, such as `vi.mock("./store")`, a mock implementation, such as `vi.fn(() => 1)` or
+  `mockReturnValue(1)`, and a stubbed global, such as `vi.stubGlobal("fetch", fake)`. It also
+  finds `vi` and `jest` through a namespace import, a destructured method, or a `const` alias. A
+  test replaces a dependency through its interface, such as an Effect `Layer` or a function
+  parameter. A spy, such as `vi.spyOn(store, "save")`, and `vi.fn()` without an implementation
+  only observe, so they stay allowed. The rule runs in every file, so a setup file cannot mock a
+  module for every test either. The jest and vitest presets turn off `prefer-mock-promise-shorthand`
+  and `prefer-mock-return-shorthand`, which ask for `mockResolvedValue` and `mockReturnValue`.
 - In test files, `testing/no-flake-masking` reports a test retry and a raised test timeout. A
   test that passes only on a retry is flaky, and a raised timeout hides a slow or stuck test. The
   rule reports a `retry` or `timeout` option of a test or suite, a timeout after the test

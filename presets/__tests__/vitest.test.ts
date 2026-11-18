@@ -65,6 +65,20 @@ const testImport = 'import { expect, it } from "vitest"'
 
 const moduleMock = ['import { vi } from "vitest"', "", 'vi.mock("./load.ts")', ""]
 
+// The shorthand rules ask for `mockResolvedValue(1)`, which strict also reports.
+const mockImplementation = [
+  'import { beforeEach, describe, vi } from "vitest"',
+  "",
+  'describe("load", () => {',
+  "  const load = vi.fn<() => Promise<number>>()",
+  "",
+  "  beforeEach(() => {",
+  "    load.mockImplementation(() => Promise.resolve(1))",
+  "  })",
+  "})",
+  "",
+]
+
 describe("vitest preset", () => {
   const presetPath = JSON.stringify(join(REPO_ROOT, `presets/lint/${name}.ts`))
   // `prefer-to-be` reports `toEqual(2)`, so the file has a report that the preset rules make.
@@ -146,8 +160,12 @@ describe("vitest preset", () => {
     expect(codes["src/math.test.ts"]).toStrictEqual([`${name}(prefer-lowercase-title)`])
   })
 
-  // Strict bans each module mock, so the preset must not tell the author how to write one.
-  it("give a module mock only the report of the strict preset", () => {
+  // Strict bans each module mock and mock implementation, so the preset must not tell the author how
+  // to write one.
+  it.each([
+    { file: moduleMock, kind: "module mock" },
+    { file: mockImplementation, kind: "mock implementation" },
+  ])("give a $kind only the report of the strict preset", ({ file }) => {
     const strictPath = JSON.stringify(join(REPO_ROOT, "presets/lint/strict.ts"))
 
     const codes = lint(
@@ -158,7 +176,7 @@ describe("vitest preset", () => {
         "export default { extends: [preset, strict] }",
         "",
       ].join("\n"),
-      { "src/load.test.ts": moduleMock.join("\n") }
+      { "src/load.test.ts": file.join("\n") }
     )
 
     expect(codes["src/load.test.ts"]).toStrictEqual(["testing(no-doubles)"])

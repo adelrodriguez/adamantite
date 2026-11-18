@@ -10,6 +10,7 @@ RuleTester.itOnly = it.only
 
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 const error = { messageId: "moduleMock" }
+const replacement = { messageId: "replacement" }
 
 tester.run("no-doubles", plugin.rules["no-doubles"], {
   invalid: [
@@ -71,9 +72,50 @@ tester.run("no-doubles", plugin.rules["no-doubles"], {
       errors: [error],
       name: "vi read from globalThis",
     },
+    { code: "vi.importMock('./user-store');", errors: [error] },
+    { code: "vi.mockObject(store);", errors: [error] },
+    { code: "jest.createMockFromModule('./user-store');", errors: [error] },
+    { code: "jest.genMockFromModule('./user-store');", errors: [error] },
+    { code: "jest.setMock('./user-store', store);", errors: [error] },
+    { code: "jest.enableAutomock();", errors: [error] },
+    { code: "vi.stubGlobal('fetch', fakeFetch);", errors: [replacement] },
+    { code: "jest.replaceProperty(process, 'platform', 'win32');", errors: [replacement] },
+    {
+      code: "import { vi } from 'vitest'; const { stubGlobal } = vi; stubGlobal('fetch', fakeFetch);",
+      errors: [replacement],
+      name: "stubGlobal destructured from an import of vi",
+    },
+    { code: "vi.fn(() => 42);", errors: [replacement] },
+    { code: "jest.fn(async () => ({ id: 1 }));", errors: [replacement] },
+    {
+      code: "import * as vitest from 'vitest'; vitest.vi.fn(load);",
+      errors: [replacement],
+      name: "an implementation through a namespace import",
+    },
+    { code: "vi.spyOn(store, 'save').mockImplementation(() => undefined);", errors: [replacement] },
+    { code: "vi.spyOn(store, 'load').mockResolvedValue({ id: 1 });", errors: [replacement] },
+    { code: "save.mockReturnValue(1);", errors: [replacement] },
+    { code: "save.mockReturnValueOnce(1);", errors: [replacement] },
+    { code: "save.mockImplementationOnce(() => 1);", errors: [replacement] },
+    { code: "load.mockRejectedValue(new Error('down'));", errors: [replacement] },
+    { code: "load.mockRejectedValueOnce(new Error('down'));", errors: [replacement] },
+    { code: "load.mockResolvedValueOnce(1);", errors: [replacement] },
+    { code: "builder.mockReturnThis();", errors: [replacement] },
+    { code: "save.withImplementation(() => 1, run);", errors: [replacement] },
+    { code: "save['mockReturnValue'](1);", errors: [replacement], name: "computed method name" },
   ],
   valid: [
     "const store = new InMemoryUserStore();",
+    "const save = vi.fn();",
+    "const save = jest.fn(undefined);",
+    "const save = vi.spyOn(store, 'save'); expect(save).toHaveBeenCalledOnce();",
+    "vi.useFakeTimers();",
+    "vi.stubEnv('NODE_ENV', 'test');",
+    "const fn = { fn() {} }; fn.fn(() => 1);",
+    {
+      code: "it.effect('loads', () => load.pipe(Effect.provide(Layer.succeed(Store, testStore))));",
+      name: "a test implementation through an Effect layer",
+    },
     "vi.spyOn(store, 'save');",
     "const vi = { mock() {} }; vi.mock();",
     "function test(jest: { mock(): void }) { jest.mock(); }",

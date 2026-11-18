@@ -280,6 +280,78 @@ describe("assessProject", () => {
       })
   )
 
+  it.effect("report each selected script that is missing or runs another command", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          [LOCKFILE_PATH]: yield* makeLockfile({
+            ...EMPTY_SELECTION,
+            scripts: ["analyze", "check", "fix"],
+          }),
+          "package.json": yield* stringifyJson({
+            devDependencies: { adamantite: "1.0.0" },
+            scripts: { analyze: "adamantite analyze", check: "true", test: "vitest" },
+          }),
+        },
+        root: ROOT,
+      })
+
+      files.makeReadOnly(ROOT)
+
+      const assessment = yield* Project.read().pipe(
+        Effect.flatMap((project) => assessProject(project)),
+        Effect.provideService(Project.Directory, ROOT),
+        Effect.provide(
+          withConfigLoader(
+            Layer.mergeAll(
+              files.layer,
+              Path.layer,
+              makeModuleResolverLayer(ROOT),
+              noProcessLayer,
+              Digest.layerWebCrypto,
+              NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
+              Layer.succeed(DependencyInstaller)({
+                addDevDependencies: () => Effect.void,
+                detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
+              })
+            )
+          )
+        )
+      )
+
+      // The findings follow the script order, and the `analyze` script gets none.
+      expect(
+        assessment.findings.filter((finding) => finding.integration === "scripts")
+      ).toStrictEqual([
+        {
+          currentState:
+            "The selection includes the `check` script, and the root `package.json` sets it to `true`, not to `adamantite check`.",
+          goal: [
+            "Run `adamantite update`. It sets the `check` script to `adamantite check`, and replaces what the script ran.",
+            "Run `adamantite doctor` again. It must not report this finding.",
+          ],
+          id: "mismatched-managed-script",
+          integration: "scripts",
+          notes: [
+            "If the project still needs `true`, move it to a script of another name before the update, and run that script wherever the project ran `check`, such as in CI.",
+          ],
+          title: "Managed script runs another command",
+        },
+        {
+          currentState:
+            "The selection includes the `fix` script, and the root `package.json` has no `fix` script.",
+          goal: [
+            "Run `adamantite update`. It sets the `fix` script to `adamantite fix`.",
+            "Run `adamantite doctor` again. It must not report this finding.",
+          ],
+          id: "missing-managed-script",
+          integration: "scripts",
+          title: "Missing managed script",
+        },
+      ])
+    })
+  )
+
   it.effect("read the shared project facts one time for every integration", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

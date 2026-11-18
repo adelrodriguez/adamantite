@@ -13,7 +13,11 @@ import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import * as Project from "#lib/project/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { readPackageJson } from "#lib/project/package-json.ts"
+import {
+  MANAGED_SCRIPT_COMMANDS,
+  readPackageJson,
+  SCRIPT_ORDER,
+} from "#lib/project/package-json.ts"
 import { Selection } from "#lib/project/selection.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
@@ -129,6 +133,49 @@ const notInstalled: ProjectAssessment = {
 }
 
 /**
+ * The findings for the managed scripts of the selection, in `SCRIPT_ORDER`: a script that the root
+ * `package.json` does not have, and a script that runs another command. `Setup.apply` sets each
+ * selected script to its command, so Doctor reports what `update` would change.
+ */
+function assessScripts({ packageJson }: Project.Snapshot, { scripts }: Selection): Finding[] {
+  return SCRIPT_ORDER.filter((script) => scripts.includes(script)).flatMap((script): Finding[] => {
+    const command = packageJson.scripts?.[script]
+    const managed = MANAGED_SCRIPT_COMMANDS[script]
+
+    if (command === managed) {
+      return []
+    }
+
+    return [
+      command === undefined
+        ? {
+            currentState: `The selection includes the \`${script}\` script, and the root \`package.json\` has no \`${script}\` script.`,
+            goal: [
+              `Run \`adamantite update\`. It sets the \`${script}\` script to \`${managed}\`.`,
+              "Run `adamantite doctor` again. It must not report this finding.",
+            ],
+            id: "missing-managed-script",
+            integration: "scripts",
+            title: "Missing managed script",
+          }
+        : {
+            currentState: `The selection includes the \`${script}\` script, and the root \`package.json\` sets it to \`${command}\`, not to \`${managed}\`.`,
+            goal: [
+              `Run \`adamantite update\`. It sets the \`${script}\` script to \`${managed}\`, and replaces what the script ran.`,
+              "Run `adamantite doctor` again. It must not report this finding.",
+            ],
+            id: "mismatched-managed-script",
+            integration: "scripts",
+            notes: [
+              `If the project still needs \`${command}\`, move it to a script of another name before the update, and run that script wherever the project ran \`${script}\`, such as in CI.`,
+            ],
+            title: "Managed script runs another command",
+          },
+    ]
+  })
+}
+
+/**
  * What an assessment found in a project. `doctor --json` prints it as this schema encodes it.
  */
 export const ProjectAssessment = Schema.Struct({
@@ -187,7 +234,10 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 
   return {
     applicableIntegrations: applicable.map(({ name }) => name),
-    findings: applicable.flatMap(({ assessment }) => assessment.findings),
+    findings: [
+      ...assessScripts(project, selection),
+      ...applicable.flatMap(({ assessment }) => assessment.findings),
+    ],
     packageActions: applicable.flatMap(({ assessment }) => assessment.packageActions),
     selection,
     warnings: applicable.flatMap(({ assessment }) => assessment.warnings),

@@ -124,7 +124,8 @@ _Avoid_: Framework language, plugin format
 
 **Managed script**:
 A `package.json` script whose command is owned by Adamantite, such as `check`. Setup sets each
-selected one to its command and replaces what it ran, the one exception to whole files.
+selected one to its command and replaces what it ran, the one exception to whole files. Doctor
+reports a selected one that is missing or runs another command.
 _Avoid_: User script, package command
 
 **Selection**:

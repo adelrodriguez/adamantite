@@ -278,8 +278,10 @@ adamantite analyze --only monorepo --fix -- --select highest
 Assess every integration of the setup. Doctor is read-only. Each finding describes
 the current state, the goal state, and how to verify the repair. Doctor checks each integration
 that the lockfile selects, so a selected integration whose file is missing or wrong gets a
-finding. A project without a lockfile gets one finding that says to run `adamantite init`, and
-Doctor checks nothing else. Doctor also checks that the
+finding. Doctor reports a selected managed script that `package.json` does not have, or that runs
+another command, because `check` then passes without running Adamantite. A project without a
+lockfile gets one finding that says to run `adamantite init`, and Doctor checks nothing else.
+Doctor also checks that the
 installed packages can run Oxlint: each declared package is installed, and `@effect/tsgo` has
 a build for the installed Oxlint, tsrs, and platform. It starts no tool for this check.
 

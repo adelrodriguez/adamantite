@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Digest from "effect/crypto/Digest"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { CommandRunner } from "#lib/shared/command-runner.ts"
@@ -62,6 +63,8 @@ export const makeAppLayer = (
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
     DependencyInstaller.layer.pipe(Layer.provide(NodeServices.layer)),
     Digest.layerWebCrypto,
+    // Harden gives the agent the date of today, in the time zone of the user.
+    DateTime.layerCurrentZoneLocal,
     Project.Directory.layer
   )
 

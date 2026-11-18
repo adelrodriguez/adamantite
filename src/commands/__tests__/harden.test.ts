@@ -1,5 +1,5 @@
 import type { PackageJson } from "type-fest"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -13,6 +13,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
+import { TestClock } from "effect/testing"
 import type { AgentReach } from "#lib/hardening/agent-reach.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
@@ -31,6 +32,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import hardenCommand, { Report } from "#commands/harden.ts"
 import { LintedOverrides } from "#lib/hardening/overrides.ts"
+import { ProjectPath } from "#lib/hardening/project-files.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -128,6 +130,10 @@ const REQUIRED_PHRASES = {
     "A step that reports valid code cannot hold the standard, so use a lower step.",
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
+    "One that matches a recorded decision is settled: do not propose it or ask about it again.",
+    "A decision that the section shows `in` a folder settles it for that folder only.",
+    "List it under **Also considered** in step 8, with the `id` of the decision, and its folder when its line shows one.",
+    "evidence that is newer than the date of the decision, such as fix commits after it",
     "Continue when every remaining candidate has a proposed step, evidence, limits, and cases",
   ],
   "## 8. Show the candidates and wait for approval": [
@@ -146,6 +152,22 @@ const REQUIRED_PHRASES = {
     "Wait until the user names the candidates to write or approves none",
     "When no human can approve",
     "stop after this step.",
+    "Write no file, also not the decisions record.",
+    "After the user answers, append to the decisions record.",
+    "Append this session line in each session that the user answers, also when the user approves every candidate or none.",
+    "one for each item of the Decisions list that the user resolved",
+    "An approved candidate needs no line, because its rule or instruction is the trace.",
+    "and each candidate or decision that step 7 matched with a decision of the record",
+    "Never edit or delete an earlier line.",
+    "A line replaces only the earlier line that has the same `id` and the same `scope`",
+    "To change a decision that the Decisions section shows, write its `id` and its scope",
+    "To end a decision that the Decisions section shows, append a line with its `id`, its scope, and the decision `approved`.",
+    "A decision that this session does not cover stays",
+    "one JSON object on one line",
+    "no trailing comma",
+    "Leave out a key that has no value.",
+    "reuse the `id` that the Decisions section shows",
+    "Tell the user to commit the record",
   ],
   "## 9. Write the approved standards": [
     "**Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail",
@@ -169,6 +191,9 @@ const REQUIRED_PHRASES = {
     "`CODING_STANDARDS.md`",
     "When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.",
     "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
+  ],
+  "## Check the result": [
+    "The decisions record has the session line, and a line for each candidate that the user did not approve and each decision that the user resolved",
   ],
   "## Verify": [
     "no temporary verification cases, fixtures, or verification-only helpers remain",
@@ -247,6 +272,15 @@ interface ProcessOptions {
    */
   readonly indexOnlyFiles?: readonly string[]
   /**
+   * What `git rev-parse --verify HEAD` prints. Git prints nothing in a repository without a commit.
+   */
+  readonly head?: string
+  /**
+   * What `git merge-base <commit> HEAD` prints, by the commit. Git prints nothing for a commit that
+   * the repository does not have.
+   */
+  readonly mergeBases?: Readonly<Record<string, string>>
+  /**
    * Files that an ignore pattern of the Oxlint config matches, so `oxlint` does not list them.
    */
   readonly lintIgnoredFiles?: readonly string[]
@@ -274,27 +308,38 @@ function makeHandle(exitCode: number, stdout: string) {
   })
 }
 
-function makeProcessLayer(
-  files: FileSystemTestContext,
-  {
+function makeProcessLayer(files: FileSystemTestContext, processes: ProcessOptions = {}) {
+  const {
     exitCode = 0,
     indexOnlyFiles = [],
     lintIgnoredFiles = [],
     oxlintExitCode = 0,
     probeReport = '{ "diagnostics": [], "number_of_files": 0 }',
-  }: ProcessOptions = {}
-) {
+  } = processes
+
   const listFiles = () =>
     Array.sort(
       files.list().filter((file) => !file.startsWith("../")),
       Order.String
     )
 
-  const getGitOutput = (args: ChildProcess.StandardCommand["args"]) =>
-    Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
+  const getGitOutput = (args: ChildProcess.StandardCommand["args"]) => {
+    if (args[0] === "rev-parse") {
+      return processes.head ?? ""
+    }
+
+    if (args[0] === "merge-base") {
+      const [, mergeBase = ""] =
+        Object.entries(processes.mergeBases ?? {}).find(([commit]) => args[1] === commit) ?? []
+
+      return mergeBase
+    }
+
+    return Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
       .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
       .map((file) => `${file}\0`)
       .join("")
+  }
 
   const getOxlintOutput = () =>
     listFiles()
@@ -492,9 +537,13 @@ function runHardenHoisted() {
   })
 }
 
-function runHardenPrompt(files: Record<string, string>, args: readonly string[] = []) {
+function runHardenPrompt(
+  files: Record<string, string>,
+  args: readonly string[] = [],
+  processes: ProcessOptions = {}
+) {
   return Effect.gen(function* () {
-    const { exit, logLines } = yield* runHarden(files, args)
+    const { exit, logLines } = yield* runHarden(files, args, processes)
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(logLines).toHaveLength(1)
@@ -549,6 +598,82 @@ function getContext(prompt: string) {
 }
 
 const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
+const { decisionsRecord: DecisionsRecord, fixHistory: FixHistory } = Report.fields
+
+const RECORD = ProjectPath.make(".adamantite/decisions.jsonl")
+
+// The commit that `HEAD` names in this session, the commit that the session of `SESSION` recorded,
+// and the common ancestor of the two.
+const HEAD_COMMIT = "1a954628a960aaef81d7b2d4521929579f3541e6"
+const SESSION_HEAD = "fcbdc4c271c889825d8338d2d8f10b6e5e95c171"
+const BOUNDARY = "2db8c22f75474a58cd13fa2d3425017015d392ce"
+
+// A session line of the whole project, as the agent copies it from the prompt.
+const SESSION = { head: SESSION_HEAD, session: "2026-03-14" }
+
+// The lines of a decisions record, as the agent writes them and as `harden --json` prints them.
+const REJECTED = {
+  at: "2026-03-14",
+  break: 7,
+  decision: "rejected",
+  fixes: ["1a2b3c4"],
+  follow: 41,
+  id: "tests-beside-module",
+  reason: "Integration tests stay in tests/",
+  standard: "Test files sit beside the module that they test",
+}
+
+const DEFERRED = {
+  at: "2026-03-14",
+  decision: "deferred",
+  id: "default-exports",
+  rule: "import/no-default-export",
+  scope: "packages/web",
+  standard: "Ban default exports",
+}
+
+const DECIDED = {
+  at: "2026-03-15",
+  decision: "decided",
+  id: "no-console-suppressions",
+  reason: "Keep the rule, and allow it in scripts/.",
+  standard: "`no-console` has 40 suppressions",
+}
+
+const BROKEN_LINE = '{"id":"layers","standard":"Keep src/lib in layers",}'
+
+/**
+ * The text of a record that has one of `decisions` on each line.
+ */
+function makeRecord(decisions: readonly object[]) {
+  return decisions.map((decision) => `${JSON.stringify(decision)}\n`).join("")
+}
+
+const RECORD_CONTENT = makeRecord([REJECTED, DEFERRED, SESSION, DECIDED])
+
+// A decisions record with three decisions and the line of one session of the whole project.
+const RECORD_FILES = { [RECORD]: RECORD_CONTENT }
+
+// The line that step 8 gives the agent to copy, without the scope of the session.
+const EXAMPLE = {
+  at: "2026-03-14",
+  break: 7,
+  decision: "rejected",
+  fixes: ["1a2b3c4"],
+  follow: 41,
+  id: "default-exports",
+  reason: "The router loads each page by its default export",
+  rule: "import/no-default-export",
+  standard: "Modules have no default export",
+}
+
+const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
+
+// A git that knows `HEAD` and the commit of `SESSION`.
+const RECORD_PROCESSES = {
+  head: `${HEAD_COMMIT}\n`,
+  mergeBases: { [SESSION_HEAD]: `${BOUNDARY}\n` },
+}
 
 // What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`.
 const INDEX_PROBE_REPORT = JSON.stringify({
@@ -590,9 +715,11 @@ describe("harden", () => {
           brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
           unreached: ["docs/unreached.md"],
         }),
-        commits: 20,
         configs: ["oxlint.config.ts"],
+        decisionsRecord: DecisionsRecord.cases.Missing.make({ path: RECORD }),
         documentationFiles: Option.some(["AGENTS.md", "docs/unreached.md"]),
+        fixHistory: FixHistory.cases.Requested.make({ count: 20 }),
+        head: Option.none(),
         instructionFiles: ["AGENTS.md"],
         overrides: new LintedOverrides({ rules: [] }),
         rulesFolders: [".adamantite/lint"],
@@ -605,6 +732,68 @@ describe("harden", () => {
       })
     })
   )
+
+  it.effect(
+    "print the decisions, the sessions, the lines that do not decode, and the commit of HEAD as JSON",
+    () =>
+      Effect.gen(function* () {
+        const { logLines } = yield* runHarden(
+          {
+            ...INSTALLED,
+            [RECORD]: `${makeRecord([REJECTED, SESSION])}${BROKEN_LINE}\n${makeRecord([DEFERRED])}`,
+          },
+          ["--json"],
+          RECORD_PROCESSES
+        )
+
+        const report = decodeJson(logLines[0])
+
+        expect(report).toHaveProperty("decisionsRecord", {
+          _tag: expect.stringMatching(/^Present$/u),
+          decisions: [REJECTED, DEFERRED],
+          path: RECORD,
+          sessions: [SESSION],
+          undecodableLines: [{ issue: expect.any(String), line: 3, text: BROKEN_LINE }],
+        })
+        expect(report).toHaveProperty("head", HEAD_COMMIT)
+        expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
+          FixHistory.cases.Since.make({
+            boundary: BOUNDARY,
+            head: SESSION_HEAD,
+            session: "2026-03-14",
+          })
+        )
+      })
+  )
+
+  it.effect(
+    "print the default fix history as the last 200 commits, apart from a requested count",
+    () =>
+      Effect.gen(function* () {
+        const { logLines } = yield* runHarden(INSTALLED, ["--json"])
+        const requested = yield* runHarden(INSTALLED, ["--json", "--commits", "200"])
+
+        expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
+          FixHistory.cases.Last.make({ count: 200 })
+        )
+        expect(decodeReport(requested.logLines[0]).fixHistory).toStrictEqual(
+          FixHistory.cases.Requested.make({ count: 200 })
+        )
+      })
+  )
+
+  it("give the fix history a number of commits, or a boundary with its session, and never both", () => {
+    expectTypeOf<{ _tag: "Last"; count: number }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Requested"; count: number }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{
+      _tag: "Since"
+      boundary: string
+      head: string
+      session: string
+    }>().toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Last"; boundary: string }>().not.toExtend<typeof FixHistory.Type>()
+    expectTypeOf<{ _tag: "Since"; boundary: string }>().not.toExtend<typeof FixHistory.Type>()
+  })
 
   it.effect("open no menu and start no agent with --json in an interactive terminal", () =>
     Effect.gen(function* () {
@@ -765,6 +954,7 @@ describe("harden", () => {
           "### Instructions",
           "### Documentation",
           "### Agent reach",
+          "### Decisions",
           "### Suppressions",
           "### Overrides that turn a rule off",
           "## 1. Explore the documentation",
@@ -1071,9 +1261,12 @@ describe("harden", () => {
           )
         )
 
-        expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
-          "Steps 1 to 8 are read-only for the target project."
-        )
+        expect(
+          getMissingPhrases(prompt.slice(0, prompt.indexOf("\n## Context\n")), [
+            "Steps 1 to 8 are read-only for the target project.",
+            "The one exception is the decisions record, which you append to after the user answers in step 8.",
+          ])
+        ).toStrictEqual([])
         expect(missing).toStrictEqual([])
       })
   )
@@ -1139,6 +1332,345 @@ describe("harden", () => {
         `\`git log -n 200 --no-merges --format="%h %s" -- 'src/(app)'\``
       )
     })
+  )
+
+  it.effect(
+    "show each decision of the record on one line, and read the fix history since the last session",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt(
+          { ...RECORD_FILES, ...INSTALLED },
+          [],
+          RECORD_PROCESSES
+        )
+
+        const decisions = getSection(prompt, "### Decisions")
+
+        expect(getListItems(decisions)).toStrictEqual([
+          "- `tests-beside-module`, rejected 2026-03-14: Test files sit beside the module that they test. Reason: Integration tests stay in tests/. Then: 41 follow, 7 break, fixes 1a2b3c4.",
+          "- `default-exports`, deferred 2026-03-14, in `packages/web`: Ban default exports. Proposed: `import/no-default-export`.",
+          "- `no-console-suppressions`, decided 2026-03-15: `no-console` has 40 suppressions. Choice: Keep the rule, and allow it in scripts/.",
+        ])
+        expect(
+          getMissingPhrases(decisions, [
+            "Adamantite decoded the record, so do not read the file.",
+            "The decisions record is `.adamantite/decisions.jsonl`.",
+          ])
+        ).toStrictEqual([])
+        expect(
+          getMissingPhrases(getSection(prompt, "## 4. Read the fix history"), [
+            `A session on 2026-03-14 read the fix history of the project up to commit \`${SESSION_HEAD}\`.`,
+            `the commits since commit \`${BOUNDARY}\`, the common ancestor of that commit and \`HEAD\``,
+            `\`git log ${BOUNDARY}..HEAD --no-merges --format="%h %s" -- .\``,
+            "When it lists no commit, record that the history has no commit after that session",
+          ])
+        ).toStrictEqual([])
+        // This session reads from the earlier session on, so its line records the commit of `HEAD`.
+        expect(getSection(prompt, "## 8. Show the candidates and wait for approval")).toContain(
+          `{"session":"1970-01-01","head":"${HEAD_COMMIT}"}`
+        )
+      })
+  )
+
+  it.effect("list a line that does not decode with its number, and say to repair it", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        ...INSTALLED,
+        [RECORD]: `${makeRecord([REJECTED])}${BROKEN_LINE}\n`,
+      })
+
+      const decisions = getSection(prompt, "### Decisions")
+
+      expect(getListItems(decisions)).toStrictEqual([
+        expect.stringMatching(/^- `tests-beside-module`, rejected 2026-03-14: /u),
+        expect.stringMatching(/^- Line 2: \S/u),
+      ])
+      expect(decisions).toContain(
+        "Adamantite could not decode these lines of the record, and left them out. Repair each one when you append to the record in step 8."
+      )
+    })
+  )
+
+  it.effect("say that the record holds no decision when each id is approved", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        ...INSTALLED,
+        [RECORD]: makeRecord([REJECTED, { ...REJECTED, at: "2026-06-01", decision: "approved" }]),
+      })
+
+      const decisions = getSection(prompt, "### Decisions")
+
+      expect(getListItems(decisions)).toStrictEqual([])
+      expect(decisions).toContain("It holds no decision.")
+    })
+  )
+
+  it.effect("say that no decisions record exists, and that step 8 creates it", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(INSTALLED)
+
+      expect(
+        getMissingPhrases(getSection(prompt, "### Decisions"), [
+          "The decisions record is `.adamantite/decisions.jsonl`.",
+          "It does not exist yet, so no earlier session recorded a decision. Step 8 creates it with the first line.",
+        ])
+      ).toStrictEqual([])
+    })
+  )
+
+  it.effect.each([
+    {
+      lines: [REJECTED],
+      name: "the record has no session line",
+      processes: RECORD_PROCESSES,
+    },
+    {
+      lines: [{ ...SESSION, scope: "packages/web" }],
+      name: "no session line covers the session",
+      processes: RECORD_PROCESSES,
+    },
+    {
+      lines: [{ session: "2026-03-14" }],
+      name: "the covering session line has no head",
+      processes: RECORD_PROCESSES,
+    },
+    {
+      lines: [SESSION],
+      name: "git gives no common ancestor for the recorded commit",
+      processes: { head: `${HEAD_COMMIT}\n` },
+    },
+    {
+      lines: [SESSION],
+      name: "git cannot read the history",
+      processes: { ...RECORD_PROCESSES, exitCode: 128 },
+    },
+  ])("read the last 200 commits when $name", ({ lines, processes }) =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden(
+        { ...INSTALLED, [RECORD]: makeRecord(lines) },
+        [],
+        processes
+      )
+
+      expect(getSection(logLines[0] ?? "", "## 4. Read the fix history")).toContain(
+        '`git log -n 200 --no-merges --format="%h %s" -- .`'
+      )
+    })
+  )
+
+  it.effect("start the fix history at the last session line that covers the session", () =>
+    Effect.gen(function* () {
+      const later = "2f".repeat(20)
+      const laterBoundary = "3e".repeat(20)
+
+      const prompt = yield* runHardenPrompt(
+        {
+          ...MONOREPO_FILES,
+          [RECORD]: makeRecord([
+            SESSION,
+            { head: later, scope: "packages", session: "2026-04-01" },
+            // The session of a sibling folder, and a session that recorded no commit.
+            { head: "4d".repeat(20), scope: "packages/api", session: "2026-05-01" },
+            { scope: "packages/web", session: "2026-06-01" },
+          ]),
+        },
+        ["--path", "packages/web"],
+        {
+          ...RECORD_PROCESSES,
+          mergeBases: { ...RECORD_PROCESSES.mergeBases, [later]: `${laterBoundary}\n` },
+        }
+      )
+
+      expect(
+        getMissingPhrases(getSection(prompt, "## 4. Read the fix history"), [
+          `A session on 2026-04-01 read the fix history of \`packages/web\` up to commit \`${later}\`.`,
+          `\`git log ${laterBoundary}..HEAD --no-merges --format="%h %s" -- packages/web\``,
+        ])
+      ).toStrictEqual([])
+    })
+  )
+
+  it.effect("read a commit that git prints with a carriage return and a line feed", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({ ...RECORD_FILES, ...INSTALLED }, [], {
+        head: `${HEAD_COMMIT}\r\n`,
+        mergeBases: { [SESSION_HEAD]: `${BOUNDARY}\r\n` },
+      })
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        `\`git log ${BOUNDARY}..HEAD --no-merges --format="%h %s" -- .\``
+      )
+      expect(getSection(prompt, "## 8. Show the candidates and wait for approval")).toContain(
+        `"head":"${HEAD_COMMIT}"`
+      )
+    })
+  )
+
+  it.effect("read the number of commits that --commits gives, also with a decisions record", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(
+        { ...RECORD_FILES, ...INSTALLED },
+        ["--commits", "50"],
+        RECORD_PROCESSES
+      )
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        '`git log -n 50 --no-merges --format="%h %s" -- .`'
+      )
+    })
+  )
+
+  it.effect("leave out the decisions of another folder when --path selects a package", () =>
+    Effect.gen(function* () {
+      const other = { ...DEFERRED, id: "api-errors", scope: "packages/api" }
+
+      const prompt = yield* runHardenPrompt(
+        { ...MONOREPO_FILES, [RECORD]: makeRecord([REJECTED, DEFERRED, other]) },
+        ["--path", "packages/web"],
+        RECORD_PROCESSES
+      )
+
+      const decisions = getSection(prompt, "### Decisions")
+
+      expect(getListItems(decisions)).toStrictEqual([
+        expect.stringMatching(/^- `tests-beside-module`, /u),
+        expect.stringMatching(/^- `default-exports`, /u),
+      ])
+      expect(decisions).toContain(
+        "It holds these decisions for `packages/web`, without the decisions of other folders."
+      )
+    })
+  )
+
+  it.effect(
+    "show two decisions that have one id, each with its scope, in the prompt and as JSON",
+    () =>
+      Effect.gen(function* () {
+        // The same standard, which an earlier session rejected for the whole project.
+        const project = {
+          at: DEFERRED.at,
+          decision: "rejected",
+          id: DEFERRED.id,
+          rule: DEFERRED.rule,
+          standard: DEFERRED.standard,
+        }
+
+        const api = { ...DEFERRED, scope: "packages/api" }
+
+        const files = {
+          ...MONOREPO_FILES,
+          // The session of `packages/api` wrote its line last, with the `id` of the standard.
+          [RECORD]: makeRecord([project, DEFERRED, api]),
+        }
+
+        const prompt = yield* runHardenPrompt(files, ["--path", "packages/web"])
+        const { logLines } = yield* runHarden(files, ["--json", "--path", "packages/web"])
+
+        expect(getListItems(getSection(prompt, "### Decisions"))).toStrictEqual([
+          "- `default-exports`, rejected 2026-03-14: Ban default exports. Proposed: `import/no-default-export`.",
+          "- `default-exports`, deferred 2026-03-14, in `packages/web`: Ban default exports. Proposed: `import/no-default-export`.",
+        ])
+        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
+          project,
+          DEFERRED,
+        ])
+      })
+  )
+
+  it.effect.each([
+    {
+      args: ["--path", "packages/web"],
+      name: "the scope of --path",
+      phrases: [
+        'A line of this session has `"scope":"packages/web"`, the folder of this session.',
+        "This session covers a decision in `packages/web` or in a folder inside it.",
+      ],
+      processes: RECORD_PROCESSES,
+      scope: "packages/web",
+      session: { head: HEAD_COMMIT, scope: "packages/web", session: "2026-03-14" },
+      sessionLine: `{"session":"2026-03-14","head":"${HEAD_COMMIT}","scope":"packages/web"}`,
+    },
+    {
+      args: [],
+      name: "no scope without --path",
+      phrases: [
+        "A line of this session has no `scope`, because this session covers the whole project.",
+        "This session covers each decision that the section shows.",
+      ],
+      processes: RECORD_PROCESSES,
+      scope: undefined,
+      session: { head: HEAD_COMMIT, session: "2026-03-14" },
+      sessionLine: `{"session":"2026-03-14","head":"${HEAD_COMMIT}"}`,
+    },
+    {
+      // A session that reads a requested number of commits did not read the history up to `HEAD`.
+      args: ["--commits", "30"],
+      name: "no head with --commits",
+      phrases: [
+        "A line of this session has no `scope`, because this session covers the whole project.",
+        "This session covers each decision that the section shows.",
+      ],
+      processes: RECORD_PROCESSES,
+      scope: undefined,
+      session: { session: "2026-03-14" },
+      sessionLine: '{"session":"2026-03-14"}',
+    },
+    {
+      args: ["--path", "packages/web", "--commits", "30"],
+      name: "the scope of --path and no head with --commits",
+      phrases: [
+        'A line of this session has `"scope":"packages/web"`, the folder of this session.',
+        "This session covers a decision in `packages/web` or in a folder inside it.",
+      ],
+      processes: RECORD_PROCESSES,
+      scope: "packages/web",
+      session: { scope: "packages/web", session: "2026-03-14" },
+      sessionLine: '{"session":"2026-03-14","scope":"packages/web"}',
+    },
+    {
+      args: [],
+      name: "no head when git cannot name HEAD",
+      phrases: [
+        "A line of this session has no `scope`, because this session covers the whole project.",
+        "This session covers each decision that the section shows.",
+      ],
+      processes: {},
+      scope: undefined,
+      session: { session: "2026-03-14" },
+      sessionLine: '{"session":"2026-03-14"}',
+    },
+  ])(
+    "give a session line and an example line that decode, with the date of the clock and $name",
+    (expected) =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.UTC(2026, 2, 14, 12))
+
+        const step = getSection(
+          yield* runHardenPrompt(MONOREPO_FILES, expected.args, expected.processes),
+          "## 8. Show the candidates and wait for approval"
+        )
+
+        const [example = ""] = /\{"id":.+\}/u.exec(step) ?? []
+        const [copied = ""] = /\{"session":.+\}/u.exec(step) ?? []
+
+        // The record of the next session holds both lines, as the agent copies them.
+        const { logLines } = yield* runHarden(
+          { ...MONOREPO_FILES, [RECORD]: `${copied}\n${example}\n` },
+          ["--json"]
+        )
+
+        const report = decodeJson(logLines[0])
+
+        expect(copied).toBe(expected.sessionLine)
+        expect(
+          getMissingPhrases(step, [...expected.phrases, "`at` is `2026-03-14`, the date of today."])
+        ).toStrictEqual([])
+        expect(report).toHaveProperty("decisionsRecord.undecodableLines", [])
+        expect(report).toHaveProperty("decisionsRecord.sessions", [expected.session])
+        expect(report).toHaveProperty("decisionsRecord.decisions", [
+          expected.scope === undefined ? EXAMPLE : { ...EXAMPLE, scope: expected.scope },
+        ])
+      })
   )
 
   it.effect("fail when --commits is not a positive number", () =>
@@ -1495,6 +2027,43 @@ describe("harden", () => {
         nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
       ).toStrictEqual(["claude", "oxfmt", "oxlint"])
       expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
+    })
+  )
+
+  it.effect("pass the verification of a session that appends a line to the decisions record", () =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runInteractiveHarden({
+        // The line that did not decode before the session does not fail it.
+        files: { ...HEALTHY_FILES, [RECORD]: `${BROKEN_LINE}\n` },
+        keys: ["enter"],
+        onSession: (files) => {
+          files.write(RECORD, `${files.read(RECORD)}${makeRecord([REJECTED])}`)
+        },
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
+    })
+  )
+
+  it.effect("fail and name the line when the session adds a line that does not decode", () =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runInteractiveHarden({
+        files: { ...HEALTHY_FILES, [RECORD]: makeRecord([REJECTED]) },
+        keys: ["enter"],
+        onSession: (files) => {
+          files.write(RECORD, `${files.read(RECORD)}${BROKEN_LINE}\n`)
+        },
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(logLines).toStrictEqual([
+        "💠 adamantite harden",
+        "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+        ...CHECK_TITLES,
+        expect.stringMatching(/^✖ Line 2 of `\.adamantite\/decisions\.jsonl` does not decode: \S/u),
+        "⚠️ Harden found issues.",
+      ])
     })
   )
 

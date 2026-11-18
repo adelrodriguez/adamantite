@@ -3,6 +3,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
@@ -395,6 +396,8 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
       canPrompt: false,
     }),
     Stdio.layerTest({}),
+    // UTC, so the date that a command prints depends on the test clock and not on the machine.
+    DateTime.layerCurrentZoneOffset(0),
     // Synchronous, so the test clock tracks every step before a prompt. A WebCrypto digest resolves
     // outside the test scheduler, and `TestClock.adjust` would not wait for it.
     NodeCrypto.layerDigest,

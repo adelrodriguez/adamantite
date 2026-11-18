@@ -125,6 +125,12 @@ prompt is built from, such as the agent reach and the suppressions, as JSON. Use
 when the request covers one package or folder. Show the candidate standards and wait for
 the user's approval before writing. If no human can approve, report the candidates and stop.
 
+The prompt shows the decisions of the decisions record, `.adamantite/decisions.jsonl`. Do not
+propose again what a decision settles. After the user answers, append the session line that the
+prompt gives, and one decision line for each candidate that the user did not approve and for each
+decision that the user resolved. Copy the lines that the prompt gives, and never edit or delete an
+earlier line.
+
 For rule trials that the prompt requests, follow the trial step in
 [How to repair preset rule reports](references/lint-rules.md#try-a-rule-setting).
 For approved custom rules, follow [How to write and verify custom rules](references/custom-rules.md).

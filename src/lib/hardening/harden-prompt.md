@@ -2,7 +2,7 @@
 
 Find the coding standards that this target project already follows. Propose the highest step of the enforcement ladder that can enforce each standard. The project uses Adamantite {{version}}.
 
-Steps 1 to 8 are read-only for the target project. Keep trial case files outside the project and use stdin for RuleTester cases. Change project files only in step 9, for the candidates that the user approves.
+Steps 1 to 8 are read-only for the target project. Keep trial case files outside the project and use stdin for RuleTester cases. Change project files only in step 9, for the candidates that the user approves. The one exception is the decisions record, which you append to after the user answers in step 8.
 
 ## Context
 
@@ -29,6 +29,12 @@ These are the Markdown files of the project, without the changesets, the changel
 ### Agent reach
 
 {{agentReach}}
+
+### Decisions
+
+The decisions record holds each candidate that the user did not approve, and each decision that the user resolved, in an earlier session. Adamantite decoded the record, so do not read the file. A decision is its `id` together with its folder, which a line shows after `in`, so one `id` can have a decision for the project and another for a folder.
+
+{{decisionsRecord}}
 
 ### Suppressions
 
@@ -66,9 +72,9 @@ This step is done when each area has its candidates or the note "none found".
 
 ## 4. Read the fix history
 
-A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold. Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.
+A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold.
 
-{{fixHistoryCommand}}
+{{fixHistory}}
 
 - Find the commits that fix a mistake: a bug fix, a revert, or a correction after a review. Read the diff of each one with `git show <commit>`.
 - Name the mistake in one sentence, in terms of the code, such as "an `await` in a `forEach` callback" or "a date that the code parses without a time zone". Skip the fixes of logic that only one place has.
@@ -112,13 +118,15 @@ This step is done when each rule has its gaps or the note "none found".
 
 ## 7. Place each candidate on the enforcement ladder
 
+Before you place a candidate, compare it with the decisions in the Decisions section above, and do the same for each decision from steps 3 and 6, and for each choice that this step finds. One that matches a recorded decision is settled: do not propose it or ask about it again. A decision that the section shows `in` a folder settles it for that folder only. List it under **Also considered** in step 8, with the `id` of the decision, and its folder when its line shows one. The exception is evidence that is newer than the date of the decision, such as fix commits after it: then show the candidate or the decision again, with the `id` and the new evidence.
+
 {{ladder}}
 
 For each rule, give one case that the rule must report and one similar case that it must accept. For a type, a project check, or an instruction, give the mistake that it prevents and the similar valid code that it accepts. For a candidate from step 4, use the code before and after one of its fixes. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
 
 A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 8, and propose no rule for it.
 
-Continue when every remaining candidate has a proposed step, evidence, limits, and cases, or is recorded as a decision.
+Continue when every remaining candidate has a proposed step, evidence, limits, and cases, is recorded as a decision, or is settled by a recorded decision.
 
 ## 8. Show the candidates and wait for approval
 
@@ -148,11 +156,37 @@ Then show three short lists:
 
 - **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 7, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to. For a broken link, propose the correct target.
-- **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
+- **Also considered:** the candidates with a score of 3 or lower, and each candidate or decision that step 7 matched with a decision of the record, one line for each, with the reason or the `id` of the decision.
 
-When no human can approve, for example in CI or in an unattended session, report the candidates and stop after this step.
+When no human can approve, for example in CI or in an unattended session, report the candidates and stop after this step. Write no file, also not the decisions record.
 
-Otherwise, put the approval question last in the report, with no text after it. Ask the user which named candidates to write. Wait until the user names the candidates to write or approves none. If the user approves none, stop without changing project files.
+Otherwise, put the approval question last in the report, with no text after it. Ask the user which named candidates to write. Wait until the user names the candidates to write or approves none.
+
+After the user answers, append to the decisions record. It is the only project file that you change before step 9. Create the file when it does not exist.
+
+- Append this session line in each session that the user answers, also when the user approves every candidate or none. It records how far this session read the fix history, so the next session reads only the commits after it:
+
+  ```jsonl
+  {{sessionLine}}
+  ```
+
+- Append one line for each candidate that you showed and that the user did not approve, and one for each item of the Decisions list that the user resolved. An approved candidate needs no line, because its rule or instruction is the trace.
+- A decision is its `id` together with its `scope`. A line replaces only the earlier line that has the same `id` and the same `scope`, so one standard can have a decision for the project and another for a folder. Never edit or delete an earlier line. The one edit is the repair of a line that the Decisions section lists as not decoded.
+- {{decisionScope}} To change a decision that the Decisions section shows, write its `id` and its scope in place of that: the folder that its line shows after `in`, or no `scope` when its line shows none. Change a shown decision when the user decides the standard again for that same scope, or says to change it. Otherwise, the line of this session stands beside the shown decision, and both apply.
+- To end a decision that the Decisions section shows, append a line with its `id`, its scope, and the decision `approved`. Do this for each shown decision that an approved candidate matches and that this session covers. {{decisionsCovered}} A decision that this session does not cover stays, because it still applies outside this session.
+- Write one JSON object on one line, with no trailing comma, and end the line with a newline. Leave out a key that has no value.
+- Copy the form of this line:
+
+  ```jsonl
+  {{decisionExample}}
+  ```
+
+- `id` is kebab-case and stays the same for a standard, in each scope: reuse the `id` that the Decisions section shows when the standard was decided before. `at` is `{{today}}`, the date of today. `standard` is the standard in one sentence.
+- `decision` is `rejected`, `deferred` when the user wants to decide later, `decided` for a resolved item of the Decisions list, or `approved`. `reason` is the reason that the user gave, or the choice of a `decided` line.
+- `rule` is the rule or the ladder step that you proposed. `follow` and `break` are the numbers of places that follow and break the standard, and `fixes` are the short hashes of the fix commits that you saw.
+- Tell the user to commit the record with the other changes of the session, because the next session takes its decisions and the start of its fix history from it.
+
+If the user approves none, stop after you append the lines, without another change to the project files.
 
 ## 9. Write the approved standards
 
@@ -182,13 +216,14 @@ Continue when the required checks pass, the approved discovery gaps are closed, 
 
 ## Report the result
 
-Use the missing-source report format from step 8. Report the approved candidates implemented, changed files, verification cases and results, commands run, and remaining violations or decisions. State whether temporary verification files were removed. Keep unverified results separate from successful checks.
+Use the missing-source report format from step 8. Report the approved candidates implemented, the lines that you appended to the decisions record, changed files, verification cases and results, commands run, and remaining violations or decisions. State whether temporary verification files were removed. Keep unverified results separate from successful checks.
 
 The report is complete when each approved candidate has a verified result or an explicit blocker. Use this report only after approval and implementation. Before approval, use the proposal and closing question in step 8.
 
 ## Check the result
 
-- Every project change implements an approved candidate and stays inside the selected scope.
+- Every project change implements an approved candidate and stays inside the selected scope, or is a line of the decisions record.
+- The decisions record has the session line, and a line for each candidate that the user did not approve and each decision that the user resolved. Each line is one JSON object, and the record is unchanged when no human answered.
 - Each new or changed custom rule passed valid and invalid cases, including a regression case for a bug fix.
 - Temporary verification files are removed, and user-owned tests and CI steps remain.
 - Project checks and Doctor pass, or the report names each blocked check and remaining finding.

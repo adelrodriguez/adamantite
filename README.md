@@ -334,18 +334,78 @@ the agent reads each one. A coding agent finds the skills in its skill folder, s
 packages in that folder, or of the package that contains it, the rules folders that those configs
 load, the `AGENTS.md` of the root and of those packages, and the Markdown files of those packages
 and of the root. The prompt also lists the Markdown files that no chain of links or code-span paths
-from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix commits of the last 200 commits, or of the number
-that `--commits` gives, and a mistake that the fixes repeat becomes a candidate. With `--path`, it
-reads only the commits that change that folder.
+from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix
+commits of the last 200 commits, and a mistake that the fixes repeat becomes a candidate. With
+`--path`, it reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
+
+After you answer, the agent appends lines to the decisions record:
+`.adamantite/decisions.jsonl` at the project root, or at the workspace root of a monorepo. The
+record is a JSON Lines log. Commit it. Adamantite never writes it.
+
+```jsonl
+{"session":"2026-03-14","head":"4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d","scope":"packages/web"}
+{"id":"tests-beside-module","at":"2026-03-14","standard":"Test files sit beside the module that they test","decision":"rejected","reason":"Integration tests stay in tests/","follow":41,"break":7,"fixes":["1a2b3c4"]}
+{"id":"default-exports","at":"2026-03-14","standard":"Ban default exports","decision":"deferred","rule":"import/no-default-export","scope":"packages/web","follow":14,"break":9}
+```
+
+The agent appends one decision line for each candidate that you did not approve, and for each
+decision that you made:
+
+| Key               | Required | Meaning                                                                                                                                                                  |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`              | Yes      | The key of the standard, in kebab-case. A later line with the same `id` and the same `scope` replaces the earlier one.                                                   |
+| `at`              | Yes      | The date of the decision, as `YYYY-MM-DD`.                                                                                                                               |
+| `standard`        | Yes      | The standard in one sentence.                                                                                                                                            |
+| `decision`        | Yes      | `rejected`, `deferred`, `decided` for a decision that you made, with the choice in `reason`, or `approved`, which ends an earlier decision of the same `id` and `scope`. |
+| `reason`          | No       | The reason or the choice that you gave.                                                                                                                                  |
+| `rule`            | No       | The rule or the step of the enforcement ladder that the session proposed.                                                                                                |
+| `scope`           | No       | The folder that the decision applies to, from the project root. A session with `--path` writes its folder.                                                               |
+| `follow`, `break` | No       | How many places followed and broke the standard.                                                                                                                         |
+| `fixes`           | No       | The short hashes of the fix commits that the session saw.                                                                                                                |
+
+A decision is its `id` together with its `scope`, so one standard can have a decision for the
+project and another for a folder. A session of `packages/web` does not replace the decision that a
+session of `packages/api` recorded for the same `id`. To end the decision of a folder after you
+approve the standard for the whole project, the agent appends an `approved` line with the `id` and
+the `scope` of that decision.
+
+Adamantite decodes the record and keeps the last line of each `id` and `scope`. The next prompt
+shows those decisions, so the agent does not propose them again, unless it has evidence that is newer than the
+decision. With `--path`, the prompt leaves out the decisions of other folders. Adamantite ignores a
+key that it does not know. The prompt lists each line that does not decode, with its line number,
+for the agent to repair. To let harden propose a candidate again, delete its decision line. A
+decision line does not change which commits the next session reads.
+
+The agent also appends one session line in each session that you answer. The prompt gives the
+line, so the agent copies it:
+
+| Key       | Required | Meaning                                                                             |
+| --------- | -------- | ----------------------------------------------------------------------------------- |
+| `session` | Yes      | The date of the session, as `YYYY-MM-DD`.                                           |
+| `head`    | No       | The full hash of the commit that `HEAD` named. A session with `--commits` has none. |
+| `scope`   | No       | The `--path` of the session, as a folder from the project root.                     |
+
+A session line starts the fix history of a later session. Adamantite takes the last session line
+that covers the scope of the session and has a `head`. A line covers a scope when it has no
+`scope`, or when its `scope` is that folder or a parent of it. A session of a child or a sibling
+folder does not count, and for the whole project only a line without `scope` covers. The agent then
+reads the commits after the common ancestor of that commit and `HEAD`, in place of the last 200
+commits. That range can list a commit that the earlier session read, such as after a squash merge,
+and it cannot skip one that the earlier session did not read. Without a covering line, or when the
+repository does not have the recorded commit, the agent reads the last 200 commits. `--commits`
+gives a number of commits to read instead, in each case. A session with `--commits` reads only that
+number of commits, so its session line has no `head` and does not move the start of later sessions.
+The line also has no `head` when git cannot name `HEAD`.
 
 In an interactive terminal, `harden` offers the same resolution menu as Doctor: hand off to an
 installed coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff,
 `harden` runs `check`, then the Doctor assessment, and exits 1 when either fails.
 During the session, the agent verifies each new or changed custom rule with temporary
 RuleTester cases and removes the cases before handback.
-Harden also exits 1 when the session added a link to a Markdown file that does not exist. A copy or "do nothing"
+Harden also exits 1 when the session added a link to a Markdown file that does not exist, or a line
+to the decisions record that does not decode. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings.
 `harden --json` prints what the prompt is built from as one JSON document, and starts no agent.
 
@@ -430,13 +490,13 @@ JSON document on standard output, and its other lines on standard error. With `-
 never asks a question and never starts an agent. The exit codes stay the same. Each document has a
 `schemaVersion`:
 
-| Command          | Document                                                                                                                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`. |
-| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, and commits of the prompt.             |
-| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                   |
-| `rule ast`       | The `file` and its `program`.                                                                                                                      |
-| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                            |
+| Command          | Document                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`.           |
+| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, decisions record, and fix history of the prompt. |
+| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                             |
+| `rule ast`       | The `file` and its `program`.                                                                                                                                |
+| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                                      |
 
 Each finding keeps its `id`, `integration`, `title`, `currentState`, and `goal`, and its `notes`
 and `reference` when it has them. The `setup` of `update` is `null` in a project that has no

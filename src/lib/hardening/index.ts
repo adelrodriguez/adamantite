@@ -1,4 +1,5 @@
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
@@ -7,11 +8,23 @@ import * as Schema from "effect/Schema"
 import type * as Project from "#lib/project/index.ts"
 import { AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import {
+  type Decision,
+  DecisionsRecord,
+  findCoveringSession,
+  readDecisionsRecord,
+} from "#lib/hardening/decisions-record.ts"
+import {
   getEnforcementLadder,
   getHardenPromptTemplate,
 } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/hardening/overrides.ts"
-import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
+import {
+  listProjectFiles,
+  ProjectPath,
+  readHead,
+  readMergeBase,
+  toProjectPath,
+} from "#lib/hardening/project-files.ts"
 import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
 import { skillFolders } from "#lib/integrations/agents/skill.ts"
 import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
@@ -45,6 +58,51 @@ function isDocumentation(file: string) {
 }
 
 /**
+ * The number of recent commits that the agent reads for fixed mistakes when `--commits` is not set
+ * and no session line gives a start.
+ */
+export const DEFAULT_FIX_HISTORY_COMMITS = 200
+
+/**
+ * The commits that the agent reads for fixed mistakes: a number of recent commits, or the commits
+ * after a boundary that a session line of the decisions record gives.
+ *
+ * The boundary is sound for this reason. A session line records `head`, the commit that the session
+ * read the history up to. The boundary is the common ancestor of `head` and the `HEAD` of this
+ * session, so it is an ancestor of `head`. A commit that the earlier session did not read is not
+ * reachable from `head`, so it is not reachable from the boundary either, and `git log
+ * <boundary>..HEAD` lists it. While `head` is still an ancestor of `HEAD`, the boundary is `head`
+ * and the range is exact. After a squash or a rebase of the branch of that session, the boundary is
+ * the point where the branch left, and the range lists some commits again. The range can read a
+ * commit twice, and it cannot skip one.
+ *
+ * The case also decides what the session line of this session records. A session that reads the
+ * default count or the commits after a boundary records the commit of `HEAD`, because it read the
+ * fix history up to that commit. A session that reads a requested count records no commit: the user
+ * chose how much to read, and the session can leave out older commits that no session read. Its
+ * line then gives later sessions no start, so they start at an earlier session line.
+ */
+const FixHistory = Schema.TaggedUnion({
+  /**
+   * The last `count` commits, where `count` is the default. No session line gave a start.
+   */
+  Last: { count: Schema.Int },
+  /**
+   * The last `count` commits, where `count` is the number that `--commits` gave.
+   */
+  Requested: { count: Schema.Int },
+  /**
+   * The commits after `boundary`, the common ancestor of `HEAD` and of `head`, the commit that the
+   * session of the date `session` recorded.
+   */
+  Since: { boundary: Schema.String, head: Schema.String, session: Schema.String },
+})
+
+type FixHistory = typeof FixHistory.Type
+
+const { Last, Requested, Since } = Data.taggedEnum<FixHistory>()
+
+/**
  * What a harden session starts from: the files that Adamantite found, and what it computed about
  * the rules. Paths are relative to the project root. `harden --json` prints it as this schema
  * encodes it.
@@ -54,15 +112,18 @@ export const HardenContext = Schema.Struct({
    * Which Markdown files each `AGENTS.md` reaches, or none when git cannot list them.
    */
   agentReach: Schema.OptionFromNullOr(AgentReach),
-  /**
-   * The number of recent commits that the agent reads for fixed mistakes.
-   */
-  commits: Schema.Int,
   configs: Schema.Array(ProjectPath),
+  decisionsRecord: DecisionsRecord,
   /**
    * The Markdown files of the project, or none when git cannot list them.
    */
   documentationFiles: Schema.OptionFromNullOr(Schema.Array(Schema.String)),
+  fixHistory: FixHistory,
+  /**
+   * The commit that `HEAD` names, or none when git cannot name it. The session line that the prompt
+   * gives the agent records it.
+   */
+  head: Schema.OptionFromNullOr(Schema.String),
   instructionFiles: Schema.Array(Schema.String),
   /**
    * The trial of each override that turns a rule off.
@@ -198,22 +259,56 @@ export const readHardenReach = Effect.fn("readHardenReach")(function* (
 })
 
 /**
+ * Chooses the commits that the agent reads for fixed mistakes. `commits` is the value of
+ * `--commits`, which wins. Without it, the fix history starts after the common ancestor of `HEAD`
+ * and the commit of the last session line that covers `scope`. It is the last
+ * `DEFAULT_FIX_HISTORY_COMMITS` commits when no session line covers the scope, when the line
+ * records no commit, or when git gives no common ancestor, such as for a commit that this
+ * repository does not have.
+ */
+const readFixHistory = Effect.fn("readFixHistory")(function* (
+  cwd: string,
+  commits: Option.Option<number>,
+  record: DecisionsRecord,
+  scope: ProjectPath | null
+) {
+  if (Option.isSome(commits)) {
+    return Requested({ count: commits.value })
+  }
+
+  const covering = findCoveringSession(record, scope)
+
+  if (Option.isNone(covering)) {
+    return Last({ count: DEFAULT_FIX_HISTORY_COMMITS })
+  }
+
+  const { head, session } = covering.value
+
+  return Option.match(yield* readMergeBase(cwd, head), {
+    onNone: () => Last({ count: DEFAULT_FIX_HISTORY_COMMITS }),
+    onSome: (boundary) => Since({ boundary, head, session }),
+  })
+})
+
+/**
  * Reads the harden context of the root and each workspace package of `workspace`. A `scope` keeps
  * the packages inside that folder, or the package that contains it. The context keeps the configs
  * that lint those packages, an ancestor config included, and the rules folders that those configs
  * load, also when they are outside the scope. A scope also keeps the Markdown files outside each
- * workspace package, because the root documentation applies to every package. `commits` is the
- * number of recent commits that the agent reads for fixed mistakes.
+ * workspace package, because the root documentation applies to every package. The project has one
+ * decisions record, and a scope leaves out its decisions of other folders. `commits` is the value
+ * of `--commits`, which `readFixHistory` takes.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
   workspace: Project.Workspace,
   scope: string,
-  commits: number
+  commits: Option.Option<number>
 ) {
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
   const { packageDirectories, selectedPackages } = selectPackages(path, cwd, workspace, scope)
+  const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
 
   // The root instructions apply to every package, so a scope keeps them.
   const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
@@ -221,19 +316,25 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   )
 
   // Git lists the Markdown files while discovery reads the workspace packages.
-  const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation] = yield* Effect.all(
-    [
-      discoverCustomRules(cwd, packageDirectories, selectedPackages),
-      Effect.filter(instructionCandidates, (file) => checkExists(file), {
-        concurrency: "unbounded",
-      }),
-      readScopedDocumentation(cwd, workspace, scope),
-    ],
-    { concurrency: "unbounded" }
-  )
+  const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation, decisionsRecord] =
+    yield* Effect.all(
+      [
+        discoverCustomRules(cwd, packageDirectories, selectedPackages),
+        Effect.filter(instructionCandidates, (file) => checkExists(file), {
+          concurrency: "unbounded",
+        }),
+        readScopedDocumentation(cwd, workspace, scope),
+        readDecisionsRecord(cwd, projectScope),
+      ],
+      { concurrency: "unbounded" }
+    )
 
   const projectConfigs = configs.map((config) => toProjectPath(path, cwd, config))
-  const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
+
+  const [head, fixHistory] = yield* Effect.all(
+    [readHead(cwd), readFixHistory(cwd, commits, decisionsRecord, projectScope)],
+    { concurrency: "unbounded" }
+  )
 
   // These reads change no file in the project, so they run together.
   const [overrides, suppressions] = yield* Effect.all(
@@ -246,9 +347,11 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
 
   return {
     agentReach: documentation.agentReach,
-    commits,
     configs: projectConfigs,
+    decisionsRecord,
     documentationFiles: documentation.documentationFiles,
+    fixHistory,
+    head,
     instructionFiles: instructionFiles.map((file) => relative(file)),
     overrides,
     rulesFolders: Array.sort(Array.dedupe(calls.map((call) => relative(call.dir))), Order.String),
@@ -386,19 +489,171 @@ function renderOverrides(report: OverridesReport) {
 }
 
 /**
- * The number of recent commits that the agent reads for fixed mistakes when `--commits` is not set.
+ * What comes before the reason of a decision: the user gave a reason for a candidate, and made a
+ * choice for an item of the Decisions list.
  */
-export const DEFAULT_FIX_HISTORY_COMMITS = 200
+const REASON_LABELS = {
+  decided: "Choice",
+  deferred: "Reason",
+  rejected: "Reason",
+} as const satisfies Record<Decision["decision"], string>
+
+/**
+ * Ends `text` as a sentence, without a second period.
+ */
+function endSentence(text: string) {
+  return /[!.?]$/u.test(text) ? text : `${text}.`
+}
+
+/**
+ * One decision as one list item, with only the parts that its line has: the `id`, the decision and
+ * its date, the scope, the standard, the reason, the proposed rule, and after `Then` what the
+ * session counted.
+ */
+function renderDecision(decision: Decision) {
+  const evidence = Array.getSomes([
+    Option.map(decision.follow, (count) => `${count} follow`),
+    Option.map(decision.break, (count) => `${count} break`),
+    decision.fixes.pipe(
+      Option.filter((fixes) => fixes.length > 0),
+      Option.map((fixes) => `fixes ${fixes.join(", ")}`)
+    ),
+  ])
+
+  const scope = Option.match(decision.scope, {
+    onNone: () => "",
+    onSome: (folder) => `, in \`${folder}\``,
+  })
+
+  return [
+    `- \`${decision.id}\`, ${decision.decision} ${decision.at}${scope}: ${endSentence(decision.standard)}`,
+    ...Array.getSomes([
+      Option.map(
+        decision.reason,
+        (reason) => `${REASON_LABELS[decision.decision]}: ${endSentence(reason)}`
+      ),
+      Option.map(decision.rule, (rule) => `Proposed: \`${rule}\`.`),
+      Option.liftPredicate(`Then: ${evidence.join(", ")}.`, () => evidence.length > 0),
+    ]),
+  ].join(" ")
+}
+
+/**
+ * The "Decisions" section: the decisions that the record holds for the scope of the session, and
+ * the lines that do not decode. The agent works from this text and does not read the file. The
+ * section shows no session line, because the fix history carries the one fact that they give.
+ */
+function renderDecisionsRecord(record: DecisionsRecord, scope: HardenContext["scope"]) {
+  const name = `The decisions record is \`${record.path}\`.`
+
+  return DecisionsRecord.match(record, {
+    Missing: () =>
+      `${name} It does not exist yet, so no earlier session recorded a decision. Step 8 creates it with the first line.`,
+    Present: ({ decisions, undecodableLines }) => {
+      const folder = scope === null ? "" : ` for \`${scope}\``
+
+      const held =
+        decisions.length === 0
+          ? `It holds no decision${folder}.`
+          : [
+              `It holds these decisions${folder}${scope === null ? "" : ", without the decisions of other folders"}. After \`Then\`, a line gives what the session of that date counted: the places that follow and break the standard, and its fix commits.`,
+              "",
+              ...decisions.map((decision) => renderDecision(decision)),
+            ].join("\n")
+
+      const undecodable =
+        undecodableLines.length === 0
+          ? []
+          : [
+              [
+                "Adamantite could not decode these lines of the record, and left them out. Repair each one when you append to the record in step 8.",
+                "",
+                ...undecodableLines.map(({ issue, line }) => `- Line ${line}: ${issue}`),
+              ].join("\n"),
+            ]
+
+      return [`${name} ${held}`, ...undecodable].join("\n\n")
+    },
+  })
+}
+
+/**
+ * The line that step 8 gives the agent to copy, with each key of a line once. It has the date of
+ * today and the scope of this session, so the agent computes neither.
+ */
+function renderDecisionExample(today: string, scope: HardenContext["scope"]) {
+  const scopeKey = scope === null ? "" : `"scope":${JSON.stringify(scope)},`
+
+  return `{"id":"default-exports","at":"${today}","standard":"Modules have no default export","decision":"rejected","reason":"The router loads each page by its default export","rule":"import/no-default-export",${scopeKey}"follow":41,"break":7,"fixes":["1a2b3c4"]}`
+}
+
+/**
+ * The session line that step 8 gives the agent to copy: the date of today, the commit that this
+ * session read the fix history up to, and the scope of this session, so the agent computes nothing.
+ * The line has no commit when git cannot name `HEAD`, and when the session reads a requested number
+ * of commits, as the `FixHistory` cases say.
+ */
+function renderSessionLine(today: string, context: HardenContext) {
+  const head = FixHistory.match(context.fixHistory, {
+    Last: () => context.head,
+    Requested: () => Option.none(),
+    Since: () => context.head,
+  }).pipe(
+    Option.match({
+      onNone: () => "",
+      onSome: (commit) => `,"head":"${commit}"`,
+    })
+  )
+
+  const scope = context.scope === null ? "" : `,"scope":${JSON.stringify(context.scope)}`
+
+  return `{"session":"${today}"${head}${scope}}`
+}
+
+/**
+ * The commits that step 4 reads, as the text before the command and the `git log` command. The
+ * command keeps the history to the folder that the session surveys.
+ */
+function renderFixHistory(history: FixHistory, scope: HardenContext["scope"]) {
+  // `.` keeps the history to the project folder when the project is a folder of a larger
+  // repository.
+  const folder = quoteShellArgument(scope ?? ".")
+
+  const command = (range: string) =>
+    `\`git log ${range} --no-merges --format="%h %s" -- ${folder}\``
+
+  // The agent reads a default count and a requested count in the same way.
+  const renderLast = ({ count }: { readonly count: number }) =>
+    [
+      "Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.",
+      "",
+      command(`-n ${count}`),
+    ].join("\n")
+
+  return FixHistory.match(history, {
+    Last: renderLast,
+    Requested: renderLast,
+    Since: ({ boundary, head, session }) =>
+      [
+        `A session on ${session} read the fix history of ${scope === null ? "the project" : `\`${scope}\``} up to commit \`${head}\`. Run this command from the project root, and read the commits that it lists: the commits since commit \`${boundary}\`, the common ancestor of that commit and \`HEAD\`. When it lists no commit, record that the history has no commit after that session, and continue with step 5. To read older history, the user runs \`adamantite harden --commits <number>\`.`,
+        "",
+        command(`${boundary}..HEAD`),
+      ].join("\n"),
+  })
+}
 
 /**
  * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
  * files, the facts that Adamantite computes, and the commands. The shipped skill holds the
- * enforcement ladder, and `harden-prompt.md` holds the rest.
+ * enforcement ladder, and `harden-prompt.md` holds the rest. `today` is the date of the session as
+ * `YYYY-MM-DD`, which step 8 gives the agent for each line that it appends to the decisions
+ * record.
  */
-export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
-  // `.` keeps the history to the project folder when the project is a folder of a larger repository.
-  const fixHistoryPath = quoteShellArgument(context.scope ?? ".")
-
+export function renderHardenPrompt(
+  context: HardenContext,
+  adamantiteVersion: string,
+  today: string
+): string {
   return fillTemplate(hardenPromptTemplate, {
     agentReach: Option.match(context.agentReach, {
       onNone: () =>
@@ -410,12 +665,22 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
       "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 9."
     ),
     customRulesSection: CUSTOM_RULES_SECTION,
+    decisionExample: renderDecisionExample(today, context.scope),
+    decisionScope:
+      context.scope === null
+        ? "A line of this session has no `scope`, because this session covers the whole project."
+        : `A line of this session has \`"scope":${JSON.stringify(context.scope)}\`, the folder of this session.`,
+    decisionsCovered:
+      context.scope === null
+        ? "This session covers each decision that the section shows."
+        : `This session covers a decision in \`${context.scope}\` or in a folder inside it.`,
+    decisionsRecord: renderDecisionsRecord(context.decisionsRecord, context.scope),
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
         "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, changelogs, and agent skill folders such as `.agents/skills`. Record the search scope and report this fallback with the missing sources.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
-    fixHistoryCommand: `\`git log -n ${context.commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,
+    fixHistory: renderFixHistory(context.fixHistory, context.scope),
     instructionFiles: renderList(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."
@@ -427,7 +692,9 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
       context.scope === null
         ? "Adamantite found these files in the project and its workspace packages. Paths are relative to the project root."
         : `Adamantite found these files for \`${context.scope}\`, the folder that \`--path\` selects. Survey only the code in this folder. Paths are relative to the project root.`,
+    sessionLine: renderSessionLine(today, context),
     suppressions: renderSuppressions(context.suppressions),
+    today,
     version: adamantiteVersion,
   })
 }

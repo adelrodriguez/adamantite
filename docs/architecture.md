@@ -143,7 +143,7 @@ package checks that several tools share. Helper modules beside an integration, s
 also have command builders in `command.ts`, which return `CommandRunOptions` and start no process.
 The builders stay out of the `Integration`, and the bridge and `setup` import each `command.ts`
 directly. The Oxlint integration and the Oxlint entry use one Oxlint runtime resolver, and
-`hardening` starts the Oxlint entry through `oxlint/entry.ts` to capture the lint output.
+`hardening` starts Oxlint through `oxlint/entry.ts` to capture the lint output.
 
 The editor integrations select the installed Effect language server when `@effect/tsgo` is
 present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the
@@ -318,9 +318,10 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
 
 ## Command boundaries
 
-- `check` and `fix` call the bridge to run Oxfmt and Oxlint. The bridge starts Oxlint through
-  the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
-  `check` fails on Oxlint warnings unless `--allow-warnings` is set.
+- `check` and `fix` call the bridge to run Oxfmt and Oxlint. The bridge resolves the project's
+  Oxlint runtime and starts Oxlint's own CLI module with `node`, so Oxlint runs with that runtime
+  and no second process loads Effect. `check` fails on Oxlint warnings unless `--allow-warnings`
+  is set.
 - `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
   `quality/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
@@ -332,9 +333,11 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   one stage.
 - `check`, `fix`, and `analyze` read the lockfile selection and pass it to the bridge. When a tool
   is not on `PATH` and no selected script runs it, the bridge replaces `CliNotFound` with
-  `ToolNotSelected`, which names the `init` command that adds the script. The Oxlint entry reads
-  the selection and replaces `PackageNotInstalled` for Oxlint the same way. Without a lockfile, or
-  for a selected tool, the failure of the tool stands.
+  `ToolNotSelected`, which names the `init` command that adds the script. `resolveOxlintLaunch`
+  in `oxlint/entry.ts` reads the selection and replaces `PackageNotInstalled` for Oxlint the same
+  way, for the bridge and for the Oxlint entry. The step that starts Oxlint resolves it, so a
+  missing Oxlint fails only the lint stage. Without a lockfile, or for a selected tool, the failure
+  of the tool stands.
 - `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
   runs `applySetup`, as "Setup and the write rule" describes. `init --json` takes the selection
   from the flags and asks nothing. When the selection includes coding agents, the `agents`
@@ -473,8 +476,11 @@ the Effect plugin replaces native parts, so no two overrides replace one part. A
 replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
 launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
-runs stock Oxlint. Only the entry `src/oxlint/index.ts` sets the variables and loads the CLI. A
-binding override names a preload module and its variables. The Effect plugin names
+runs stock Oxlint. `toLaunch` turns the runtime into an `OxlintLaunch`: the variables, the
+preload module, and Oxlint's CLI module. The CLI starts Oxlint's CLI module with the variables and
+passes the preload module to `node --import`. The entry `src/oxlint/index.ts`, which editors start,
+sets the variables and loads both modules in its own process. A binding override names a preload
+module and its variables. The Effect plugin names
 `@effect/tsgo/oxlint-bridge`, which swaps the installed `@oxlint/binding-*` file for the Effect build
 through `process.dlopen`, so every other napi-rs binding, such as `oxc-resolver` in a JavaScript
 plugin, loads unchanged.
@@ -548,7 +554,7 @@ Oxlint run. The fixtures stay below `src/`: below `presets/`, the published `pre
 would include them, and the Oxlint type check of `presets/analyze.ts` reports each file of that
 project, also a file that `ignorePatterns` ignores. Each fixture file holds one case. The namespace folder, such as `quality`, lets one
 preset hold fixtures for several plugins. The harness in `presets/__tests__/rule-fixtures.ts`
-starts the Oxlint entry `src/oxlint/index.ts`, as `adamantite check` does, so the effect preset loads the
+starts the Oxlint entry `src/oxlint/index.ts`, as editors do, so the effect preset loads the
 Effect build of Oxlint.
 
 A valid fixture is code that a target project can keep. `presets/__tests__/stacks.ts` lists the

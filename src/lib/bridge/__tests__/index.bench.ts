@@ -33,7 +33,7 @@ import * as Schema from "effect/Schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
-import { OXLINT_ENTRY_FILE, PROJECT_VARIABLE } from "#lib/integrations/oxlint/entry.ts"
+import { OXLINT_ENTRY_FILE } from "#lib/integrations/oxlint/entry.ts"
 import { resolveOxlintRuntime, StockPart, toBackendEnv } from "#lib/integrations/oxlint/runtime.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { linkFixturePackages } from "#presets/__tests__/fixture-packages.ts"
@@ -349,9 +349,7 @@ function validateLint(project: TargetProject, command: Command, files: readonly 
   const canary = files.length === 0
   const expected = canary ? countProjectFiles(project) - JSON_FILES.length : files.length
 
-  const env = direct
-    ? { ...project.env, ...project.oxlintEnv }
-    : { ...project.env, [PROJECT_VARIABLE]: project.root }
+  const env = direct ? { ...project.env, ...project.oxlintEnv } : project.env
 
   if (canary) {
     writeFileSync(join(project.root, CANARY.file), CANARY.source)

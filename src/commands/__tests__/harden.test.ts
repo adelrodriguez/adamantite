@@ -7,7 +7,6 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
-import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
@@ -21,6 +20,7 @@ import {
   makeLockfileFile,
   promptingLayer,
   nonProbeInvocations,
+  OXLINT_COMMAND,
   runCommand,
   SKILL_FILES,
 } from "#__tests__/command-test-helpers.ts"
@@ -30,12 +30,9 @@ import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import hardenCommand, { Report } from "#commands/harden.ts"
 import { LintedOverrides } from "#lib/hardening/overrides.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
-import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
-
-const OXLINT = Effect.runSync(getOxlintCommand("/project").pipe(Effect.provide(Path.layer)))
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -182,8 +179,10 @@ const ADAMANTITE_MODULE = {
 }
 
 // Node.js resolves `adamantite/lint` to this file, as Oxlint loads the preset.
-const ADAMANTITE_RESOLUTION = {
+// The project installs Oxlint, which Harden runs to list and probe the files.
+const PROJECT_RESOLUTIONS = {
   "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
+  "oxlint/package.json": "node_modules/oxlint/package.json",
 }
 
 // The lockfile of a project that init set up with nothing selected, so Doctor reports no missing
@@ -300,8 +299,8 @@ function makeProcessLayer(
 
       if (
         ChildProcess.isStandardCommand(command)
-        && command.command === OXLINT.command
-        && command.args[0] === OXLINT.args[0]
+        && command.command === OXLINT_COMMAND.command
+        && command.args[0] === OXLINT_COMMAND.args[0]
         && command.args.includes("--debug=files")
       ) {
         return Effect.succeed(
@@ -311,8 +310,8 @@ function makeProcessLayer(
 
       if (
         ChildProcess.isStandardCommand(command)
-        && command.command === OXLINT.command
-        && command.args[0] === OXLINT.args[0]
+        && command.command === OXLINT_COMMAND.command
+        && command.args[0] === OXLINT_COMMAND.args[0]
         && command.args.includes("--disable-nested-config")
       ) {
         return Effect.succeed(makeHandle(0, probeReport))
@@ -342,7 +341,7 @@ function runHarden(
         makeProcessLayer(context, processes),
         makeModuleResolverLayer(context.root, {
           "@acme/lint": "tooling/lint/index.ts",
-          ...ADAMANTITE_RESOLUTION,
+          ...PROJECT_RESOLUTIONS,
         }),
       ],
       logLines,
@@ -391,6 +390,10 @@ interface InteractiveHardenOptions {
    * Codex`, `Copy the agent prompt`, and `Finish without an agent`, with the cursor on the first.
    */
   readonly keys: readonly TestKey[]
+  /**
+   * The modules that the project resolves. Defaults to `PROJECT_RESOLUTIONS`.
+   */
+  readonly resolutions?: Readonly<Record<string, string>>
   readonly runner?: Parameters<typeof makeHandoffRunner>[0]
 }
 
@@ -427,7 +430,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
         runner.layer,
         promptingLayer,
         makeProcessLayer(files),
-        makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
+        makeModuleResolverLayer(files.root, options.resolutions ?? PROJECT_RESOLUTIONS),
       ],
       logLines,
       terminal,
@@ -466,6 +469,7 @@ function runHardenHoisted() {
         makeProcessLayer(context),
         makeModuleResolverLayer(context.root, {
           "adamantite/lint": "../node_modules/adamantite/dist/presets/lint/core.js",
+          "oxlint/package.json": "node_modules/oxlint/package.json",
         }),
       ],
       logLines,
@@ -1355,8 +1359,8 @@ describe("harden", () => {
         }),
         expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
         expect.objectContaining({
-          ...OXLINT,
-          args: [...OXLINT.args, "--deny-warnings"],
+          ...OXLINT_COMMAND,
+          args: [...OXLINT_COMMAND.args, "--deny-warnings"],
         }),
       ])
       expect(logLines).toStrictEqual([
@@ -1455,6 +1459,42 @@ describe("harden", () => {
         "⚠️ Harden found issues.",
       ])
     })
+  )
+
+  // The CLI finds the Oxlint runtime before it starts Oxlint, so a missing Oxlint fails check with
+  // an error and no Oxlint output. Harden still runs Doctor and reports both.
+  it.effect(
+    "name the repair and still run Doctor when check cannot find Oxlint after the session",
+    () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runInteractiveHarden({
+          // Knip is installed without its managed config, so Doctor reports one finding.
+          files: {
+            ...ADAMANTITE_MODULE,
+            ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
+            ...SKILL_FILES,
+            "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
+            "package.json": manifest({
+              devDependencies: { adamantite: "1.0.0", knip: knip.version },
+              scripts: { analyze: "adamantite analyze" },
+            }),
+          },
+          keys: ["enter", "n"],
+          resolutions: { "adamantite/lint": PROJECT_RESOLUTIONS["adamantite/lint"] },
+        })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(logLines).toStrictEqual([
+          "💠 adamantite harden",
+          "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+          "✨ Checking formatting · adamantite (oxfmt)",
+          "✖ The lockfile selects no script that runs `oxlint`, so `oxlint` is not installed. Run `adamantite init --non-interactive --script check` to add the script and install it.",
+          "✖ `adamantite check` failed.",
+          "▲ 1 finding remains after the Claude Code session.",
+          expect.stringMatching(/^\n1\. Missing knip configuration\n {2}Current state\n/u),
+          "⚠️ Harden found issues.",
+        ])
+      })
   )
 
   it.effect("fail and show the findings when Doctor finds issues after the session", () =>

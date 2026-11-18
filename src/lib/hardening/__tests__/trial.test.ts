@@ -22,6 +22,7 @@ import {
   tryRule,
 } from "#lib/hardening/trial.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { InvalidTrialCase } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
@@ -30,19 +31,18 @@ const RULES_MODULE = join(REPO_ROOT, "presets/rules/plugin.ts")
 
 // Oxlint uses the backend in `OXLINT_TSGOLINT_PATH` before it looks in `node_modules/.bin` or on
 // `PATH`, and `pnpm test` puts the repository's launcher on `PATH`. A trial gets a path that does
-// not exist, so only a launcher that the test project installs can start the backend. The entry
-// removes the variable when it finds that launcher.
+// not exist, so only a launcher that the test project installs can start the backend. The launch of
+// a project that installs a launcher removes the variable, so its variables go after the path.
 const MISSING_BACKEND = join(REPO_ROOT, "missing-tsrs-lint")
 
-// The build writes the Oxlint entry beside the CLI, so a run from source starts its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
+  ModuleResolver.layer,
   Layer.succeed(OxlintCommand)((project) =>
     getOxlintCommand(project).pipe(
       Effect.map((command) => ({
         ...command,
-        args: [join(REPO_ROOT, "src/oxlint/index.ts")],
-        env: { ...command.env, OXLINT_TSGOLINT_PATH: MISSING_BACKEND },
+        env: { OXLINT_TSGOLINT_PATH: MISSING_BACKEND, ...command.env },
       }))
     )
   )

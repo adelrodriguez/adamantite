@@ -57,17 +57,24 @@ export class ReplacedBackend extends Data.TaggedClass("Replaced")<{
 type RuntimeBackend = NoBackend | ReplacedBackend | TsrsBackend
 
 /**
- * The variables that make Oxlint start the backend on `platform`.
+ * The variables that make Oxlint start the backend on `platform`. A variable without a value is
+ * removed from the environment.
  */
-export function toBackendEnv(backend: RuntimeBackend, platform = process.platform) {
+export function toBackendEnv(
+  backend: RuntimeBackend,
+  platform = process.platform
+): Readonly<Record<string, string | undefined>> {
   return Match.valueTags(backend, {
     None: () => ({}),
     Replaced: ({ env }) => env,
     // Oxlint 1.92 and later find the launcher with the same search as `findLauncher`, and start it
     // as `<path> headless`. Only when that search finds nothing does Oxlint also look on `PATH`.
     // The `tsrs-lint` bin adds the `--lint` flag of tsrs. Windows still names the launcher, because
-    // no Windows run has confirmed that search.
-    Tsrs: ({ launcher }) => (platform === "win32" ? { OXLINT_TSGOLINT_PATH: launcher } : {}),
+    // no Windows run has confirmed that search. Elsewhere, the tsrs backend owns the variable, so an
+    // inherited path, such as one to an old tsgolint, must not win over that search.
+    Tsrs: ({ launcher }) => ({
+      OXLINT_TSGOLINT_PATH: platform === "win32" ? launcher : undefined,
+    }),
   })
 }
 
@@ -83,6 +90,41 @@ export interface OxlintRuntime {
    */
   readonly oxlint: string
 }
+
+/**
+ * How a process starts Oxlint with a runtime: the variables to set, or to remove when a value is
+ * undefined, the module to load before Oxlint, and the CLI module of Oxlint.
+ */
+export interface OxlintLaunch {
+  readonly cli: string
+  readonly env: Readonly<Record<string, string | undefined>>
+  /**
+   * The preload module of a plugin, which swaps the stock binding for the plugin's build when
+   * Oxlint loads it.
+   */
+  readonly preload: Option.Option<string>
+}
+
+/**
+ * How a process starts Oxlint with `runtime` on `platform`.
+ */
+export const toLaunch = Effect.fn("toLaunch")(function* (
+  { backend, binding, oxlint }: OxlintRuntime,
+  platform: NodeJS.Platform = process.platform
+) {
+  const path = yield* Path.Path
+  const cli = path.join(oxlint, "dist", "cli.js")
+  const backendEnv = toBackendEnv(backend, platform)
+
+  return Match.valueTags(binding, {
+    Replaced: ({ env, preload }) => ({
+      cli,
+      env: { ...backendEnv, ...env },
+      preload: Option.some(preload),
+    }),
+    Stock: () => ({ cli, env: backendEnv, preload: Option.none<string>() }),
+  }) satisfies OxlintLaunch
+})
 
 /**
  * The nearest `tsrs-lint` launcher in a `node_modules/.bin` folder from `project` up to the root,

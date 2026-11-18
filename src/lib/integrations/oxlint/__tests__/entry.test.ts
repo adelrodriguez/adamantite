@@ -1,9 +1,30 @@
-import * as NodePath from "@effect/platform-node/NodePath"
+import type * as Layer from "effect/Layer"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as Path from "effect/Path"
+import type { ModuleResolver } from "#lib/project/module-resolver.ts"
+import {
+  makeLockfileFile,
+  OXLINT_COMMAND,
+  oxlintInstalledLayer,
+} from "#__tests__/command-test-helpers.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeSelection } from "#__tests__/lifecycle.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { getOxlintCommand, getProjectDirectory } from "#lib/integrations/oxlint/entry.ts"
+import { ToolNotSelected } from "#lib/shared/errors.ts"
 
 const CWD = "/somewhere/else"
+
+/**
+ * The Oxlint command of the project at `/project`, with `files` and the packages that `resolver`
+ * finds.
+ */
+function runIn(files: Readonly<Record<string, string>>, resolver: Layer.Layer<ModuleResolver>) {
+  return getOxlintCommand("/project").pipe(
+    Effect.provide([createFileSystemTestContext({ files }).layer, Path.layer, resolver])
+  )
+}
 
 describe("oxlint-entry", () => {
   describe("getProjectDirectory", () => {
@@ -34,32 +55,31 @@ describe("oxlint-entry", () => {
       ).toBe("C:\\project")
     })
 
-    it("take the project that a command names, also for an entry in a package runner cache", () => {
-      expect(
-        getProjectDirectory(
-          "/home/user/.npm/_npx/1a2b/node_modules/adamantite/dist/oxlint.js",
-          CWD,
-          "/project"
-        )
-      ).toBe("/project")
-    })
-
     it("take the working directory for an entry outside node_modules", () => {
       expect(getProjectDirectory("/adamantite/src/oxlint/index.ts", CWD)).toBe(CWD)
     })
   })
 
   describe("getOxlintCommand", () => {
-    it.effect("start the entry beside the CLI module with Node.js, and name the project", () =>
+    it.effect("start Oxlint's CLI module of the project with Node.js", () =>
       Effect.gen(function* () {
-        expect(yield* getOxlintCommand("/project")).toStrictEqual({
-          args: [expect.stringMatching(/[/\\]oxlint\.js$/u)],
-          command: "node",
-          cwd: "/project",
-          env: { ADAMANTITE_PROJECT: "/project" },
-          name: "oxlint",
+        expect(yield* runIn({}, oxlintInstalledLayer)).toStrictEqual(OXLINT_COMMAND)
+      })
+    )
+
+    it.effect(
+      "name the init command when Oxlint is missing and the lockfile selects no script that runs it",
+      () =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(
+            runIn(
+              makeLockfileFile(makeSelection({ scripts: ["analyze"] })),
+              makeModuleResolverLayer("/project")
+            )
+          )
+
+          expect(error).toStrictEqual(new ToolNotSelected({ script: "check", tool: "oxlint" }))
         })
-      }).pipe(Effect.provide(NodePath.layer))
     )
   })
 })

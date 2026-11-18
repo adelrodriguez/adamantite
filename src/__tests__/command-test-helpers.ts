@@ -102,6 +102,26 @@ export interface RunnerTestContext {
   readonly layer: Layer.Layer<CodingAgents | CommandRunner>
 }
 
+/**
+ * The command that runs Oxlint in a test project that installs Oxlint with no plugin and no
+ * type-aware backend.
+ */
+export const OXLINT_COMMAND = {
+  args: ["/project/node_modules/oxlint/dist/cli.js"],
+  command: "node",
+  cwd: "/project",
+  env: {},
+  name: "oxlint",
+} as const
+
+/**
+ * Finds the Oxlint package of the test project, so a command that runs Oxlint resolves the runtime
+ * of `OXLINT_COMMAND`.
+ */
+export const oxlintInstalledLayer = makeModuleResolverLayer("/project", {
+  "oxlint/package.json": "node_modules/oxlint/package.json",
+})
+
 // A layer's output type is contravariant, so `never` accepts every layer that does not fail.
 // `runCommand` provides the filesystem of the test to each one.
 type TestLayer = Layer.Layer<never, never, FileSystem.FileSystem | Path.Path>

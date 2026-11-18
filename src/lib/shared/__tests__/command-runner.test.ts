@@ -17,7 +17,7 @@ import {
   type CommandRunOptions,
   type OutputSink,
 } from "#lib/shared/command-runner.ts"
-import { CommandFailed } from "#lib/shared/errors.ts"
+import { CommandFailed, PackageNotInstalled } from "#lib/shared/errors.ts"
 
 function toStream(text: string | undefined) {
   return text === undefined ? Stream.empty : Stream.succeed(new TextEncoder().encode(text))
@@ -51,6 +51,14 @@ function makeSpawnerLayer(
     })
   )
 }
+
+const FORMAT = Effect.succeed<CommandRunOptions>({ args: [], command: "oxfmt", title: "Format" })
+const LINT = Effect.succeed<CommandRunOptions>({ args: [], command: "oxlint", title: "Lint" })
+
+/**
+ * A step that finds no command, as the Oxlint step does in a project without Oxlint.
+ */
+const MISSING = new PackageNotInstalled({ packageName: "oxlint", project: "/project" })
 
 describe("CommandRunner", () => {
   it.effect("keep a child that reads the terminal in this process group", () =>
@@ -151,10 +159,7 @@ describe("CommandRunner", () => {
     const print = (output: OutputSink, stream: "stderr" | "stdout", text: string) =>
       output({ bytes: encoder.encode(text), stream })
 
-    const steps: CommandRunOptions[] = [
-      { args: [], command: "oxfmt", title: "Format" },
-      { args: [], command: "oxlint", title: "Lint" },
-    ]
+    const steps = [FORMAT, LINT]
 
     it.effect("start every step at once, and print each section in the order of the steps", () =>
       Effect.gen(function* () {
@@ -218,6 +223,35 @@ describe("CommandRunner", () => {
       })
     )
 
+    it.effect("start only the steps that find a command, and keep each failure in step order", () =>
+      Effect.gen(function* () {
+        const terminal = makeTerminal()
+        const started: string[] = []
+
+        const runner = CommandRunner.make((options) =>
+          Effect.sync(() => {
+            started.push(options.command)
+
+            return ChildProcessSpawner.ExitCode(1)
+          })
+        )
+
+        const error = yield* Effect.flip(
+          runner
+            .runConcurrently([Effect.fail(MISSING), FORMAT])
+            .pipe(Effect.provide(terminal.layer))
+        )
+
+        const logs = yield* TestConsole.logLines.pipe(Effect.provide(terminal.layer))
+
+        expect({ error, logs, started }).toStrictEqual({
+          error: MISSING,
+          logs: ["Format · adamantite (oxfmt)"],
+          started: ["oxfmt"],
+        })
+      })
+    )
+
     it.effect.each([
       { canColor: true, env: { FORCE_COLOR: "1" } },
       { canColor: false, env: undefined },
@@ -244,6 +278,31 @@ describe("CommandRunner", () => {
         )
 
         expect(seen).toStrictEqual([env])
+      })
+    )
+  })
+
+  describe("a step that finds no command", () => {
+    it.effect.each([
+      { method: "runAll", started: ["oxfmt"] },
+      { method: "runUntilFailure", started: [] },
+    ] as const)("$method fails with the failure of the step", ({ method, started }) =>
+      Effect.gen(function* () {
+        const seen: string[] = []
+
+        const runner = CommandRunner.make((options) =>
+          Effect.sync(() => {
+            seen.push(options.command)
+
+            return ChildProcessSpawner.ExitCode(0)
+          })
+        )
+
+        const error = yield* Effect.flip(
+          runner[method]([Effect.fail(MISSING), FORMAT]).pipe(Effect.provide(TestConsole.layer))
+        )
+
+        expect({ error, started: seen }).toStrictEqual({ error: MISSING, started })
       })
     )
   })

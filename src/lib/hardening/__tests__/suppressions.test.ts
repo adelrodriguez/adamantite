@@ -10,9 +10,8 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions } from "#lib/hardening/suppressions.ts"
-import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
 
@@ -25,15 +24,10 @@ const TEST_OXLINT =
     ? join(REPO_ROOT, "node_modules/oxlint")
     : OXLINT_OVERRIDE
 
-// The build writes the Oxlint entry and the probe beside the CLI, so a run from source starts their
-// source.
+// The build writes the probe beside the CLI, so a run from source loads its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
-  Layer.succeed(OxlintCommand)((project) =>
-    getOxlintCommand(project).pipe(
-      Effect.map((command) => ({ ...command, args: [join(REPO_ROOT, "src/oxlint/index.ts")] }))
-    )
-  ),
+  ModuleResolver.layer,
   Layer.succeed(OxlintProbe)(new URL("../../../oxlint/probe.ts", import.meta.url))
 )
 

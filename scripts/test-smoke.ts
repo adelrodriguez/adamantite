@@ -635,14 +635,15 @@ try {
 
   // `adamantite/typescript` loads the type resets by a path inside the installed
   // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
-  // Outside Windows, the Oxlint entry sets no backend variable, so the lint error also proves that
+  // Outside Windows, the Oxlint launch sets no backend variable, so the lint error also proves that
   // Oxlint finds the `tsrs-lint` launcher of the real tsrs by itself.
   console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
 
   // The lint inherits a path to a missing backend, as a shell with an old tsgolint setup passes it.
-  // The entry removes it outside Windows, so Oxlint still finds the real `tsrs-lint`.
+  // The CLI removes it from Oxlint's environment outside Windows, so Oxlint still finds the real
+  // `tsrs-lint`.
   const staleBackendEnv = { ...fixtureEnv, OXLINT_TSGOLINT_PATH: join(fixture, "missing-tsgolint") }
 
   for (const [command, args, env] of [

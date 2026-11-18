@@ -5,14 +5,12 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type * as Project from "#lib/project/index.ts"
 import { lintFiles, resolveRule, listLintedFiles, splitRuleName } from "#lib/hardening/oxlint.ts"
 import { listIgnoredFiles, listProjectFiles } from "#lib/hardening/project-files.ts"
 import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
 import {
-  type CliNotFound,
   ProjectCopyFailed,
   InvalidTrialCase,
   TrialCaseIgnored,
@@ -456,13 +454,11 @@ export const tryRule = Effect.fn("tryRule")(
 
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
     // config can add a rule that the project config does not have.
-    const toRuleNotFound = (error: CliNotFound | TrialLintFailed) => {
+    const toRuleNotFound = (error: TrialLintFailed) => {
       const detail = [
         `Rule '${ruleName}' not found in plugin '${plugin}'`,
         `Plugin '${plugin}' not found`,
-      ].find(
-        (message) => Predicate.isTagged(error, "TrialLintFailed") && error.output.includes(message)
-      )
+      ].find((message) => error.output.includes(message))
 
       return Schema.is(ErrorSetting)(setting) && detail !== undefined
         ? new TrialRuleNotFound({ detail, rule })
@@ -558,7 +554,7 @@ export const tryRule = Effect.fn("tryRule")(
       const files = round.map((entry) => entry.case.path)
 
       const report = yield* lintFiles(copy, files).pipe(
-        Effect.mapError((error) => toRuleNotFound(error))
+        Effect.catchTag("TrialLintFailed", (error) => Effect.fail(toRuleNotFound(error)))
       )
 
       if (report.number_of_files < files.length) {

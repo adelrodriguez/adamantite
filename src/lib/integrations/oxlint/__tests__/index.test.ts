@@ -9,8 +9,6 @@ import * as Schema from "effect/Schema"
 import { findingsLeft, getFailure, makeLockfileFile } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection, runLifecycle } from "#__tests__/lifecycle.ts"
-import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import oxlint, { PACKAGE } from "#lib/integrations/oxlint/index.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import * as Project from "#lib/project/index.ts"
@@ -76,11 +74,6 @@ function assess(root: string) {
         NodeServices.layer,
         ModuleResolver.layer,
         ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
-        Layer.succeed(OxlintCommand)((project) =>
-          getOxlintCommand(project).pipe(
-            Effect.map((command) => ({ ...command, args: [join(REPO, "src/oxlint/index.ts")] }))
-          )
-        ),
       ])
     )
   )

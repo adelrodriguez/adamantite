@@ -8,7 +8,8 @@ standard of the project, run `adamantite harden`.
 
 ## Fix the code before a disable comment
 
-Skip this step when no lint rule reports the code.
+Follow this step only when you came to this guide before you add a disable comment. After a
+fix or a review correction, start at the next step.
 
 When a rule reports code that you wrote, fix the code. When a suppression is necessary, state
 after `--` why the rule does not apply, as
@@ -20,8 +21,8 @@ Before you add the comment, search the code for disable comments of the same rul
 the rule and the code disagree about a standard. That repeated suppression is the mistake for
 the steps below, so add no further comment.
 
-Stop when the code passes without a suppression, or when one suppression states a reason that
-no other comment gives. Continue when the repeated suppression is the mistake.
+The guide ends here when the code passes without a suppression, or when one suppression states
+a reason that no other comment gives. Continue when the repeated suppression is the mistake.
 
 ## Start with the mistake
 
@@ -42,8 +43,9 @@ note "none found", and one similar case that is correct.
 
 When a lint rule can report the mistake, run
 `adamantite rule try <rule> --current --report <case>` with the case that failed, as
-[Try a rule setting](lint-rules.md#try-a-rule-setting) says. Try each rule of the config that
-can report the mistake. When the config reports the case, a tool already holds the standard:
+[Try a rule setting](lint-rules.md#try-a-rule-setting) says. The project file already holds the
+fix, so give the code before the fix as `<path>=<file>`, with the file outside the project. Try
+each rule of the config that can report the mistake. When the config reports the case, a tool already holds the standard:
 fix the code, and stop. A repeated suppression is the exception, because its rule reports the
 code already.
 

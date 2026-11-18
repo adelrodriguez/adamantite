@@ -125,6 +125,10 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "getter-return": "error",
     "grouped-accessor-pairs": "error",
     "import/default": "error",
+    // TypeScript reports two exports of one name in a module and two `export *` that export one
+    // name. It accepts a local export that hides a name of an `export *`, and it does not check a
+    // JavaScript file. This rule reports both.
+    "import/export": "error",
     "import/first": "error",
     "import/named": "error",
     "import/namespace": "error",

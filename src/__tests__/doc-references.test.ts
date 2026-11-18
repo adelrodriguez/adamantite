@@ -115,21 +115,23 @@ function findDeadLink(file: string, target: string): string[] {
 }
 
 const CODE_SPAN = /`[^`\n]+`/gu
-const INLINE_LINK = /\]\(\s*<?([^\s)>]+)>?(?:\s[^)]*)?\)/gu
-const LINK_DEFINITION = /^ {0,3}\[(?!\^)[^\]]+\]:\s*<?([^\s>]+)>?/u
+const INLINE_LINK = /\]\(\s*(?:<([^>\n]*)>|([^\s)<]+))(?:\s[^)]*)?\)/gu
+const LINK_DEFINITION = /^ {0,3}\[(?!\^)[^\]]+\]:\s*(?:<([^>\n]*)>|(\S+))/u
 
 /**
  * The link targets of a line: the target of each inline link, with or without a title, and the
- * target of a link reference definition, such as `[map]: docs/architecture.md`. A link inside a
- * code span is an example, so it does not count. A footnote definition is not a link.
+ * target of a link reference definition, such as `[map]: docs/architecture.md`. A target between
+ * `<` and `>` can hold spaces. A link inside a code span is an example, so it does not count, and a
+ * space takes the place of the span, so the text before and after it cannot join into a link. A
+ * footnote definition is not a link.
  */
 function listLinkTargets(text: string) {
-  const prose = text.replaceAll(CODE_SPAN, "")
+  const prose = text.replaceAll(CODE_SPAN, " ")
+  const definition = LINK_DEFINITION.exec(prose)
 
-  return [
-    ...[...prose.matchAll(INLINE_LINK)].map(([, target = ""]) => target),
-    ...(LINK_DEFINITION.exec(prose)?.slice(1) ?? []),
-  ]
+  return [...prose.matchAll(INLINE_LINK), ...(definition === null ? [] : [definition])].flatMap(
+    ([, bracketed, bare]) => bracketed ?? bare ?? []
+  )
 }
 
 /**

@@ -1260,7 +1260,9 @@ in `tsconfig.json`. To check the hidden rules folder too, add `.adamantite/lint`
 
 Rule files run with Node.js type stripping, so use erasable TypeScript only: no `enum`,
 `namespace` with values, or parameter properties. Rules get no type information. A rule
-that throws prints an error for each file, and the lint run still exits 0. Adamantite owns
+that throws fails the lint run: Oxlint reports `Error running JS plugin` for each file in which
+the rule throws, and omits the reports of every other rule that a JavaScript plugin provides for
+those files. Fix the throw before you trust the other reports. Adamantite owns
 the wiring and the authoring guidance; your project owns the correctness of its rules.
 Agents use `RuleTester` from `adamantite/rules/testing` to verify new and changed rules.
 They run valid and invalid cases from stdin or a temporary file with Node.js, also in Bun

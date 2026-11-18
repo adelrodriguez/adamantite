@@ -9,7 +9,7 @@ import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
 
 /**
  * A TypeScript config that a tool integration renders whole, and the tool's own JSON configs, which
- * conflict with it.
+ * conflict with it. Oxlint, Oxfmt, and Knip each have one.
  */
 export interface ConfigFile {
   readonly conflicting: readonly string[]

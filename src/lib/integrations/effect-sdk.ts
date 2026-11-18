@@ -17,6 +17,10 @@ import {
 import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject, formatJson } from "#lib/shared/json.ts"
 
+/**
+ * The copy of the Effect editor SDK that VS Code starts, from the project root. The `prepare` of the
+ * `vscode` integration builds it in `init` and `update`.
+ */
 export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
 
@@ -54,8 +58,10 @@ const findNativeTypescript = Effect.fn("findNativeTypescript")(function* (cwd: s
   return Option.none()
 })
 
-// Match the installed native TypeScript by gitHead, as @effect/tsgo/lib/getExePath does.
-// Resolving through Effect services keeps assessment read-only and tests off the host filesystem.
+// Match the installed native TypeScript by gitHead, as @effect/tsgo/lib/getExePath does. The source
+// is the folder of the Effect build of that compiler, with its standard libraries, which
+// `prepareSdk` copies. Resolving through Effect services keeps assessment read-only and tests off
+// the host filesystem.
 const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   cwd: string,
   effectDirectory: string,
@@ -132,6 +138,10 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   })
 })
 
+/**
+ * Whether the SDK copy holds the build that `source` names, with each of its files. Doctor reports a
+ * stale or incomplete copy, and writes no file.
+ */
 const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
   cwd: string,
   source: Effect.Success<ReturnType<typeof resolveSdkSource>>
@@ -197,7 +207,9 @@ export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: st
     return yield* new InvalidConfigFormat({ path: presetPath })
   }
 
-  // The schema lists every Effect rule, including rules excluded from upstream presets.
+  // The schema lists every Effect rule, including rules excluded from upstream presets. Each editor
+  // integration turns them off in the Oxlint server, so the Effect server alone supplies their
+  // diagnostics and the semantic quick fixes.
   const rulesCustomization = Object.fromEntries(
     Object.keys(properties)
       .filter((rule) => rule.startsWith("effecttsgo/"))

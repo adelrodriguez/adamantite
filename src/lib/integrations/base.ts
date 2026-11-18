@@ -85,8 +85,10 @@ export interface ManagedFile {
 
 /**
  * Everything Adamantite knows about one integration. `Setup.apply` and the assessment iterate the
- * list in `integrations/index.ts`, so an integration is one folder and one line there. `E` and `R`
- * are the errors and the services of its effects.
+ * list in `integrations/index.ts`, so an integration is one folder and one line there. A command
+ * builder is not a member: the `command.ts` of a tool returns `CommandRunOptions` and starts no
+ * process, and the bridge and `Setup.apply` import it. `E` and `R` are the errors and the services
+ * of its effects.
  */
 export interface Integration<E = unknown, R = unknown> {
   /**
@@ -117,7 +119,8 @@ export interface Integration<E = unknown, R = unknown> {
    */
   readonly prepare?: (project: Project.Snapshot) => Effect.Effect<void, E, R>
   /**
-   * Whether the selection includes this integration.
+   * Whether the selection includes this integration, such as `oxlint` for a selection with the
+   * `check` or the `fix` script.
    */
   readonly selected: (selection: Selection) => boolean
 }

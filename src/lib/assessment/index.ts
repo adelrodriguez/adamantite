@@ -30,9 +30,10 @@ const repairPromptTemplate = getRepairPromptTemplate()
 const warningReportTemplate = getWarningReportTemplate()
 
 /**
- * The integrations that have not moved to a folder of their own yet, assessed against a project
- * before the ones in `integrations/index.ts`. The order fixes how findings are numbered in the
- * rendered output.
+ * The integrations that only assess, assessed against a project before the ones in
+ * `integrations/index.ts`. Each one decides from the project whether it applies, and the Oxlint
+ * integration installs their packages. The order fixes how findings are numbered in the rendered
+ * output.
  */
 const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs] as const
 

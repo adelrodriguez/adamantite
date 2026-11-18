@@ -90,57 +90,33 @@ outside the build-time macros, so no write bypasses `FileSystem`.
 
 ## Integrations
 
-An integration is one folder in `src/lib/integrations/` and one line in the list of
-`integrations/index.ts`. Each one implements `Integration` from `integrations/base.ts`:
+An integration is one folder in `src/lib/integrations` and one line in the list of
+`src/lib/integrations/index.ts`. Each one implements `Integration` from
+`src/lib/integrations/base.ts`:
 
-```ts
-export interface Integration<E = unknown, R = unknown> {
-  readonly assess: (project: Project, selection: Selection) => Effect.Effect<AssessmentPart, E, R>
-  readonly files: (
-    project: Project,
-    selection: Selection
-  ) => Effect.Effect<readonly ManagedFile[], E, R>
-  readonly name: string
-  readonly packages: (project: Project, selection: Selection) => readonly ToolingPackage[]
-  readonly prepare?: (project: Project) => Effect.Effect<void, E, R>
-  readonly selected: (selection: Selection) => boolean
-}
-```
-
-- `selected` says whether the selection includes the integration, such as `oxlint` for a selection
-  with the `check` or `fix` script.
-- `packages` lists the packages to install at their managed versions. The Oxlint integration
-  installs Oxlint, tsrs, and the managed plugin of each selected preset.
-- `files` renders the managed files whole, such as `.vscode/extensions.json`.
+- `selected` says whether the selection includes the integration.
+- `packages` lists the packages to install at their managed versions.
+- `files` renders the managed files whole.
 - `prepare`, which only `vscode` has, builds what the integration needs outside the committed
-  files, after the install, such as the Effect SDK copy in `node_modules`.
-- `assess` reads the project and returns its findings, warnings, and package actions. It never
-  writes. A file that the user changed gets a finding only when the change breaks the setup.
+  files, after the install.
+- `assess` reads the project and returns its findings, warnings, and package actions.
 
 The list holds `oxlint`, `oxfmt`, `knip`, `sherif`, `tsconfig`, `vscode`, `zed`, `github`, and
-`agents`. Three more integrations only assess, and the assessment runs them first: `oxlint-custom`
-in `oxlint/custom.ts`, the managed plugins in `oxlint/plugins/managed.ts`, and `tsrs` in
-`oxlint/tsrs.ts`. Each one decides from the project whether it applies, and the Oxlint integration
-installs their packages.
+`agents`. Three more integrations only assess, and `src/lib/assessment/index.ts` runs them first:
+`oxlint-custom` in `src/lib/integrations/oxlint/custom.ts`, the managed plugins in
+`src/lib/integrations/oxlint/plugins/managed.ts`, and `tsrs` in
+`src/lib/integrations/oxlint/tsrs.ts`.
 
-`config-file.ts` holds the findings of a managed tool config that Oxlint, Oxfmt, and Knip share:
-a conflicting JSON config, a missing config, and a config that does not load. `tooling/base.ts` holds the
-package checks that several tools share. Helper modules beside an integration, such as
-`knip/config.ts`, hold the logic that only that integration uses. Oxlint, Oxfmt, Knip, and Sherif
-also have command builders in `command.ts`, which return `CommandRunOptions` and start no process.
-The builders stay out of the `Integration`, and the bridge and `setup` import each `command.ts`
-directly. The Oxlint integration and the Oxlint entry use one Oxlint runtime resolver, and
-`hardening` starts Oxlint through `oxlint/entry.ts` to capture the lint output.
-
-The editor integrations select the installed Effect language server when `@effect/tsgo` is
-present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the
-`prepare` step of the `vscode` integration builds in `init` and `update`. The editor helper in
-`integrations/effect-sdk.ts` matches the installed TypeScript `gitHead` to the Effect build and
-copies its compiler and standard libraries. A project without a matching build gets the SDK
-finding, and the setup continues. Zed starts the upstream CLI through Node.js. Both editor
-integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics and
-semantic quick fixes. Doctor reports missing settings and a stale or incomplete SDK without writing
-files.
+- An `assess` never writes. `project/file-writers` in `.adamantite/lint/file-writers.ts` rejects a
+  write outside the file writers that it lists.
+- The logic of one tool stays in its folder, such as `src/lib/integrations/knip/config.ts`. Only
+  what several integrations share leaves it: `src/lib/integrations/config-file.ts` for the findings
+  of a managed tool config, `src/lib/integrations/tooling/base.ts` for the package checks, and
+  `src/lib/integrations/effect-sdk.ts` for the Effect language server of the editors.
+  `CODING_STANDARDS.md` states it, and nothing enforces it.
+- A command builder is not a member of `Integration`. The `command.ts` of Oxlint, Oxfmt, Knip, and
+  Sherif returns `CommandRunOptions` and starts no process, and the bridge and Setup import it.
+  Nothing enforces it.
 
 ## Setup and the write rule
 

@@ -1289,8 +1289,8 @@ warns about a config that does not load.
 ## Agent skill
 
 The Adamantite skill teaches coding agents how to initialize, assess, repair, and update a
-project, what to keep after they fix a mistake so that it does not recur, and how to write
-[custom rules](#custom-rules). The Adamantite package ships it.
+project, what to keep after they fix a mistake so that it does not recur, what to do before
+they add a disable comment, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
 
 `adamantite init` asks whether to set up coding agents. When you answer yes, or pass
 `--agents` in non-interactive mode, init writes `AGENTS.md` with the Adamantite section when the

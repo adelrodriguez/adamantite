@@ -19,7 +19,7 @@ A project that already has ts-reset can delete its `reset.d.ts` files and the
 
 Adapt the selected options to the request. Omitted boolean flags are disabled.
 `--agents` writes `AGENTS.md` with the Adamantite instructions when the project has none, and
-writes this skill to `.agents/skills`, and to `.claude/skills` or `.grok/skills` when the project
+writes the Adamantite skills to `.agents/skills`, and to `.claude/skills` or `.grok/skills` when the project
 has `.claude/` or `.grok/`. An existing `AGENTS.md` stays as it is, and Doctor reports the
 `missing-agents-section` finding when it has no Adamantite section.
 
@@ -43,7 +43,7 @@ managed scripts, so a test that the replaced script ran no longer runs in it.
 It writes each managed config, such as `oxlint.config.ts`, whole, and keeps a config that the
 project changed. Do not merge the reference config into a kept file. Read `setup.files` in the
 JSON for a `Kept` file. `init` exits 1 when findings remain after the setup, and
-`assessment.findings` lists them. Repair them as the Doctor step of the skill says.
+`assessment.findings` lists them. Repair them as the Doctor step of the `adamantite` skill says.
 
 Adamantite requires TypeScript 7 or later in the target project's own `package.json`.
 Check that declaration if npm cannot install or update a managed plugin.

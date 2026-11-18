@@ -1112,7 +1112,7 @@ describe("init", () => {
         })
         expect(files.list()).toStrictEqual([
           ".adamantite/adamantite-lock.json",
-          ...Object.keys(shippedSkill).map((file) => `.agents/skills/adamantite/${file}`),
+          ...Object.keys(shippedSkill).map((file) => `.agents/skills/${file}`),
           ".github/workflows/adamantite.yml",
           ".zed/settings.json",
           "AGENTS.md",

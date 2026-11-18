@@ -1,6 +1,6 @@
 ---
 name: adamantite
-description: Use when setting up Adamantite, running its checks, repairing Doctor findings, updating managed dependencies, keeping a fixed mistake from recurring, hardening coding standards, or writing and testing custom rules.
+description: Use when setting up Adamantite, running its checks, repairing preset rule reports or Doctor findings, or updating managed dependencies.
 metadata:
   type: core
   library: adamantite
@@ -12,9 +12,7 @@ sources:
   - "adelrodriguez/adamantite:src/lib/bridge/index.ts"
   - "adelrodriguez/adamantite:src/lib/integrations/oxlint/plugins/**/*.ts"
   - "adelrodriguez/adamantite:src/lib/integrations/knip/config.ts"
-  - "adelrodriguez/adamantite:src/lib/project/custom-rules/*"
   - "adelrodriguez/adamantite:presets/lint/*.ts"
-  - "adelrodriguez/adamantite:presets/rules/*.ts"
 ---
 
 # Adamantite
@@ -29,7 +27,10 @@ with its package manager and installed Adamantite version. Use `adamantite <comm
 to check options that the task needs.
 
 Use the section below that matches the request. Read a linked guide only when that case
-applies. Continue when you have identified the target project, command, and requested scope.
+applies. For a coding standard, a custom rule, a fixed mistake, a disable comment, or
+`adamantite harden`, use the `adamantite-hardening` skill.
+
+Continue when you have identified the target project, command, and requested scope.
 
 ## Set up a target project
 
@@ -91,7 +92,9 @@ config unchanged. Otherwise, repair the config or the rule file that the error n
 imports an Adamantite preset or a name that the installed package does not export, use the
 replacement that the [changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md) names for it. For
 a custom rule or a rules folder, use the repair step in
-[How to write and verify custom rules](references/custom-rules.md#repair-an-existing-rules-folder).
+[How to repair preset rule reports](references/lint-rules.md#repair-an-existing-rules-folder).
+When Doctor warns that a config states import layers by hand, use the `adamantite-hardening`
+skill to state them in layer maps.
 
 Run `adamantite doctor --json` again after the repair. This step is complete when Doctor exits 0
 with no findings. Report the `warnings` separately, because warnings alone also exit 0.
@@ -99,7 +102,7 @@ with no findings. Report the `warnings` separately, because warnings alone also 
 ## Update managed dependencies
 
 Run `adamantite update --json`. It installs the managed packages of the recorded setup, writes the
-managed files of the recorded setup, such as `.vscode/extensions.json` and this skill, that are
+managed files of the recorded setup, such as `.vscode/extensions.json` and the Adamantite skills, that are
 missing or unchanged since Adamantite wrote them, and writes
 `.adamantite/adamantite-lock.json`. In a project without a lockfile, it sets up nothing and reports
 one finding: run `adamantite init`. Commit the lockfile. The JSON lists the file writes, the script writes, and the installs in `setup`, and the
@@ -108,49 +111,10 @@ findings that remain in `assessment`. It exits 1 while findings remain.
 Follow the repair step above. The update is complete when Doctor reports no findings and
 the project's checks pass.
 
-## Keep a fixed mistake from recurring
-
-After you fix a regression, a mistake that a reviewer corrected before, or a break of a project
-standard that no check reported, follow
-[How to keep a fixed mistake from recurring](references/corrections.md). It starts from that one
-mistake, and decides whether the project keeps a test, a type, a rule, an instruction, or nothing.
-
-The task is complete when the guide's checks pass.
-
-## Harden coding standards
-
-Run `adamantite harden` and follow its Markdown prompt. The prompt puts each coding standard on a
-step of [the enforcement ladder](references/enforcement-ladder.md). `adamantite harden --json` prints what the
-prompt is built from, such as the agent reach and the suppressions, as JSON. Use `--path` to limit the scope
-when the request covers one package or folder. Show the candidate standards and wait for
-the user's approval before writing. If no human can approve, report the candidates and stop.
-
-The prompt shows the decisions of the decisions record, `.adamantite/decisions.jsonl`. Do not
-propose again what a decision settles. After the user answers, append the session line that the
-prompt gives, and one decision line for each candidate that the user did not approve and for each
-decision that the user resolved. Copy the lines that the prompt gives, and never edit or delete an
-earlier line.
-
-For rule trials that the prompt requests, follow the trial step in
-[How to repair preset rule reports](references/lint-rules.md#try-a-rule-setting).
-For approved custom rules, follow [How to write and verify custom rules](references/custom-rules.md).
-
-A non-interactive `harden` run only prints the prompt. Its exit code does not verify the
-work. Hardening is complete when the approved standards are enforced, the checks pass,
-and Doctor reports no findings.
-
-## Custom rules
-
-To add, change, verify, or save tests for a project-owned rule, follow
-[How to write and verify custom rules](references/custom-rules.md).
-
-The task is complete when the guide's verification and cleanup checks pass.
-
 ## Report the result
 
 If a required tool or source was unavailable, name it on the first line and state what you
 used instead. Report the changes, commands run, results, and remaining findings or warnings.
-For a custom rule, include the cases tested and whether you removed temporary verification files.
 
 The report is complete when every result has command output or an inspected artifact as evidence.
 
@@ -160,4 +124,3 @@ The report is complete when every result has command output or an inspected arti
 - The affected checks and the tests of each changed behavior passed, or the report names what
   remains unverified.
 - Doctor findings and assessment warnings are reported separately.
-- Every new or changed custom rule passed verification, and temporary cases are removed.

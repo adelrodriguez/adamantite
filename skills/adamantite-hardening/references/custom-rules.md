@@ -14,21 +14,6 @@ the root config. Extend the root config when the package needs its rules.
 
 Continue when you have identified the loaded rules folder and its plugin name.
 
-## Repair an existing rules folder
-
-When Doctor reports that Oxlint cannot load a config or a rule file, read the error that it
-names. Load the rules folder with the default import from `adamantite/rules`, and import
-`definePlugin`, `defineRule`, and the authoring types from `adamantite/rules/plugin`. For a name
-that the installed package does not export, use the replacement that the changelog names. A rule
-file must load with type stripping, so replace TypeScript that Node.js cannot erase, such as an
-`enum`.
-
-When Doctor reports a rules folder that no `custom()` call loads, load it with `custom()`, and set
-its path with `dir` when it is not `.adamantite/lint`.
-Preserve rule behavior, plugin names, severity, and options.
-
-Continue when Doctor reports no custom-rule findings and no config load failure.
-
 ## Write the rule
 
 For a new rule, run `adamantite rule add <name>`. It writes only a stub.

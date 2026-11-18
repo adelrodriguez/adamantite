@@ -2,7 +2,7 @@ import type { Script } from "#lib/project/package-json.ts"
 import { getAgentsSectionTemplate } from "#lib/integrations/agents/section.macro.ts" with { type: "macro" }
 import { SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
 import { type SupportedPackageManager, formatRunScript } from "#lib/project/package-manager.ts"
-import { CORRECTIONS_SECTION, CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import { CORRECTIONS_SECTION, CUSTOM_RULES_SECTION, HARDENING_SKILL } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
 const agentsSectionTemplate = getAgentsSectionTemplate()
@@ -46,9 +46,10 @@ export function renderAgentsSection({ isMonorepo, packageManager, scripts }: Age
   return fillTemplate(agentsSectionTemplate, {
     correctionsSection: CORRECTIONS_SECTION,
     customRules: checkRunsTool(scripts, "oxlint")
-      ? `- For custom rules, follow the "${CUSTOM_RULES_SECTION}" section and linked guide in the Adamantite skill. Complete its verification and cleanup checks.\n`
+      ? `- For custom rules, follow the "${CUSTOM_RULES_SECTION}" section and linked guide in the \`${HARDENING_SKILL}\` skill. Complete its verification and cleanup checks.\n`
       : "",
     end: ADAMANTITE_AGENTS_END_MARKER,
+    hardeningSkill: HARDENING_SKILL,
     scripts:
       selectedScriptGuidance.length > 0
         ? [

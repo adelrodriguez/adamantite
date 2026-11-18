@@ -29,7 +29,7 @@ import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.
 import { skillFolders } from "#lib/integrations/agents/skill.ts"
 import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
-import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import { CUSTOM_RULES_SECTION, HARDENING_SKILL } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 
@@ -681,6 +681,7 @@ export function renderHardenPrompt(
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
     fixHistory: renderFixHistory(context.fixHistory, context.scope),
+    hardeningSkill: HARDENING_SKILL,
     instructionFiles: renderList(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."

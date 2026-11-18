@@ -84,7 +84,7 @@ describe("rule add", () => {
       expect(files.list()).toStrictEqual([".adamantite/lint/no-process-env.ts"])
       expect(logLines).toStrictEqual([
         "✔ Wrote .adamantite/lint/no-process-env.ts.",
-        '● `custom()` from `adamantite/rules` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells agents how to verify the rule with temporary cases.',
+        '● `custom()` from `adamantite/rules` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the `adamantite-hardening` skill tells agents how to verify the rule with temporary cases.',
       ])
     })
   )

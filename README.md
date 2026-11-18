@@ -42,7 +42,7 @@ and update the project.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
 - **Agent guidance**: Write an `AGENTS.md` with the Adamantite section when the project has
-  none, and add the Adamantite skill for your coding agents.
+  none, and add the Adamantite skills for your coding agents.
 
 ## Quick start
 
@@ -59,7 +59,7 @@ configs there too. Run `init` at the root of that project, or extend the root co
 as [Custom rules in a monorepo](#custom-rules-in-a-monorepo) shows.
 
 The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
-and coding agent setup with the [Adamantite skill](#agent-skill). The scripts prompt starts with
+and coding agent setup with the [Adamantite skills](#agent-skills). The scripts prompt starts with
 the recommended `check` and `fix` scripts checked. After setup, use the scripts written to `package.json`:
 
 ```sh
@@ -314,7 +314,7 @@ remain. See [JSON output](#json-output).
 
 Ask a coding agent to find the coding standards that the project already follows, and to put
 each one on the highest step of the
-[enforcement ladder](skills/adamantite/references/enforcement-ladder.md) that can hold it. The
+[enforcement ladder](skills/adamantite-hardening/references/enforcement-ladder.md) that can hold it. The
 steps go from a type that makes the mistake impossible, through rules and project checks, to an
 entry in `CODING_STANDARDS.md` with its reason and an example.
 
@@ -423,7 +423,7 @@ managed version, such as Oxlint, tsrs, and the managed plugin of each selected p
 from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry. `update` exits 1
 when findings remain after it, and offers their repair as `init` does.
 It also writes the managed files of the recorded setup, such as the
-[Adamantite skill](#agent-skill), that are missing or unchanged since Adamantite wrote them,
+[Adamantite skills](#agent-skills), that are missing or unchanged since Adamantite wrote them,
 and writes the lockfile again with the installed version. A project without a lockfile, such as
 one that an Adamantite version before the lockfile set up, has no recorded setup, so `update`
 changes nothing and reports one finding: run `adamantite init`. `init` keeps each existing file
@@ -1266,7 +1266,7 @@ Agents use `RuleTester` from `adamantite/rules/testing` to verify new and change
 They run valid and invalid cases from stdin or a temporary file with Node.js, also in Bun
 projects, and remove their temporary verification cases and fixtures before handback. The rules and their
 runtime helpers stay in the target project. The "Custom rules" section of the
-[Adamantite skill](#agent-skill) has the command and the full authoring guidance.
+[`adamantite-hardening` skill](#agent-skills) has the command and the full authoring guidance.
 
 `adamantite doctor` reports a rules folder that no `custom()` call loads, a `dir` that names a
 folder that does not exist, and two rules
@@ -1321,15 +1321,20 @@ warns about a config that does not load.
   reports custom configurations that require manual work instead of overwriting them.
 - `fix`, `analyze --fix`, `init`, and `update` can change project files. Doctor is read-only.
 
-## Agent skill
+## Agent skills
 
-The Adamantite skill teaches coding agents how to initialize, assess, repair, and update a
-project, what to keep after they fix a mistake so that it does not recur, and how to write
-[custom rules](#custom-rules). The Adamantite package ships it.
+The Adamantite package ships two skills for coding agents, so an agent loads only the one that
+its task needs:
+
+- The `adamantite` skill teaches them how to initialize, check, assess, repair, and update a
+  project.
+- The `adamantite-hardening` skill teaches them what to keep after they fix a mistake so that it
+  does not recur, what to do before they add a disable comment, how to harden coding standards,
+  and how to write [custom rules](#custom-rules) and import rules.
 
 `adamantite init` asks whether to set up coding agents. When you answer yes, or pass
 `--agents` in non-interactive mode, init writes `AGENTS.md` with the Adamantite section when the
-project has no `AGENTS.md`, and writes the skill to these folders. Init never edits an existing
+project has no `AGENTS.md`, and writes both skills to these folders. Init never edits an existing
 `AGENTS.md`: Doctor reports one without the section, so you or an agent can add it.
 
 | Skill folder     | Agents                                  | When                        |
@@ -1338,31 +1343,33 @@ project has no `AGENTS.md`, and writes the skill to these folders. Init never ed
 | `.claude/skills` | Claude Code                             | The project has `.claude/`. |
 | `.grok/skills`   | Grok Build                              | The project has `.grok/`.   |
 
-The Adamantite CLI bundles the skill, so the copy matches the Adamantite version that wrote
-it. Each file of the skill is a managed file: after you update Adamantite, `adamantite update`
-writes the skill of the new version over each copy that nobody changed. Doctor reports a copy
+The Adamantite CLI bundles the skills, so each copy matches the Adamantite version that wrote
+it. Each file of a skill is a managed file: after you update Adamantite, `adamantite update`
+writes the skills of the new version over each copy that nobody changed, and deletes an unchanged
+file that the new version no longer ships. Doctor reports a copy
 that differs from the skill of the installed version, such as one that an earlier version wrote
 before the lockfile. Delete that copy, and run `adamantite update`. Doctor also reports an
-`adamantite` entry in `skills-lock.json`, so the `skills` CLI does not write the same folders.
-Commit the skill folders, so every clone has the skill.
+`adamantite` or `adamantite-hardening` entry in `skills-lock.json`, so the `skills` CLI does not
+write the same folders. Commit the skill folders, so every clone has the skills.
 
-To install the skill from GitHub instead, with the
+To install the skills from GitHub instead, with the
 [`skills` CLI](https://github.com/vercel-labs/skills):
 
 ```sh
 npx skills add adelrodriguez/adamantite --list
 npx skills add adelrodriguez/adamantite --skill adamantite
+npx skills add adelrodriguez/adamantite --skill adamantite-hardening
 ```
 
 Doctor reports a copy from GitHub that differs from the skill of the installed Adamantite
 version.
 
-With pnpm 12.11 or later, `pnpm install` can also link the skill that the package ships
+With pnpm 12.11 or later, `pnpm install` can also link the skills that the package ships
 into the agent skill directories that exist in the project, such as `.claude/skills`,
 after you approve it. pnpm creates the directory only when the agent that runs pnpm sets an
 environment variable that identifies it, such as `CLAUDECODE` for `.claude/skills`.
 Otherwise, if no skill directory exists, the install fails, so create one before you
-approve the skill:
+approve the skills:
 
 ```sh
 mkdir -p .claude/skills

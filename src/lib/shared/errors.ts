@@ -328,7 +328,7 @@ export class SetupOutdated extends Data.TaggedError("SetupOutdated")<{
   recorded: string
 }> {
   override get message() {
-    return `\`${this.path}\` records the setup of Adamantite ${this.recorded}, but the project installs Adamantite ${this.installed}. Run \`adamantite update\` to update the managed packages, files, and skill, commit the changes, and run \`adamantite check\` again.`
+    return `\`${this.path}\` records the setup of Adamantite ${this.recorded}, but the project installs Adamantite ${this.installed}. Run the project's installed \`adamantite update\` through its package runner, such as \`pnpm exec adamantite update\`, to update the managed packages, files, and skill, commit the changes, and run \`adamantite check\` again.`
   }
 }
 

@@ -411,7 +411,7 @@ describe("check", () => {
             ],
           })
           expect(error?.message).toBe(
-            "`.adamantite/adamantite-lock.json` records the setup of Adamantite 0.46.0, but the project installs Adamantite 0.47.0. Run `adamantite update` to update the managed packages, files, and skill, commit the changes, and run `adamantite check` again."
+            "`.adamantite/adamantite-lock.json` records the setup of Adamantite 0.46.0, but the project installs Adamantite 0.47.0. Run the project's installed `adamantite update` through its package runner, such as `pnpm exec adamantite update`, to update the managed packages, files, and skill, commit the changes, and run `adamantite check` again."
           )
         })
     )

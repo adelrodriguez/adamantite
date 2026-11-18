@@ -134,7 +134,7 @@ function assessSetupVersion(error: SetupAhead | SetupOutdated): Finding {
     SetupOutdated: ({ installed, path, recorded }): Finding => ({
       currentState: `\`${path}\` records the setup of Adamantite ${recorded}, but the project installs Adamantite ${installed}, so the managed packages, files, and skill can be out of date. \`adamantite check\` fails until the setup is updated.`,
       goal: [
-        `Run \`adamantite update\`. It applies the setup of Adamantite ${installed} and records that version in \`${path}\`.`,
+        `Run the project's installed \`adamantite update\` through its package runner, such as \`npx\` or \`pnpm exec\`. It applies the setup of Adamantite ${installed} and records that version in \`${path}\`.`,
         "Commit the changes, then run `adamantite doctor` again. It must not report this finding.",
       ],
       id: "setup-outdated",

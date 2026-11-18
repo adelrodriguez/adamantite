@@ -926,7 +926,7 @@ describe("doctor", () => {
         ])
         expect(logLines).toStrictEqual([
           expect.stringContaining(
-            "Run `adamantite update`. It applies the setup of Adamantite 0.47.0 and records that version in `.adamantite/adamantite-lock.json`."
+            "Run the project's installed `adamantite update` through its package runner, such as `npx` or `pnpm exec`. It applies the setup of Adamantite 0.47.0 and records that version in `.adamantite/adamantite-lock.json`."
           ),
         ])
       })

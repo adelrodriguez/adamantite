@@ -450,7 +450,10 @@ export const tryRule = Effect.fn("tryRule")(
     const { name: ruleName, plugin } = splitRuleName(rule)
     const resolved = yield* resolveRule(rule, cwd)
     const copy = yield* makeProjectCopy(cwd, workspace)
-    const toProjectPath = (file: string) => path.relative(copy, file).split(path.sep).join("/")
+
+    function toProjectPath(file: string) {
+      return path.relative(copy, file).split(path.sep).join("/")
+    }
 
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
     // config can add a rule that the project config does not have.

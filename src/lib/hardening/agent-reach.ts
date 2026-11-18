@@ -291,10 +291,13 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
     })
   }
 
-  const getLinkTargets = (file: string) =>
-    getLinks(file).flatMap((link) => (link.target === file ? [] : [link.target]))
+  function getLinkTargets(file: string) {
+    return getLinks(file).flatMap((link) => (link.target === file ? [] : [link.target]))
+  }
 
-  const getCodeSpans = (file: string) => matchAll(prose.get(file) ?? "", CODE_SPAN)
+  function getCodeSpans(file: string) {
+    return matchAll(prose.get(file) ?? "", CODE_SPAN)
+  }
 
   function getReferences(file: string) {
     return [

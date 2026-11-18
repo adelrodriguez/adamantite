@@ -670,10 +670,14 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     return result.exitCode === 0
   }
 
-  const testPresets = (name: TestRunName) =>
-    step(name, "pnpm", ["run", "test:presets", "--reporter=default", `--reporter=${REPORTER}`], {
-      ADAMANTITE_LATEST_RESULTS: join(out, `${name}.results.json`),
-    })
+  function testPresets(name: TestRunName) {
+    return step(
+      name,
+      "pnpm",
+      ["run", "test:presets", "--reporter=default", `--reporter=${REPORTER}`],
+      { ADAMANTITE_LATEST_RESULTS: join(out, `${name}.results.json`) }
+    )
+  }
 
   read("git", ["worktree", "add", "--detach", worktree, commit])
 

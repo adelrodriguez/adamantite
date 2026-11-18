@@ -318,11 +318,12 @@ function makeProcessLayer(files: FileSystemTestContext, processes: ProcessOption
     probeReport = '{ "diagnostics": [], "number_of_files": 0 }',
   } = processes
 
-  const listFiles = () =>
-    Array.sort(
+  function listFiles() {
+    return Array.sort(
       files.list().filter((file) => !file.startsWith("../")),
       Order.String
     )
+  }
 
   function getGitOutput(args: ChildProcess.StandardCommand["args"]) {
     if (args[0] === "rev-parse") {
@@ -342,11 +343,12 @@ function makeProcessLayer(files: FileSystemTestContext, processes: ProcessOption
       .join("")
   }
 
-  const getOxlintOutput = () =>
-    listFiles()
+  function getOxlintOutput() {
+    return listFiles()
       .filter((file) => !lintIgnoredFiles.includes(file))
       .map((file) => `${file}\n`)
       .join("")
+  }
 
   return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
     ChildProcessSpawner.make((command) => {

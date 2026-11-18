@@ -69,8 +69,9 @@ function reportTwice(context: Context, fact: Fact) {
   const start = { column: 0, line: 1 }
   const end = context.sourceCode.getLocFromIndex(text.length)
 
-  const encode = (anchor: string) =>
-    JSON.stringify({ anchor, lines: lines.length, ...fact }, writeFactValue)
+  function encode(anchor: string) {
+    return JSON.stringify({ anchor, lines: lines.length, ...fact }, writeFactValue)
+  }
 
   context.report({ loc: { end: start, start }, message: encode("start") })
   context.report({ loc: { end, start: end }, message: encode("end") })

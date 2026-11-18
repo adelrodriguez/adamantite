@@ -658,12 +658,13 @@ function renderFixHistory(history: FixHistory, scope: HardenContext["scope"]) {
   }
 
   // The agent reads a default count and a requested count in the same way.
-  const renderLast = ({ count }: { readonly count: number }) =>
-    [
+  function renderLast({ count }: { readonly count: number }) {
+    return [
       "Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.",
       "",
       command(`-n ${count}`),
     ].join("\n")
+  }
 
   return FixHistory.match(history, {
     Last: renderLast,

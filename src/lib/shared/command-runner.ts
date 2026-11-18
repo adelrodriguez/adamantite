@@ -122,12 +122,13 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       yield* toResult(options, yield* exitCode(options))
     })
 
-    const toSections = <E, R>(steps: ReadonlyArray<Step<E, R>>) =>
-      steps.map((step, index) =>
+    function toSections<E, R>(steps: ReadonlyArray<Step<E, R>>) {
+      return steps.map((step, index) =>
         Effect.flatMap(step, (options) =>
           index === 0 ? run(options) : Effect.andThen(Console.log(""), run(options))
         )
       )
+    }
 
     return {
       exitCode,

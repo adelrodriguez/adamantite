@@ -321,7 +321,7 @@ const rule: Rule = {
           return
         }
 
-        const accumulator = context.sourceCode
+        const declared = context.sourceCode
           .getDeclaredVariables(reducer.callback)
           .find((variable) =>
             variable.identifiers.some(
@@ -329,12 +329,17 @@ const rule: Rule = {
             )
           )
 
-        if (accumulator === undefined) {
+        if (declared === undefined) {
           return
         }
 
-        const isAccumulator = (expression: ESTree.Node) =>
-          referencesAccumulator(context.sourceCode, expression, accumulator)
+        // TypeScript hoists a function declaration, so `isAccumulator` does not keep the narrowing
+        // of `declared`. It reads this variable, which never holds `undefined`.
+        const accumulator = declared
+
+        function isAccumulator(expression: ESTree.Node) {
+          return referencesAccumulator(context.sourceCode, expression, accumulator)
+        }
 
         const initialValue =
           reducer.initialValue === undefined

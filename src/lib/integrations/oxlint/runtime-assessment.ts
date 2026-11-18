@@ -33,8 +33,9 @@ function finding(currentState: string, goal: readonly string[]): readonly Findin
 export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (
   project: Project.Snapshot
 ) {
-  const declared = (name: string) =>
-    project.packageJson.devDependencies?.[name] ?? project.packageJson.dependencies?.[name]
+  function declared(name: string) {
+    return project.packageJson.devDependencies?.[name] ?? project.packageJson.dependencies?.[name]
+  }
 
   if (!declared("oxlint")) {
     return [] satisfies readonly Finding[]

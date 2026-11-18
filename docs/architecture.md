@@ -370,9 +370,10 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   the changesets, the changelogs, and the files in the skill folders of the coding agents, so the
   agent reads all the documentation. An agent finds its skills on its own, so they need no reach.
   `hardening/agent-reach.ts` finds the discovery gaps: the files that no chain of links from an
-  `AGENTS.md` reaches, and the links to missing files. After a handoff, a link to a missing file
-  that the session added fails the verification. `hardening/suppressions.ts` counts the disable
-  comments of each rule in the files that Oxlint lints, and `hardening/overrides.ts` marks each file
+  `AGENTS.md` reaches, the links to missing files, and the links whose anchor a simple rule cannot
+  match to a heading, for the agent to check. After a handoff, a link to a missing file that the
+  session added fails the verification. `hardening/suppressions.ts` counts the disable
+  comments of each rule and the TypeScript directives in the files that Oxlint lints, and `hardening/overrides.ts` marks each file
   of an override that turns a rule off, after a trial that turns the rule on again. The prompt shows
   both as data. `hardening/decisions-record.ts` decodes the decisions record, a JSON Lines log
   that the agent appends to, and the prompt shows its decisions. A session line of the record names

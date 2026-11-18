@@ -33,7 +33,14 @@ const PLACE_FIELDS = { anchor: Schema.Literals(["end", "start"]), lines: Schema.
 
 const CommentsFact = Schema.Struct({
   ...PLACE_FIELDS,
-  comments: Schema.Array(Schema.Struct({ line: Schema.Int, value: Schema.String })),
+  comments: Schema.Array(
+    Schema.Struct({
+      leading: Schema.Boolean,
+      line: Schema.Int,
+      type: Schema.Literals(["Block", "Line"]),
+      value: Schema.String,
+    })
+  ),
 })
 
 const AstFact = Schema.Struct({ ...PLACE_FIELDS, program: Schema.Unknown })
@@ -130,9 +137,10 @@ const runProbe = Effect.fn("runProbe")(function* (
 }, Effect.scoped)
 
 /**
- * The disable comments of each of `files`, relative to `cwd`, with their lines in the file and
- * their text. Oxlint parses each file as it lints it, so a Vue, Svelte, or Astro file gives the
- * comments of its scripts, and a file that does not parse has none. Each comment comes once.
+ * The comments that can turn lint rules or type checks off in each of `files`, relative to `cwd`,
+ * with their lines in the file, their text, their kind, and whether they lead their source. Oxlint
+ * parses each file as it lints it, so a Vue, Svelte, or Astro file gives the comments of its
+ * scripts, and a file that does not parse has none. Each comment comes once.
  */
 export const probeComments = Effect.fn("probeComments")(function* (
   cwd: string,
@@ -145,11 +153,11 @@ export const probeComments = Effect.fn("probeComments")(function* (
       reports.flatMap((report) =>
         decodeCommentsFact(report.message).pipe(
           Option.map((fact) =>
-            fact.comments.map(({ line, value }) => ({
+            fact.comments.map(({ line, ...comment }) => ({
+              ...comment,
               // The line of the file where the source of the report starts, from 1.
               line:
                 (fact.anchor === "start" ? report.line : report.line - fact.lines + 1) + line - 1,
-              value,
             }))
           ),
           Option.getOrElse(() => [])

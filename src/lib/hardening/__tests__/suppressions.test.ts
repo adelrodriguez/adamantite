@@ -78,7 +78,7 @@ describe("readSuppressions", () => {
       )
       write("src/b.tsx", "/* oxlint-disable */\nexport const b = <div />\n")
 
-      expect(yield* read()).toStrictEqual([
+      expect((yield* read()).rules).toStrictEqual([
         // A comment that names no rule turns off all rules, and comes first among equal counts.
         { locations: ["src/a.ts:4", "src/b.tsx:1"], rule: Option.none() },
         { locations: ["src/a.ts:1", "src/a.ts:3"], rule: Option.some("no-console") },
@@ -104,7 +104,55 @@ describe("readSuppressions", () => {
         ].join("\n")
       )
 
-      expect(yield* read()).toStrictEqual([])
+      expect(yield* read()).toStrictEqual({ directives: [], rules: [] })
+    })
+  )
+
+  it.live("count each TypeScript directive where TypeScript reads it", () =>
+    Effect.gen(function* () {
+      write(
+        "src/a.ts",
+        [
+          "#!/usr/bin/env node",
+          "/* License */",
+          "// @TS-NOCHECK",
+          "// @ts-expect-error -- the API returns any",
+          "/// @ts-ignore",
+          "/* @ts-ignore */",
+          "/**",
+          " * @ts-expect-error that is not on the last line",
+          " */",
+          "/*",
+          " * @ts-ignore */",
+          "// @ts-ignored also counts, as TypeScript reads a prefix",
+          "// Use @ts-expect-error, not @ts-ignore.",
+          "/* @ts-nocheck */",
+          'export const text = "// @ts-ignore"',
+          "// @ts-nocheck after code",
+          "/* * @ts-ignore */",
+          "/* * @ts-expect-error */",
+          "/** @ts-expect-error */",
+          "/**",
+          " * @ts-expect-error -- the JSDoc form, on the last line */",
+          "",
+        ].join("\n")
+      )
+      write(
+        "src/b.tsx",
+        "// @ts-nocheck: generated\nexport const b = (\n  <div>\n    {/* @ts-expect-error */}\n  </div>\n)\n"
+      )
+
+      expect((yield* read()).directives).toStrictEqual([
+        {
+          directive: "@ts-expect-error",
+          locations: ["src/a.ts:4", "src/a.ts:19", "src/a.ts:20", "src/b.tsx:4"],
+        },
+        {
+          directive: "@ts-ignore",
+          locations: ["src/a.ts:5", "src/a.ts:6", "src/a.ts:10", "src/a.ts:12"],
+        },
+        { directive: "@ts-nocheck", locations: ["src/a.ts:3", "src/b.tsx:1"] },
+      ])
     })
   )
 
@@ -113,7 +161,7 @@ describe("readSuppressions", () => {
       write("src/broken.ts", "// oxlint-disable\nexport const = ;\n")
       write("src/fixtures/bad.ts", "// oxlint-disable-next-line no-alert\nalert(1)\n")
 
-      expect(yield* read()).toStrictEqual([])
+      expect(yield* read()).toStrictEqual({ directives: [], rules: [] })
     })
   )
 
@@ -135,7 +183,7 @@ describe("readSuppressions", () => {
         `---\n${comment}\nconst value = 1\n---\n<div>{value}</div>\n<script>\n\n/* oxlint-disable no-console */\n</script>\n`
       )
 
-      expect(yield* read()).toStrictEqual([
+      expect((yield* read()).rules).toStrictEqual([
         {
           locations: ["src/App.astro:2", "src/App.svelte:2", "src/Jsx.vue:2", "src/Setup.vue:3"],
           rule: Option.some("quality/no-reflect-get"),
@@ -150,9 +198,13 @@ describe("readSuppressions", () => {
       write("packages/api/src/a.ts", "// oxlint-disable-next-line no-console\nconsole.log(1)\n")
       write("packages/web/src/a.ts", "// oxlint-disable-next-line no-alert\nalert(1)\n")
 
-      expect(yield* read("packages/web")).toStrictEqual([
-        { locations: ["packages/web/src/a.ts:1"], rule: Option.some("no-alert") },
-      ])
+      write("packages/api/src/b.ts", "// @ts-expect-error\nexport const b: number = ''\n")
+      write("packages/web/src/b.ts", "// @ts-expect-error\nexport const b: number = ''\n")
+
+      expect(yield* read("packages/web")).toStrictEqual({
+        directives: [{ directive: "@ts-expect-error", locations: ["packages/web/src/b.ts:1"] }],
+        rules: [{ locations: ["packages/web/src/a.ts:1"], rule: Option.some("no-alert") }],
+      })
     })
   )
 })

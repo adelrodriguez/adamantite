@@ -1,4 +1,4 @@
-import type { Context, ESTree, Plugin, Rule, Visitor } from "@oxlint/plugins"
+import type { Comment, Context, ESTree, Plugin, Rule, Visitor } from "@oxlint/plugins"
 
 // The facts that only a parser knows, such as the disable comments of a file and its syntax tree,
 // come from Oxlint itself. `lib/integrations/oxlint/probe.ts` runs Oxlint with only this plugin and
@@ -10,9 +10,10 @@ import type { Context, ESTree, Plugin, Rule, Visitor } from "@oxlint/plugins"
 // the file, so the line of a report tells where the source starts or ends.
 
 /**
- * A comment that can turn rules off. The CLI reads the directive.
+ * A comment that can turn lint rules or type checks off: a disable comment, or a TypeScript
+ * directive such as `@ts-expect-error`. The CLI reads the directive.
  */
-const DISABLE_COMMENT = /-disable/u
+const SUPPRESSION_COMMENT = /-disable|@ts-/iu
 
 /**
  * What a rule reports about a source.
@@ -20,9 +21,16 @@ const DISABLE_COMMENT = /-disable/u
 type Fact =
   | {
       /**
-       * Each disable comment, with its line in the source.
+       * Each comment that can turn lint rules or type checks off, with its line in the source, its
+       * kind, and whether only whitespace and other comments come before it, as TypeScript requires
+       * of `@ts-nocheck`.
        */
-      readonly comments: ReadonlyArray<{ readonly line: number; readonly value: string }>
+      readonly comments: ReadonlyArray<{
+        readonly leading: boolean
+        readonly line: number
+        readonly type: "Block" | "Line"
+        readonly value: string
+      }>
     }
   | { readonly program: ESTree.Program }
 
@@ -68,20 +76,46 @@ function reportTwice(context: Context, fact: Fact) {
   context.report({ loc: { end, start: end }, message: encode("end") })
 }
 
+/**
+ * Whether only whitespace and other comments come before each of `comments`, in source order. The
+ * first comment with code before it, and each comment after it, does not lead.
+ */
+function readLeading(text: string, comments: readonly Comment[]) {
+  const firstAfterCode = comments.findIndex(
+    (comment, index) => text.slice(comments[index - 1]?.end ?? 0, comment.start).trim().length > 0
+  )
+
+  return comments.map((_, index) => firstAfterCode === -1 || index < firstAfterCode)
+}
+
 const comments: Rule = {
   create(context): Visitor {
     return {
       Program() {
+        const all = context.sourceCode.getAllComments()
+        const leading = readLeading(context.sourceCode.text, all)
+
         reportTwice(context, {
-          comments: context.sourceCode
-            .getAllComments()
-            .filter((comment) => DISABLE_COMMENT.test(comment.value))
-            .map((comment) => ({ line: comment.loc.start.line, value: comment.value })),
+          comments: all.flatMap((comment, index) =>
+            comment.type !== "Shebang" && SUPPRESSION_COMMENT.test(comment.value)
+              ? [
+                  {
+                    leading: leading[index] ?? false,
+                    line: comment.loc.start.line,
+                    type: comment.type,
+                    value: comment.value,
+                  },
+                ]
+              : []
+          ),
         })
       },
     }
   },
-  meta: { docs: { description: "Report the disable comments of each source." }, schema: [] },
+  meta: {
+    docs: { description: "Report the comments that turn lint rules or type checks off." },
+    schema: [],
+  },
 }
 
 const ast: Rule = {

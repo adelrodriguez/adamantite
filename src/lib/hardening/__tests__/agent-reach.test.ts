@@ -35,7 +35,42 @@ describe("readAgentReach", () => {
         ["AGENTS.md"]
       ).pipe(Effect.provide([context.layer, Path.layer]))
 
-      expect(reach).toStrictEqual({ brokenLinks: [], unreached: ["docs/deleted.md"] })
+      expect(reach).toStrictEqual({
+        brokenLinks: [],
+        unmatchedAnchors: [],
+        unreached: ["docs/deleted.md"],
+      })
+    })
+  )
+
+  // Each heading gives a fixed number of candidates, and each pattern takes time linear in the
+  // heading, so a heading that repeats a construct finishes.
+  it.effect.each([
+    {
+      // A heading of 25 collapsed reference links, which GitHub renders as 25 `x`.
+      heading: `${"[x][]".repeat(25)}\n\n[x]: https://example.com`,
+      matched: "x".repeat(25),
+      name: "25 collapsed reference links",
+    },
+    {
+      // Each pattern of the rule stops early on this text, where a backtracking pattern would not.
+      heading: `${"](<a {# _ ".repeat(20_000)}${"{#x".repeat(200_000)}${"#".repeat(20_000)}tail`,
+      matched: "top",
+      name: "a very long heading of unclosed markup",
+    },
+  ])("list the anchors of a heading of $name", ({ heading, matched }) =>
+    Effect.gen(function* () {
+      const context = createFileSystemTestContext({
+        files: { "AGENTS.md": `## ${heading}\n\n[a](#${matched}) [b](#nowhere)\n` },
+      })
+
+      const reach = yield* readAgentReach(context.root, ["AGENTS.md"], ["AGENTS.md"]).pipe(
+        Effect.provide([context.layer, Path.layer])
+      )
+
+      expect(reach.unmatchedAnchors).toStrictEqual([
+        { anchor: "nowhere", file: "AGENTS.md", target: "AGENTS.md" },
+      ])
     })
   )
 })

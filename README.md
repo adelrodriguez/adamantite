@@ -341,7 +341,10 @@ the agent reads each one. A coding agent finds the skills in its skill folder, s
 packages in that folder, or of the package that contains it, the rules folders that those configs
 load, the `AGENTS.md` of the root and of those packages, and the Markdown files of those packages
 and of the root. The prompt also lists the Markdown files that no chain of links or code-span paths
-from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix
+from an `AGENTS.md` reaches, each link to a missing file, and each link whose anchor Adamantite
+could not match to a heading of its Markdown file, for the agent to check. It also gives the number of comments that turn each lint rule off,
+and of the `@ts-expect-error`, `@ts-ignore`, and `@ts-nocheck` comments that turn type checks
+off. The agent also reads the fix
 commits of the last 200 commits, and a mistake that the fixes repeat becomes a candidate. With
 `--path`, it reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can

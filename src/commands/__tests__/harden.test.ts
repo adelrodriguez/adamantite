@@ -13,6 +13,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
+import { TestClock } from "effect/testing"
 import type { AgentReach } from "#lib/hardening/agent-reach.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
@@ -72,7 +73,6 @@ const REQUIRED_PHRASES = {
     "Each link to a Markdown file that does not exist is a discovery gap too.",
     "the files that the instructions link to or tell agents to read, including files absent from the list",
     "**discovery gap**",
-    "When the decisions record above exists, read it too.",
     "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
   ],
   "## 2. List the written standards": [
@@ -125,9 +125,9 @@ const REQUIRED_PHRASES = {
     "one case that the rule must report and one similar case that it must accept",
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
-    "One that matches an entry is settled: do not propose it or ask about it again.",
-    "List it under **Also considered** in step 8, with the heading of its entry.",
-    "evidence that is newer than the date of the entry, such as fix commits after it",
+    "One that matches a decision is settled: do not propose it or ask about it again.",
+    "List it under **Also considered** in step 8, with the `id` of the decision.",
+    "evidence that is newer than the date of the decision, such as fix commits after it",
     "Continue when every remaining candidate has a proposed step, evidence, limits, and cases",
   ],
   "## 8. Show the candidates and wait for approval": [
@@ -144,14 +144,16 @@ const REQUIRED_PHRASES = {
     "When no human can approve",
     "stop after this step.",
     "Write no file, also not the decisions record.",
-    "After the user answers, write the decisions record, also when the user approves none.",
+    "After the user answers, append to the decisions record, also when the user approves none.",
     "one for each item of the Decisions list that the user resolved",
-    "An approved candidate needs no entry, because its rule or instruction is the trace.",
-    "and each candidate or decision that step 7 matched with an entry of the decisions record",
-    "- Decision: rejected",
-    "- Date: ",
-    "- Reason: ",
-    "- Evidence: ",
+    "An approved candidate needs no line, because its rule or instruction is the trace.",
+    "and each candidate or decision that step 7 matched with a decision of the record",
+    "Never edit or delete an earlier line.",
+    "To change a decision, append a line with the same `id`.",
+    "one JSON object on one line",
+    "no trailing comma",
+    "Leave out a key that has no value.",
+    "reuse the `id` that the Decisions section shows",
     "Tell the user to commit the record",
   ],
   "## 9. Write the approved standards": [
@@ -175,7 +177,7 @@ const REQUIRED_PHRASES = {
     "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
   "## Check the result": [
-    "The decisions record has an entry for each candidate that the user did not approve and each decision that the user resolved",
+    "The decisions record has a line for each candidate that the user did not approve and each decision that the user resolved",
   ],
   "## Verify": [
     "no temporary verification cases, fixtures, or verification-only helpers remain",
@@ -568,14 +570,52 @@ function getContext(prompt: string) {
 const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
 const { decisionsRecord: DecisionsRecord, fixHistory: FixHistory } = Report.fields
 
-const RECORD = ProjectPath.make(".adamantite/decisions.md")
+const RECORD = ProjectPath.make(".adamantite/decisions.jsonl")
 const RECORD_COMMIT = "4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d"
 
-const RECORD_CONTENT =
-  "# Decisions\n\n## Test files sit beside their module\n\n- Decision: rejected\n"
+// The lines of a decisions record, as the agent writes them and as `harden --json` prints them.
+const REJECTED = {
+  at: "2026-03-14",
+  break: 7,
+  decision: "rejected",
+  fixes: ["1a2b3c4"],
+  follow: 41,
+  id: "tests-beside-module",
+  reason: "Integration tests stay in tests/",
+  standard: "Test files sit beside the module that they test",
+}
+
+const DEFERRED = {
+  at: "2026-03-14",
+  decision: "deferred",
+  id: "default-exports",
+  rule: "import/no-default-export",
+  scope: "packages/web",
+  standard: "Ban default exports",
+}
+
+const DECIDED = {
+  at: "2026-03-15",
+  decision: "decided",
+  id: "no-console-suppressions",
+  reason: "Keep the rule, and allow it in scripts/.",
+  standard: "`no-console` has 40 suppressions",
+}
+
+const BROKEN_LINE = '{"id":"layers","standard":"Keep src/lib in layers",}'
+
+function makeRecord(lines: readonly (object | string)[]) {
+  return lines
+    .map((line) => `${typeof line === "string" ? line : JSON.stringify(line)}\n`)
+    .join("")
+}
+
+const RECORD_CONTENT = makeRecord([REJECTED, DEFERRED, DECIDED])
 
 // A decisions record that commit `RECORD_COMMIT` last changed.
 const RECORD_FILES = { [RECORD]: RECORD_CONTENT }
+
+const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
 
 const RECORD_PROCESSES = { lastChanges: { [RECORD]: `${RECORD_COMMIT} 2026-11-02\n` } }
 
@@ -636,23 +676,29 @@ describe("harden", () => {
     })
   )
 
-  it.effect("print the commit of the decisions record, and the fix history since it, as JSON", () =>
-    Effect.gen(function* () {
-      const { logLines } = yield* runHarden(
-        { ...RECORD_FILES, ...INSTALLED },
-        ["--json"],
-        RECORD_PROCESSES
-      )
+  it.effect(
+    "print the decisions, the lines that do not decode, and the commit of the record as JSON",
+    () =>
+      Effect.gen(function* () {
+        const { logLines } = yield* runHarden(
+          { ...INSTALLED, [RECORD]: makeRecord([REJECTED, BROKEN_LINE, DEFERRED]) },
+          ["--json"],
+          RECORD_PROCESSES
+        )
 
-      expect(decodeReport(logLines[0])).toMatchObject({
-        decisionsRecord: DecisionsRecord.cases.Committed.make({
-          commit: RECORD_COMMIT,
-          date: "2026-11-02",
+        const report = decodeJson(logLines[0])
+
+        expect(report).toHaveProperty("decisionsRecord", {
+          _tag: expect.stringMatching(/^Present$/u),
+          decisions: [REJECTED, DEFERRED],
+          lastChange: { commit: RECORD_COMMIT, date: "2026-11-02" },
           path: RECORD,
-        }),
-        fixHistory: FixHistory.cases.Since.make({ commit: RECORD_COMMIT }),
+          undecodableLines: [{ issue: expect.any(String), line: 2, text: BROKEN_LINE }],
+        })
+        expect(decodeReport(logLines[0]).fixHistory).toStrictEqual(
+          FixHistory.cases.Since.make({ commit: RECORD_COMMIT })
+        )
       })
-    })
   )
 
   it("give the fix history a number of commits or a start commit, and never both", () => {
@@ -1130,7 +1176,7 @@ describe("harden", () => {
         expect(
           getMissingPhrases(prompt.slice(0, prompt.indexOf("\n## Context\n")), [
             "Steps 1 to 8 are read-only for the target project.",
-            "The one exception is the decisions record, which you write after the user answers in step 8.",
+            "The one exception is the decisions record, which you append to after the user answers in step 8.",
           ])
         ).toStrictEqual([])
         expect(missing).toStrictEqual([])
@@ -1176,7 +1222,7 @@ describe("harden", () => {
   )
 
   it.effect(
-    "name the decisions record and its last commit, and read the fix history since that commit",
+    "show each decision of the record on one line, and read the fix history since its last commit",
     () =>
       Effect.gen(function* () {
         const prompt = yield* runHardenPrompt(
@@ -1185,9 +1231,17 @@ describe("harden", () => {
           RECORD_PROCESSES
         )
 
+        const decisions = getSection(prompt, "### Decisions")
+
+        expect(getListItems(decisions)).toStrictEqual([
+          "- `tests-beside-module`, rejected 2026-03-14: Test files sit beside the module that they test. Reason: Integration tests stay in tests/. Then: 41 follow, 7 break, fixes 1a2b3c4.",
+          "- `default-exports`, deferred 2026-03-14, in `packages/web`: Ban default exports. Proposed: `import/no-default-export`.",
+          "- `no-console-suppressions`, decided 2026-03-15: `no-console` has 40 suppressions. Choice: Keep the rule, and allow it in scripts/.",
+        ])
         expect(
-          getMissingPhrases(getSection(prompt, "### Decisions"), [
-            "The decisions record is `.adamantite/decisions.md`.",
+          getMissingPhrases(decisions, [
+            "Adamantite decoded the record, so do not read the file.",
+            "The decisions record is `.adamantite/decisions.jsonl`.",
             `Commit \`${RECORD_COMMIT}\` last changed it, on 2026-11-02.`,
           ])
         ).toStrictEqual([])
@@ -1197,9 +1251,40 @@ describe("harden", () => {
             "When it lists no commit, record that the history has no commit after the record",
           ])
         ).toStrictEqual([])
-        // The agent reads the record, so the prompt names it and does not repeat its entries.
-        expect(prompt).not.toContain("Test files sit beside their module")
       })
+  )
+
+  it.effect("list a line that does not decode with its number, and say to repair it", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        ...INSTALLED,
+        [RECORD]: makeRecord([REJECTED, BROKEN_LINE]),
+      })
+
+      const decisions = getSection(prompt, "### Decisions")
+
+      expect(getListItems(decisions)).toStrictEqual([
+        expect.stringMatching(/^- `tests-beside-module`, rejected 2026-03-14: /u),
+        expect.stringMatching(/^- Line 2: \S/u),
+      ])
+      expect(decisions).toContain(
+        "Adamantite could not decode these lines of the record, and left them out. Repair each one when you append to the record in step 8."
+      )
+    })
+  )
+
+  it.effect("say that the record holds no decision when each id is approved", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        ...INSTALLED,
+        [RECORD]: makeRecord([REJECTED, { ...REJECTED, at: "2026-06-01", decision: "approved" }]),
+      })
+
+      const decisions = getSection(prompt, "### Decisions")
+
+      expect(getListItems(decisions)).toStrictEqual([])
+      expect(decisions).toContain("It holds no decision.")
+    })
   )
 
   it.effect("say that no decisions record exists, and that step 8 creates it", () =>
@@ -1208,8 +1293,8 @@ describe("harden", () => {
 
       expect(
         getMissingPhrases(getSection(prompt, "### Decisions"), [
-          "The decisions record is `.adamantite/decisions.md`.",
-          "It does not exist yet. Step 8 creates it with the first entry.",
+          "The decisions record is `.adamantite/decisions.jsonl`.",
+          "It does not exist yet, so no earlier session recorded a decision. Step 8 creates it with the first line.",
         ])
       ).toStrictEqual([])
     })
@@ -1246,16 +1331,24 @@ describe("harden", () => {
     })
   )
 
-  it.effect("keep one decisions record at the project root when --path selects a package", () =>
+  it.effect("leave out the decisions of another folder when --path selects a package", () =>
     Effect.gen(function* () {
+      const other = { ...DEFERRED, id: "api-errors", scope: "packages/api" }
+
       const prompt = yield* runHardenPrompt(
-        { ...MONOREPO_FILES, ...RECORD_FILES, "packages/web/.adamantite/decisions.md": "# Web\n" },
+        { ...MONOREPO_FILES, [RECORD]: makeRecord([REJECTED, DEFERRED, other]) },
         ["--path", "packages/web"],
         RECORD_PROCESSES
       )
 
-      expect(getSection(prompt, "### Decisions")).toContain(
-        "The decisions record is `.adamantite/decisions.md`."
+      const decisions = getSection(prompt, "### Decisions")
+
+      expect(getListItems(decisions)).toStrictEqual([
+        expect.stringMatching(/^- `tests-beside-module`, /u),
+        expect.stringMatching(/^- `default-exports`, /u),
+      ])
+      expect(decisions).toContain(
+        "It holds these decisions for `packages/web`, without the decisions of other folders."
       )
       expect(getSection(prompt, "## 4. Read the fix history")).toContain(
         `\`git log ${RECORD_COMMIT}..HEAD --no-merges --format="%h %s" -- packages/web\``
@@ -1263,19 +1356,44 @@ describe("harden", () => {
     })
   )
 
-  it.effect("leave the decisions record out of the documentation and the agent reach", () =>
-    Effect.gen(function* () {
-      const { logLines } = yield* runHarden(
-        { ...RECORD_FILES, "AGENTS.md": "# Acme\n", ...INSTALLED },
-        ["--json"],
-        RECORD_PROCESSES
-      )
+  it.effect.each([
+    {
+      args: ["--path", "packages/web"],
+      name: "the scope of --path",
+      phrase: 'Write `"scope":"packages/web"` on each line, the folder of this session.',
+      scope: "packages/web",
+    },
+    {
+      args: [],
+      name: "no scope without --path",
+      phrase: "Leave out `scope`, because this session covers the whole project.",
+      scope: undefined,
+    },
+  ])(
+    "give an example line that decodes, with the date of the clock and $name",
+    ({ args, phrase, scope }) =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.UTC(2026, 2, 14, 12))
 
-      expect(decodeReport(logLines[0])).toMatchObject({
-        agentReach: Option.some({ brokenLinks: [], unreached: [] }),
-        documentationFiles: Option.some(["AGENTS.md"]),
+        const step = getSection(
+          yield* runHardenPrompt(MONOREPO_FILES, args),
+          "## 8. Show the candidates and wait for approval"
+        )
+
+        const [example = ""] = /\{"id":.+\}/u.exec(step) ?? []
+
+        // The record of the next session holds the example line, as the agent copies it.
+        const { logLines } = yield* runHarden({ ...MONOREPO_FILES, [RECORD]: `${example}\n` }, [
+          "--json",
+        ])
+
+        expect(step).toContain(phrase)
+        expect(step).toContain("`at` is `2026-03-14`, the date of today.")
+        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.undecodableLines", [])
+        expect(decodeJson(logLines[0])).toHaveProperty("decisionsRecord.decisions", [
+          expect.objectContaining({ at: "2026-03-14", scope }),
+        ])
       })
-    })
   )
 
   it.effect("fail when --commits is not a positive number", () =>
@@ -1635,17 +1753,40 @@ describe("harden", () => {
     })
   )
 
-  it.effect("pass the verification of a session that writes only the decisions record", () =>
+  it.effect("pass the verification of a session that appends a line to the decisions record", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
+        // The line that did not decode before the session does not fail it.
+        files: { ...HEALTHY_FILES, [RECORD]: makeRecord([BROKEN_LINE]) },
         keys: ["enter"],
         onSession: (files) => {
-          files.write(RECORD, RECORD_CONTENT)
+          files.write(RECORD, `${files.read(RECORD)}${makeRecord([REJECTED])}`)
         },
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(logLines.slice(-2)).toStrictEqual([SUCCESS_LOG, "✅ Harden checks passed."])
+    })
+  )
+
+  it.effect("fail and name the line when the session adds a line that does not decode", () =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runInteractiveHarden({
+        files: { ...HEALTHY_FILES, [RECORD]: makeRecord([REJECTED]) },
+        keys: ["enter"],
+        onSession: (files) => {
+          files.write(RECORD, `${files.read(RECORD)}${makeRecord([BROKEN_LINE])}`)
+        },
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(logLines).toStrictEqual([
+        "💠 adamantite harden",
+        "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+        ...CHECK_TITLES,
+        expect.stringMatching(/^✖ Line 2 of `\.adamantite\/decisions\.jsonl` does not decode: \S/u),
+        "⚠️ Harden found issues.",
+      ])
     })
   )
 

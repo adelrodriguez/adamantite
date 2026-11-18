@@ -1,6 +1,6 @@
 ---
 name: adamantite
-description: Use when setting up Adamantite, running its checks, repairing Doctor findings, updating managed dependencies, hardening coding standards, or writing and testing custom rules.
+description: Use when setting up Adamantite, running its checks, repairing Doctor findings, updating managed dependencies, keeping a fixed mistake from recurring, hardening coding standards, or writing and testing custom rules.
 metadata:
   type: core
   library: adamantite
@@ -71,7 +71,12 @@ chain, which lists each binding file and package that Oxlint tried. When it stop
 mean that the install left out the optional dependency for this platform. Reinstall the
 dependencies with optional dependencies for this platform, then run the check again.
 
-The task is complete when the affected checks exit 0 and you have read their output.
+`adamantite check` proves formatting, lint rules, and types. It does not run the project's tests.
+After you change behavior, find the project's test command in its instructions or its package
+scripts, and run the tests of the changed code.
+
+The task is complete when the affected checks exit 0, the tests of each changed behavior pass,
+and you have read their output.
 
 ## Repair managed setup
 
@@ -103,9 +108,19 @@ findings that remain in `assessment`. It exits 1 while findings remain.
 Follow the repair step above. The update is complete when Doctor reports no findings and
 the project's checks pass.
 
+## Keep a fixed mistake from recurring
+
+After you fix a regression, a mistake that a reviewer corrected before, or a break of a project
+standard that no check reported, follow
+[How to keep a fixed mistake from recurring](references/corrections.md). It starts from that one
+mistake, and decides whether the project keeps a test, a type, a rule, an instruction, or nothing.
+
+The task is complete when the guide's checks pass.
+
 ## Harden coding standards
 
-Run `adamantite harden` and follow its Markdown prompt. `adamantite harden --json` prints what the
+Run `adamantite harden` and follow its Markdown prompt. The prompt puts each coding standard on a
+step of [the enforcement ladder](references/enforcement-ladder.md). `adamantite harden --json` prints what the
 prompt is built from, such as the agent reach and the suppressions, as JSON. Use `--path` to limit the scope
 when the request covers one package or folder. Show the candidate standards and wait for
 the user's approval before writing. If no human can approve, report the candidates and stop.
@@ -136,6 +151,7 @@ The report is complete when every result has command output or an inspected arti
 ## Check the result
 
 - The selected command matches the requested task and scope.
-- The affected checks passed, or the report names the checks that remain unverified.
+- The affected checks and the tests of each changed behavior passed, or the report names what
+  remains unverified.
 - Doctor findings and assessment warnings are reported separately.
 - Every new or changed custom rule passed verification, and temporary cases are removed.

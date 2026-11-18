@@ -118,4 +118,17 @@ describe("agent guidance setup", () => {
       )
     })
   )
+
+  // The skill loads for an Adamantite task, so AGENTS.md sends an agent to it after a fix.
+  it.effect("send an agent that fixed a mistake to the section of the skill for it", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+
+      yield* runLifecycle("init", files, INIT_ARGS)
+
+      expect(files.read(AGENTS)).toContain(
+        '- After you fix a regression, or a mistake that a reviewer corrected before, follow the "Keep a fixed mistake from recurring" section of the Adamantite skill.'
+      )
+    })
+  )
 })

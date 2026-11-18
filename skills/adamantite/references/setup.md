@@ -37,7 +37,9 @@ and a later `init` adds its options to that selection. Commit the lockfile with 
 It sets each selected script in `package.json` to its Adamantite command and replaces what the
 script ran. Before you select a script that already runs another command, check that the task
 includes replacing it. Otherwise, leave that script out, or move its command to a script of
-another name first.
+another name first. After a move, find each place that ran the script, such as a CI workflow or a
+Git hook, and make it run the new script too. The workflow that Adamantite writes runs only the
+managed scripts, so a test that the replaced script ran no longer runs in it.
 It writes each managed config, such as `oxlint.config.ts`, whole, and keeps a config that the
 project changed. Do not merge the reference config into a kept file. Read `setup.files` in the
 JSON for a `Kept` file. `init` exits 1 when findings remain after the setup, and
@@ -78,3 +80,4 @@ Continue when Doctor reports no findings for the selected plugins and editors.
 - `.adamantite/adamantite-lock.json` exists and is committed with the setup.
 - Doctor reports no findings, and its assessment warnings are recorded.
 - Existing scripts and configuration are preserved unless the task includes replacing them.
+- Each command that a replaced script ran still runs where it ran before, such as in CI.

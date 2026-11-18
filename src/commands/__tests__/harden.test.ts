@@ -234,9 +234,10 @@ const NO_SELECTION = {
   typescript: null,
 } as const satisfies Selection
 
+// The installed Adamantite wrote the lockfile, or `check` fails the setup.
 const INSTALLED = {
   ...ADAMANTITE_MODULE,
-  ...makeLockfileFile(NO_SELECTION),
+  ...makeLockfileFile(NO_SELECTION, {}, getPackageVersion()),
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
 }
 
@@ -2118,7 +2119,11 @@ describe("harden", () => {
           // Knip is installed without its managed config, so Doctor reports one finding.
           files: {
             ...ADAMANTITE_MODULE,
-            ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
+            ...makeLockfileFile(
+              { ...NO_SELECTION, agents: true, scripts: ["analyze"] },
+              {},
+              getPackageVersion()
+            ),
             ...SKILL_FILES,
             "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
             "package.json": manifest({
@@ -2153,7 +2158,11 @@ describe("harden", () => {
         // Knip is installed without its managed config, so Doctor reports one finding.
         files: {
           ...ADAMANTITE_MODULE,
-          ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
+          ...makeLockfileFile(
+            { ...NO_SELECTION, agents: true, scripts: ["analyze"] },
+            {},
+            getPackageVersion()
+          ),
           ...SKILL_FILES,
           "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
           "package.json": manifest({

@@ -33,7 +33,10 @@ function moduleExportName(name: ESTree.ModuleExportName): string {
 const rule: Rule = {
   createOnce(context) {
     const report = (node: DeclaredName) => {
-      if (!containsForbiddenSymbolName(node.name)) return
+      if (!containsForbiddenSymbolName(node.name)) {
+        return
+      }
+
       context.report({
         data: { name: node.name },
         messageId: "forbiddenSymbolName",
@@ -42,15 +45,21 @@ const rule: Rule = {
     }
 
     const reportMemberKey = ({ computed, key }: Member) => {
-      if (!computed && (key.type === "Identifier" || key.type === "PrivateIdentifier")) report(key)
+      if (!computed && (key.type === "Identifier" || key.type === "PrivateIdentifier")) {
+        report(key)
+      }
     }
 
     return {
       AccessorProperty: reportMemberKey,
       ExportSpecifier(node) {
-        if (moduleExportName(node.local) === moduleExportName(node.exported)) return
+        if (moduleExportName(node.local) === moduleExportName(node.exported)) {
+          return
+        }
 
-        if (node.exported.type !== "Literal") report(node.exported)
+        if (node.exported.type !== "Literal") {
+          report(node.exported)
+        }
       },
       ImportDefaultSpecifier(node) {
         report(node.local)
@@ -59,7 +68,9 @@ const rule: Rule = {
         report(node.local)
       },
       ImportSpecifier(node) {
-        if (moduleExportName(node.imported) !== node.local.name) report(node.local)
+        if (moduleExportName(node.imported) !== node.local.name) {
+          report(node.local)
+        }
       },
       MethodDefinition: reportMemberKey,
       "Program:exit"() {
@@ -67,7 +78,9 @@ const rule: Rule = {
         // Without either, skip the scope analysis that the walk below would build.
         const { text } = context.sourceCode
 
-        if (!FORBIDDEN_SYMBOL_PATTERN.test(text) && !text.includes("\\u")) return
+        if (!FORBIDDEN_SYMBOL_PATTERN.test(text) && !text.includes("\\u")) {
+          return
+        }
 
         // A class name is a variable in two scopes, so report each declared name once.
         const declaredNames = new Set<DeclaredName>()
@@ -82,7 +95,9 @@ const rule: Rule = {
           }
         }
 
-        for (const name of declaredNames) report(name)
+        for (const name of declaredNames) {
+          report(name)
+        }
       },
       PropertyDefinition: reportMemberKey,
       TSAbstractAccessorProperty: reportMemberKey,

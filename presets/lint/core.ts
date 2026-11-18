@@ -116,6 +116,7 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "block-scoped-var": "error",
     "class-methods-use-this": "warn",
     "constructor-super": "error",
+    curly: "error",
     "default-case": "off",
     "default-case-last": "error",
     "default-param-last": "error",

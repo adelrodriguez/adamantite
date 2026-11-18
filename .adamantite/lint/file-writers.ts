@@ -121,7 +121,9 @@ function findFileSystemExports(context: Context, node: ESTree.ImportDeclaration)
 function findTags(context: Context, node: ESTree.ImportDeclaration) {
   const exports = findFileSystemExports(context, node)
 
-  if (node.source.value === "effect/FileSystem") return exports
+  if (node.source.value === "effect/FileSystem") {
+    return exports
+  }
 
   return node.source.value === "effect"
     ? exports.flatMap(({ parent }) =>
@@ -133,7 +135,9 @@ function findTags(context: Context, node: ESTree.ImportDeclaration) {
 // The import specifier that declares the variable that `node` reads, or null when `node` is not an
 // identifier or reads a variable that no import declares.
 function findImportSpecifier(context: Context, node: ESTree.Node) {
-  if (node.type !== "Identifier") return null
+  if (node.type !== "Identifier") {
+    return null
+  }
 
   let scope: Scope | null = context.sourceCode.getScope(node)
 
@@ -216,7 +220,9 @@ function findServiceParameters(context: Context, tag: ESTree.Node) {
   const call =
     parent?.type === "MemberExpression" && memberName(parent) === "pipe" ? parent.parent : undefined
 
-  if (call?.type !== "CallExpression" || call.callee !== parent) return []
+  if (call?.type !== "CallExpression" || call.callee !== parent) {
+    return []
+  }
 
   // The steps up to and including the first one that may change the value.
   const steps = call.arguments
@@ -246,7 +252,9 @@ export default defineRule({
         }
       }
 
-      if (pattern.type !== "ObjectPattern") return
+      if (pattern.type !== "ObjectPattern") {
+        return
+      }
 
       for (const property of pattern.properties) {
         if (property.type === "Property") {
@@ -277,7 +285,9 @@ export default defineRule({
       }
 
       for (const parameter of findServiceParameters(context, tag)) {
-        if (parameter !== undefined) reportBinding(parameter)
+        if (parameter !== undefined) {
+          reportBinding(parameter)
+        }
       }
     }
 
@@ -290,7 +300,9 @@ export default defineRule({
     // The file that a relative or `#` import resolves to, such as `src/lib/shared/filesystem.ts` for
     // `../shared/filesystem.ts`, or null for a package or a path that does not resolve.
     function resolveImport(source: string) {
-      if (!source.startsWith(".") && !source.startsWith("#")) return null
+      if (!source.startsWith(".") && !source.startsWith("#")) {
+        return null
+      }
 
       try {
         return relative(ROOT, createRequire(context.filename).resolve(source)).split(sep).join("/")
@@ -312,11 +324,17 @@ export default defineRule({
       ImportDeclaration(node) {
         reportNodeFs(node, node.source)
 
-        if (WRITERS.some((writer) => file === writer || file.startsWith(`${writer}/`))) return
+        if (WRITERS.some((writer) => file === writer || file.startsWith(`${writer}/`))) {
+          return
+        }
 
-        for (const tag of findTags(context, node)) reportTag(tag)
+        for (const tag of findTags(context, node)) {
+          reportTag(tag)
+        }
 
-        if (resolveImport(node.source.value) !== HELPERS_MODULE) return
+        if (resolveImport(node.source.value) !== HELPERS_MODULE) {
+          return
+        }
 
         for (const specifier of node.specifiers) {
           if (specifier.type === "ImportSpecifier") {

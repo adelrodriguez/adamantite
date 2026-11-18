@@ -84,7 +84,10 @@ function declaredName(node: TypeBindingNode): string | null {
 function recordBinding(node: TypeBindingNode, bindingsByName: BindingIndex): void {
   const name = declaredName(node)
 
-  if (name === null) return
+  if (name === null) {
+    return
+  }
+
   const scope = enclosingTypeScope(node)
   const scopes = bindingsByName.get(name) ?? new Map<TypeScope, TypeBinding[]>()
   const bindings = scopes.get(scope) ?? []
@@ -113,7 +116,9 @@ export function withTypeBindings(
   let environment: TypeAliasEnvironment | null = null
 
   const record = (node: TypeBindingNode) => {
-    if (bindingsByName !== null) recordBinding(node, bindingsByName)
+    if (bindingsByName !== null) {
+      recordBinding(node, bindingsByName)
+    }
   }
 
   return {
@@ -155,7 +160,9 @@ export function withTypeBindings(
       visitors["Program:exit"]?.(node)
 
       if (environment !== null) {
-        for (const check of checks) check(environment)
+        for (const check of checks) {
+          check(environment)
+        }
       }
 
       checks.length = 0
@@ -204,14 +211,20 @@ function nearestDeclaredBindings(
 ): DeclaredBindings {
   const scopes = environment.bindingsByName.get(name)
 
-  if (scopes === undefined) return NO_DECLARED_BINDINGS
+  if (scopes === undefined) {
+    return NO_DECLARED_BINDINGS
+  }
+
   let current: ESTree.Node | null = use
   let distance = 0
 
   while (current !== null) {
     const bindings = scopes.get(current)
 
-    if (bindings !== undefined) return { bindings, distance }
+    if (bindings !== undefined) {
+      return { bindings, distance }
+    }
+
     current = current.parent
     distance += 1
   }
@@ -266,7 +279,9 @@ export function visibleInterfaces(
 ): readonly ESTree.TSInterfaceDeclaration[] {
   const nearest = nearestTypeBinding(name, use, environment)
 
-  if (nearest.kind !== "declared") return []
+  if (nearest.kind !== "declared") {
+    return []
+  }
 
   const interfaces = nearest.bindings.flatMap(({ declaration }) =>
     declaration.type === "TSInterfaceDeclaration" ? [declaration] : []
@@ -373,7 +388,10 @@ function aliasSubstitutions(
     const explicitArgument = arguments_[index]
     const argument = explicitArgument ?? parameter.default
 
-    if (argument === null) return null
+    if (argument === null) {
+      return null
+    }
+
     const argumentSubstitutions = explicitArgument === undefined ? next : base
     next.set(parameter.name.name, {
       substitutions: new Map(argumentSubstitutions),

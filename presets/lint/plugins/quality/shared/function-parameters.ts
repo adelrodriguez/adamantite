@@ -42,7 +42,9 @@ export function functionParameterBindingName(
     return functionParameterBindingName(parameter.argument, sourceCode)
   }
 
-  if (parameter.type === "Identifier") return parameter.name
+  if (parameter.type === "Identifier") {
+    return parameter.name
+  }
 
   const sourceText = sourceCode.getText(parameter)
   const annotationStart = parameter.typeAnnotation?.start

@@ -131,7 +131,9 @@ const FINITE_KEY_TYPES: ReadonlySet<string> = new Set(["TSLiteralType", "TSNever
 type KeyBreadth = "broad" | "finite" | "unresolved"
 
 function unionKeyBreadth(members: readonly KeyBreadth[]): KeyBreadth {
-  if (members.includes("broad")) return "broad"
+  if (members.includes("broad")) {
+    return "broad"
+  }
 
   return members.every((member) => member === "finite") ? "finite" : "unresolved"
 }
@@ -144,9 +146,13 @@ function keyBreadth(
 ): KeyBreadth {
   const unwrapped = unwrapTransparentType(type)
 
-  if (BROAD_KEY_TYPES.has(unwrapped.type)) return "broad"
+  if (BROAD_KEY_TYPES.has(unwrapped.type)) {
+    return "broad"
+  }
 
-  if (FINITE_KEY_TYPES.has(unwrapped.type)) return "finite"
+  if (FINITE_KEY_TYPES.has(unwrapped.type)) {
+    return "finite"
+  }
 
   if (unwrapped.type === "TSUnionType") {
     return unionKeyBreadth(
@@ -166,10 +172,16 @@ function keyBreadth(
       : "unresolved"
   }
 
-  if (unwrapped.type !== "TSTypeReference") return "unresolved"
+  if (unwrapped.type !== "TSTypeReference") {
+    return "unresolved"
+  }
+
   const reference = namedTypeReference(unwrapped)
 
-  if (reference === null) return "unresolved"
+  if (reference === null) {
+    return "unresolved"
+  }
+
   const { name, typeArguments } = reference
   const substitution = substitutionFor(reference, substitutions)
 
@@ -177,7 +189,9 @@ function keyBreadth(
     return keyBreadth(substitution.type, environment, substitution.substitutions, visitedAliases)
   }
 
-  if (isBuiltIn(reference, "PropertyKey", environment)) return "broad"
+  if (isBuiltIn(reference, "PropertyKey", environment)) {
+    return "broad"
+  }
 
   if (KEY_CASE_CHANGES.has(name) && isBuiltIn(reference, name, environment)) {
     const [key] = typeArguments
@@ -189,7 +203,10 @@ function keyBreadth(
 
   const alias = localAlias(reference, environment)
 
-  if (alias === null || hasTypeParameters(alias) || visitedAliases.has(name)) return "unresolved"
+  if (alias === null || hasTypeParameters(alias) || visitedAliases.has(name)) {
+    return "unresolved"
+  }
+
   const nextVisited = new Set(visitedAliases)
   nextVisited.add(name)
 
@@ -220,7 +237,10 @@ function mappedKeyBreadth(
   environment: TypeEnvironment,
   substitutions: TypeAliasEnvironment
 ): KeyBreadth {
-  if (type.nameType === null) return keyBreadth(type.constraint, environment, substitutions)
+  if (type.nameType === null) {
+    return keyBreadth(type.constraint, environment, substitutions)
+  }
+
   const keySubstitutions = new Map(substitutions)
   keySubstitutions.set(type.key.name, { substitutions, type: type.constraint })
 
@@ -260,7 +280,10 @@ function isEffectivelyEmptyTypeLiteral(type: ESTree.TSTypeLiteral): boolean {
 function isEffectivelyEmptyInterface(
   declarations: readonly ESTree.TSInterfaceDeclaration[]
 ): boolean {
-  if (declarations.length !== 1) return false
+  if (declarations.length !== 1) {
+    return false
+  }
+
   const [type] = declarations
 
   return (
@@ -287,7 +310,10 @@ function typeArgumentSubstitution(
     const explicitArgument = arguments_[index]
     const argument = explicitArgument ?? parameter.default
 
-    if (argument === null) return null
+    if (argument === null) {
+      return null
+    }
+
     next.set(parameter.name.name, {
       substitutions: explicitArgument === undefined ? new Map(next) : base,
       type: argument,
@@ -305,14 +331,21 @@ function unsafeDirectValue(
 ): UnsafeDictionary["unsafeValue"] | null {
   const unwrapped = unwrapTransparentType(type)
 
-  if (unwrapped.type === "TSUnknownKeyword") return "unknown"
+  if (unwrapped.type === "TSUnknownKeyword") {
+    return "unknown"
+  }
 
-  if (unwrapped.type === "TSAnyKeyword") return "any"
+  if (unwrapped.type === "TSAnyKeyword") {
+    return "any"
+  }
 
-  if (unwrapped.type === "TSObjectKeyword") return "object"
+  if (unwrapped.type === "TSObjectKeyword") {
+    return "object"
+  }
 
-  if (unwrapped.type === "TSTypeLiteral" && isEffectivelyEmptyTypeLiteral(unwrapped))
+  if (unwrapped.type === "TSTypeLiteral" && isEffectivelyEmptyTypeLiteral(unwrapped)) {
     return "empty-object"
+  }
 
   if (unwrapped.type === "TSUnionType") {
     return unwrapped.types.some(
@@ -327,17 +360,25 @@ function unsafeDirectValue(
       unsafeDirectValue(member, environment, substitutions, resolvingAliases)
     )
 
-    if (unsafeMembers.includes("any")) return "any"
+    if (unsafeMembers.includes("any")) {
+      return "any"
+    }
 
     const [first = null] = unsafeMembers
 
     return unsafeMembers.every((member) => member !== null) ? first : null
   }
 
-  if (unwrapped.type !== "TSTypeReference") return null
+  if (unwrapped.type !== "TSTypeReference") {
+    return null
+  }
+
   const reference = namedTypeReference(unwrapped)
 
-  if (reference === null) return null
+  if (reference === null) {
+    return null
+  }
+
   const { name, typeArguments } = reference
 
   if (isTransparentWrapper(reference, environment)) {
@@ -367,10 +408,16 @@ function unsafeDirectValue(
 
   const alias = localAlias(reference, environment)
 
-  if (alias === null || resolvingAliases.has(name)) return null
+  if (alias === null || resolvingAliases.has(name)) {
+    return null
+  }
+
   const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
 
-  if (nextSubstitutions === null) return null
+  if (nextSubstitutions === null) {
+    return null
+  }
+
   const nextResolving = new Set(resolvingAliases)
   nextResolving.add(name)
 
@@ -400,7 +447,10 @@ function dictionaryValueTypes(
       : [{ substitutions, type: unwrapped.typeAnnotation }]
   }
 
-  if (unwrapped.type !== "TSTypeReference") return []
+  if (unwrapped.type !== "TSTypeReference") {
+    return []
+  }
+
   const reference = namedTypeReference(unwrapped)
 
   return reference === null
@@ -451,7 +501,10 @@ function referenceValueTypes(
       : dictionaryValueTypes(source, environment, substitutions, resolvingAliases)
   }
 
-  if (resolvingAliases.has(name)) return []
+  if (resolvingAliases.has(name)) {
+    return []
+  }
+
   const nextResolving = new Set(resolvingAliases)
   nextResolving.add(name)
   const alias = localAlias(reference, environment)
@@ -486,7 +539,9 @@ function interfaceValueTypes(
     substitutions
   )
 
-  if (nextSubstitutions === null) return []
+  if (nextSubstitutions === null) {
+    return []
+  }
 
   const indexValues = declaration.body.body.flatMap((member): readonly ResolvedType[] =>
     member.type === "TSIndexSignature"
@@ -538,13 +593,19 @@ function defaultTypeArguments(node: ESTree.Node, environment: TypeEnvironment) {
   const declaration = enclosingGenericDeclaration(node)
   const defaults = new Map<string, ResolvedType>()
 
-  if (declaration === null) return defaults
+  if (declaration === null) {
+    return defaults
+  }
+
   const hidden = lexicalTypeParameterNames(node, environment.typeAliases.visitorKeys, declaration)
 
   for (const parameter of declaration.typeParameters?.params ?? []) {
     const name = parameter.name.name
 
-    if (parameter.default === null || hidden.has(name)) continue
+    if (parameter.default === null || hidden.has(name)) {
+      continue
+    }
+
     defaults.set(name, { substitutions: new Map(defaults), type: parameter.default })
   }
 
@@ -563,7 +624,9 @@ function classifyValueTypes(
       new Set()
     )
 
-    if (unsafeValue !== null) return { kind: "unsafe-dictionary", unsafeValue }
+    if (unsafeValue !== null) {
+      return { kind: "unsafe-dictionary", unsafeValue }
+    }
   }
 
   return null
@@ -600,7 +663,10 @@ export function classifyUnsafeHeritage(
 ): UnsafeDictionary | null {
   const reference = namedTypeReference(heritage)
 
-  if (reference === null) return null
+  if (reference === null) {
+    return null
+  }
+
   const substitutions = defaultTypeArguments(heritage, environment)
 
   return classifyValueTypes(
@@ -615,9 +681,13 @@ export function classifyWideningTarget(
 ): WideningTarget | null {
   const unwrapped = unwrapTransparentType(type)
 
-  if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" }
+  if (unwrapped.type === "TSUnknownKeyword") {
+    return { kind: "unknown" }
+  }
 
-  if (unwrapped.type === "TSObjectKeyword") return { kind: "object" }
+  if (unwrapped.type === "TSObjectKeyword") {
+    return { kind: "object" }
+  }
 
   if (unwrapped.type === "TSTypeLiteral") {
     return unwrapped.members.some((member) => member.type === "TSIndexSignature")
@@ -633,10 +703,16 @@ export function classifyWideningTarget(
       : null
   }
 
-  if (unwrapped.type !== "TSTypeReference") return null
+  if (unwrapped.type !== "TSTypeReference") {
+    return null
+  }
+
   const reference = namedTypeReference(unwrapped)
 
-  if (reference === null) return null
+  if (reference === null) {
+    return null
+  }
+
   const [wrapped] = reference.typeArguments
 
   if (isTransparentWrapper(reference, environment)) {
@@ -650,7 +726,9 @@ export function classifyWideningTarget(
 
   // A generic named type is a container for the caller's values, and its other broad targets
   // depend on the type argument.
-  if (declaration === undefined || !hasTypeParameters(declaration)) return resolved
+  if (declaration === undefined || !hasTypeParameters(declaration)) {
+    return resolved
+  }
 
   return resolved?.kind === "open dictionary" ? { kind: "generic container" } : null
 }
@@ -667,7 +745,9 @@ function isOpenInterface(
   resolvingAliases: ReadonlySet<string>
 ): boolean {
   return declarations.some((declaration) => {
-    if (declaration.body.body.some((member) => member.type === "TSIndexSignature")) return true
+    if (declaration.body.body.some((member) => member.type === "TSIndexSignature")) {
+      return true
+    }
 
     const heritageSubstitutions = typeArgumentSubstitution(
       declaration,
@@ -702,9 +782,13 @@ function classifyAliasBroadTarget(
 ): WideningTarget | null {
   const unwrapped = unwrapTransparentType(type)
 
-  if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" }
+  if (unwrapped.type === "TSUnknownKeyword") {
+    return { kind: "unknown" }
+  }
 
-  if (unwrapped.type === "TSObjectKeyword") return { kind: "object" }
+  if (unwrapped.type === "TSObjectKeyword") {
+    return { kind: "object" }
+  }
 
   if (unwrapped.type === "TSTypeLiteral") {
     return unwrapped.members.some((member) => member.type === "TSIndexSignature")
@@ -718,7 +802,10 @@ function classifyAliasBroadTarget(
       : null
   }
 
-  if (unwrapped.type !== "TSTypeReference") return null
+  if (unwrapped.type !== "TSTypeReference") {
+    return null
+  }
+
   const reference = namedTypeReference(unwrapped)
 
   return reference === null
@@ -758,7 +845,10 @@ function classifyReferenceBroadTarget(
       : null
   }
 
-  if (resolvingAliases.has(name)) return null
+  if (resolvingAliases.has(name)) {
+    return null
+  }
+
   const nextResolving = new Set(resolvingAliases)
   nextResolving.add(name)
   const alias = localAlias(reference, environment)
@@ -777,7 +867,9 @@ function classifyReferenceBroadTarget(
 
   const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
 
-  if (nextSubstitutions === null) return null
+  if (nextSubstitutions === null) {
+    return null
+  }
 
   return classifyAliasBroadTarget(
     alias.typeAnnotation,
@@ -815,7 +907,9 @@ export function isKnownEvidenceExpression(expression: ESTree.Expression): boolea
     current = current.expression
   }
 
-  if (current.type === "ObjectExpression") return true
+  if (current.type === "ObjectExpression") {
+    return true
+  }
 
   return (
     current.type === "ArrayExpression"

@@ -17,7 +17,9 @@ const loopHeadKinds = new Set(["ForInStatement", "ForOfStatement", "ForStatement
  * Reports whether a node is the statement that owns the comments above an assertion.
  */
 function isCommentOwner(node: ESTree.Node): boolean {
-  if (node.type === "VariableDeclaration" && loopHeadKinds.has(node.parent.type)) return false
+  if (node.type === "VariableDeclaration" && loopHeadKinds.has(node.parent.type)) {
+    return false
+  }
 
   return statementLikeKinds.has(node.type) || /(?:Declaration|Statement)$/u.test(node.type)
 }
@@ -54,7 +56,10 @@ function isTrailingComment(
   comment: ESTree.Comment,
   statement: ESTree.Node
 ): boolean {
-  if (comment.start >= statement.start) return false
+  if (comment.start >= statement.start) {
+    return false
+  }
+
   const previous = sourceCode.getTokenBefore(comment)
 
   return previous !== null && previous.loc.end.line === comment.loc.start.line
@@ -99,13 +104,19 @@ const rule: Rule = {
     const patterns = new Map<string, RegExp>()
 
     const checkAssertion = (node: TypeAssertion) => {
-      if (isConstAssertion(node)) return
+      if (isConstAssertion(node)) {
+        return
+      }
+
       const markers = configuredSafetyMarkers(readStringArrayOption(context.options, "markers"))
       const patternKey = markers.join("\u0000")
       const pattern = patterns.get(patternKey) ?? markerPattern(markers)
       patterns.set(patternKey, pattern)
 
-      if (hasSafetyComment(context.sourceCode, node, pattern)) return
+      if (hasSafetyComment(context.sourceCode, node, pattern)) {
+        return
+      }
+
       context.report({
         data: { marker: markers[0] ?? DEFAULT_SAFETY_MARKERS[0] },
         messageId: "missingSafetyComment",

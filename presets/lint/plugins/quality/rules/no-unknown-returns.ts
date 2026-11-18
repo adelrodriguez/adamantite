@@ -21,9 +21,15 @@ const rule: Rule = {
       const checkReturnType = (node: FunctionWithReturnType) => {
         const annotation = node.returnType
 
-        if (annotation === null || annotation === undefined) return
+        if (annotation === null || annotation === undefined) {
+          return
+        }
+
         defer((environment) => {
-          if (!exposesUnknown(annotation.typeAnnotation, environment)) return
+          if (!exposesUnknown(annotation.typeAnnotation, environment)) {
+            return
+          }
+
           context.report({ messageId: "unknownReturn", node: annotation.typeAnnotation })
         })
       }

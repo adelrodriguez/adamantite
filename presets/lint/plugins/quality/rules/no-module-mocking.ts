@@ -24,7 +24,10 @@ const frameworkExports = new Map([
  * import, or null when the identifier is not an import.
  */
 function importedBinding(sourceCode: SourceCode, expression: ESTree.Node) {
-  if (expression.type !== "Identifier") return null
+  if (expression.type !== "Identifier") {
+    return null
+  }
+
   const definition = resolveVariable(sourceCode, expression)?.defs[0]
 
   if (definition?.type !== "ImportBinding" || definition.parent?.type !== "ImportDeclaration") {
@@ -34,9 +37,14 @@ function importedBinding(sourceCode: SourceCode, expression: ESTree.Node) {
   const { node } = definition
   const source = definition.parent.source.value
 
-  if (node.type === "ImportNamespaceSpecifier") return { name: "*", source }
+  if (node.type === "ImportNamespaceSpecifier") {
+    return { name: "*", source }
+  }
 
-  if (node.type !== "ImportSpecifier") return null
+  if (node.type !== "ImportSpecifier") {
+    return null
+  }
+
   const name = staticKeyName(node.imported, false)
 
   return name === null ? null : { name, source }
@@ -54,9 +62,14 @@ function isTestFrameworkObject(sourceCode: SourceCode, expression: ESTree.Node) 
 
   const imported = importedBinding(sourceCode, expression)
 
-  if (imported !== null) return frameworkExports.get(imported.source) === imported.name
+  if (imported !== null) {
+    return frameworkExports.get(imported.source) === imported.name
+  }
 
-  if (expression.type !== "MemberExpression") return false
+  if (expression.type !== "MemberExpression") {
+    return false
+  }
+
   const namespace = importedBinding(sourceCode, expression.object)
 
   return (

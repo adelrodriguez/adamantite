@@ -33,7 +33,10 @@ function unwrapExpression(expression: ESTree.Expression): ESTree.Expression {
 }
 
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
-  if (variable.defs.length !== 1) return null
+  if (variable.defs.length !== 1) {
+    return null
+  }
+
   const [definition] = variable.defs
 
   return definition?.type === "Variable" && definition.node.type === "VariableDeclarator"
@@ -54,13 +57,22 @@ function hasKnownEvidence(
   expression: ESTree.Expression,
   visitedVariables = new Set<Variable>()
 ): boolean {
-  if (isKnownEvidenceExpression(expression)) return true
+  if (isKnownEvidenceExpression(expression)) {
+    return true
+  }
+
   const unwrapped = unwrapExpression(expression)
 
-  if (unwrapped.type !== "Identifier") return false
+  if (unwrapped.type !== "Identifier") {
+    return false
+  }
+
   const variable = resolveVariable(sourceCode, unwrapped)
 
-  if (variable === null || visitedVariables.has(variable)) return false
+  if (variable === null || visitedVariables.has(variable)) {
+    return false
+  }
+
   const declarator = variableDeclarator(variable)
 
   if (!declarator?.init || !isStableConstVariable(variable, declarator)) {
@@ -88,15 +100,25 @@ function localFunctionForCall(
 ): FunctionExpression | null {
   const unwrapped = unwrapExpression(callee)
 
-  if (isFunctionExpression(unwrapped)) return unwrapped
+  if (isFunctionExpression(unwrapped)) {
+    return unwrapped
+  }
 
-  if (unwrapped.type !== "Identifier") return null
+  if (unwrapped.type !== "Identifier") {
+    return null
+  }
+
   const variable = resolveVariable(sourceCode, unwrapped)
 
-  if (variable?.defs.length !== 1) return null
+  if (variable?.defs.length !== 1) {
+    return null
+  }
+
   const [definition] = variable.defs
 
-  if (definition === undefined) return null
+  if (definition === undefined) {
+    return null
+  }
 
   if (definition.type === "FunctionName" && isFunctionExpression(definition.node)) {
     return definition.node
@@ -108,7 +130,10 @@ function localFunctionForCall(
 
   const initializer = definition.node.init
 
-  if (initializer === null) return null
+  if (initializer === null) {
+    return null
+  }
+
   const unwrappedInitializer = unwrapExpression(initializer)
 
   return isFunctionExpression(unwrappedInitializer) ? unwrappedInitializer : null
@@ -161,22 +186,35 @@ function enclosingFunction(node: ESTree.Node): FunctionExpression | null {
 }
 
 function sourceKeyName(sourceCode: SourceCode, key: ESTree.PropertyKey): string {
-  if (key.type === "Identifier" || key.type === "PrivateIdentifier") return key.name
+  if (key.type === "Identifier" || key.type === "PrivateIdentifier") {
+    return key.name
+  }
 
-  if (key.type === "Literal") return String(key.value)
+  if (key.type === "Literal") {
+    return String(key.value)
+  }
 
   return sourceCode.getText(key)
 }
 
 function functionName(sourceCode: SourceCode, owner: FunctionExpression | null): string {
-  if (owner === null) return "anonymous function"
+  if (owner === null) {
+    return "anonymous function"
+  }
 
-  if (owner.id !== null) return owner.id.name
+  if (owner.id !== null) {
+    return owner.id.name
+  }
+
   const parent = owner.parent
 
-  if (parent.type === "VariableDeclarator" && parent.id.type === "Identifier") return parent.id.name
+  if (parent.type === "VariableDeclarator" && parent.id.type === "Identifier") {
+    return parent.id.name
+  }
 
-  if (parent.type === "MethodDefinition") return sourceKeyName(sourceCode, parent.key)
+  if (parent.type === "MethodDefinition") {
+    return sourceKeyName(sourceCode, parent.key)
+  }
 
   return "anonymous function"
 }
@@ -234,13 +272,18 @@ const rule: Rule = {
       destination: WideningTarget | null,
       subject: string
     ) => {
-      if (destination === null) return
+      if (destination === null) {
+        return
+      }
 
       if (isDictionaryAccumulatorTarget(destination) && isEmptyObjectExpression(expression)) {
         return
       }
 
-      if (!hasKnownEvidence(context.sourceCode, expression)) return
+      if (!hasKnownEvidence(context.sourceCode, expression)) {
+        return
+      }
+
       context.report({
         data: { subject, target: destination.kind },
         messageId: "widening",
@@ -249,13 +292,22 @@ const rule: Rule = {
     }
 
     const checkAssignment = (node: ESTree.AssignmentExpression, environment: TypeEnvironment) => {
-      if (node.left.type !== "Identifier" || !annotatedNames.has(node.left.name)) return
+      if (node.left.type !== "Identifier" || !annotatedNames.has(node.left.name)) {
+        return
+      }
+
       const variable = resolveVariable(context.sourceCode, node.left)
 
-      if (variable === null) return
+      if (variable === null) {
+        return
+      }
+
       const declarator = variableDeclarator(variable)
 
-      if (declarator?.id.type !== "Identifier") return
+      if (declarator?.id.type !== "Identifier") {
+        return
+      }
+
       reportFlow(
         node.right,
         annotationTarget(declarator.id.typeAnnotation, environment),
@@ -266,13 +318,22 @@ const rule: Rule = {
     const checkPredicateCall = (node: ESTree.CallExpression, environment: TypeEnvironment) => {
       const callee = unwrapExpression(node.callee)
 
-      if (callee.type === "Identifier" && !predicateNames.has(callee.name)) return
+      if (callee.type === "Identifier" && !predicateNames.has(callee.name)) {
+        return
+      }
+
       const owner = localFunctionForCall(context.sourceCode, node.callee)
 
-      if (owner === null) return
+      if (owner === null) {
+        return
+      }
+
       const parameterIndex = typePredicateSubjectIndex(context.sourceCode, owner)
 
-      if (parameterIndex === null) return
+      if (parameterIndex === null) {
+        return
+      }
+
       const parameter = owner.params[parameterIndex]
       const argument = node.arguments[parameterIndex]
 
@@ -292,7 +353,9 @@ const rule: Rule = {
 
       // TypeScript narrows the caller's binding at a guard call, so a declared type, such as
       // a union, is not evidence. Only a literal or object value makes the guard pointless.
-      if (!hasKnownEvidence(context.sourceCode, argument)) return
+      if (!hasKnownEvidence(context.sourceCode, argument)) {
+        return
+      }
 
       context.report({
         data: {
@@ -315,11 +378,16 @@ const rule: Rule = {
         return
       }
 
-      if (owner.id !== null) predicateNames.add(owner.id.name)
+      if (owner.id !== null) {
+        predicateNames.add(owner.id.name)
+      }
+
       const value = outermostWrapper(owner)
       const declarator = value.parent
 
-      if (declarator?.type !== "VariableDeclarator" || declarator.init !== value) return
+      if (declarator?.type !== "VariableDeclarator" || declarator.init !== value) {
+        return
+      }
 
       if (declarator.id.type === "Identifier") {
         predicateNames.add(declarator.id.name)
@@ -338,14 +406,20 @@ const rule: Rule = {
         annotation: ESTree.TSTypeAnnotation | null | undefined,
         subject: () => string
       ) => {
-        if (annotation === null || annotation === undefined) return
+        if (annotation === null || annotation === undefined) {
+          return
+        }
+
         defer((typeAliases) => {
           reportFlow(expression, annotationTarget(annotation, { typeAliases }), subject())
         })
       }
 
       const checkAssertion = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion) => {
-        if (hasParentAssertion(node)) return
+        if (hasParentAssertion(node)) {
+          return
+        }
+
         defer((typeAliases) => {
           reportFlow(
             node.expression,
@@ -356,7 +430,10 @@ const rule: Rule = {
       }
 
       const checkProperty = (node: ESTree.AccessorProperty | ESTree.PropertyDefinition) => {
-        if (node.value === null) return
+        if (node.value === null) {
+          return
+        }
+
         checkAnnotated(
           node.value,
           node.typeAnnotation,
@@ -367,7 +444,10 @@ const rule: Rule = {
       return {
         AccessorProperty: checkProperty,
         ArrowFunctionExpression(node) {
-          if (node.body.type === "BlockStatement") return
+          if (node.body.type === "BlockStatement") {
+            return
+          }
+
           checkAnnotated(
             node.body,
             node.returnType,
@@ -375,7 +455,10 @@ const rule: Rule = {
           )
         },
         AssignmentExpression(node) {
-          if (node.operator !== "=" || node.left.type !== "Identifier") return
+          if (node.operator !== "=" || node.left.type !== "Identifier") {
+            return
+          }
+
           defer((typeAliases) => {
             checkAssignment(node, { typeAliases })
           })
@@ -383,7 +466,10 @@ const rule: Rule = {
         CallExpression(node) {
           const callee = unwrapExpression(node.callee)
 
-          if (callee.type !== "Identifier" && !isFunctionExpression(callee)) return
+          if (callee.type !== "Identifier" && !isFunctionExpression(callee)) {
+            return
+          }
+
           defer((typeAliases) => {
             checkPredicateCall(node, { typeAliases })
           })
@@ -394,7 +480,10 @@ const rule: Rule = {
         },
         PropertyDefinition: checkProperty,
         ReturnStatement(node) {
-          if (node.argument === null) return
+          if (node.argument === null) {
+            return
+          }
+
           const owner = enclosingFunction(node)
           checkAnnotated(
             node.argument,
@@ -406,10 +495,16 @@ const rule: Rule = {
         TSTypeAssertion: checkAssertion,
         TSTypePredicate: recordPredicateOwner,
         VariableDeclarator(node) {
-          if (node.id.type !== "Identifier") return
+          if (node.id.type !== "Identifier") {
+            return
+          }
+
           const { name, typeAnnotation } = node.id
 
-          if (typeAnnotation === null || typeAnnotation === undefined) return
+          if (typeAnnotation === null || typeAnnotation === undefined) {
+            return
+          }
+
           annotatedNames.add(name)
 
           if (node.init !== null) {

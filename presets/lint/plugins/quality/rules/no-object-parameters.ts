@@ -32,12 +32,19 @@ function preservedObjectType(
   type: ESTree.TSType,
   environment: TypeAliasEnvironment
 ): ESTree.TSType | null {
-  if (type.type !== "TSTypeReference") return null
+  if (type.type !== "TSTypeReference") {
+    return null
+  }
+
   const reference = namedTypeReference(type)
 
-  if (reference === null || !OBJECT_PRESERVING_WRAPPERS.has(reference.name)) return null
+  if (reference === null || !OBJECT_PRESERVING_WRAPPERS.has(reference.name)) {
+    return null
+  }
 
-  if (!reference.global && hasVisibleTypeBinding(reference.name, type, environment)) return null
+  if (!reference.global && hasVisibleTypeBinding(reference.name, type, environment)) {
+    return null
+  }
 
   return reference.typeArguments[0] ?? null
 }
@@ -54,11 +61,17 @@ function isEmptyObjectType(type: ESTree.TSType, environment: TypeAliasEnvironmen
 
 function resolvesToObject(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
   return resolvedTypeMatches(type, environment, (resolved, matches) => {
-    if (resolved.type === "TSObjectKeyword") return true
+    if (resolved.type === "TSObjectKeyword") {
+      return true
+    }
 
-    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+    if (resolved.type === "TSParenthesizedType") {
+      return matches(resolved.typeAnnotation)
+    }
 
-    if (resolved.type === "TSUnionType") return resolved.types.some(matches)
+    if (resolved.type === "TSUnionType") {
+      return resolved.types.some(matches)
+    }
 
     // `object & {}` is still `object`, but `object & Owner` names a contract.
     if (resolved.type === "TSIntersectionType") {
@@ -86,9 +99,15 @@ const rule: Rule = {
         for (const parameter of node.params) {
           const annotation = functionParameterTypeAnnotation(parameter)
 
-          if (annotation === null || annotation === undefined) continue
+          if (annotation === null || annotation === undefined) {
+            continue
+          }
+
           defer((environment) => {
-            if (!resolvesToObject(annotation.typeAnnotation, environment)) return
+            if (!resolvesToObject(annotation.typeAnnotation, environment)) {
+              return
+            }
+
             context.report({
               data: { parameter: functionParameterBindingName(parameter, context.sourceCode) },
               messageId: "objectParameter",

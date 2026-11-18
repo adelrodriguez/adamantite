@@ -27,6 +27,7 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | `clean/undefined.ts` | Written for Adamantite | | Required `undefined` arguments, concise arrow results, expression callbacks, and typed optional block returns. |
 | `clean/worker-message.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-worker/src/types.ts#L234-L239) | MIT | Two message kinds with an exhaustive `switch`. |
 | `fixable/abort-error.ts` | [p-retry](https://github.com/sindresorhus/p-retry/blob/ac3c4cdb7f015e1f71825e4274e2323a49b615eb/index.js#L59-L83) | MIT | Adds a constructor that only calls `super`, which the fix removes. |
+| `fixable/braces.ts` | Written for Adamantite | | An `if` without braces, which `curly` wraps in a block that then needs a blank line. A known second pass. |
 | `fixable/greeting.ts` | Written for Adamantite | | String concatenation, which the fix writes as a template literal. |
 | `fixable/literals.ts` | `format.test.ts` | | Uppercase hex and a number without separators. |
 | `fixable/moved.ts` | `fix.test.ts` | | `no-else-return` moves a statement that then needs a blank line. A known second pass. |

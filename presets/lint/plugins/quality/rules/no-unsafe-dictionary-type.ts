@@ -78,7 +78,10 @@ function isTypeAliasBody(node: ESTree.TSType): boolean {
  * dictionary, so its plain uses do not report again.
  */
 function isPlainNamedConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
-  if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false
+  if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) {
+    return false
+  }
+
   const reference = namedTypeReference(node)
 
   return (
@@ -98,10 +101,16 @@ function isTypeFilterArgument(
   parent: ESTree.Node,
   environment: TypeEnvironment
 ): boolean {
-  if (parent.type !== "TSTypeParameterInstantiation" || parent.params[1] !== child) return false
+  if (parent.type !== "TSTypeParameterInstantiation" || parent.params[1] !== child) {
+    return false
+  }
+
   const reference = parent.parent
 
-  if (reference.type !== "TSTypeReference") return false
+  if (reference.type !== "TSTypeReference") {
+    return false
+  }
+
   const filter = namedTypeReference(reference)
 
   return (
@@ -126,7 +135,10 @@ function isInsideTypeTest(node: ESTree.TSType, environment: TypeEnvironment): bo
   let parent: ESTree.Node = child.parent
 
   while (parent.type !== "Program") {
-    if (isTypeTest(child, parent, environment)) return true
+    if (isTypeTest(child, parent, environment)) {
+      return true
+    }
+
     child = parent
     parent = child.parent
   }
@@ -138,15 +150,25 @@ function isInsideTypeTest(node: ESTree.TSType, environment: TypeEnvironment): bo
  * Return whether to report an unsafe dictionary type, which the caller has classified.
  */
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
-  if (isInsideTypeTest(node, environment)) return false
+  if (isInsideTypeTest(node, environment)) {
+    return false
+  }
 
-  if (isPlainNamedConsumerUse(node, environment)) return false
+  if (isPlainNamedConsumerUse(node, environment)) {
+    return false
+  }
+
   let current: ESTree.Node = node.parent
 
   while (current.type !== "Program") {
-    if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null) return false
+    if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null) {
+      return false
+    }
 
-    if (isHeritage(current) && classifyUnsafeHeritage(current, environment) !== null) return false
+    if (isHeritage(current) && classifyUnsafeHeritage(current, environment) !== null) {
+      return false
+    }
+
     current = current.parent
   }
 
@@ -165,14 +187,19 @@ const rule: Rule = {
     const reportIfUnsafe = (node: ESTree.TSType, environment: TypeEnvironment) => {
       const unsafe = classifyUnsafeDictionary(node, environment)
 
-      if (unsafe === null || !shouldReportType(node, environment)) return
+      if (unsafe === null || !shouldReportType(node, environment)) {
+        return
+      }
+
       report(node, unsafe.unsafeValue)
     }
 
     const reportUnsafeHeritage = (node: Heritage, environment: TypeEnvironment) => {
       const unsafe = classifyUnsafeHeritage(node, environment)
 
-      if (unsafe !== null) report(node, unsafe.unsafeValue)
+      if (unsafe !== null) {
+        report(node, unsafe.unsafeValue)
+      }
     }
 
     return withTypeBindings(context, (defer) => {
@@ -191,13 +218,18 @@ const rule: Rule = {
       return {
         TSClassImplements: checkHeritage,
         TSIndexSignature(node) {
-          if (node.parent.type === "TSTypeLiteral") return
+          if (node.parent.type === "TSTypeLiteral") {
+            return
+          }
+
           defer((typeAliases) => {
             const unsafe = classifyUnsafeDictionaryValue(node.typeAnnotation.typeAnnotation, {
               typeAliases,
             })
 
-            if (unsafe !== null) report(node, unsafe.unsafeValue)
+            if (unsafe !== null) {
+              report(node, unsafe.unsafeValue)
+            }
           })
         },
         TSInterfaceHeritage: checkHeritage,

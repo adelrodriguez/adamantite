@@ -203,19 +203,18 @@ changed it.
 
 ## Lockfile
 
-The lockfile is `.adamantite/adamantite-lock.json` at the project root, the workspace root in a
-monorepo. `Lockfile` and `Selection` in `src/lib/project/` are its Effect schemas: a
-`schemaVersion`, the `selection`, the Adamantite `version` that last wrote it, and `written`, which
-maps the path of each managed file to the hash of what Adamantite wrote. `apply` writes it last,
-formatted like a managed file, and only when its content changes. Each run computes `written`
-again from the files that it created, replaced, or found unchanged, so a file that the user changed
-leaves it.
+`.adamantite/adamantite-lock.json` records the selection, the Adamantite version that last wrote
+it, and the hash of each managed file. `src/lib/project/lockfile.ts` owns its schema, its read, and
+the hash. `src/lib/project/selection.ts` owns the `Selection` schema.
 
-`Project.read` decodes the lockfile once into `project.lockfile`, an `Option`, and the rest of the
-code trusts it. A lockfile with an unknown `schemaVersion` fails with `UnsupportedLockfile`, and one
-that does not decode fails with `InvalidLockfile`. Both name the file. `init` and `update` read the
-lockfile before they change a file, and fail, so they do not overwrite a lockfile that they cannot
-read. The error says to run `adamantite doctor`.
+- `Project.read` decodes the lockfile one time into `project.lockfile`, and the rest of the code
+  trusts that value. Nothing enforces it.
+- A lockfile that does not decode, or that a newer Adamantite wrote, fails `init` and `update`
+  before they change a file. `src/commands/__tests__/init.test.ts` and
+  `src/commands/__tests__/update.test.ts` hold it.
+- Only `Setup.apply` writes the lockfile, as its last step. `project/file-writers` in
+  `.adamantite/lint/file-writers.ts` holds the writer, and `src/lib/setup/__tests__/index.test.ts`
+  holds that a second run changes no file.
 
 `verifyLockfileVersion` compares the lockfile's `version` with the Adamantite that the project
 installs. `check` fails with its error after the stages, and `assessProject` reports it as the

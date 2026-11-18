@@ -399,7 +399,7 @@ export const apply = Effect.fn("Setup.apply")(function* (
     Option.match(hash, { onNone: () => [], onSome: (value) => [[write.path, value] as const] })
   )
 
-  // Last, so the lockfile records what the steps above wrote.
+  // Last, so the lockfile records what the steps above wrote, and only when its content changes.
   const lockfilePath = path.join(cwd, LOCKFILE_PATH)
 
   const lockfileContent = yield* format(

@@ -22,7 +22,10 @@ trial copy or a workspace package, takes the folder as a parameter.
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
 
-Tsdown bundles the CLI, the Oxlint entry, the probe plugin, and the presets into `dist`. Unplugin
+Tsdown bundles the CLI, the Oxlint entry, the probe plugin, and the presets into `dist`. The CLI
+bundle and the Oxlint entry include Effect and `@effect/platform-node`, so Node.js starts the CLI
+from a few files, and the package installs neither. `oxc-resolver` loads native bindings, so it
+stays a runtime dependency. Unplugin
 macros expands compile-time package metadata and terminal-title values during builds and Vitest
 source transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint` holds the
 two entries that run in Oxlint's process, and each builds beside the CLI bundle.

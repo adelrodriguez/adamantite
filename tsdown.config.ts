@@ -4,10 +4,11 @@ import packageJson from "./package.json" with { type: "json" }
 
 export default defineConfig([
   {
+    // The bundle includes Effect, so Node.js loads three files at startup in place of more than
+    // two hundred Effect modules. Each runtime dependency stays external. The build fails when the
+    // bundle imports any other package, or bundles a package that `onlyBundle` leaves out.
     deps: {
-      neverBundle: true,
-      // Deliberately tracks package.json: adding a runtime dependency widens
-      // this import guard without a change to the build config.
+      onlyBundle: ["effect", "@effect/platform-node", "@effect/platform-node-shared"],
       onlyImport: Object.keys(packageJson.dependencies),
     },
     dts: false,

@@ -1,0 +1,24 @@
+diff --git a/dist/cli/CliOutput.js b/dist/cli/CliOutput.js
+index 7b9c4be1f52efe1e86c98b887c67d986ecc67be7..709b3fa5645cd65a47f9a65003060364a6ed2672 100644
+--- a/dist/cli/CliOutput.js
++++ b/dist/cli/CliOutput.js
+@@ -298,7 +298,9 @@ const stripAnsi = text => {
+  * Segments text into grapheme clusters.
+  * @internal
+  */
+-const graphemeSegmenter = /*#__PURE__*/new Intl.Segmenter(undefined, {
++let graphemeSegmenter;
++// Creating the first Intl object loads ICU data, so the segmenter waits for its first use.
++const getGraphemeSegmenter = () => graphemeSegmenter ??= new Intl.Segmenter(undefined, {
+   granularity: "grapheme"
+ });
+ const zeroWidthCodePoints = /[\p{Mark}\p{Control}\p{Default_Ignorable_Code_Point}]/gu;
+@@ -343,7 +345,7 @@ export const displayWidth = text => {
+   let length = 0;
+   for (const {
+     segment
+-  } of graphemeSegmenter.segment(stripAnsi(text))) {
++  } of getGraphemeSegmenter().segment(stripAnsi(text))) {
+     length += graphemeWidth(segment);
+   }
+   return length;

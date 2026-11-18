@@ -639,6 +639,14 @@ try {
   console.info("Checking that Oxlint gets the compile cache of the CLI...")
   const userCache = mkdtempSync(join(tmpdir(), "adamantite-smoke-compile-cache-"))
 
+  // Each case sets the cache variables itself, so the values of the caller do not change it.
+  // Windows reads variable names in any case, so the filter compares them in uppercase.
+  const cacheFreeEnv = Object.fromEntries(
+    Object.entries(fixtureEnv).filter(
+      ([name]) => !["NODE_COMPILE_CACHE", "NODE_DISABLE_COMPILE_CACHE"].includes(name.toUpperCase())
+    )
+  )
+
   try {
     for (const { cacheFolder, env } of [
       { cacheFolder: join(tmpdir(), "node-compile-cache"), env: {} },
@@ -647,22 +655,27 @@ try {
     ]) {
       const result = spawn(process.execPath, [cliPath, "check", "--only", "lint"], {
         cwd: fixture,
-        env: { ...fixtureEnv, ...env, NODE_DEBUG_NATIVE: "COMPILE_CACHE" },
+        env: { ...cacheFreeEnv, ...env, NODE_DEBUG_NATIVE: "COMPILE_CACHE" },
       })
 
       if (result.status !== 0) {
         throw new Error(`Command failed: ${result.description}\n${result.output}`)
       }
 
+      // The log names a module by its URL and the cache folder by its path, which has backslashes
+      // on Windows, so the comparison uses forward slashes.
       const oxlintCacheLines = result.output
         .split("\n")
+        .map((line) => line.replaceAll("\\", "/"))
         .filter(
           (line) => line.startsWith("[compile cache]") && line.includes("/oxlint/dist/cli.js")
         )
 
       const usesFolder =
         cacheFolder !== undefined
-        && oxlintCacheLines.some((line) => line.includes(`reading cache from ${cacheFolder}`))
+        && oxlintCacheLines.some((line) =>
+          line.includes(`reading cache from ${cacheFolder.replaceAll("\\", "/")}`)
+        )
 
       if (cacheFolder === undefined ? oxlintCacheLines.length > 0 : !usesFolder) {
         throw new Error(

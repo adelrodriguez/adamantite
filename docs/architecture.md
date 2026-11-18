@@ -213,13 +213,13 @@ Each command is one module of `src/commands`:
 | `harden`       | Offer a prompt that tells a coding agent to move the project's coding standards up the enforcement ladder, from the facts that `src/lib/hardening/index.ts` computes. It produces no findings. |
 | `rule`         | Write a custom rule stub, print a syntax tree, run the saved rule tests, and run a trial in a copy of the project through `src/lib/hardening/trial.ts`.                                        |
 
-| Invariant                                                                                                                                                            | Held by                                                    |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Only `check`, `fix`, and `analyze` forward the arguments after `--`, because each wraps one tool.                                                                    | `src/__tests__/cli.test.ts`                                |
-| A missing tool that no selected script runs fails with `ToolNotSelected`, which names the `init` command that adds the script.                                       | The tests in `src/commands/__tests__`                      |
-| A trial changes no file of the project.                                                                                                                              | `src/lib/hardening/__tests__/trial.test.ts`                |
-| `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                        | `src/commands/__tests__/rule.test.ts`                      |
-| Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)). | `secondPasses` in `src/lib/bridge/__tests__/index.test.ts` |
+| Invariant                                                                                                                                                            | Held by                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Only `check`, `fix`, and `analyze` forward the arguments after `--`, because each wraps one tool.                                                                    | `src/__tests__/cli.test.ts`                                                                           |
+| A missing tool that no selected script runs fails with `ToolNotSelected`, which names the `init` command that adds the script.                                       | The tests in `src/commands/__tests__`                                                                 |
+| A trial changes no file of the project.                                                                                                                              | `src/lib/hardening/__tests__/trial.test.ts`                                                           |
+| `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                        | `src/commands/__tests__/rule.test.ts`                                                                 |
+| Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)). | `secondPasses` in `presets/__tests__/idioms.ts`, which `src/lib/bridge/__tests__/index.test.ts` reads |
 
 ## Preset layout
 

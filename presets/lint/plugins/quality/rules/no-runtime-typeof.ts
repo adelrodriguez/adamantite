@@ -1,6 +1,6 @@
 import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
 import { readBooleanOption } from "../../shared/options.ts"
-import { resolveVariable } from "../shared/scope.ts"
+import { resolveVariable } from "../../shared/scope.ts"
 import {
   resolvedTypeMatches,
   visibleTypeParameter,

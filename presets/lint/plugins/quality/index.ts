@@ -3,7 +3,6 @@ import noArrayFilterMap from "./rules/no-array-filter-map.ts"
 import noChainedTypeAssertions from "./rules/no-chained-type-assertions.ts"
 import noConditionalEmptyObjectSpread from "./rules/no-conditional-empty-object-spread.ts"
 import noKnownValueWidening from "./rules/no-known-value-widening.ts"
-import noModuleMocking from "./rules/no-module-mocking.ts"
 import noObjectParameters from "./rules/no-object-parameters.ts"
 import noReduceAccumulatorCopy from "./rules/no-reduce-accumulator-copy.ts"
 import noReflectApply from "./rules/no-reflect-apply.ts"
@@ -24,7 +23,6 @@ interface QualityPlugin extends Plugin {
     readonly "no-chained-type-assertions": Rule
     readonly "no-conditional-empty-object-spread": Rule
     readonly "no-known-value-widening": Rule
-    readonly "no-module-mocking": Rule
     readonly "no-object-parameters": Rule
     readonly "no-reduce-accumulator-copy": Rule
     readonly "no-reflect-apply": Rule
@@ -52,7 +50,6 @@ const plugin: QualityPlugin = {
     "no-chained-type-assertions": noChainedTypeAssertions,
     "no-conditional-empty-object-spread": noConditionalEmptyObjectSpread,
     "no-known-value-widening": noKnownValueWidening,
-    "no-module-mocking": noModuleMocking,
     "no-object-parameters": noObjectParameters,
     "no-reduce-accumulator-copy": noReduceAccumulatorCopy,
     "no-reflect-apply": noReflectApply,

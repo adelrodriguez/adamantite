@@ -408,6 +408,7 @@ presets/
       adamantite/   the adamantite rules
       quality/        the quality rules of the strict preset
       quality-effect/ the quality-effect rules of the effect preset
+      testing/        the testing rules of the strict preset
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
@@ -517,15 +518,16 @@ package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through 
 
 ## First-party plugins
 
-Adamantite has three Oxlint plugins of its own under `presets/lint/plugins/`: `adamantite`,
-`quality`, and `quality-effect`. Each plugin has one folder, and the folder name is the rule
+Adamantite has four Oxlint plugins of its own under `presets/lint/plugins/`: `adamantite`,
+`quality`, `quality-effect`, and `testing`. Each plugin has one folder, and the folder name is the rule
 namespace, the `meta.name` of the plugin, and the name of its fixture folder. In a plugin folder,
 `index.ts` registers the rules, `rules/` holds one module for each rule, and `shared/` holds the
 helpers that only this plugin uses. `adamantite/shared/imports.ts`, for example, finds calls of
 imported functions, such as `useState` and `React.useState`.
 
 `plugins/shared/` holds the helpers that more than one plugin uses: `options.ts` reads rule
-options, and `ast.ts` holds the AST helpers, such as the key reader. A helper moves there only
+options, `ast.ts` holds the AST helpers, such as the key reader, and `scope.ts` resolves a name to
+its binding and follows `const` aliases. A helper moves there only
 when a second plugin needs it. `replacement.d.ts` holds the `Replacement` type that any rule can
 declare. It is a declaration file, so the build ships no module for it.
 
@@ -539,7 +541,7 @@ outside its rule.
 A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
 such as `firstPartyPlugin("quality")`. The function builds a file URL from its own location.
 The source tree has `<name>/index.ts` and the dist tree has `<name>/index.js`, so it takes the
-extension from its own module URL. Its parameter type accepts only the three namespaces.
+extension from its own module URL. Its parameter type accepts only the four namespaces.
 `entry.ts` imports no plugin code, so a preset loads no rule module.
 `presets/lint/plugins/__tests__/entry.test.ts` loads each plugin from its entry and fails when a plugin
 name and its folder name disagree. Tsdown builds the plugins with the presets, so the
@@ -595,6 +597,16 @@ The rules in `presets/lint/plugins/quality/` ship in the `strict` preset, and th
 code that its folder derives from. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship.
+
+The rules in `presets/lint/plugins/testing/` ship in the `strict` preset. `no-flake-masking` and
+`no-fixed-sleep` run in the override for the test files of the jest and vitest presets, and
+`no-flake-masking` also runs in Vite and Vitest configs. `no-doubles` runs in every file, so a
+setup file cannot mock a module either. They started as a copy of
+[landmines](https://github.com/interfere-inc/landmines) at commit `92084b1`, and `license.md` keeps
+its MIT notice. Adamantite drops the per-file allowlists of landmines: a file that needs an
+exception suppresses the rule with a reason, as `adamantite/require-suppression-reason` asks.
+The jest and vitest presets load no first-party plugin, because a project can copy their `plugins`
+and `rules` into an override of its own, and that override would not load the plugin.
 
 The `architecture` preset loads the `adamantite` plugin without enabling rules. Init offers it
 for projects that configure layer maps and import owners without the other rules of `strict`.

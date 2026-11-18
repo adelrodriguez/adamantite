@@ -1,10 +1,7 @@
 import type { Rule } from "@oxlint/plugins"
 
-import {
-  arrayMethodTarget,
-  isKnownArrayExpression,
-  unwrapArrayExpression,
-} from "../shared/array-method.ts"
+import { unwrapExpression } from "../../shared/ast.ts"
+import { arrayMethodTarget, isKnownArrayExpression } from "../shared/array-method.ts"
 
 /**
  * Reject eager array filter/map pipelines; lazy iterator helpers remain allowed.
@@ -19,7 +16,7 @@ const rule: Rule = {
           return
         }
 
-        const innerCall = unwrapArrayExpression(outer.object)
+        const innerCall = unwrapExpression(outer.object)
 
         if (innerCall.type !== "CallExpression") {
           return

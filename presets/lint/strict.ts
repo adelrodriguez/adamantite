@@ -9,13 +9,21 @@ import { testFiles as vitestTestFiles } from "./vitest.ts"
 // console call stays, and no task comment marks a workaround. Use it with any other preset.
 //
 // The quality plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
-// access, no module mocking, and readable spacing. Its rules started as a copy of
+// access, and readable spacing. Its rules started as a copy of
 // https://github.com/dmmulroy/anti-slop and now live in plugins/quality/ as first-party code. They
 // use the `quality` namespace.
+//
+// The testing plugin holds the rules that keep tests honest: no module mocks, fixed sleeps,
+// retries, or raised timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
+// in plugins/testing/ as first-party code. They use the `testing` namespace.
 
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,
-  jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("quality")],
+  jsPlugins: [
+    firstPartyPlugin("adamantite"),
+    firstPartyPlugin("quality"),
+    firstPartyPlugin("testing"),
+  ],
   overrides: [
     {
       // A declaration file states the types of code that it does not hold, such as a built-in API or
@@ -39,8 +47,17 @@ const config: OxlintConfig = {
         "quality/no-chained-type-assertions": "error",
         "quality/no-widen-then-assert": "error",
         "quality/require-safety-comment-for-type-assertion": "error",
+        // A fixed sleep, a retry, or a raised timeout guesses how long the work takes. The rules
+        // ask the test to await the event that it depends on.
+        "testing/no-fixed-sleep": "error",
+        "testing/no-flake-masking": "error",
         "typescript/consistent-type-assertions": "error",
       },
+    },
+    {
+      // A Vitest config can retry every test in its `test` options, also in a project.
+      files: ["**/{vite,vitest}.config.{js,mjs,cjs,ts,mts,cts}"],
+      rules: { "testing/no-flake-masking": "error" },
     },
   ],
   rules: {
@@ -60,8 +77,6 @@ const config: OxlintConfig = {
     // Decode input at its boundary into types that the code owns, instead of passing `unknown`,
     // loose dictionaries, or `typeof` checks through the code.
     "quality/no-known-value-widening": "error",
-    // Tests replace a dependency through its interface instead of mocking its module.
-    "quality/no-module-mocking": "error",
     "quality/no-object-parameters": "error",
     "quality/no-reduce-accumulator-copy": "error",
     "quality/no-reflect-apply": "error",
@@ -75,6 +90,9 @@ const config: OxlintConfig = {
     "quality/no-unknown-type-aliases": "error",
     "quality/no-unsafe-dictionary-type": "error",
     "quality/require-readable-spacing": "error",
+    // Tests replace a dependency through its interface instead of mocking its module. The rule runs
+    // in every file, so a Vitest or Jest setup file cannot mock a module for each test either.
+    "testing/no-doubles": "error",
     // The autofix of this core rule makes `Record` aliases that no-known-value-widening reports
     // again.
     "typescript/consistent-indexed-object-style": "off",

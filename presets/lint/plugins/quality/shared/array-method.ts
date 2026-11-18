@@ -1,27 +1,7 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
-import { staticKeyName } from "../../shared/ast.ts"
-import { constBinding } from "./scope.ts"
+import { staticKeyName, unwrapExpression } from "../../shared/ast.ts"
+import { constBinding } from "../../shared/scope.ts"
 import { namedTypeReference } from "./type-alias-resolution.ts"
-
-/**
- * Unwrap syntax-only wrappers when inspecting array methods and accumulator references.
- */
-export function unwrapArrayExpression(expression: ESTree.Node): ESTree.Node {
-  let node = expression
-
-  while (
-    node.type === "ParenthesizedExpression"
-    || node.type === "ChainExpression"
-    || node.type === "TSAsExpression"
-    || node.type === "TSTypeAssertion"
-    || node.type === "TSNonNullExpression"
-    || node.type === "TSSatisfiesExpression"
-  ) {
-    node = node.expression
-  }
-
-  return node
-}
 
 /**
  * Resolve a local binding by scope, not by identifier spelling.
@@ -30,7 +10,7 @@ export function resolveArrayBinding(
   sourceCode: SourceCode,
   expression: ESTree.Node
 ): Variable | null {
-  const node = unwrapArrayExpression(expression)
+  const node = unwrapExpression(expression)
 
   if (node.type !== "Identifier") {
     return null
@@ -68,7 +48,7 @@ export function constInitializer(variable: Variable): ESTree.Expression | null {
 export function arrayMethodTarget(
   callee: ESTree.Node
 ): { readonly name: string; readonly object: ESTree.Node } | null {
-  const node = unwrapArrayExpression(callee)
+  const node = unwrapExpression(callee)
 
   if (node.type !== "MemberExpression") {
     return null
@@ -119,7 +99,7 @@ function isKnownArrayExpressionFrom(
   expression: ESTree.Node,
   visited: Set<Variable>
 ): boolean {
-  const node = unwrapArrayExpression(expression)
+  const node = unwrapExpression(expression)
 
   if (node.type === "ArrayExpression") {
     return true

@@ -31,8 +31,8 @@ _Avoid_: Vendored bundle, patch, override
 **First-party plugin**:
 Adamantite's own Oxlint plugin, under the `adamantite/*` rule namespace. It ships inside the
 package, and presets load it by file URL, so target projects install nothing extra. A rule
-in it is a first-party rule. The `quality` and `quality-effect` plugins are first-party
-plugins too.
+in it is a first-party rule. The `quality`, `quality-effect`, and `testing` plugins are
+first-party plugins too.
 _Avoid_: Vendored bundle, managed plugin, custom plugin
 
 **Managed plugin**:

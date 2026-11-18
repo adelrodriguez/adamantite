@@ -1,6 +1,6 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
 
-import { staticKeyName } from "../../shared/ast.ts"
+import { staticKeyName } from "./ast.ts"
 
 /**
  * Resolve an identifier to its binding by walking lexical scopes upward.

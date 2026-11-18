@@ -1,14 +1,13 @@
 import type { ESTree, Rule, SourceCode, Variable } from "@oxlint/plugins"
 
-import { isNumberLiteral, staticKeyName } from "../../shared/ast.ts"
+import { isNumberLiteral, staticKeyName, unwrapExpression } from "../../shared/ast.ts"
+import { isGlobalObject } from "../../shared/scope.ts"
 import {
   arrayMethodTarget,
   constInitializer,
   isKnownArrayExpression,
   resolveArrayBinding,
-  unwrapArrayExpression,
 } from "../shared/array-method.ts"
-import { isGlobalObject } from "../shared/scope.ts"
 
 type ReducerCallback = ESTree.ArrowFunctionExpression | ESTree.Function
 
@@ -18,12 +17,12 @@ type ReducerCallback = ESTree.ArrowFunctionExpression | ESTree.Function
 function callWithArgument(node: ESTree.Node) {
   let owner: ESTree.Node | null = node.parent
 
-  while (owner !== null && unwrapArrayExpression(owner) === node) {
+  while (owner !== null && unwrapExpression(owner) === node) {
     owner = owner.parent
   }
 
   return owner?.type === "CallExpression"
-    && owner.arguments.some((argument) => unwrapArrayExpression(argument) === node)
+    && owner.arguments.some((argument) => unwrapExpression(argument) === node)
     ? owner
     : null
 }
@@ -44,7 +43,7 @@ function reduceCallWithReducer(node: ESTree.Node) {
   return (method?.name === "reduce" || method?.name === "reduceRight")
     && call.arguments.length <= 2
     && reducer !== undefined
-    && unwrapArrayExpression(reducer) === node
+    && unwrapExpression(reducer) === node
     ? call
     : null
 }
@@ -64,7 +63,7 @@ function functionBinding(sourceCode: SourceCode, callback: ReducerCallback) {
 
   let declarator: ESTree.Node | null = callback.parent
 
-  while (declarator !== null && unwrapArrayExpression(declarator) === callback) {
+  while (declarator !== null && unwrapExpression(declarator) === callback) {
     declarator = declarator.parent
   }
 
@@ -221,7 +220,7 @@ function resolveInitialValue(
   expression: ESTree.Node,
   visited = new Set<Variable>()
 ): ESTree.Node {
-  const node = unwrapArrayExpression(expression)
+  const node = unwrapExpression(expression)
   const variable = resolveArrayBinding(sourceCode, node)
 
   if (variable === null || visited.has(variable)) {
@@ -261,7 +260,7 @@ function stepResult(
   let parent = result.parent
 
   while (parent !== null) {
-    if (unwrapArrayExpression(parent) === unwrapArrayExpression(result)) {
+    if (unwrapExpression(parent) === unwrapExpression(result)) {
       result = parent
     } else if (parent.type === "MemberExpression" && parent.object === result) {
       const call = parent.parent
@@ -347,7 +346,7 @@ const rule: Rule = {
 
         if (
           method.name === "assign"
-          && isGlobalObject(context.sourceCode, unwrapArrayExpression(method.object), "Object")
+          && isGlobalObject(context.sourceCode, unwrapExpression(method.object), "Object")
         ) {
           const target = node.arguments[0]
 
@@ -357,18 +356,18 @@ const rule: Rule = {
             initialValue?.type === "ObjectExpression"
             && initialValue.properties.length > 0
             && node.arguments.every(
-              (argument) => isAccumulator(argument) || hasFixedKeys(unwrapArrayExpression(argument))
+              (argument) => isAccumulator(argument) || hasFixedKeys(unwrapExpression(argument))
             )
             && isUsedOnlyIn(accumulator, stepResult(node, reducer.callback))
 
           copiesAccumulator =
             target !== undefined
-            && unwrapArrayExpression(target).type === "ObjectExpression"
+            && unwrapExpression(target).type === "ObjectExpression"
             && node.arguments.slice(1).some(isAccumulator)
             && !isBounded
         } else if (
           method.name === "from"
-          && isGlobalObject(context.sourceCode, unwrapArrayExpression(method.object), "Array")
+          && isGlobalObject(context.sourceCode, unwrapExpression(method.object), "Array")
         ) {
           const source = node.arguments[0]
           copiesAccumulator = source !== undefined && isAccumulator(source)

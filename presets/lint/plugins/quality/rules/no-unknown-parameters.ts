@@ -1,12 +1,12 @@
 import type { ESTree, Reference, Rule, SourceCode } from "@oxlint/plugins"
 import { staticKeyName } from "../../shared/ast.ts"
 
+import { resolveVariable } from "../../shared/scope.ts"
 import {
   type FunctionParameter,
   functionParameterBindingName,
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
-import { resolveVariable } from "../shared/scope.ts"
 import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { resolvesToUnknown } from "../shared/unknown-type.ts"
 

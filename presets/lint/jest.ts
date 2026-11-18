@@ -84,8 +84,11 @@ const rules: OxlintConfig["rules"] = {
   "jest/prefer-jest-mocked": "error",
   // A describe title often names the class or function under test, such as `Calculator`.
   "jest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
-  "jest/prefer-mock-promise-shorthand": "error",
-  "jest/prefer-mock-return-shorthand": "error",
+  // The rules ask for `mockResolvedValue` and `mockReturnValue` in place of a mock implementation,
+  // and the strict preset bans both. A preset cannot see which other presets a project selects, so
+  // one instruction must go.
+  "jest/prefer-mock-promise-shorthand": "off",
+  "jest/prefer-mock-return-shorthand": "off",
   "jest/prefer-snapshot-hint": "error",
   "jest/prefer-spy-on": "error",
   "jest/prefer-strict-equal": "error",

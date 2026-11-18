@@ -8,6 +8,7 @@ import * as Order from "effect/Order"
 import { testFiles as jestTestFiles } from "#presets/lint/jest.ts"
 import adamantitePlugin from "#presets/lint/plugins/adamantite/index.ts"
 import qualityPlugin from "#presets/lint/plugins/quality/index.ts"
+import testingPlugin from "#presets/lint/plugins/testing/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
@@ -30,11 +31,23 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 
 const presetRules = getFirstPartyRules(strict.rules)
 
-// The preset enables some quality rules for every file and the assertion rules only in tests. An
-// override that turns a rule off, such as the override for declaration files, enables nothing.
-const qualityRules = [strict.rules, ...(strict.overrides ?? []).map((override) => override.rules)]
-  .flatMap((rules) => Object.entries(rules ?? {}))
-  .flatMap(([name, setting]) => (name.startsWith("quality/") && setting !== "off" ? [name] : []))
+// The preset enables some quality rules for every file, and the assertion and testing rules only in
+// tests. An override that turns a rule off, such as the override for declaration files, enables
+// nothing.
+function getEnabledRules(namespace: string) {
+  const enabled = [strict.rules, ...(strict.overrides ?? []).map((override) => override.rules)]
+    .flatMap((rules) => Object.entries(rules ?? {}))
+    .flatMap(([name, setting]) =>
+      name.startsWith(`${namespace}/`) && setting !== "off" ? [name] : []
+    )
+
+  return EffectArray.sort(enabled, Order.String)
+}
+
+const qualityRules = getEnabledRules("quality")
+
+// `testing/no-flake-masking` also runs in Vitest configs, so it counts once.
+const testingRules = EffectArray.dedupe(getEnabledRules("testing"))
 
 // These rules need options from the target project, such as a layer map, so the project turns them
 // on.
@@ -42,9 +55,18 @@ const PROJECT_RULES = ["import-owners", "layers"]
 
 describe("strict preset", () => {
   it("enable each rule of the quality plugin exactly once", () => {
-    expect(EffectArray.sort(qualityRules, Order.String)).toStrictEqual(
+    expect(qualityRules).toStrictEqual(
       EffectArray.sort(
         Object.keys(qualityPlugin.rules).map((rule) => `quality/${rule}`),
+        Order.String
+      )
+    )
+  })
+
+  it("enable each rule of the testing plugin", () => {
+    expect(testingRules).toStrictEqual(
+      EffectArray.sort(
+        Object.keys(testingPlugin.rules).map((rule) => `testing/${rule}`),
         Order.String
       )
     )
@@ -61,7 +83,7 @@ describe("strict preset", () => {
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
       EffectArray.sort(
-        [...presetRules.map((rule) => `${NAMESPACE}/${rule}`), ...qualityRules],
+        [...presetRules.map((rule) => `${NAMESPACE}/${rule}`), ...qualityRules, ...testingRules],
         Order.String
       )
     )

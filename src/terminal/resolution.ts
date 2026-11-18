@@ -37,7 +37,8 @@ export function fromAssessment({
 
 /**
  * What a command hands to an agent. A `Repair` resolves what remains, and the command fails while
- * something remains. A `Task`, such as harden, is work that the user can decline.
+ * something remains. `doctor`, `init`, and `update` offer the repair prompt of an assessment as
+ * one. A `Task`, such as harden, is work that the user can decline.
  */
 type Work = { readonly _tag: "Repair"; readonly remaining: Remaining } | { readonly _tag: "Task" }
 

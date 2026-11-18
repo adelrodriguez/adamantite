@@ -11,6 +11,11 @@ const versions = {
   "oxlint-plugin-react-doctor": getDependencyVersion("oxlint-plugin-react-doctor"),
 } satisfies Record<(typeof oxlintPlugins)[number]["name"], string>
 
+/**
+ * One integration for each preset of the catalog that has a plugin. Setup installs the package of a
+ * selected preset, and Doctor and `update` maintain it while a config of the project applies the
+ * preset.
+ */
 export const managedPlugins = lintPresets.flatMap((preset) =>
   "plugin" in preset
     ? [

@@ -86,7 +86,8 @@ const decodeLoadResult = Schema.decodeUnknownOption(LoadResult)
 
 /**
  * Loads the configs of a target project as the tools do: Node.js imports the module, and the
- * default export is the config.
+ * default export is the config. Adamantite does not parse the source of a config. Each reader
+ * decodes the loaded value with a Schema, such as `LintConfig` for Oxlint.
  */
 export class ConfigLoader extends Context.Service<
   ConfigLoader,

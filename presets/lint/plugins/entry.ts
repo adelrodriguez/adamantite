@@ -1,5 +1,9 @@
 // The first-party plugins, by rule namespace. Each one is the folder with that name beside this
-// module, and its `index.ts` registers the rules under the same name.
+// module, and its `index.ts` registers the rules under the same name. The fixture folder of a
+// plugin has that name too. In a plugin folder, `rules/` holds one module for each rule, and
+// `shared/` holds the helpers that only this plugin uses. The `shared/` folder beside this module
+// holds the helpers that more than one plugin uses, and a helper moves there only when a second
+// plugin needs it.
 export const FIRST_PARTY_PLUGINS = ["adamantite", "quality", "quality-effect", "testing"] as const
 
 export type FirstPartyPlugin = (typeof FIRST_PARTY_PLUGINS)[number]

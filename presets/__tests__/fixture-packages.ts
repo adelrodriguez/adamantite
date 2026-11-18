@@ -8,7 +8,9 @@ const REPO_ROOT = join(import.meta.dirname, "../..")
  * The folder of the fixture packages: the packages that the fixtures import, such as React and
  * TanStack Query, so that a type-aware run gets their real types. The folder has its own
  * `package.json`, lockfile, and `pnpm-workspace.yaml`, so pnpm installs it as a separate workspace
- * and the root manifest lists only what Adamantite builds, publishes, and tests itself against.
+ * and the root manifest lists only what Adamantite builds, publishes, and tests itself against. Its
+ * `pnpm-workspace.yaml` holds the pnpm settings of the fixture packages, such as `allowBuilds`, and
+ * never a `packages` key.
  */
 export const FIXTURE_PACKAGES_DIR = join(import.meta.dirname, "fixture-packages")
 

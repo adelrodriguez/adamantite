@@ -281,7 +281,9 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
 
 /**
  * The `tsconfig.json` that Adamantite writes for the selection, with the Effect language service
- * entry when the selection includes the `effect` preset.
+ * entry when the selection includes the `effect` preset. The write rule keeps a config that the
+ * project changed, so Adamantite never adds the entry to it, and the `@effect/tsgo` managed plugin
+ * assesses the entry.
  */
 const render = (selection: Selection, preset: TypeScriptPreset) =>
   formatJson(

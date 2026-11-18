@@ -1,10 +1,10 @@
 import { readdirSync } from "node:fs"
 import { extname, join } from "node:path"
 
-// What a rules folder holds. `custom()` and `loadRules` both read rules folders, so they share this
-// module. The package exports map does not list it, so it is not public. This module runs under
-// whatever runtime executes oxlint in the target project, so it uses only APIs that Node.js and Bun
-// both provide.
+// What a rules folder holds. `custom()`, `loadRules`, and the CLI read rules folders, so they share
+// this module. The package exports map does not list it, so it is not public. This module runs
+// under whatever runtime executes oxlint in the target project, so it uses only APIs that Node.js
+// and Bun both provide.
 
 /**
  * The rules folder that `custom()` loads when no `dir` is given, relative to the file that calls

@@ -276,7 +276,9 @@ export interface Workspace {
 }
 
 /**
- * Reads the workspace patterns one time, and finds the workspace packages that they select.
+ * Reads the workspace patterns one time, and finds the workspace packages that they select. A
+ * command that reads the workspace outside a snapshot, such as `harden` or `rule try`, reads it one
+ * time for each phase and passes the `Workspace` down.
  */
 export const readWorkspace = Effect.fn("Project.readWorkspace")(function* () {
   const directory = yield* Directory
@@ -293,7 +295,8 @@ const LINT_CONFIG_FILE = "oxlint.config.ts"
 
 /**
  * The facts about the target project that several assessments share. It is a snapshot: a coding
- * agent or an install can change the project, so each reassessment reads a new one.
+ * agent or an install can change the project, so each reassessment reads a new one. It holds facts,
+ * and not the folder, which `Directory` gives.
  */
 export interface Snapshot {
   /**
@@ -305,7 +308,8 @@ export interface Snapshot {
    */
   readonly lintConfig: Option.Option<Result.Result<LintConfig, ConfigLoadFailed>>
   /**
-   * The lockfile that `init` or `update` wrote, or none when the project has no lockfile.
+   * The lockfile that `init` or `update` wrote, or none when the project has no lockfile. `read`
+   * decodes the lockfile one time, and the rest of the code trusts this value.
    */
   readonly lockfile: Option.Option<Lockfile>
   readonly packageJson: PackageJson

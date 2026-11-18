@@ -40,8 +40,9 @@ are the prompts of `effect/cli/Prompt`. Both use one style: a symbol at the star
 no guide line at the left edge. Plain Markdown reports carry findings and hardening instructions
 when the command runs without interaction, and `--json` prints one JSON document for an agent.
 
-This reference records the existing interface. The [architecture](docs/architecture.md) explains
-command behavior, and [GLOSSARY.md](GLOSSARY.md) defines the terms used in the output.
+This reference records the existing interface. The [architecture](docs/architecture.md) names the
+module that owns the behavior of each command, and [GLOSSARY.md](GLOSSARY.md) defines the terms
+used in the output.
 
 ## Colors
 

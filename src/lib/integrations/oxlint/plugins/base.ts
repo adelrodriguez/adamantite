@@ -32,7 +32,8 @@ export class BackendOverride extends Data.TaggedClass("Backend")<{
 export type NativeOverride = BindingOverride | BackendOverride
 
 /**
- * A plugin that Oxlint loads through `jsPlugins`.
+ * A plugin that Oxlint loads through the `jsPlugins` entry of its preset, which resolves from the
+ * target project.
  */
 export class JavaScriptRuntime extends Data.TaggedClass("JavaScript") {}
 

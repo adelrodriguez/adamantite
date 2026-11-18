@@ -26,6 +26,9 @@ import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as Output from "#terminal/output.ts"
 
+// The commands that run tools through the bridge forward the arguments after `--` to one stage,
+// which the bridge chooses. A lifecycle command coordinates several operations, so it forwards
+// none.
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
 const commands = [
@@ -51,8 +54,10 @@ const main = Command.make("adamantite").pipe(
 )
 
 /**
- * Every service the CLI needs. The runner is a parameter so tests exercise this exact wiring while
- * stubbing process spawning.
+ * Every service the CLI needs. `@effect/platform-node` supplies the filesystem, path, process, and
+ * terminal services. The other external behavior, such as prompts and child commands, is behind
+ * services too, so a test runs a command without changing a real project. The runner is a parameter
+ * so tests exercise this exact wiring while stubbing process spawning.
  */
 export const makeAppLayer = (
   runner: Layer.Layer<CommandRunner, never, ChildProcessSpawner.ChildProcessSpawner>

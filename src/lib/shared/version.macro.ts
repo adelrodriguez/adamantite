@@ -3,7 +3,8 @@ import { MissingPackageVersion } from "#lib/shared/errors.ts"
 import packageJson from "../../../package.json" with { type: "json" }
 
 /**
- * Build-time macros that inline versions from this repository's `package.json` into the bundle. The
+ * Build-time macros that inline versions from this repository's `package.json` into the bundle.
+ * Unplugin macros expands each call in the Tsdown build and in the source transform of Vitest. The
  * static JSON import keeps the macros synchronous, so importing modules do not need top-level
  * `await`.
  */

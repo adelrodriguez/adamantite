@@ -15,7 +15,7 @@ Adamantite is a strict, agent-first set of presets and a CLI for modern TypeScri
 
 ## Read before you work
 
-- Before you explore or change code, read [GLOSSARY.md](GLOSSARY.md) and the relevant parts of [docs/architecture.md](docs/architecture.md).
+- Before you explore or change code, read [GLOSSARY.md](GLOSSARY.md) and [docs/architecture.md](docs/architecture.md), the map of each area's owning module and invariants. The TSDoc of the owning module describes how the area works.
 - Before you write or review code, read [CODING_STANDARDS.md](CODING_STANDARDS.md).
 - Before you change terminal output, prompts, or menus, read [DESIGN.md](DESIGN.md).
 - Before you add or move a test, read where each kind of test goes in [CONTRIBUTING.md](CONTRIBUTING.md#place-a-test).

@@ -283,6 +283,9 @@ function listAliasNames(path: string) {
   return [...new Set([path, ...bareNames, ...folders])].filter((name) => name !== ".")
 }
 
+/**
+ * The rule. It needs its options from the target project, so no preset turns it on.
+ */
 export function createImportOwnersRule(project: Project): Rule {
   // Whether a project module covers a resolved path, by module, root, path, and mode. Oxlint loads
   // the rule one time for a lint run, so the answers carry over between files.

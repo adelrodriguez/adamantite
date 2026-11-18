@@ -30,7 +30,8 @@ const ContentHash = Schema.String.check(Schema.isPattern(/^sha256-[0-9a-f]{64}$/
 /**
  * What `init` and `update` record in the target project. `version` is the Adamantite version that
  * last wrote the lockfile. `written` maps each file that Adamantite wrote whole, by its path from
- * the project root, to the hash of what it wrote.
+ * the project root, to the hash of what it wrote. Each setup computes `written` again from the
+ * files that it created, replaced, or found unchanged, so a file that the user changed leaves it.
  */
 export const Lockfile = Schema.Struct({
   schemaVersion: Schema.Literal(SCHEMA_VERSION),
@@ -62,7 +63,9 @@ const decodeLockfile = Schema.decodeUnknownEffect(Schema.fromJsonString(Lockfile
 const encodeLockfile = Schema.encodeEffect(Schema.fromJsonString(Lockfile, { space: 2 }))
 
 /**
- * Reads the lockfile of the project at `root`. None when the project has no lockfile.
+ * Reads the lockfile of the project at `root`. None when the project has no lockfile. A lockfile
+ * with a schema version that this Adamantite version does not know fails with
+ * `UnsupportedLockfile`, and one that does not decode fails with `InvalidLockfile`.
  */
 export const readLockfile = Effect.fn("readLockfile")(function* (root: string) {
   const path = yield* Path.Path

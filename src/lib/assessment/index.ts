@@ -30,9 +30,10 @@ const repairPromptTemplate = getRepairPromptTemplate()
 const warningReportTemplate = getWarningReportTemplate()
 
 /**
- * The integrations that have not moved to a folder of their own yet, assessed against a project
- * before the ones in `integrations/index.ts`. The order fixes how findings are numbered in the
- * rendered output.
+ * The integrations that only assess, assessed against a project before the ones in
+ * `integrations/index.ts`. Each one decides from the project whether it applies, and the Oxlint
+ * integration installs their packages. The order fixes how findings are numbered in the rendered
+ * output.
  */
 const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs] as const
 
@@ -175,7 +176,8 @@ const notInstalled: ProjectAssessment = {
 /**
  * The findings for the managed scripts of the selection, in `SCRIPT_ORDER`: a script that the root
  * `package.json` does not have, and a script that runs another command. `Setup.apply` sets each
- * selected script to its command, so Doctor reports what `update` would change.
+ * selected script to its command, so Doctor reports what `update` would change. No integration owns
+ * the managed scripts, so each finding names `scripts` as its integration.
  */
 function assessScripts({ packageJson }: Project.Snapshot, { scripts }: Selection): Finding[] {
   return SCRIPT_ORDER.filter((script) => scripts.includes(script)).flatMap((script): Finding[] => {
@@ -239,8 +241,10 @@ export const ProjectAssessment = Schema.Struct({
 export type ProjectAssessment = typeof ProjectAssessment.Type
 
 /**
- * Assess every managed integration against one read of the project. A reassessment after an agent
- * session or a dependency update reads the project again, so it sees the changes.
+ * Assess every managed integration against one read of the project. It runs each integration that
+ * the lockfile's selection includes, so a selected integration whose file is missing gets a
+ * finding. A reassessment after an agent session or a dependency update reads the project again, so
+ * it sees the changes.
  */
 export const assessProject = Effect.fn("assessProject")(function* (project: Project.Snapshot) {
   if (Option.isNone(project.lockfile)) {
@@ -298,7 +302,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 /**
  * The assessment that Doctor reports for the target project, from a new read of it. A project that
  * does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so a
- * coding agent can repair it.
+ * coding agent can repair it. Any other read or parse failure still fails Doctor.
  */
 export const readAssessment = Effect.fn("readAssessment")(function* () {
   // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets

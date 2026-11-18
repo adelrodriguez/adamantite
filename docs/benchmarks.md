@@ -45,8 +45,8 @@ lists the commands of each operation. The bench runs each command in the project
 | check          | `adamantite check`                               | `oxfmt --check && oxlint --deny-warnings` |
 | fix then check | `adamantite fix --suggested && adamantite check` | None                                      |
 
-The one file of each stack is ordinary code of its framework, such as `src/react/clean/todo-list.tsx`.
-A one-file lint still runs the type check of the whole TypeScript program.
+The one file of each stack is ordinary code of its framework, such as `clean/todo-list.tsx` of the
+`react` idiom tree. A one-file lint still runs the type check of the whole TypeScript program.
 
 The direct `oxlint` command runs only when Adamantite runs Oxlint with the stock native binding.
 It gets the variables of the type-aware backend that Adamantite gives Oxlint. In the `effect` stack,

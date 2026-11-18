@@ -1,7 +1,7 @@
 # Coding standards
 
 These standards cover choices that require review. The [architecture](docs/architecture.md)
-describes the module boundaries and lifecycle. [Oxlint](oxlint.config.ts),
+maps the module boundaries and their invariants. [Oxlint](oxlint.config.ts),
 [Vitest](vitest.config.ts), and the [build](tsdown.config.ts) enforce the constraints they can
 check. A standard that a rule checks has no section here. The rule and the comment beside it, in
 [oxlint.config.ts](oxlint.config.ts), in the [config](config) modules that it imports, or in
@@ -87,8 +87,9 @@ import tailwind from "#lib/integrations/oxlint/plugins/tailwind.ts"
 ```
 
 [PR #472](https://github.com/adelrodriguez/adamantite/pull/472) moved managed plugins under Oxlint.
-The [module seams](docs/architecture.md#module-seams) describe integration exports, helper
-modules, the plugin registry, and shared infrastructure.
+[Integrations](docs/architecture.md#integrations) and
+[Managed plugins](docs/architecture.md#managed-plugins) in the architecture name the owner of the
+integration list, the helper modules, the shared checks, and the plugin definitions.
 
 ### Keep lifecycle writes within their command
 
@@ -116,7 +117,8 @@ Effect.gen(function* () {
 ```
 
 [PR #393](https://github.com/adelrodriguez/adamantite/pull/393) removed Doctor's repair path.
-The [lifecycle reference](docs/architecture.md#integration-lifecycle) describes each command's work.
+[Command boundaries](docs/architecture.md#command-boundaries) in the architecture states each
+command's work.
 
 ### Preserve explicit project choices when defaults change
 

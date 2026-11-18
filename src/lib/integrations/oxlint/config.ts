@@ -113,8 +113,8 @@ export interface MisplacedCorePreset {
 /**
  * Find the Adamantite presets that a loaded `oxlint.config.ts` applies before the last core preset.
  * Oxlint applies the `extends` entries in order, and a later entry replaces the rules of an earlier
- * one, so core replaces each change that an earlier preset makes to a core rule. A config that does
- * not extend core has none.
+ * one, so core replaces each change that an earlier preset makes to a core rule. An entry that is
+ * not an Adamantite preset can come before core. A config that does not extend core has none.
  */
 export function findMisplacedCorePreset(config: LintConfig): Option.Option<MisplacedCorePreset> {
   const modules = listPresetModules(config).filter(

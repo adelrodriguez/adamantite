@@ -1328,7 +1328,8 @@ To install the skills from GitHub instead, with the
 
 ```sh
 npx skills add adelrodriguez/adamantite --list
-npx skills add adelrodriguez/adamantite --skill adamantite --skill adamantite-hardening
+npx skills add adelrodriguez/adamantite --skill adamantite
+npx skills add adelrodriguez/adamantite --skill adamantite-hardening
 ```
 
 Doctor reports a copy from GitHub that differs from the skill of the installed Adamantite

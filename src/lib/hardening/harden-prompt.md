@@ -48,7 +48,7 @@ The decisions record holds each candidate that the user did not approve, and eac
 
 Start with each `AGENTS.md` above, then read each file in the documentation list. Follow the files that the instructions link to or tell agents to read, including files absent from the list. Read the comments in the Oxlint config. Read a linked file outside `--path`, but keep the code survey inside the selected scope. Read each file once.
 
-Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to.
+Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to. A link to a heading that does not exist is the same kind of gap: record the heading that the link must go to.
 
 This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.
 
@@ -110,7 +110,7 @@ Step 5 starts from the standards. This step starts from the rules that the proje
 - **Files that a rule misses:** for each `files` glob of an override, list the files that the standard applies to and that the glob does not match, such as a new folder or another file extension.
 - **Verification cases:** for each existing custom rule, prepare temporary valid and invalid cases for the forms above. Verify them with RuleTester from stdin. Do not write files in this step. Preserve user-owned saved rule tests.
 - **Overrides that can shrink:** each file that the overrides above mark "no longer breaks the rule" or "does not exist" is a candidate: remove it from the override. A file that Oxlint did not lint, because the config ignores it or it does not parse, is not evidence. Check it yourself.
-- **Suppressions:** read the counts in the suppressions above. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know.
+- **Suppressions:** read the counts in the suppressions above. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know. Many `@ts-expect-error` or `@ts-ignore` comments with the same reason point to a type that is wrong at its source, not to a lint rule: read the comments, and propose the fix of that type as a candidate on step 1 of the ladder in step 7.
 
 Each gap is a candidate on the step of the rule that it extends: a wider custom rule, a new option, a new test case, a wider glob, or a smaller override. A gap that is not confirmed is a candidate too: show it with the mark "not confirmed". A gap in a rule that a preset or plugin ships, and that no option of the rule can close, is not a candidate: list it under **Decisions** as a report for the maintainers of that package.
 
@@ -155,7 +155,7 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 Then show three short lists:
 
 - **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 7, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
-- **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to. For a broken link, propose the correct target.
+- **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to. For a broken link or a link to a missing heading, propose the correct target.
 - **Also considered:** the candidates with a score of 3 or lower, and each candidate or decision that step 7 matched with a decision of the record, one line for each, with the reason or the `id` of the decision.
 
 When no human can approve, for example in CI or in an unattended session, report the candidates and stop after this step. Write no file, also not the decisions record.
@@ -200,7 +200,7 @@ Write only the approved candidates:
 - **Instruction that became a rule:** delete the text that only repeats what the rule now reports. The rule is the source of that part. Keep the reason and the example of a standard that shapes a design, such as which module owns an import, because an agent needs them before it writes the code. Keep the part of the standard that the rule does not check.
 - **Existing violations:** fix the code that a new rule reports in the same change when the user approved the fixes with the candidate and each fix keeps the behavior of the code. The rule then needs no override. Otherwise, keep the code as it is, keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. A file in the override can gain new violations without a report. In a comment above the entry, state the change that removes each file from it, and list the files and their violations for the user. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule.
 - **Instruction:** write each approved standard that needs judgment, or that no tool can check, to `CODING_STANDARDS.md` as one entry. The entry states the standard, the reason for it, how to spot the mistake, and one example from the project of the code to avoid and the code to prefer. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
-- **Discovery gap:** add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link. Fix each approved broken link.
+- **Discovery gap:** add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link. Fix each approved broken link and each approved link to a missing heading.
 
 Continue when every approved candidate is implemented and each changed custom rule has passed the guide's verification and cleanup checks.
 
@@ -210,7 +210,7 @@ Run `adamantite check` and `adamantite doctor` in this order, through the projec
 
 When a new rule makes `check` fail, fix the rule, fix the code, or add the file to the override as step 9 says, not a disable comment. Do not add saved rule tests or CI steps unless the user requests them. Preserve user-owned tests and CI steps.
 
-When you changed the documentation, run `adamantite harden` again without a terminal and read its agent reach. Do not restart this procedure. Each discovery gap that you closed must be gone, and no link that you added may go to a file that does not exist.
+When you changed the documentation, run `adamantite harden` again without a terminal and read its agent reach. Do not restart this procedure. Each discovery gap that you closed must be gone, and no link that you added may go to a file or a heading that does not exist.
 
 Continue when the required checks pass, the approved discovery gaps are closed, and no temporary verification cases, fixtures, or verification-only helpers remain. If a check is blocked, record its command and reason instead of claiming completion.
 

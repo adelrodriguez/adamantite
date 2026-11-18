@@ -341,7 +341,10 @@ the agent reads each one. A coding agent finds the skills in its skill folder, s
 packages in that folder, or of the package that contains it, the rules folders that those configs
 load, the `AGENTS.md` of the root and of those packages, and the Markdown files of those packages
 and of the root. The prompt also lists the Markdown files that no chain of links or code-span paths
-from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix
+from an `AGENTS.md` reaches, each link to a missing file, and each link to a heading that its
+Markdown file does not have. It also gives the number of comments that turn each lint rule off,
+and of the `@ts-expect-error`, `@ts-ignore`, and `@ts-nocheck` comments that turn type checks
+off. The agent also reads the fix
 commits of the last 200 commits, and a mistake that the fixes repeat becomes a candidate. With
 `--path`, it reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
@@ -411,7 +414,7 @@ installed coding agent seeded with the prompt, copy the prompt, or do nothing. A
 `harden` runs `check`, then the Doctor assessment, and exits 1 when either fails.
 During the session, the agent verifies each new or changed custom rule with temporary
 RuleTester cases and removes the cases before handback.
-Harden also exits 1 when the session added a link to a Markdown file that does not exist, or a line
+Harden also exits 1 when the session added a link to a Markdown file or a heading that does not exist, or a line
 to the decisions record that does not decode. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings.
 `harden --json` prints what the prompt is built from as one JSON document, and starts no agent.

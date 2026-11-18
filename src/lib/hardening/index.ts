@@ -25,7 +25,7 @@ import {
   readMergeBase,
   toProjectPath,
 } from "#lib/hardening/project-files.ts"
-import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
+import { readSuppressions, Suppressions } from "#lib/hardening/suppressions.ts"
 import { skillFolders } from "#lib/integrations/agents/skill.ts"
 import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
@@ -136,10 +136,10 @@ export const HardenContext = Schema.Struct({
    */
   scope: Schema.NullOr(ProjectPath),
   /**
-   * The disable comments of each rule, or none when Oxlint cannot list the files that it lints or
-   * read their comments.
+   * The disable comments of each rule and the comments of each TypeScript directive, or none when
+   * Oxlint cannot list the files that it lints or read their comments.
    */
-  suppressions: Schema.OptionFromNullOr(Schema.Array(RuleSuppressions)),
+  suppressions: Schema.OptionFromNullOr(Suppressions),
   /**
    * The Oxlint configs that Node.js cannot load, so only the agent can find the rules folders that
    * their `custom()` calls load.
@@ -237,6 +237,7 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
     agentReach: agentReach.pipe(
       Option.map((reach) => ({
         brokenLinks: reach.brokenLinks.filter((link) => isSelectedFile(link.file)),
+        deadAnchors: reach.deadAnchors.filter((link) => isSelectedFile(link.file)),
         unreached: reach.unreached.filter((file) => isSelectedFile(file)),
       }))
     ),
@@ -390,7 +391,16 @@ function renderAgentReach(reach: AgentReach) {
             .join("\n")}`,
         ]
 
-  return [unreached, ...brokenLinks].join("\n\n")
+  const deadAnchors =
+    reach.deadAnchors.length === 0
+      ? []
+      : [
+          `These links go to headings that do not exist in their Markdown file:\n\n${reach.deadAnchors
+            .map((link) => `- \`${link.file}\` links to \`${link.target}#${link.anchor}\``)
+            .join("\n")}`,
+        ]
+
+  return [unreached, ...brokenLinks, ...deadAnchors].join("\n\n")
 }
 
 function renderRulesFolders(context: HardenContext) {
@@ -408,44 +418,59 @@ function renderRulesFolders(context: HardenContext) {
 }
 
 /**
- * The locations of the disable comments that the prompt shows for each rule. The agent reads the
- * other comments with the command in the fallback text.
+ * The locations of the comments that the prompt shows for each rule or directive. The agent reads
+ * the other comments with the command in the fallback text.
  */
 const SHOWN_SUPPRESSIONS = 5
 
-function renderSuppressions(suppressions: Option.Option<readonly RuleSuppressions[]>) {
+function renderCount(name: string, locations: readonly string[]) {
+  const shown = locations
+    .slice(0, SHOWN_SUPPRESSIONS)
+    .map((location) => `\`${location}\``)
+    .join(", ")
+
+  const more =
+    locations.length > SHOWN_SUPPRESSIONS
+      ? `, and ${locations.length - SHOWN_SUPPRESSIONS} more`
+      : ""
+
+  return `- ${name}: ${locations.length} ${locations.length === 1 ? "comment" : "comments"}, in ${shown}${more}`
+}
+
+function renderSuppressions(suppressions: Option.Option<Suppressions>) {
   return Option.match(suppressions, {
     onNone: () =>
-      'Adamantite could not count the comments that turn a rule off, because Oxlint could not list the files that it lints or read their comments. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`, and leave out the files that the config ignores.',
-    onSome: (rules) => {
-      if (rules.length === 0) {
-        return "No `oxlint-disable` or `eslint-disable` comment turns a rule off."
-      }
+      'Adamantite could not count the comments that turn a rule or a type check off, because Oxlint could not list the files that it lints or read their comments. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable|@ts-(expect-error|ignore|nocheck)"`, and leave out the files that the config ignores.',
+    onSome: ({ directives, rules }) => {
+      const lint =
+        rules.length === 0
+          ? "No `oxlint-disable` or `eslint-disable` comment turns a rule off."
+          : [
+              "Adamantite counted the `oxlint-disable` and `eslint-disable` comments of each rule in the files that Oxlint lints. Oxlint obeys both. A comment that names no rule turns off all rules.",
+              "",
+              ...rules.map(({ locations, rule }) =>
+                renderCount(
+                  Option.match(rule, {
+                    onNone: () => "All rules",
+                    onSome: (ruleName) => `\`${ruleName}\``,
+                  }),
+                  locations
+                )
+              ),
+            ].join("\n")
 
-      const lines = rules.map(({ locations, rule }) => {
-        const name = Option.match(rule, {
-          onNone: () => "All rules",
-          onSome: (ruleName) => `\`${ruleName}\``,
-        })
+      const types =
+        directives.length === 0
+          ? "No `@ts-expect-error`, `@ts-ignore`, or `@ts-nocheck` comment turns a type check off."
+          : [
+              "Adamantite counted the comments of each TypeScript directive in the same files, where TypeScript reads the directive.",
+              "",
+              ...directives.map(({ directive, locations }) =>
+                renderCount(`\`${directive}\``, locations)
+              ),
+            ].join("\n")
 
-        const shown = locations
-          .slice(0, SHOWN_SUPPRESSIONS)
-          .map((location) => `\`${location}\``)
-          .join(", ")
-
-        const more =
-          locations.length > SHOWN_SUPPRESSIONS
-            ? `, and ${locations.length - SHOWN_SUPPRESSIONS} more`
-            : ""
-
-        return `- ${name}: ${locations.length} ${locations.length === 1 ? "comment" : "comments"}, in ${shown}${more}`
-      })
-
-      return [
-        "Adamantite counted the `oxlint-disable` and `eslint-disable` comments of each rule in the files that Oxlint lints. Oxlint obeys both. A comment that names no rule turns off all rules.",
-        "",
-        ...lines,
-      ].join("\n")
+      return [lint, types].join("\n\n")
     },
   })
 }

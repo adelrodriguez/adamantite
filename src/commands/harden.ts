@@ -6,7 +6,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
+import type { AgentReach } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import * as Bridge from "#lib/bridge/index.ts"
 import { DecisionsRecord, readDecisionsRecord } from "#lib/hardening/decisions-record.ts"
@@ -42,8 +42,22 @@ export const Report = Schema.Struct({
   ...HardenContext.fields,
 })
 
-function getLinkKey(link: BrokenLink) {
-  return `${link.file}\0${link.target}`
+/**
+ * The links of the agent reach that point to nothing, each with a key and the failure that it gives
+ * when the session added it. A dead anchor sends an agent to a section that is gone, as a broken
+ * link sends it to a file that is gone.
+ */
+function getDeadLinks(reach: AgentReach) {
+  return [
+    ...reach.brokenLinks.map((link) => ({
+      failure: `\`${link.file}\` links to \`${link.target}\`, which does not exist.`,
+      key: `${link.file}\0${link.target}`,
+    })),
+    ...reach.deadAnchors.map((link) => ({
+      failure: `\`${link.file}\` links to \`${link.target}#${link.anchor}\`, a heading that \`${link.target}\` does not have.`,
+      key: `${link.file}\0${link.target}#${link.anchor}`,
+    })),
+  ]
 }
 
 const scope = Flag.Directory("path", { mustExist: true }).pipe(
@@ -78,10 +92,10 @@ function listUndecodableLines(record: DecisionsRecord) {
 /**
  * What remains after a harden session. The agent verifies custom rules during the session with
  * temporary cases, and the project must still pass check and Doctor after it. A link that was
- * broken before the session is a gap that the user may not have approved, so only a link that the
- * session added remains. The same holds for a line of the decisions record that does not decode:
- * only a line that the session added remains. `before` is the context that the session started
- * from.
+ * broken before the session, to a missing file or heading, is a gap that the user may not have
+ * approved, so only a link that the session added remains. The same holds for a line of the
+ * decisions record that does not decode: only a line that the session added remains. `before` is
+ * the context that the session started from.
  */
 const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before: HardenContext) {
   const CHECK_FAILED = "`adamantite check` failed."
@@ -106,16 +120,16 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
     { concurrency: "unbounded" }
   )
 
-  const brokenBefore = new Set(
+  const deadBefore = new Set(
     Option.match(before.agentReach, {
       onNone: () => [],
-      onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
+      onSome: (reach) => getDeadLinks(reach).map((link) => link.key),
     })
   )
 
-  const addedBrokenLinks = Option.match(reachAfter, {
+  const addedDeadLinks = Option.match(reachAfter, {
     onNone: () => [],
-    onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
+    onSome: (reach) => getDeadLinks(reach).filter((link) => !deadBefore.has(link.key)),
   })
 
   // A line has no key that survives a repair, so its text tells whether the session added it.
@@ -126,9 +140,7 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
   return {
     failures: [
       ...checkFailures,
-      ...addedBrokenLinks.map(
-        (link) => `\`${link.file}\` links to \`${link.target}\`, which does not exist.`
-      ),
+      ...addedDeadLinks.map((link) => link.failure),
       ...listUndecodableLines(recordAfter)
         .filter(({ text }) => !undecodableBefore.has(text))
         .map(

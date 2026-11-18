@@ -118,7 +118,7 @@ jobs:
           grep "react-doctor(no-effect-event-handler)" oxlint-output.txt
           tsrs_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.tsrs")"
           effect_tsgo_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['@effect/tsgo']")"
-          effect_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).dependencies.effect")"
+          effect_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.effect")"
           npm install "tsrs@${tsrs_version}" "@effect/tsgo@${effect_tsgo_version}" "effect@${effect_version}"
           # The effecttsgo rules exist only in the Effect builds, which the Oxlint entry loads
           # without a patch.

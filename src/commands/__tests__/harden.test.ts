@@ -676,7 +676,8 @@ const RECORD_PROCESSES = {
   mergeBases: { [SESSION_HEAD]: `${BOUNDARY}\n` },
 }
 
-// What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`.
+// What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`, and
+// whose third line turns off the type check of the fourth.
 const INDEX_PROBE_REPORT = JSON.stringify({
   diagnostics: [
     {
@@ -685,8 +686,16 @@ const INDEX_PROBE_REPORT = JSON.stringify({
       labels: [{ span: { column: 1, line: 1 } }],
       message: JSON.stringify({
         anchor: "start",
-        comments: [{ line: 1, value: " oxlint-disable-next-line no-console" }],
-        lines: 3,
+        comments: [
+          {
+            leading: true,
+            line: 1,
+            type: "Line",
+            value: " oxlint-disable-next-line no-console",
+          },
+          { leading: false, line: 3, type: "Line", value: " @ts-expect-error -- untyped" },
+        ],
+        lines: 5,
       }),
     },
   ],
@@ -699,9 +708,10 @@ describe("harden", () => {
       const { exit, logLines } = yield* runHarden(
         {
           ...CUSTOM_RULE_FILES,
-          "AGENTS.md": "Read [the guide](docs/missing.md).\n",
+          "AGENTS.md": "Read [the guide](docs/missing.md) and [the setup](#setup).\n",
           "docs/unreached.md": "# Unreached\n",
-          "src/index.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
+          "src/index.ts":
+            "// oxlint-disable-next-line no-console\nconsole.log(1)\n// @ts-expect-error -- untyped\nconsole.log(missing)\n",
         },
         ["--json", "--commits", "20"],
         {
@@ -714,6 +724,7 @@ describe("harden", () => {
       expect(decodeReport(logLines[0])).toStrictEqual({
         agentReach: Option.some({
           brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
+          deadAnchors: [{ anchor: "setup", file: "AGENTS.md", target: "AGENTS.md" }],
           unreached: ["docs/unreached.md"],
         }),
         configs: ["oxlint.config.ts"],
@@ -726,9 +737,10 @@ describe("harden", () => {
         rulesFolders: [".adamantite/lint"],
         schemaVersion: 1,
         scope: null,
-        suppressions: Option.some([
-          { locations: ["src/index.ts:1"], rule: Option.some("no-console") },
-        ]),
+        suppressions: Option.some({
+          directives: [{ directive: "@ts-expect-error", locations: ["src/index.ts:3"] }],
+          rules: [{ locations: ["src/index.ts:1"], rule: Option.some("no-console") }],
+        }),
         unloadedConfigs: [],
       })
     })
@@ -823,13 +835,17 @@ describe("harden", () => {
       files: {
         "AGENTS.md": "Read `GLOSSARY.md` and [the architecture](docs/architecture.md#layers).\n",
         "GLOSSARY.md": "# Glossary\n",
-        "docs/architecture.md": "See [the testing guide](./guides/testing.md).\n",
+        "docs/architecture.md": "## Layers\n\nSee [the testing guide](./guides/testing.md).\n",
         "docs/guides/testing.md": "# Testing\n",
         "docs/plans/old.md": "# Old plan\n",
         "src/README.md": "# Source\n",
       },
       name: "reach the files that links and code spans name, also through other files",
-      reach: { brokenLinks: [], unreached: ["docs/plans/old.md", "src/README.md"] },
+      reach: {
+        brokenLinks: [],
+        deadAnchors: [],
+        unreached: ["docs/plans/old.md", "src/README.md"],
+      },
     },
     {
       files: {
@@ -843,6 +859,7 @@ describe("harden", () => {
       name: "start from each AGENTS.md, and not from the files of one vendor",
       reach: {
         brokenLinks: [],
+        deadAnchors: [],
         unreached: [".cursor/rules/style.mdc", "CLAUDE.md", "docs/style.md", "docs/testing.md"],
       },
     },
@@ -855,22 +872,30 @@ describe("harden", () => {
         "src/lib/hardening/prompt.md": "# Prompt\n",
       },
       name: "reach each Markdown file directly in a folder that a file names",
-      reach: { brokenLinks: [], unreached: ["docs/plans/old.md", "src/lib/hardening/prompt.md"] },
+      reach: {
+        brokenLinks: [],
+        deadAnchors: [],
+        unreached: ["docs/plans/old.md", "src/lib/hardening/prompt.md"],
+      },
     },
     {
       files: {
         "AGENTS.md":
-          "Use [Effect](https://effect.website), see [below](#tests), install `@effect/vitest`, and run `pnpm run check`.\n",
+          "Use [Effect](https://effect.website), see [below](#tests), install `@effect/vitest`, and run `pnpm run check`.\n\n## Tests\n",
         "docs/testing.md": "# Testing\n",
       },
       name: "ignore a URL, an anchor, a package name, and a code span that names no file",
-      reach: { brokenLinks: [], unreached: ["docs/testing.md"] },
+      reach: { brokenLinks: [], deadAnchors: [], unreached: ["docs/testing.md"] },
     },
     {
       // A code span can name a file that a step creates later, so only a link counts as broken.
       files: { "AGENTS.md": "Read [the guide](docs/guide.md), then `docs/missing-span.md`.\n" },
       name: "list a link to a Markdown file that does not exist",
-      reach: { brokenLinks: [{ file: "AGENTS.md", target: "docs/guide.md" }], unreached: [] },
+      reach: {
+        brokenLinks: [{ file: "AGENTS.md", target: "docs/guide.md" }],
+        deadAnchors: [],
+        unreached: [],
+      },
     },
     {
       // A fence with text after it cannot close a block, so the block ends on the third line.
@@ -880,7 +905,11 @@ describe("harden", () => {
         "docs/guide.md": "# Guide\n",
       },
       name: "read the links after a code block that shows a fence with a language",
-      reach: { brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }], unreached: [] },
+      reach: {
+        brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
+        deadAnchors: [],
+        unreached: [],
+      },
     },
     {
       files: {
@@ -899,7 +928,86 @@ describe("harden", () => {
         "docs/style.md": "# Style\n",
       },
       name: "ignore the links of an example in a code block or in inline code",
-      reach: { brokenLinks: [], unreached: ["docs/style.md"] },
+      reach: { brokenLinks: [], deadAnchors: [], unreached: ["docs/style.md"] },
+    },
+    {
+      files: {
+        "AGENTS.md": [
+          "Read [the layers](docs/architecture.md#layers), [the seams](docs/architecture.md#module-seams),",
+          "[the setup](#set-up), [the tests](#tests), and [the changelog](CHANGELOG.md#100).",
+          "",
+          "## Set up",
+          "",
+        ].join("\n"),
+        "CHANGELOG.md": "# acme\n",
+        "docs/architecture.md": "# Architecture\n\n## Layers\n",
+      },
+      name: "list a link to a heading that a Markdown file of the project does not have",
+      reach: {
+        brokenLinks: [],
+        deadAnchors: [
+          { anchor: "module-seams", file: "AGENTS.md", target: "docs/architecture.md" },
+          { anchor: "tests", file: "AGENTS.md", target: "AGENTS.md" },
+        ],
+        unreached: [],
+      },
+    },
+    {
+      files: {
+        "AGENTS.md": [
+          "---",
+          "description: Front matter is not a heading",
+          "---",
+          "",
+          "# The `Setup.apply` rule",
+          "",
+          "## Tests",
+          "",
+          "## Tests",
+          "",
+          "## What's new?",
+          "",
+          "## [Linked](docs/guide.md) heading",
+          "",
+          "## snake_case and _emphasis_",
+          "",
+          "## Docs site id {#custom-id}",
+          "",
+          '<a id="html-anchor"></a>',
+          "",
+          "---",
+          "",
+          "Setext heading",
+          "==============",
+          "",
+          "```markdown",
+          "## Fenced",
+          "```",
+          "",
+          "Write a link like `[the tests](#example)`.",
+          "",
+          "[1](#the-setupapply-rule) [2](#tests) [3](#tests-1) [4](#whats-new) [5](#linked-heading)",
+          "[6](#snake_case-and-emphasis) [7](#custom-id) [8](#html-anchor) [9](#setext-heading)",
+          "[10](#Tests) [11](#top) [12](#L10-L20) [13](#tests-2) [14](#fenced)",
+          "[15](#description-front-matter-is-not-a-heading)",
+          "",
+        ].join("\n"),
+        "docs/guide.md": "# Guide\n",
+      },
+      name: "make the anchors of headings as GitHub does",
+      reach: {
+        brokenLinks: [],
+        deadAnchors: [
+          { anchor: "tests-2", file: "AGENTS.md", target: "AGENTS.md" },
+          { anchor: "fenced", file: "AGENTS.md", target: "AGENTS.md" },
+          {
+            anchor: "description-front-matter-is-not-a-heading",
+            file: "AGENTS.md",
+            target: "AGENTS.md",
+          },
+        ],
+        unreached: [],
+      },
     },
   ])("$name", ({ files, reach }) =>
     Effect.gen(function* () {
@@ -935,7 +1043,9 @@ describe("harden", () => {
       expect(project.list()).toContain(".claude/skills/adamantite/SKILL.md")
       expect(project.list()).toContain(".claude/skills/adamantite-hardening/SKILL.md")
       expect(documentationFiles).toStrictEqual(Option.some(["AGENTS.md"]))
-      expect(agentReach).toStrictEqual(Option.some({ brokenLinks: [], unreached: [] }))
+      expect(agentReach).toStrictEqual(
+        Option.some({ brokenLinks: [], deadAnchors: [], unreached: [] })
+      )
     })
   )
 
@@ -1087,6 +1197,20 @@ describe("harden", () => {
     })
   )
 
+  it.effect("list a link to a heading that does not exist", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        "AGENTS.md": "Read [the seams](docs/architecture.md#module-seams).\n",
+        "docs/architecture.md": "# Architecture\n",
+        ...INSTALLED,
+      })
+
+      expect(getSection(prompt, "### Agent reach")).toContain(
+        "These links go to headings that do not exist in their Markdown file:\n\n- `AGENTS.md` links to `docs/architecture.md#module-seams`"
+      )
+    })
+  )
+
   it.effect("list a link to a file that the git index has and the working tree does not", () =>
     Effect.gen(function* () {
       const { logLines } = yield* runHarden(
@@ -1139,7 +1263,7 @@ describe("harden", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(getSection(logLines[0] ?? "", "### Suppressions")).toContain(
-        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`'
+        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable|@ts-(expect-error|ignore|nocheck)"`'
       )
     })
   )
@@ -1158,8 +1282,28 @@ describe("harden", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(getSection(logLines[0] ?? "", "### Suppressions")).toContain(
-        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`'
+        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable|@ts-(expect-error|ignore|nocheck)"`'
       )
+    })
+  )
+
+  it.effect("list the comments of each rule and of each TypeScript directive", () =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden(
+        {
+          "oxlint.config.ts": CORE_CONFIG,
+          "src/index.ts":
+            "// oxlint-disable-next-line no-console\nconsole.log(1)\n// @ts-expect-error -- untyped\nconsole.log(missing)\n",
+          ...INSTALLED,
+        },
+        [],
+        { probeReport: INDEX_PROBE_REPORT }
+      )
+
+      expect(getListItems(getSection(logLines[0] ?? "", "### Suppressions"))).toStrictEqual([
+        "- `no-console`: 1 comment, in `src/index.ts:1`",
+        "- `@ts-expect-error`: 1 comment, in `src/index.ts:3`",
+      ])
     })
   )
 
@@ -1168,7 +1312,7 @@ describe("harden", () => {
       const prompt = yield* runHardenPrompt({ "oxlint.config.ts": CORE_CONFIG, ...INSTALLED })
 
       expect(getSection(prompt, "### Suppressions")).toContain(
-        "No `oxlint-disable` or `eslint-disable` comment turns a rule off."
+        "No `oxlint-disable` or `eslint-disable` comment turns a rule off.\n\nNo `@ts-expect-error`, `@ts-ignore`, or `@ts-nocheck` comment turns a type check off."
       )
       expect(getSection(prompt, "### Overrides that turn a rule off")).toContain(
         "No override in the Oxlint config turns a rule off for files that it names."
@@ -1822,6 +1966,35 @@ describe("harden", () => {
       })
   )
 
+  it.effect("list the dead links of the root and the selected package with --path", () =>
+    Effect.gen(function* () {
+      const { logLines } = yield* runHarden(
+        {
+          ...MONOREPO_FILES,
+          "AGENTS.md":
+            "Read [the plan](docs/plan.md) and [the layers](docs/architecture.md#layers).\n",
+          "packages/api/README.md": "Read [the guide](guide.md) and [the setup](#setup).\n",
+          "packages/web/AGENTS.md": "Read [the guide](guide.md) and [the setup](#setup).\n",
+        },
+        ["--json", "--path", "packages/web"]
+      )
+
+      expect(decodeReport(logLines[0]).agentReach).toStrictEqual(
+        Option.some({
+          brokenLinks: [
+            { file: "AGENTS.md", target: "docs/plan.md" },
+            { file: "packages/web/AGENTS.md", target: "packages/web/guide.md" },
+          ],
+          deadAnchors: [
+            { anchor: "layers", file: "AGENTS.md", target: "docs/architecture.md" },
+            { anchor: "setup", file: "packages/web/AGENTS.md", target: "packages/web/AGENTS.md" },
+          ],
+          unreached: [],
+        })
+      )
+    })
+  )
+
   it.effect("start the reach of --path also from the AGENTS.md of a parent package", () =>
     Effect.gen(function* () {
       // `packages/web/admin` is a workspace package inside `web`, and an agent in it reads the
@@ -2225,6 +2398,28 @@ describe("harden", () => {
         "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
         ...CHECK_TITLES,
         "✖ `AGENTS.md` links to `docs/style.md`, which does not exist.",
+        "⚠️ Harden found issues.",
+      ])
+    })
+  )
+
+  it.effect("fail and name the link when the session adds a link to a missing heading", () =>
+    Effect.gen(function* () {
+      const { exit, logLines } = yield* runInteractiveHarden({
+        // The link to a missing heading that the project had before the session does not fail it.
+        files: { "AGENTS.md": "Read [the setup](#setup).\n", ...HEALTHY_FILES },
+        keys: ["enter"],
+        onSession: (files) => {
+          files.write("AGENTS.md", `${files.read("AGENTS.md")}Read [the tests](#tests).\n`)
+        },
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(logLines).toStrictEqual([
+        "💠 adamantite harden",
+        "● Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+        ...CHECK_TITLES,
+        "✖ `AGENTS.md` links to `AGENTS.md#tests`, a heading that `AGENTS.md` does not have.",
         "⚠️ Harden found issues.",
       ])
     })

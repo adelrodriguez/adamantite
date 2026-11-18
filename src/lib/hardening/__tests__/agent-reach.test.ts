@@ -35,7 +35,11 @@ describe("readAgentReach", () => {
         ["AGENTS.md"]
       ).pipe(Effect.provide([context.layer, Path.layer]))
 
-      expect(reach).toStrictEqual({ brokenLinks: [], unreached: ["docs/deleted.md"] })
+      expect(reach).toStrictEqual({
+        brokenLinks: [],
+        deadAnchors: [],
+        unreached: ["docs/deleted.md"],
+      })
     })
   )
 })

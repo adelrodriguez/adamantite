@@ -1,6 +1,7 @@
-import type { ESTree, Rule } from "@oxlint/plugins"
+import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { staticKeyName } from "../../shared/ast.ts"
+import { isNumberLiteral, staticKeyName, staticString } from "../../shared/ast.ts"
+import { constBinding, resolveVariable } from "../../shared/scope.ts"
 
 // The functions that register a test or a suite, by the name at the root of the call, such as `it`
 // in `it.effect("loads", ...)` or `test` in `test.each([1])("loads %i", ...)`.
@@ -8,7 +9,14 @@ const testFunctions: ReadonlySet<string> = new Set(["describe", "it", "suite", "
 
 // The members of a test function that do not register a test: they return a new test function or
 // set fixture values.
-const builderMembers: ReadonlySet<string> = new Set(["each", "extend", "for", "override", "scoped"])
+const builderMembers: ReadonlySet<string> = new Set(["each", "extend", "for", "override"])
+
+// The member that sets fixture values in Vitest, as `test.scoped({ ... })`, and registers a test in
+// @effect/vitest 3, as `it.scoped("loads", ...)`.
+const scopedMember = "scoped"
+
+// The Vite and Vitest configs, whose `test` options set the retries of every test.
+const configFile = /(?:^|\/)(?:vite|vitest)\.config\.[cm]?[jt]s$/u
 
 // The files that Vitest runs as benchmarks by default, such as `index.bench.ts`.
 const benchmarkFile = /\.(?:bench|benchmark)\.[cm]?[jt]sx?$/u
@@ -47,6 +55,10 @@ function rootName(node: ESTree.Node): string | null {
     return rootName(node.callee)
   }
 
+  if (node.type === "TaggedTemplateExpression") {
+    return rootName(node.tag)
+  }
+
   return node.type === "Identifier" ? node.name : null
 }
 
@@ -64,7 +76,8 @@ function methodCall(callee: ESTree.Node): { method: string; object: string } | n
   return method === null ? null : { method, object: callee.object.name }
 }
 
-function isTestCall(callee: ESTree.Node): boolean {
+function isTestCall(node: ESTree.CallExpression): boolean {
+  const { callee } = node
   const root = rootName(callee)
 
   if (root === null || !testFunctions.has(root)) {
@@ -76,12 +89,69 @@ function isTestCall(callee: ESTree.Node): boolean {
   }
 
   const member = staticKeyName(callee.property, callee.computed)
+  const [name] = node.arguments
+
+  if (member === scopedMember) {
+    return name !== undefined && name.type !== "SpreadElement" && staticString(name) !== null
+  }
 
   return member === null || !builderMembers.has(member)
 }
 
-function isFunction(node: ESTree.Node): boolean {
-  return node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression"
+/**
+ * Return the value that a `const` binding of an identifier holds, or the node itself for any other
+ * expression.
+ */
+function constValue(sourceCode: SourceCode, node: ESTree.Node): ESTree.Node {
+  if (node.type !== "Identifier") {
+    return node
+  }
+
+  const variable = resolveVariable(sourceCode, node)
+  const binding = variable === null ? null : constBinding(variable)
+
+  return binding?.id.type === "Identifier" ? binding.init : node
+}
+
+/**
+ * Reports whether an expression is a function, also through a function declaration or a `const`
+ * binding, such as `body` in `function body() {}`.
+ */
+function isFunctionValue(sourceCode: SourceCode, node: ESTree.Node): boolean {
+  if (node.type === "Identifier") {
+    const variable = resolveVariable(sourceCode, node)
+
+    if (variable?.defs.some((definition) => definition.type === "FunctionName")) {
+      return true
+    }
+  }
+
+  const value = constValue(sourceCode, node)
+
+  return value.type === "ArrowFunctionExpression" || value.type === "FunctionExpression"
+}
+
+/**
+ * Reports whether an expression computes a number from number literals, such as `2 * 60_000`, also
+ * through a `const` binding.
+ */
+function isNumberValue(sourceCode: SourceCode, node: ESTree.Node, depth = 0): boolean {
+  const value = depth > 8 ? node : constValue(sourceCode, node)
+
+  if (isNumberLiteral(value)) {
+    return true
+  }
+
+  if (value.type === "UnaryExpression") {
+    return isNumberValue(sourceCode, value.argument, depth + 1)
+  }
+
+  return (
+    value.type === "BinaryExpression"
+    && value.left.type !== "PrivateIdentifier"
+    && isNumberValue(sourceCode, value.left, depth + 1)
+    && isNumberValue(sourceCode, value.right, depth + 1)
+  )
 }
 
 /**
@@ -91,6 +161,7 @@ const rule: Rule = {
   createOnce(context) {
     // The local names of `flakyTest` that the file imports from @effect/vitest.
     const flakyTestNames = new Set<string>()
+    let isConfig = false
 
     function reportOptions(node: ESTree.Node | undefined, timeoutKeys: ReadonlySet<string>) {
       if (node?.type !== "ObjectExpression") {
@@ -136,7 +207,7 @@ const rule: Rule = {
           return
         }
 
-        if (!isTestCall(callee)) {
+        if (!isTestCall(node)) {
           return
         }
 
@@ -145,12 +216,23 @@ const rule: Rule = {
         reportOptions(second, testTimeouts)
         reportOptions(third, testTimeouts)
 
-        // `test(name, fn, 60_000)` passes the timeout as a bare value after the test function.
         if (
-          third !== undefined
-          && second?.type !== "ObjectExpression"
-          && third.type !== "ObjectExpression"
-          && !isFunction(third)
+          second === undefined
+          || third === undefined
+          || second.type === "SpreadElement"
+          || third.type === "SpreadElement"
+          || third.type === "ObjectExpression"
+          || isFunctionValue(context.sourceCode, third)
+        ) {
+          return
+        }
+
+        // `test(name, fn, 60_000)` passes the timeout as a bare value after the test function, and
+        // `test(name, options, body)` passes the test function last. A third argument is a timeout
+        // when the second is the test function or when it computes a number.
+        if (
+          isFunctionValue(context.sourceCode, second)
+          || isNumberValue(context.sourceCode, third)
         ) {
           context.report({ messageId: "timeout", node: third })
         }
@@ -171,7 +253,7 @@ const rule: Rule = {
       },
       // A Vitest config sets the retries of every test in its `test` options, also in a project.
       Property(node) {
-        if (propertyName(node) !== "test" || node.value.type !== "ObjectExpression") {
+        if (!isConfig || propertyName(node) !== "test" || node.value.type !== "ObjectExpression") {
           return
         }
 
@@ -184,6 +266,7 @@ const rule: Rule = {
       // A benchmark is slow by design, so its timeout hides no flaky test.
       before() {
         flakyTestNames.clear()
+        isConfig = configFile.test(context.filename.replaceAll("\\", "/"))
 
         return !benchmarkFile.test(context.filename)
       },

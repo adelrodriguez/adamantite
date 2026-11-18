@@ -30,16 +30,37 @@ tester.run("no-flake-masking", plugin.rules["no-flake-masking"], {
     { code: 'test("loads", { "retry": 2 }, async () => {});', errors: [retry] },
     { code: "vi.setConfig({ retry: 2 });", errors: [retry] },
     { code: "jest.retryTimes(3);", errors: [retry], name: "Jest retries every later test" },
-    { code: "export default defineConfig({ test: { retry: 2 } });", errors: [retry] },
+    {
+      code: "export default defineConfig({ test: { retry: 2 } });",
+      errors: [retry],
+      filename: "vitest.config.ts",
+    },
     {
       code: "export default defineConfig({ test: { retry: process.env.CI ? 2 : 0 } });",
       errors: [retry],
+      filename: "vitest.config.ts",
     },
     {
       code: "export default defineConfig({ test: { projects: [{ test: { name: 'node', retry: 1 } }] } });",
       errors: [retry],
+      filename: "vitest.config.ts",
     },
     { code: 'test("loads", async () => {}, 60_000);', errors: [timeout] },
+    {
+      code: 'test.each`a | b`("loads $a", () => {}, 60_000);',
+      errors: [timeout],
+      name: "a tagged test table",
+    },
+    {
+      code: 'it.scoped("loads", () => Effect.void, 60_000);',
+      errors: [timeout],
+      name: "a scoped test of @effect/vitest 3",
+    },
+    {
+      code: 'const LONG = 60_000; test("loads", load, LONG);',
+      errors: [timeout],
+      name: "a timeout constant after a named test function",
+    },
     { code: 'it("loads", async () => {}, 30000);', errors: [timeout] },
     { code: 'test("loads", async () => {}, LONG_TIMEOUT);', errors: [timeout] },
     { code: 'test("loads", async () => {}, 2 * 60_000);', errors: [timeout] },
@@ -92,6 +113,23 @@ tester.run("no-flake-masking", plugin.rules["no-flake-masking"], {
     "const loaded = load.pipe(Effect.retry({ times: 2 }));",
     "export default defineConfig({ test: { testTimeout: 30_000, hookTimeout: 60_000 } });",
     "vi.setConfig({ fakeTimers: { now: 0 } });",
+    {
+      code: 'const options = { concurrent: true }; function body() {} test("loads", options, body);',
+      name: "options and a test function in bindings",
+    },
+    {
+      code: 'const options = { concurrent: true }; const body = () => {}; test("loads", options, body);',
+      name: "options and an arrow test function in bindings",
+    },
+    {
+      code: "const fixture = { test: { retry: 2 } };",
+      filename: "src/config.test.ts",
+      name: "test data that looks like a Vitest config",
+    },
+    {
+      code: 'const test = base.scoped({ server: "http://localhost" });',
+      name: "Vitest fixture values set with scoped",
+    },
     {
       code: 'test.for(operations)("$name", { timeout: 600_000 }, async () => {});',
       filename: "src/__tests__/index.bench.ts",

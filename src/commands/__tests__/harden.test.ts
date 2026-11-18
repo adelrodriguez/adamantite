@@ -25,6 +25,7 @@ import {
   SKILL_FILES,
 } from "#__tests__/command-test-helpers.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { runLifecycle } from "#__tests__/lifecycle.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import hardenCommand, { Report } from "#commands/harden.ts"
@@ -700,6 +701,40 @@ describe("harden", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(decodeReport(logLines[0]).agentReach).toStrictEqual(Option.some(reach))
+    })
+  )
+
+  // An agent that starts from the `AGENTS.md` of a new setup must find the Adamantite skill.
+  it.effect("reach each copy of the Adamantite skill from the AGENTS.md that init writes", () =>
+    Effect.gen(function* () {
+      const project = createFileSystemTestContext({
+        files: {
+          ".claude/settings.json": "{}\n",
+          "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+        },
+      })
+
+      yield* runLifecycle("init", project, ["--non-interactive", "--script", "check", "--agents"])
+
+      const { logLines } = yield* runHarden(
+        {
+          ...ADAMANTITE_MODULE,
+          ...Object.fromEntries(project.list().map((file) => [file, project.read(file)])),
+        },
+        ["--json"]
+      )
+
+      const { agentReach, documentationFiles } = decodeReport(logLines[0])
+
+      expect(documentationFiles).toStrictEqual(
+        Option.some([
+          ...[".agents", ".claude"].flatMap((folder) =>
+            Object.keys(SKILL_FILES).map((file) => file.replace(".agents", folder))
+          ),
+          "AGENTS.md",
+        ])
+      )
+      expect(agentReach).toStrictEqual(Option.some({ brokenLinks: [], unreached: [] }))
     })
   )
 

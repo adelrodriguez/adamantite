@@ -3,7 +3,12 @@ import * as Effect from "effect/Effect"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
+import type {
+  InvalidLockfile,
+  SetupAhead,
+  SetupOutdated,
+  UnsupportedLockfile,
+} from "#lib/shared/errors.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import { Finding, PackageAction } from "#lib/integrations/base.ts"
@@ -12,7 +17,7 @@ import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import * as Project from "#lib/project/index.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { LOCKFILE_PATH, verifyLockfileVersion } from "#lib/project/lockfile.ts"
 import {
   MANAGED_SCRIPT_COMMANDS,
   readPackageJson,
@@ -105,6 +110,41 @@ function assessUnreadableLockfile(error: InvalidLockfile | UnsupportedLockfile):
     selection: null,
     warnings: [],
   }
+}
+
+/**
+ * The finding for a lockfile that another Adamantite version than the installed one wrote. `check`
+ * fails with the same error, so Doctor does not call a project healthy that `check` fails.
+ */
+function assessSetupVersion(error: SetupAhead | SetupOutdated): Finding {
+  return Match.valueTags(error, {
+    SetupAhead: ({ installed, path, recorded }): Finding => ({
+      currentState: `\`${path}\` records the setup of Adamantite ${recorded}, but the project installs the older Adamantite ${installed}.`,
+      goal: [
+        `Install the dependencies. If the project still declares an \`adamantite\` version older than ${recorded}, update the dependency to ${recorded} or newer, and install it.`,
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "setup-ahead",
+      integration: "lockfile",
+      notes: [
+        `Do not run \`adamantite update\` with Adamantite ${installed}. It would bring the managed files back to that version.`,
+      ],
+      title: "Setup is newer than the installed Adamantite",
+    }),
+    SetupOutdated: ({ installed, path, recorded }): Finding => ({
+      currentState: `\`${path}\` records the setup of Adamantite ${recorded}, but the project installs Adamantite ${installed}, so the managed packages, files, and skill can be out of date. \`adamantite check\` fails until the setup is updated.`,
+      goal: [
+        `Run the project's installed \`adamantite update\` through its package runner, such as \`npx\` or \`pnpm exec\`. It applies the setup of Adamantite ${installed} and records that version in \`${path}\`.`,
+        "Commit the changes, then run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "setup-outdated",
+      integration: "lockfile",
+      notes: [
+        "Run the update before the other repairs, because it can resolve other findings, such as package drift.",
+      ],
+      title: "Setup is outdated",
+    }),
+  })
 }
 
 /**
@@ -209,6 +249,16 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 
   const { selection } = project.lockfile.value
 
+  const setupVersion = yield* verifyLockfileVersion(
+    yield* Project.Directory,
+    project.lockfile
+  ).pipe(
+    Effect.as([]),
+    Effect.catchTag(["SetupAhead", "SetupOutdated"], (error) =>
+      Effect.succeed([assessSetupVersion(error)])
+    )
+  )
+
   const assessments = yield* Effect.forEach(
     managedIntegrations,
     (integration) =>
@@ -235,6 +285,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
   return {
     applicableIntegrations: applicable.map(({ name }) => name),
     findings: [
+      ...setupVersion,
       ...assessScripts(project, selection),
       ...applicable.flatMap(({ assessment }) => assessment.findings),
     ],

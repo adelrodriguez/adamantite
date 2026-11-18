@@ -4,9 +4,14 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import type { Selection } from "#lib/project/selection.ts"
 import {
+  ADAMANTITE_RESOLUTION,
   createRunnerTestContext,
   getFailure,
+  getFailures,
+  makeAdamantitePackageFile,
   makeLockfileFile,
   makeToolsInstalledLayer,
   OXFMT_CLI,
@@ -16,14 +21,53 @@ import {
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection } from "#__tests__/lifecycle.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import checkCommand from "#commands/check.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   CommandFailed,
   InvalidCheckOptions,
   PackageNotInstalled,
+  SetupAhead,
+  SetupOutdated,
   ToolNotSelected,
 } from "#lib/shared/errors.ts"
+import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+
+// The test project installs Oxfmt, Oxlint, and Adamantite.
+const installedLayer = makeModuleResolverLayer("/project", {
+  "oxfmt/package.json": "node_modules/oxfmt/package.json",
+  "oxlint/package.json": "node_modules/oxlint/package.json",
+  ...ADAMANTITE_RESOLUTION,
+})
+
+// The test project installs Adamantite and only `tool`.
+function makeInstalledLayer(tool: "oxfmt" | "oxlint") {
+  return makeModuleResolverLayer("/project", {
+    [`${tool}/package.json`]: `node_modules/${tool}/package.json`,
+    ...ADAMANTITE_RESOLUTION,
+  })
+}
+
+// A project that installs Adamantite `installed`, with a lockfile that Adamantite `recorded` wrote
+// when it names one.
+function makeSetupFiles(options: { installed: string; recorded?: string; selection?: Selection }) {
+  const files = createFileSystemTestContext({
+    files: makeAdamantitePackageFile(options.installed),
+  })
+
+  if (options.recorded !== undefined) {
+    const lockfile = makeLockfileFile(
+      options.selection ?? makeSelection({ presets: ["core"], scripts: ["check"] }),
+      {},
+      options.recorded
+    )
+
+    files.write(LOCKFILE_PATH, lockfile[LOCKFILE_PATH])
+  }
+
+  return files
+}
 
 describe("check", () => {
   describe("stage flags", () => {
@@ -331,6 +375,181 @@ describe("check", () => {
         expect(
           runner.invocations.map((invocation) => invocation.name ?? invocation.command)
         ).toStrictEqual(["oxfmt", "oxlint"])
+      })
+    )
+  })
+
+  describe("setup version", () => {
+    it.effect(
+      "run both stages, then fail with the outdated setup when an older Adamantite wrote the lockfile",
+      () =>
+        Effect.gen(function* () {
+          const runner = createRunnerTestContext()
+          const logLines: unknown[] = []
+
+          const exit = yield* runCommand(checkCommand, [], {
+            files: makeSetupFiles({ installed: "0.47.0", recorded: "0.46.0" }),
+            layers: [runner.layer, installedLayer],
+            logLines,
+          })
+
+          const error = getFailure(exit)
+
+          expect({
+            error,
+            headings: logLines.map((line) => stripVTControlCharacters(String(line))),
+          }).toStrictEqual({
+            error: new SetupOutdated({
+              installed: "0.47.0",
+              path: LOCKFILE_PATH,
+              recorded: "0.46.0",
+            }),
+            headings: [
+              "✨ Checking formatting · adamantite (oxfmt)",
+              "",
+              "🔍 Linting · adamantite (oxlint)",
+            ],
+          })
+          expect(error?.message).toBe(
+            "`.adamantite/adamantite-lock.json` records the setup of Adamantite 0.46.0, but the project installs Adamantite 0.47.0. Run the project's installed `adamantite update` through its package runner, such as `pnpm exec adamantite update`, to update the managed packages, files, and skill, commit the changes, and run `adamantite check` again."
+          )
+        })
+    )
+
+    // A failed stage already printed its report, so the last line names the setup repair.
+    const OUTDATED = new SetupOutdated({
+      installed: "0.47.0",
+      path: LOCKFILE_PATH,
+      recorded: "0.46.0",
+    })
+
+    // The CLI prints each error after the stage reports, in this order, so the agent reads why a
+    // stage did not run, then the setup repair. The first error decides the exit code.
+    it.effect.each([
+      {
+        args: [],
+        error: new CommandFailed({ command: "node", exitCode: ChildProcessSpawner.ExitCode(1) }),
+        layer: installedLayer,
+        name: "a stage that printed its report",
+        runner: createRunnerTestContext([1, 0]),
+        selection: undefined,
+      },
+      {
+        args: ["--only", "format", "--allow-warnings"],
+        error: new InvalidCheckOptions({
+          reason: "`--allow-warnings` applies to the lint stage. Remove it or `--only format`.",
+        }),
+        layer: installedLayer,
+        name: "invalid options",
+        runner: createRunnerTestContext(),
+        selection: undefined,
+      },
+      {
+        args: [],
+        error: new PackageNotInstalled({ packageName: "oxlint", project: "/project" }),
+        layer: makeInstalledLayer("oxfmt"),
+        name: "an Oxlint that is not installed",
+        runner: createRunnerTestContext(),
+        selection: undefined,
+      },
+      {
+        args: [],
+        error: new PackageNotInstalled({ packageName: "oxfmt", project: "/project" }),
+        layer: makeInstalledLayer("oxlint"),
+        name: "an Oxfmt that is not installed",
+        runner: createRunnerTestContext(),
+        selection: undefined,
+      },
+      {
+        args: [],
+        error: new ToolNotSelected({ script: "check", tool: "oxfmt" }),
+        layer: makeInstalledLayer("oxlint"),
+        name: "a tool that the lockfile does not select",
+        runner: createRunnerTestContext(),
+        selection: makeSelection({}),
+      },
+    ])(
+      "fail with the stage error, then the outdated setup, after $name",
+      ({ args, error, layer, runner, selection }) =>
+        Effect.gen(function* () {
+          const exit = yield* runCommand(checkCommand, args, {
+            files: makeSetupFiles({ installed: "0.47.0", recorded: "0.46.0", selection }),
+            layers: [runner.layer, layer],
+          })
+
+          expect(getFailures(exit)).toStrictEqual([error, OUTDATED])
+        })
+    )
+
+    it.effect(
+      "fail with the newer setup, and name the install, when a newer Adamantite wrote the lockfile",
+      () =>
+        Effect.gen(function* () {
+          const runner = createRunnerTestContext()
+
+          const exit = yield* runCommand(checkCommand, [], {
+            files: makeSetupFiles({ installed: "0.47.0", recorded: "0.48.0" }),
+            layers: [runner.layer, installedLayer],
+          })
+
+          const error = getFailure(exit)
+
+          expect(error).toStrictEqual(
+            new SetupAhead({ installed: "0.47.0", path: LOCKFILE_PATH, recorded: "0.48.0" })
+          )
+          expect(error?.message).toBe(
+            "`.adamantite/adamantite-lock.json` records the setup of Adamantite 0.48.0, but the project installs the older Adamantite 0.47.0. Install the dependencies, or update the project's `adamantite` dependency to 0.48.0 or newer, and run `adamantite check` again."
+          )
+        })
+    )
+
+    it.effect.each([
+      { name: "the running Adamantite wrote the lockfile", recorded: getPackageVersion() },
+      { name: "the project has no lockfile", recorded: undefined },
+    ])("pass when $name", ({ recorded }) =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: makeSetupFiles({ installed: getPackageVersion(), recorded }),
+          layers: [runner.layer, installedLayer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+      })
+    )
+
+    // A CLI from another install, such as `npx adamantite@latest check`, judges the project as the
+    // project's own CLI does.
+    it.effect("pass when the installed Adamantite wrote the lockfile and another one runs", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        expect(getPackageVersion()).not.toBe("0.1.0")
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: makeSetupFiles({ installed: "0.1.0", recorded: "0.1.0" }),
+          layers: [runner.layer, installedLayer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+      })
+    )
+
+    // Doctor reports the lockfile, and the stages run as without a lockfile.
+    it.effect("pass when the lockfile does not decode", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+        const files = makeSetupFiles({ installed: "0.47.0" })
+
+        files.write(LOCKFILE_PATH, "<<<<<<< HEAD\n")
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files,
+          layers: [runner.layer, installedLayer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
       })
     )
   })

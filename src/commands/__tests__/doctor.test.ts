@@ -11,9 +11,11 @@ import * as Schema from "effect/Schema"
 import { TestClock } from "effect/testing"
 import type { Selection } from "#lib/project/selection.ts"
 import {
+  ADAMANTITE_RESOLUTION,
   createRunnerTestContext,
   findingsLeft,
   getFailure,
+  makeAdamantitePackageFile,
   makeHandoffRunner,
   makeLockfileFile,
   nonProbeInvocations,
@@ -129,6 +131,28 @@ const HEALTHY_FILES = {
 
 function runtimeListener() {
   // Stands in for the SIGINT listener of the runtime. Only its identity matters.
+}
+
+// The healthy project, with a lockfile that Adamantite `recorded` wrote and Adamantite 0.47.0
+// installed.
+function runOnSetup(recorded: string) {
+  return Effect.gen(function* () {
+    const logLines: unknown[] = []
+
+    const exit = yield* runCommand(doctorCommand, [], {
+      files: createFileSystemTestContext({
+        files: {
+          ...HEALTHY_FILES,
+          ...makeLockfileFile(ANALYZE_SELECTION, {}, recorded),
+          ...makeAdamantitePackageFile("0.47.0"),
+        },
+      }),
+      layers: [makeModuleResolverLayer("/project", ADAMANTITE_RESOLUTION)],
+      logLines,
+    })
+
+    return { exit, logLines }
+  })
 }
 
 describe("doctor", () => {
@@ -880,4 +904,60 @@ describe("doctor", () => {
       ])
     })
   )
+
+  describe("setup version", () => {
+    it.effect("report an outdated setup, and name update, as check fails it", () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runOnSetup("0.46.0")
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+          [
+            "# Adamantite doctor findings",
+            "## 1. Setup is outdated",
+            "## Verify",
+            "## Check the repair",
+          ],
+        ])
+        expect(logLines).toStrictEqual([
+          expect.stringContaining(
+            "`.adamantite/adamantite-lock.json` records the setup of Adamantite 0.46.0, but the project installs Adamantite 0.47.0"
+          ),
+        ])
+        expect(logLines).toStrictEqual([
+          expect.stringContaining(
+            "Run the project's installed `adamantite update` through its package runner, such as `npx` or `pnpm exec`. It applies the setup of Adamantite 0.47.0 and records that version in `.adamantite/adamantite-lock.json`."
+          ),
+        ])
+      })
+    )
+
+    it.effect("report a setup that a newer Adamantite wrote, and name the install", () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runOnSetup("0.48.0")
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+          [
+            "# Adamantite doctor findings",
+            "## 1. Setup is newer than the installed Adamantite",
+            "## Verify",
+            "## Check the repair",
+          ],
+        ])
+        expect(logLines).toStrictEqual([expect.stringContaining("Install the dependencies.")])
+      })
+    )
+
+    it.effect("report no finding when the installed Adamantite wrote the lockfile", () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runOnSetup("0.47.0")
+
+        expect({ lines: logLines, success: Exit.isSuccess(exit) }).toStrictEqual({
+          lines: [],
+          success: true,
+        })
+      })
+    )
+  })
 })

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto"
+import * as Cause from "effect/Cause"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
@@ -52,19 +53,38 @@ export function readLockfile(files: FileSystemTestContext): Lockfile {
 }
 
 /**
- * A lockfile with `selection` and the hashes of `written`, as a fixture file.
+ * A lockfile with `selection` and the hashes of `written`, that Adamantite `version` wrote, as a
+ * fixture file.
  */
 export function makeLockfileFile(
   selection: Selection,
-  written: Readonly<Record<string, string>> = {}
+  written: Readonly<Record<string, string>> = {},
+  version = "0.0.0"
 ) {
   return {
     [LOCKFILE_PATH]: Schema.encodeSync(LockfileJson)({
       schemaVersion: 1,
       selection,
-      version: "0.0.0",
+      version,
       written,
     }),
+  }
+}
+
+/**
+ * Where `adamantite/lint` resolves in a test project that installs Adamantite, inside the package
+ * of `makeAdamantitePackageFile`. Without it, the project installs no Adamantite.
+ */
+export const ADAMANTITE_RESOLUTION = {
+  "adamantite/lint": "node_modules/adamantite/dist/presets/lint.js",
+} as const
+
+/**
+ * The manifest of the installed Adamantite `version`, as a fixture file.
+ */
+export function makeAdamantitePackageFile(version: string) {
+  return {
+    "node_modules/adamantite/package.json": JSON.stringify({ name: "adamantite", version }),
   }
 }
 
@@ -481,6 +501,15 @@ export function runCommand<
  */
 export function getFailure<E>(exit: Exit.Exit<unknown, E>): E | undefined {
   return Option.getOrUndefined(Exit.findErrorOption(exit))
+}
+
+/**
+ * Each error that a command failed with, in order. Empty when it succeeded or only died.
+ */
+export function getFailures<E>(exit: Exit.Exit<unknown, E>): E[] {
+  return Exit.isFailure(exit)
+    ? exit.cause.reasons.filter((reason) => Cause.isFailReason(reason)).map(({ error }) => error)
+    : []
 }
 
 /**

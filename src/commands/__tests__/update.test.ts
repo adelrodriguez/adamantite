@@ -5,20 +5,26 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import {
+  ADAMANTITE_RESOLUTION,
   createDependencyInstallerTestContext,
   createRunnerTestContext,
   findingsLeft,
   getFailure,
+  makeAdamantitePackageFile,
   makeHandoffRunner,
   makeLockfileFile,
   nonProbeInvocations,
   promptingLayer,
+  readLockfile,
   runCommand,
 } from "#__tests__/command-test-helpers.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeSelection } from "#__tests__/lifecycle.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
+import checkCommand from "#commands/check.ts"
+import doctorCommand from "#commands/doctor.ts"
 import { Report } from "#commands/setup.ts"
 import updateCommand from "#commands/update.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
@@ -30,6 +36,7 @@ import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { FailedToInstallDependency, UnsupportedLockfile } from "#lib/shared/errors.ts"
+import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const effectTsgo = managedPlugin("@effect/tsgo")
 const shadcnLint = managedPlugin("@shadcn/lint")
@@ -131,6 +138,78 @@ describe("update", () => {
       // Without a terminal, update prints no headings.
       expect(logLines).toStrictEqual(["✔ `.adamantite/adamantite-lock.json` updated. Commit it."])
     })
+  )
+
+  // `check` fails a lockfile that an older Adamantite wrote, so an update that changes no managed
+  // file still records the installed version.
+  it.effect(
+    "record the installed version when only the version differs, so doctor and check pass",
+    () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            ...makeLockfileFile(makeSelection({}), {}, "0.46.0"),
+            ...makeAdamantitePackageFile(getPackageVersion()),
+            "package.json": manifest({ devDependencies: { adamantite: getPackageVersion() } }),
+          },
+        })
+
+        // The setup writes files as Adamantite renders them, and starts no Oxfmt.
+        const installed = makeModuleResolverLayer("/project", ADAMANTITE_RESOLUTION)
+
+        // `check` starts the stages, so it finds the tools too.
+        const withTools = makeModuleResolverLayer("/project", {
+          "oxfmt/package.json": "node_modules/oxfmt/package.json",
+          "oxlint/package.json": "node_modules/oxlint/package.json",
+          ...ADAMANTITE_RESOLUTION,
+        })
+
+        const outdated = yield* runCommand(checkCommand, [], {
+          files,
+          layers: [createRunnerTestContext().layer, withTools],
+        })
+
+        const before = files.list()
+        const updateLines: unknown[] = []
+
+        const update = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [createDependencyInstallerTestContext().layer, installed],
+          logLines: updateLines,
+        })
+
+        const doctorLines: unknown[] = []
+
+        const doctor = yield* runCommand(doctorCommand, [], {
+          files,
+          layers: [installed],
+          logLines: doctorLines,
+        })
+
+        const check = yield* runCommand(checkCommand, [], {
+          files,
+          layers: [createRunnerTestContext().layer, withTools],
+        })
+
+        expect({
+          check: Exit.isSuccess(check),
+          doctor: { lines: doctorLines, success: Exit.isSuccess(doctor) },
+          files: files.list(),
+          outdated: getFailure(outdated)?._tag,
+          update: { lines: updateLines, success: Exit.isSuccess(update) },
+          version: readLockfile(files).version,
+        }).toStrictEqual({
+          check: true,
+          doctor: { lines: [], success: true },
+          files: before,
+          outdated: "SetupOutdated",
+          update: {
+            lines: ["✔ `.adamantite/adamantite-lock.json` updated. Commit it."],
+            success: true,
+          },
+          version: getPackageVersion(),
+        })
+      })
   )
 
   it.effect("leave a package alone when its range resolves to the managed version", () =>

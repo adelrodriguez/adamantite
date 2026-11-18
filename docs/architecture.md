@@ -217,6 +217,10 @@ that does not decode fails with `InvalidLockfile`. Both name the file. `init` an
 lockfile before they change a file, and fail, so they do not overwrite a lockfile that they cannot
 read. The error says to run `adamantite doctor`.
 
+`verifyLockfileVersion` compares the lockfile's `version` with the Adamantite that the project
+installs. `check` fails with its error after the stages, and `assessProject` reports it as the
+`setup-outdated` or `setup-ahead` finding.
+
 ## Assessment
 
 An assessment reads the target project one time. `Project.read` in `src/lib/project/index.ts`

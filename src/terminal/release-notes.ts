@@ -7,10 +7,6 @@ import * as Output from "#terminal/output.ts"
 // Changesets publishes a GitHub release for each version, tagged `v<version>`.
 const RELEASES_URL = "https://github.com/adelrodriguez/adamantite/releases/tag"
 
-/**
- * The notes as one Markdown document for an agent: each release since the recorded version, oldest
- * first, so the agent applies the migrations in the order of the releases.
- */
 function renderMarkdown({ changelog, from, releases }: ReleaseNotes) {
   return [
     `# Adamantite release notes since ${from}`,
@@ -20,11 +16,6 @@ function renderMarkdown({ changelog, from, releases }: ReleaseNotes) {
   ].join("\n")
 }
 
-/**
- * Prints the notes of the releases since the version that wrote the lockfile. A terminal gets one
- * link for each release, a run without a terminal gets the notes as Markdown, and `--json` puts
- * them in the document instead.
- */
 export const printReleaseNotes = Effect.fn("printReleaseNotes")(function* (notes: ReleaseNotes) {
   if (notes.releases.length === 0) {
     return

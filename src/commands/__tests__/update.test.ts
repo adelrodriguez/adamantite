@@ -86,10 +86,6 @@ const CHANGELOG = `# adamantite
 - Record the setup in a lockfile
 `
 
-/**
- * Runs update with `args` in a project that Adamantite 0.46.0 set up, with nothing selected, after
- * the project installed Adamantite 0.47.0 and its changelog.
- */
 function runUpgrade(args: readonly string[], options: { prompting?: boolean } = {}) {
   return Effect.gen(function* () {
     const files = createFileSystemTestContext({

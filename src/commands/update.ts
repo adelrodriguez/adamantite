@@ -20,7 +20,6 @@ export default Command.make("update", { json: Mode.json }).pipe(
       const changed = yield* Option.match(project.lockfile, {
         onNone: () => Effect.as(offerRepair("update", null), false),
         onSome: (lockfile) =>
-          // The lockfile still names the version that wrote it, so the notes are read first.
           Effect.flatMap(
             Effect.flatMap(Project.Directory, (root) => readReleaseNotes(root, lockfile.version)),
             (releaseNotes) => applySetup("update", project, lockfile.selection, releaseNotes)

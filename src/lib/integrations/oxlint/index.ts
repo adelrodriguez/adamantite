@@ -137,7 +137,6 @@ const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
     Effect.as([]),
     Effect.catchTag("TrialLintFailed", ({ output }) =>
       Effect.map(findChangelog(root), (changelog) => {
-        // The changelog of the installed package names the replacement of each retired preset.
         const location = Option.match(changelog, {
           onNone: () => "`CHANGELOG.md` in the `adamantite` package",
           onSome: (path) => `\`${path}\``,

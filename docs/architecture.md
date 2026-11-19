@@ -143,10 +143,11 @@ that it names replace the recorded ones.
    with a copy of the format preset in a temporary folder, and a project without Oxfmt gets each
    file as rendered.
 4. It sets the managed scripts, after every managed file formats, so a config that Oxfmt cannot load
-   fails before a write. It writes `package.json` in the layout that the formatter gives it, and
-   only when a script or the install changed it.
-5. It writes each managed file under the write rule, and deletes each recorded file that the
-   selection no longer renders.
+   fails before it writes a managed script, a managed file, or the lockfile. It writes
+   `package.json` in the layout that the formatter gives it, and only when a script or the install
+   changed it.
+5. It writes each managed file under the write rule. It deletes each recorded file that the
+   selection no longer renders, when the file still has its recorded hash.
 6. It writes the lockfile, formatted the same way, and only when its content changes.
 
 The install uses the package manager that `detectPackageManager` in
@@ -181,7 +182,7 @@ Each managed script gets a `ScriptWrite`: `Added`, `Replaced` with the command t
 | The write rule holds, and a second run changes no file, because `apply` formats each file with the project's Oxfmt.                                                        | `src/lib/setup/__tests__/index.test.ts`                                                                                                 |
 | A config that Oxfmt cannot load fails `apply` before it sets a managed script or writes a managed file or the lockfile. The install and the `prepare` steps run before it. | `src/lib/setup/__tests__/index.test.ts`                                                                                                 |
 | A managed script is the one exception to whole files: `apply` sets each selected script of the root `package.json` to its command.                                         | `src/lib/setup/__tests__/index.test.ts`                                                                                                 |
-| Each list of a `Selection` holds each item once, in the order of its source list, so two selections of the same setup are equal.                                           | `src/lib/project/__tests__/selection.test.ts`, for `addSelection`                                                                       |
+| Each list of a `Selection` that `addSelection` returns holds each item once, in the order of its source list, so two selections of the same setup are equal.               | `src/lib/project/__tests__/selection.test.ts`, for `addSelection`                                                                       |
 
 ## Lockfile
 
@@ -230,21 +231,22 @@ the `packages` of `pnpm-workspace.yaml`, or the `workspaces` of `package.json` w
 `pnpm-workspace.yaml` declares none, because that file can hold only settings, such as
 `allowBuilds`. A `pnpm-workspace.yaml` that does not parse declares no pattern and no catalog. A
 project that declares patterns is a monorepo, also before any package exists. A workspace package
-is a folder with a `package.json` that matches an include pattern and no `!` pattern, outside
-`node_modules` and the folders whose names start with a dot. A command that reads the workspace
-outside a snapshot, such as `harden` or `rule try`, reads it one time for each phase and passes the
-`Workspace` down.
+is a folder with a `package.json` that matches an include pattern and no `!` pattern. Below the
+fixed part of a pattern, the search skips `node_modules` and the folders whose names start with a
+dot. A command that reads the workspace outside a snapshot, such as `harden` or `rule try`, reads it
+one time for each phase and passes the `Workspace` down.
 
 `readAssessment` reads the root `package.json` first, so a project that does not declare
 `adamantite` gets its one finding, also when its workspace packages do not read. A lockfile that is
-missing or does not read also gives one finding, because the other assessments need the selection.
-Any other read failure fails Doctor. `assessProject` runs the assess-only integrations, which decide
-from the project whether they apply, then the integrations that the selection includes, in the
-order of their lists, which numbers the findings. The findings start with the version finding of
-`verifyLockfileVersion`, the error that `check` fails with, so Doctor calls no project healthy that
-`check` fails. The findings of the managed scripts follow, under the integration name `scripts`,
-because no integration owns the scripts. `renderAssessmentMarkdown` renders findings into the repair
-prompt with the warnings folded in, and renders a warning-only assessment into the warning report.
+missing, does not decode, or has an unsupported schema version also gives one finding, because the
+other assessments need the selection. Any other read failure fails Doctor. `assessProject` runs the
+assess-only integrations, which decide from the project whether they apply, then the integrations
+that the selection includes, in the order of their lists, which numbers the findings. The findings
+start with the version finding of `verifyLockfileVersion`, the error that `check` fails with, so
+Doctor reports each version drift that fails `check`. The findings of the managed scripts follow,
+under the integration name `scripts`, because no integration owns the scripts.
+`renderAssessmentMarkdown` renders findings into the repair prompt with the warnings folded in, and
+renders a warning-only assessment into the warning report.
 
 ```mermaid
 flowchart TD
@@ -280,8 +282,9 @@ user can decline. The command decides its mode once, with `Mode.provide` from
 `CodingAgents.detectInstalled` probes the CLI of each entry of `codingAgents` and keeps the order of
 the list for the menu. A CLI that starts and exits within 10 seconds is installed, whatever its
 output or exit code. `CodingAgents.handoff` starts the agent with the prompt in its arguments and
-the standard streams of the terminal. It ignores SIGINT until the session ends, so a Ctrl-C reaches
-only the agent, and it discards the exit code of the agent.
+the standard streams of the terminal. A Ctrl-C sends SIGINT to the agent and to Adamantite, and
+Adamantite ignores the signal until the session ends. The handoff discards the exit code of the
+agent.
 
 | Invariant                                                                                                            | Held by                                                                               |
 | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -300,11 +303,13 @@ source text. Nothing enforces it.
 | The disable comments and the syntax tree of a file | The probe plugin, `src/oxlint/probe.ts`, reports them from Oxlint's parser, and `src/lib/integrations/oxlint/probe.ts` runs it.                                                                                                                                                                                                                                                                                         |
 | The files that Oxlint lints, and its reports       | `src/lib/integrations/oxlint/files.ts`                                                                                                                                                                                                                                                                                                                                                                                  |
 
-`ConfigLoader.load` runs each config in its own Node.js process, so the output of the config cannot
-reach the output of a command, and a later load reads the files again after a coding agent changes
-a module that the config imports. The process runs in the folder that `adamantite check` starts
-Oxlint in, so a config that reads a file through `process.cwd()` reads the file that Oxlint reads.
-It prints the encoded default export after a marker, apart from what the config prints. It passes
+`ConfigLoader.load` runs each config in its own Node.js process, so a later load reads the files
+again after a coding agent changes a module that the config imports. The loader captures the output
+of the process, so the output of the config does not mix into the output of a command. When no
+result decodes, the failure gives the standard error of the process as its reason, which a command
+such as `rule test` prints. The process runs in the folder that `adamantite check` starts Oxlint
+in, so a config that reads a file through `process.cwd()` reads the file that Oxlint reads. It
+prints the encoded default export after a marker, apart from what the config prints. It passes
 `--debug=files`, the argument of Oxlint's read-only file listing, so `custom()` writes the entry
 module of a rules folder outside the project. `ENCODE_SOURCE` copies the identity of each preset and
 each `custom()` result under the `$adamantite` key, because JSON drops symbol keys, and writes a
@@ -322,8 +327,8 @@ its own object, so `listOverrides` cannot tell the overrides of the project from
 preset.
 
 `ModuleResolver` in `src/lib/project/module-resolver.ts` resolves a specifier to the file that
-Node.js loads. Custom rule discovery clears its cache before each traversal, because a coding agent
-can change the project between two assessments of one command.
+Node.js loads. `addRootDevDependencies` in `src/lib/project/dependency-installer.ts` clears its
+cache after each install.
 
 ## Command boundaries
 
@@ -556,8 +561,9 @@ lint the given folders, as Oxlint loads them, so a `custom()` call in a module t
 imports, such as the entry module of a shared tooling package, counts, and a call in a module that
 no config imports does not. Each config loads in the project root. A config that does not load is
 in `unloadedConfigs`, with its reason. `readCustomRuleTestCommand` in
-`src/lib/project/custom-rules/index.ts` runs the saved tests of each rules folder that a call loads
-with `node --test`, also in a Bun project.
+`src/lib/project/custom-rules/index.ts` builds a `node --test` command for the saved tests of each
+rules folder that a call loads, also in a Bun project, and `rule test` in `src/commands/rule.ts`
+runs it.
 
 | Invariant                                                                                                                                                         | Held by                                                                                                              |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |

@@ -40,6 +40,8 @@ export const ENCODE_SOURCE = [
 
 const RESULT_MARKER = "\u0000adamantite-config\u0000"
 
+// Node.js imports a TypeScript config with type stripping, as Oxlint does, so a config can use only
+// erasable syntax: https://nodejs.org/api/typescript.html#type-stripping
 const LOAD_SCRIPT = [
   ENCODE_SOURCE,
   'const { pathToFileURL } = await import("node:url")',

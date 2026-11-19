@@ -121,6 +121,8 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
     }),
   }
 
+  // Oxlint applies one pass of fixes, so a fix that causes a new report needs a second `fix`:
+  // https://github.com/oxc-project/oxc/issues/16118
   yield* runner
     .runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
     .pipe(

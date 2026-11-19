@@ -33,6 +33,10 @@ function getScriptGuidance(
   }
 }
 
+function renderLines(lines: readonly string[]) {
+  return lines.map((line) => `${line}\n`).join("")
+}
+
 export function renderAgentsSection({ isMonorepo, packageManager, scripts }: AgentsSectionOptions) {
   const selectedScriptGuidance = SCRIPT_ORDER.flatMap((script) =>
     scripts.includes(script) ? [getScriptGuidance(packageManager, script, isMonorepo)] : []
@@ -40,19 +44,23 @@ export function renderAgentsSection({ isMonorepo, packageManager, scripts }: Age
 
   return fillTemplate(agentsSectionTemplate, {
     correctionsSection: CORRECTIONS_SECTION,
-    customRules: checkRunsTool(scripts, "oxlint")
-      ? `- For custom rules, follow the "${CUSTOM_RULES_SECTION}" section and linked guide in the \`${HARDENING_SKILL}\` skill. Complete its verification and cleanup checks.\n`
-      : "",
+    customRuleLines: renderLines(
+      checkRunsTool(scripts, "oxlint")
+        ? [
+            `- For custom rules, follow the "${CUSTOM_RULES_SECTION}" section and linked guide in the \`${HARDENING_SKILL}\` skill. Complete its verification and cleanup checks.`,
+          ]
+        : []
+    ),
     end: ADAMANTITE_AGENTS_END_MARKER,
     hardeningSkill: HARDENING_SKILL,
-    scripts:
+    scriptLines: renderLines(
       selectedScriptGuidance.length > 0
         ? [
             "- Prefer the package scripts Adamantite added for this workspace.",
             ...selectedScriptGuidance,
-            "",
-          ].join("\n")
-        : "",
+          ]
+        : []
+    ),
     start: ADAMANTITE_AGENTS_START_MARKER,
   })
 }

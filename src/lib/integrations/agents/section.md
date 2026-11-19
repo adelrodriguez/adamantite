@@ -4,7 +4,7 @@
 
 Use the `adamantite` skill for managed setup, checks, and Doctor repairs, and the `{{hardeningSkill}}` skill for coding standards, custom rules, and hardening. If a skill is not installed, read its `SKILL.md` below `skills/` in the installed `adamantite` package.
 
-{{scripts}}{{customRules}}- Run `adamantite doctor --json` for managed setup findings. Repair each finding and rerun Doctor to verify the result.
+{{scriptLines}}{{customRuleLines}}- Run `adamantite doctor --json` for managed setup findings. Repair each finding and rerun Doctor to verify the result.
 
 - After you fix a regression or a mistake that a reviewer corrected before, or before you add a disable comment, follow the "{{correctionsSection}}" section of the `{{hardeningSkill}}` skill.
 

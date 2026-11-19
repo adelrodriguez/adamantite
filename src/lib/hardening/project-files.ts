@@ -10,6 +10,9 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as String from "effect/String"
 
+// Node.js `path.join` does not restart at an absolute argument, as `path.resolve` does, so joining
+// the project root with an absolute config path names a file that does not exist.
+// https://nodejs.org/api/path.html#pathjoinpaths
 export const ProjectPath = Schema.String.pipe(Schema.brand("ProjectPath"))
 
 export type ProjectPath = typeof ProjectPath.Type

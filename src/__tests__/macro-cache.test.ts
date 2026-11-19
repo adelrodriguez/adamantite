@@ -6,10 +6,6 @@ import { afterAll, describe, expect, it } from "@effect/vitest"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 
-/**
- * Write a project that uses the repository's Vitest config, with one test that compares a macro's
- * output to the template on disk. The module cache stays in the project, not in the repository.
- */
 function writeMacroProject(dir: string) {
   symlinkSync(join(REPO_ROOT, "node_modules"), join(dir, "node_modules"))
   writeFileSync(join(dir, "package.json"), '{ "type": "module" }\n')
@@ -69,8 +65,7 @@ function runVitest(dir: string) {
     throw result.error
   }
 
-  // The exit status decides, because color codes can split the summary text. A failed match shows
-  // the output in its diff.
+  // Color codes can split the summary text of Vitest.
   return { output: result.stdout + result.stderr, status: result.status }
 }
 

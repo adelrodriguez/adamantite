@@ -14,11 +14,8 @@ export default Command.make("update", { json: Mode.json }).pipe(
     Effect.gen(function* () {
       yield* Output.intro("💠 adamantite update")
 
-      // First, so a lockfile that does not read fails update before it changes a file.
       const project = yield* Project.read()
 
-      // Without a lockfile, update has no selection to apply, so the assessment hands off its one
-      // finding: run `adamantite init`.
       const changed = yield* Option.match(project.lockfile, {
         onNone: () => Effect.as(offerRepair("update", null), false),
         onSome: (lockfile) => applySetup("update", project, lockfile.selection),

@@ -12,7 +12,6 @@ import { CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
 import * as Project from "#lib/project/index.ts"
 import { chooseResolution } from "#terminal/resolution-menu.ts"
 
-// Replaces one property for the scope, and restores its descriptor when the scope closes.
 const stubProperty = <T extends object, K extends keyof T>(target: T, key: K, value: T[K]) =>
   Effect.acquireRelease(
     Effect.sync(() => {
@@ -32,8 +31,6 @@ const stubProperty = <T extends object, K extends keyof T>(target: T, key: K, va
       })
   )
 
-// Makes standard input look like a terminal that records each raw mode change, and hides the
-// prompt's output.
 const fakeTerminalStreams = Effect.gen(function* () {
   const rawModes: boolean[] = []
 
@@ -53,7 +50,6 @@ const fakeTerminalStreams = Effect.gen(function* () {
   return { rawModes }
 })
 
-// Yields until the prompt listens for keys, so the test key reaches the prompt.
 const waitForKeyReader = Effect.yieldNow.pipe(
   Effect.repeat({ until: () => process.stdin.listenerCount("keypress") > 0 })
 )
@@ -61,8 +57,7 @@ const waitForKeyReader = Effect.yieldNow.pipe(
 const [agent] = codingAgents
 
 describe("chooseResolution", () => {
-  // Effect's Node terminal turns raw mode off 10 ms after the last prompt. A coding agent sets its
-  // own terminal mode, so that release must run before the agent starts.
+  // Effect's Node terminal turns raw mode off 10 ms after the last prompt.
   it.effect("start the agent after Effect turns raw mode off", () =>
     Effect.gen(function* () {
       const { rawModes } = yield* fakeTerminalStreams
@@ -94,7 +89,6 @@ describe("chooseResolution", () => {
         name: "return",
         shift: false,
       })
-      // The test clock is paused, so both Effect's release and the menu's wait run in time order.
       yield* TestClock.adjust("1 second")
 
       const result = yield* Fiber.join(fiber)

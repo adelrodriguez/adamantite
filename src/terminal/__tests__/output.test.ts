@@ -62,7 +62,6 @@ describe("Output", () => {
       recorded: "0.46.0",
     })
 
-    // The command already printed its report, so its failure adds no line.
     it.effect("print each failure but a failed command, and exit with the first one's code", () =>
       Effect.gen(function* () {
         const code = yield* Output.failures(

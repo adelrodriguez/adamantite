@@ -57,11 +57,6 @@ import {
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
-/**
- * The live `DependencyInstaller`, which detects the package manager from the test filesystem, with
- * a package manager that records each command line and declares the packages it adds. With
- * `failure`, the package manager prints its `stderr` and exits 1 instead.
- */
 function createPackageManagerTestContext(options?: {
   readonly failure?: { readonly stderr: string }
 }) {
@@ -145,16 +140,10 @@ function withPackageManagerInMonorepo(packageManager: string) {
   return JSON.stringify({ name: "test-project", packageManager, workspaces: ["packages/*"] })
 }
 
-// Interactive init probes the coding agent CLIs for the skill prompt. None of them is installed.
-
 const shippedSkill = getShippedSkillFiles()
 
-/**
- * The keys that leave exactly the given choices of a multiselect checked and submit it. Space
- * toggles each choice whose state differs from `initial`, the choices that the prompt checks at the
- * start. The prompt lists `Select All` and `Inverse Selection` above its choices, and its cursor
- * starts on `Select All`.
- */
+// `Prompt.MultiSelect` lists `Select All` and `Inverse Selection` above its choices, and its cursor
+// starts on `Select All`.
 function pickMany<const T>(
   choices: readonly T[],
   selected: readonly T[],
@@ -173,23 +162,14 @@ function pickMany<const T>(
   ]
 }
 
-/**
- * The keys that leave exactly the given scripts checked in the scripts prompt, which checks the
- * recommended `check` and `fix` at the start.
- */
 function pickScripts(selected: readonly Script[]): TestKey[] {
   return pickMany(SCRIPT_ORDER, selected, ["check", "fix"])
 }
 
-/**
- * The keys that submit the given choice of a select, whose cursor starts on the first choice.
- */
 function pickOne<const T>(choices: readonly T[], choice: T): TestKey[] {
   return [...Array.from({ length: choices.indexOf(choice) }, (): TestKey => "down"), "enter"]
 }
 
-// After setup, the resolution menu offers the repair of the findings that remain. No agent CLI is
-// installed, so the cursor passes the prompt copy and finishes without an agent.
 const FINISH_WITHOUT_AGENT: readonly TestKey[] = ["down", "enter"]
 
 function createInitTestContext(files?: Record<string, string>) {
@@ -213,7 +193,6 @@ const EXISTING_MONOREPO_TSCONFIG = JSON.stringify(
   2
 )
 
-// Runs init interactively with the check and analyze scripts, the react preset, and VS Code.
 function runFreshSetup() {
   return Effect.gen(function* () {
     const files = createInitTestContext()
@@ -221,11 +200,9 @@ function runFreshSetup() {
     const terminal = createTerminalTestContext([
       ...pickScripts(["check", "analyze"]),
       ...pickMany(LINT_PRESETS, ["react"]),
-      // Use the TypeScript preset, which the prompt offers by default.
       "enter",
       ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
       ...pickMany(INIT_EDITORS, ["vscode"]),
-      // Decline the GitHub Actions workflow and the agent guidance.
       "n",
       "n",
       ...FINISH_WITHOUT_AGENT,
@@ -243,7 +220,6 @@ function runFreshSetup() {
   })
 }
 
-// Runs init non-interactively with the check script, the effect preset, and TypeScript.
 function runEffectSetup() {
   return Effect.gen(function* () {
     const files = createInitTestContext()
@@ -269,8 +245,6 @@ function runEffectSetup() {
   })
 }
 
-// Runs init in a terminal that cannot prompt, and returns its failure, the files it wrote, and what
-// the terminal showed.
 function runWithoutPrompts(args: readonly string[]) {
   return Effect.gen(function* () {
     const files = createInitTestContext()
@@ -292,11 +266,6 @@ function runWithoutPrompts(args: readonly string[]) {
   })
 }
 
-/**
- * The packages that init installed in all its installs, sorted, and the distinct options of the
- * installs. Init installs the tools of the integrations that have not moved to a folder yet, and
- * `Setup.apply` installs the packages of the others.
- */
 function sortPackages(packages: readonly string[]) {
   return EffectArray.sort(packages, Order.String)
 }
@@ -318,10 +287,8 @@ describe("init", () => {
         const files = createInitTestContext()
 
         const terminal = createTerminalTestContext([
-          // Accept the preselected scripts and the core preset alone.
           "enter",
           "enter",
-          // Decline the TypeScript preset, the editors, the workflow, and the agent guidance.
           "n",
           "enter",
           "n",
@@ -407,7 +374,6 @@ describe("init", () => {
       Effect.gen(function* () {
         const { files, installer } = yield* runFreshSetup()
 
-        // The repair that prepares the VS Code SDK cache runs init with one script and one editor.
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "fix", "--editor", "zed"],
@@ -488,7 +454,6 @@ describe("init", () => {
     Effect.gen(function* () {
       const files = createInitTestContext()
 
-      // The cursor passes each editor choice, so the prompt shows each description.
       const terminal = createTerminalTestContext([
         ...pickScripts(["check"]),
         ...pickMany(LINT_PRESETS, []),
@@ -677,7 +642,6 @@ describe("init", () => {
         )
 
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-        // Init keeps both files with comments and still creates the Zed settings.
         expect({
           tsconfig: files.read("tsconfig.json"),
           vscode: files.read(".vscode/settings.json"),
@@ -689,7 +653,6 @@ describe("init", () => {
         expect(logLines).toContainEqual(
           "● `.vscode/settings.json` kept, because it has changes that Adamantite did not write. `adamantite doctor` reports a change that breaks the setup."
         )
-        // A kept file is not an updated file, and not a failed step.
         expect(logLines).not.toContainEqual(
           expect.stringMatching(/`(tsconfig\.json|\.vscode\/settings\.json)` updated|Failed/u)
         )
@@ -971,7 +934,6 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        // The confirm defaults to yes, and the select shows the description of the focused preset.
         expect(terminal.output()).toContain(
           [
             "? Use an Adamantite TypeScript preset? › (Y/n)✔ Use an Adamantite TypeScript preset? … yes",
@@ -1339,8 +1301,7 @@ describe("init", () => {
       })
     )
 
-    // Oxlint accepts its `options` only in the root config, so an Oxlint config that init wrote in
-    // a nested folder would stop the lint of the parent project.
+    // Oxlint accepts `options` only in the root config, and fails a nested config that has them.
     it.effect.each(["oxlint.config.ts", ".oxlintrc.json", ".oxlintrc.jsonc"])(
       "fail before it changes a file when a parent folder has `%s`",
       (config) =>
@@ -1407,7 +1368,6 @@ describe("init", () => {
             { files, layers: [createDependencyInstallerTestContext().layer] }
           )
 
-          // Setup writes the lockfile last.
           expect(files.read(LOCKFILE_PATH)).toContain('"schemaVersion": 1')
         })
     )
@@ -1418,7 +1378,6 @@ describe("init", () => {
 
         const logLines: unknown[] = []
 
-        // Accept the defaults of TypeScript, the extensions, and the workflow, and decline the agent guidance.
         const terminal = createTerminalTestContext([
           ...pickScripts(["check"]),
           ...pickMany(LINT_PRESETS, ["react"]),
@@ -1446,7 +1405,6 @@ describe("init", () => {
 
     it.effect("not offer GitHub Actions when no selected script runs in CI", () =>
       Effect.gen(function* () {
-        // `check` is managed already, but init validates the workflow against the selected scripts.
         const files = createInitTestContext({
           "package.json": yield* stringifyJson({
             name: "test-project",
@@ -1508,7 +1466,6 @@ describe("init", () => {
   })
 
   describe("repair after the setup", () => {
-    // Setup keeps a `tsconfig.json` that it did not write, so the preset is missing after it.
     const USER_TSCONFIG = '{ "compilerOptions": { "strict": true } }\n'
     const PRESET_TSCONFIG = '{ "extends": "adamantite/tsconfig" }\n'
 
@@ -1553,7 +1510,6 @@ describe("init", () => {
               ...pickOne(TYPESCRIPT_PRESET_NAMES, "tsconfig"),
               ...pickMany(INIT_EDITORS, []),
               "n",
-              // The resolution menu lists the installed agents first.
               "enter",
             ]),
           })
@@ -1585,7 +1541,6 @@ describe("init", () => {
           const logLines: unknown[] = []
           const terminal = createTerminalTestContext()
 
-          // `--json` sets up from the flags, without `--non-interactive`, and asks nothing.
           const exit = yield* runCommand(initCommand, ["--json", "--typescript", "tsconfig"], {
             files,
             layers: [createDependencyInstallerTestContext().layer, promptingLayer],

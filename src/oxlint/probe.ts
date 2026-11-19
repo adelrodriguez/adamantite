@@ -1,31 +1,12 @@
 import type { Comment, Context, ESTree, Plugin, Rule, Visitor } from "@oxlint/plugins"
 
-// The facts that only a parser knows, such as the disable comments of a file and its syntax tree,
-// come from Oxlint itself. `lib/integrations/oxlint/probe.ts` runs Oxlint with only this plugin and
-// decodes its reports. Oxlint runs this module in the target project, so it imports only types.
-//
-// Each rule reports one JSON message for each source that Oxlint parses: a file, or each script of
-// a Vue, Svelte, or Astro file. A disable comment can turn off a report, so the rule reports the
-// message twice, at the start and at the end of the source. Oxlint moves each report to its place in
-// the file, so the line of a report tells where the source starts or ends.
-
-/**
- * A comment that can turn lint rules or type checks off: a disable comment, or a TypeScript
- * directive such as `@ts-expect-error`. The CLI reads the directive.
- */
 const SUPPRESSION_COMMENT = /-disable|@ts-/iu
 
-/**
- * What a rule reports about a source.
- */
 type Fact =
   | {
-      /**
-       * Each comment that can turn lint rules or type checks off, with its line in the source, its
-       * kind, and whether only whitespace and other comments come before it, as TypeScript requires
-       * of `@ts-nocheck`.
-       */
       readonly comments: ReadonlyArray<{
+        // TypeScript reads `@ts-nocheck` only when whitespace and other comments alone come before
+        // it.
         readonly leading: boolean
         readonly line: number
         readonly type: "Block" | "Line"
@@ -34,9 +15,7 @@ type Fact =
     }
   | { readonly program: ESTree.Program }
 
-/**
- * A value in a fact. A literal node holds a `bigint` or a `RegExp` value.
- */
+// An ESTree literal node holds a `bigint` or a `RegExp` value.
 type FactValue =
   | ESTree.Node
   | Fact
@@ -49,10 +28,7 @@ type FactValue =
   | string
   | undefined
 
-/**
- * Writes a value of a fact as JSON. A node links to its parent, so the tree leaves the link out,
- * and JSON has no `bigint`, so a `bigint` becomes its digits.
- */
+// An Oxlint node links to its parent, and JSON has no `bigint`.
 function writeFactValue(key: string, value: FactValue) {
   if (typeof value === "bigint") {
     return value.toString()
@@ -61,9 +37,8 @@ function writeFactValue(key: string, value: FactValue) {
   return key === "parent" ? undefined : value
 }
 
-/**
- * Reports `fact` at the start and at the end of the source, with the number of lines of the source.
- */
+// Oxlint parses each script of a Vue, Svelte, or Astro file as its own source, moves each report to
+// its place in the file, and drops a report that a disable comment turns off.
 function reportTwice(context: Context, fact: Fact) {
   const { lines, text } = context.sourceCode
   const start = { column: 0, line: 1 }
@@ -77,10 +52,6 @@ function reportTwice(context: Context, fact: Fact) {
   context.report({ loc: { end, start: end }, message: encode("end") })
 }
 
-/**
- * Whether only whitespace and other comments come before each of `comments`, in source order. The
- * first comment with code before it, and each comment after it, does not lead.
- */
 function readLeading(text: string, comments: readonly Comment[]) {
   const firstAfterCode = comments.findIndex(
     (comment, index) => text.slice(comments[index - 1]?.end ?? 0, comment.start).trim().length > 0

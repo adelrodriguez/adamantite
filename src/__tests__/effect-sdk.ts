@@ -39,9 +39,6 @@ export function effectEditorFiles() {
   }
 }
 
-/**
- * The module paths of the installed Effect packages and TypeScript.
- */
 export const EFFECT_EDITOR_PACKAGES = {
   [`@effect/tsgo-${PLATFORM}/package.json`]: `${PLATFORM_DIRECTORY}/package.json`,
   "@effect/tsgo/package.json": "node_modules/@effect/tsgo/package.json",

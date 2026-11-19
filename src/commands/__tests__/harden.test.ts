@@ -68,7 +68,6 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
   return phrases.filter((phrase) => !section.includes(phrase))
 }
 
-// The phrases that each section must keep, so a failure names each lost one.
 const REQUIRED_PHRASES = {
   "## 1. Explore the documentation": [
     "Start with each `AGENTS.md` above",
@@ -207,7 +206,6 @@ const REQUIRED_PHRASES = {
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 
-// `node_modules` holds the Adamantite that runs the command.
 const ADAMANTITE_MODULE = {
   "node_modules/adamantite/package.json": JSON.stringify({
     name: "adamantite",
@@ -215,16 +213,12 @@ const ADAMANTITE_MODULE = {
   }),
 }
 
-// Node.js resolves `adamantite/lint` to this file, as Oxlint loads the preset.
-// The project installs Oxlint, which Harden runs to list and probe the files.
 const PROJECT_RESOLUTIONS = {
   "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
   "oxfmt/package.json": "node_modules/oxfmt/package.json",
   "oxlint/package.json": "node_modules/oxlint/package.json",
 }
 
-// The lockfile of a project that init set up with nothing selected, so Doctor reports no missing
-// lockfile.
 const NO_SELECTION = {
   agents: false,
   ci: null,
@@ -234,7 +228,6 @@ const NO_SELECTION = {
   typescript: null,
 } as const satisfies Selection
 
-// The installed Adamantite wrote the lockfile, or `check` fails the setup.
 const INSTALLED = {
   ...ADAMANTITE_MODULE,
   ...makeLockfileFile(NO_SELECTION, {}, getPackageVersion()),
@@ -260,36 +253,16 @@ export default defineConfig({
 
 const MARKDOWN_FILE = /\.(?:md|mdx|mdc)$/u
 
-/**
- * A `git` and an Oxlint entry that list the files of the test project, as `git ls-files -z` and
- * `oxlint --debug=files` print them. A `*.md` pathspec keeps only the Markdown files. Each lists
- * only the files inside the project, so the files of a parent folder stay out.
- */
 interface ProcessOptions {
   readonly exitCode?: number
-  /**
-   * Files that the git index has and the working tree does not, as after a delete that is not
-   * staged, or in a sparse checkout.
-   */
   readonly indexOnlyFiles?: readonly string[]
-  /**
-   * What `git rev-parse --verify HEAD` prints. Git prints nothing in a repository without a commit.
-   */
+  // Git prints nothing for `git rev-parse --verify HEAD` in a repository without a commit.
   readonly head?: string
-  /**
-   * What `git merge-base <commit> HEAD` prints, by the commit. Git prints nothing for a commit that
-   * the repository does not have.
-   */
+  // Git prints nothing for `git merge-base <commit> HEAD` with a commit that the repository does
+  // not have.
   readonly mergeBases?: Readonly<Record<string, string>>
-  /**
-   * Files that an ignore pattern of the Oxlint config matches, so `oxlint` does not list them.
-   */
   readonly lintIgnoredFiles?: readonly string[]
   readonly oxlintExitCode?: number
-  /**
-   * What the Oxlint probe prints for the files that it parses. The process tests in
-   * `src/lib/hardening/__tests__/suppressions.test.ts` run the probe.
-   */
   readonly probeReport?: string
 }
 
@@ -397,7 +370,6 @@ function runHarden(
 
     const exit = yield* runCommand(hardenCommand, args, {
       files: context,
-      // The monorepo configs import the shared tooling package.
       layers: [
         makeProcessLayer(context, processes),
         makeModuleResolverLayer(context.root, {
@@ -412,11 +384,8 @@ function runHarden(
   })
 }
 
-// Doctor finds no applicable integration in a project that has only the adamantite package, so
-// the assessment after a session passes.
 const HEALTHY_FILES = INSTALLED
 
-// A project with a loaded custom rule. Verification cases do not stay in the project.
 const CUSTOM_RULE_FILES = {
   ".adamantite/lint/no-foo.ts": "export default {}\n",
   "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace(
@@ -428,7 +397,6 @@ const CUSTOM_RULE_FILES = {
 
 const SUCCESS_LOG = "✔ Nothing remains to resolve after the Claude Code session."
 
-// The lines that the check runs print after the session, with a blank line between the tools.
 const CHECK_TITLES = [
   "✨ Checking formatting · adamantite (oxfmt)",
   "",
@@ -438,22 +406,9 @@ const CHECK_TITLES = [
 interface InteractiveHardenOptions {
   readonly args?: readonly string[]
   readonly files?: Record<string, string>
-  /**
-   * Called with the path of each file that Harden reads as text.
-   */
   readonly onReadFile?: (path: string) => void
-  /**
-   * What the agent changes in the project during the session.
-   */
   readonly onSession?: (files: FileSystemTestContext) => void
-  /**
-   * The keys that answer the prompts. The menu lists `Hand off to Claude Code`, `Hand off to
-   * Codex`, `Copy the agent prompt`, and `Finish without an agent`, with the cursor on the first.
-   */
   readonly keys: readonly TestKey[]
-  /**
-   * The modules that the project resolves. Defaults to `PROJECT_RESOLUTIONS`.
-   */
   readonly resolutions?: Readonly<Record<string, string>>
   readonly runner?: Parameters<typeof makeHandoffRunner>[0]
 }
@@ -507,8 +462,6 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
   })
 }
 
-// The project is a workspace package, and the package manager installs Adamantite in the parent
-// folder.
 function runHardenHoisted() {
   return Effect.gen(function* () {
     const logLines: unknown[] = []
@@ -555,7 +508,6 @@ function runHardenPrompt(
   })
 }
 
-// The root and `web` load the rules of a shared tooling package, and `api` has its own rules folder.
 const MONOREPO_FILES = {
   ...ADAMANTITE_MODULE,
   ".changeset/add-web.md": '---\n"web": patch\n---\n',
@@ -605,16 +557,12 @@ const { decisionsRecord: DecisionsRecord, fixHistory: FixHistory } = Report.fiel
 
 const RECORD = ProjectPath.make(".adamantite/decisions.jsonl")
 
-// The commit that `HEAD` names in this session, the commit that the session of `SESSION` recorded,
-// and the common ancestor of the two.
 const HEAD_COMMIT = "1a954628a960aaef81d7b2d4521929579f3541e6"
 const SESSION_HEAD = "fcbdc4c271c889825d8338d2d8f10b6e5e95c171"
 const BOUNDARY = "2db8c22f75474a58cd13fa2d3425017015d392ce"
 
-// A session line of the whole project, as the agent copies it from the prompt.
 const SESSION = { head: SESSION_HEAD, session: "2026-03-14" }
 
-// The lines of a decisions record, as the agent writes them and as `harden --json` prints them.
 const REJECTED = {
   at: "2026-03-14",
   break: 7,
@@ -645,19 +593,14 @@ const DECIDED = {
 
 const BROKEN_LINE = '{"id":"layers","standard":"Keep src/lib in layers",}'
 
-/**
- * The text of a record that has one of `decisions` on each line.
- */
 function makeRecord(decisions: readonly object[]) {
   return decisions.map((decision) => `${JSON.stringify(decision)}\n`).join("")
 }
 
 const RECORD_CONTENT = makeRecord([REJECTED, DEFERRED, SESSION, DECIDED])
 
-// A decisions record with three decisions and the line of one session of the whole project.
 const RECORD_FILES = { [RECORD]: RECORD_CONTENT }
 
-// The line that step 8 gives the agent to copy, without the scope of the session.
 const EXAMPLE = {
   at: "2026-03-14",
   break: 7,
@@ -672,14 +615,11 @@ const EXAMPLE = {
 
 const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
 
-// A git that knows `HEAD` and the commit of `SESSION`.
 const RECORD_PROCESSES = {
   head: `${HEAD_COMMIT}\n`,
   mergeBases: { [SESSION_HEAD]: `${BOUNDARY}\n` },
 }
 
-// What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`, and
-// whose third line turns off the type check of the fourth.
 const INDEX_PROBE_REPORT = JSON.stringify({
   diagnostics: [
     {
@@ -827,7 +767,6 @@ describe("harden", () => {
     })
   )
 
-  // Agent reach is a fact that Adamantite computes for the agent, so `--json` shows each case.
   it.effect.each<{
     readonly files: Readonly<Record<string, string>>
     readonly name: string
@@ -890,7 +829,6 @@ describe("harden", () => {
       reach: { brokenLinks: [], unmatchedAnchors: [], unreached: ["docs/testing.md"] },
     },
     {
-      // A code span can name a file that a step creates later, so only a link counts as broken.
       files: { "AGENTS.md": "Read [the guide](docs/guide.md), then `docs/missing-span.md`.\n" },
       name: "list a link to a Markdown file that does not exist",
       reach: {
@@ -1030,8 +968,7 @@ describe("harden", () => {
     },
     {
       // Each anchor is the slug that `github-slugger` makes from the text that GitHub's Markdown
-      // API renders for the heading. The simple rule cannot match a heading with an image or an
-      // entity, so the agent checks those links.
+      // API renders for the heading.
       files: {
         "AGENTS.md": [
           "## [`Setup.apply`](guide.md)",
@@ -1102,8 +1039,7 @@ describe("harden", () => {
       },
     },
     {
-      // GitHub renders `_lonely-underscore`, `-suits`, and `undefined-refnowhere`. The heading as
-      // written and the heading without markup give two candidates, and only the entity misses.
+      // GitHub renders `_lonely-underscore`, `-suits`, and `undefined-refnowhere`.
       files: {
         "AGENTS.md": [
           "## _lonely underscore",
@@ -1136,7 +1072,6 @@ describe("harden", () => {
     })
   )
 
-  // A coding agent finds the skills of its skill folder on its own, so harden lists none of them.
   it.effect("list no copy of an Adamantite skill in a project that init set up", () =>
     Effect.gen(function* () {
       const project = createFileSystemTestContext({
@@ -1265,7 +1200,6 @@ describe("harden", () => {
           ...INSTALLED,
         })
 
-        // `docs/skills` is not a skill folder of an agent, so its files stay.
         expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
           "- `CONTRIBUTING.md`",
           "- `docs/guides/errors.mdx`",
@@ -1450,7 +1384,6 @@ describe("harden", () => {
 
   it.effect("mark the missing files and the globs of an override without a lint", () =>
     Effect.gen(function* () {
-      // The test `git` dies on any other command, so the marks come without an Oxlint run.
       const prompt = yield* runHardenPrompt({
         "oxlint.config.ts": CORE_CONFIG.replace(
           "extends: [core],",
@@ -1545,7 +1478,6 @@ describe("harden", () => {
       })
   )
 
-  // The shipped skill is the one statement of the ladder, so the prompt and the glossary follow it.
   it.effect("state the enforcement ladder as the shipped skill and the glossary do", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt(INSTALLED)
@@ -1639,7 +1571,6 @@ describe("harden", () => {
             "When it lists no commit, record that the history has no commit after that session",
           ])
         ).toStrictEqual([])
-        // This session reads from the earlier session on, so its line records the commit of `HEAD`.
         expect(getSection(prompt, "## 8. Show the candidates and wait for approval")).toContain(
           `{"session":"1970-01-01","head":"${HEAD_COMMIT}"}`
         )
@@ -1743,7 +1674,6 @@ describe("harden", () => {
           [RECORD]: makeRecord([
             SESSION,
             { head: later, scope: "packages", session: "2026-04-01" },
-            // The session of a sibling folder, and a session that recorded no commit.
             { head: "4d".repeat(20), scope: "packages/api", session: "2026-05-01" },
             { scope: "packages/web", session: "2026-06-01" },
           ]),
@@ -1820,7 +1750,6 @@ describe("harden", () => {
     "show two decisions that have one id, each with its scope, in the prompt and as JSON",
     () =>
       Effect.gen(function* () {
-        // The same standard, which an earlier session rejected for the whole project.
         const project = {
           at: DEFERRED.at,
           decision: "rejected",
@@ -1833,7 +1762,6 @@ describe("harden", () => {
 
         const files = {
           ...MONOREPO_FILES,
-          // The session of `packages/api` wrote its line last, with the `id` of the standard.
           [RECORD]: makeRecord([project, DEFERRED, api]),
         }
 
@@ -1877,7 +1805,6 @@ describe("harden", () => {
       sessionLine: `{"session":"2026-03-14","head":"${HEAD_COMMIT}"}`,
     },
     {
-      // A session that reads a requested number of commits did not read the history up to `HEAD`.
       args: ["--commits", "30"],
       name: "no head with --commits",
       phrases: [
@@ -1927,7 +1854,6 @@ describe("harden", () => {
         const [example = ""] = /\{"id":.+\}/u.exec(step) ?? []
         const [copied = ""] = /\{"session":.+\}/u.exec(step) ?? []
 
-        // The record of the next session holds both lines, as the agent copies them.
         const { logLines } = yield* runHarden(
           { ...MONOREPO_FILES, [RECORD]: `${copied}\n${example}\n` },
           ["--json"]
@@ -1961,7 +1887,6 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden({ "package.json": manifest({}) })
 
-      // The runtime boundary prints the error once, on standard error.
       expect({
         error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
         logLines,
@@ -1979,7 +1904,6 @@ describe("harden", () => {
         "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
       })
 
-      // The runtime boundary prints the error once, on standard error.
       expect({
         error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
         logLines,
@@ -2001,7 +1925,6 @@ describe("harden", () => {
         }),
       })
 
-      // The runtime boundary prints the error once, on standard error.
       expect({
         error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
         logLines,
@@ -2037,7 +1960,6 @@ describe("harden", () => {
         "package.json": yield* stringifyJson({ name: "adamantite", version: "0.0.1" }),
       })
 
-      // The runtime boundary prints the error once, on standard error.
       expect({
         error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
         logLines,
@@ -2077,7 +1999,6 @@ describe("harden", () => {
     "start the reach of --path from the AGENTS.md of the root and the selected package",
     () =>
       Effect.gen(function* () {
-        // Only the `api` instructions link to the shared guide, and an agent in `web` does not read them.
         const files = {
           ...MONOREPO_FILES,
           "docs/shared.md": "# Shared\n",
@@ -2125,8 +2046,6 @@ describe("harden", () => {
 
   it.effect("start the reach of --path also from the AGENTS.md of a parent package", () =>
     Effect.gen(function* () {
-      // `packages/web/admin` is a workspace package inside `web`, and an agent in it reads the
-      // instructions of `web` too.
       const prompt = yield* runHardenPrompt(
         {
           ...MONOREPO_FILES,
@@ -2152,8 +2071,6 @@ describe("harden", () => {
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt(MONOREPO_FILES, args)
 
-      // The root instructions and docs apply to every package, and the rules of `web` live in
-      // tooling.
       expect(getContext(prompt)).toStrictEqual({
         configs: ["- `packages/web/oxlint.config.ts`"],
         documentationFiles: [
@@ -2178,7 +2095,7 @@ describe("harden", () => {
       const { "packages/web/oxlint.config.ts": _, ...files } = MONOREPO_FILES
       const prompt = yield* runHardenPrompt(files, args)
 
-      // Oxlint lints `web` with the nearest config, which is the root config. `api` stays out.
+      // Oxlint lints `web` with the nearest config, which is the root config.
       expect(getContext(prompt)).toStrictEqual({
         configs: ["- `oxlint.config.ts`"],
         documentationFiles: [
@@ -2196,7 +2113,6 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden(MONOREPO_FILES, ["--path", ".."])
 
-      // The runtime boundary prints the error once, on standard error.
       expect({
         error: Option.getOrThrow(Exit.findErrorOption(exit)).message,
         logLines,
@@ -2250,7 +2166,6 @@ describe("harden", () => {
 
   it.effect("hand off to an agent seeded with the prompt, then verify with check and Doctor", () =>
     Effect.gen(function* () {
-      // The agent's exit code does not decide the result, and a session may change no files.
       const { exit, logLines, runner } = yield* runInteractiveHarden({
         files: CUSTOM_RULE_FILES,
         keys: ["enter"],
@@ -2311,9 +2226,6 @@ describe("harden", () => {
           },
         })
 
-        // Before the session, custom rule discovery and the overrides load the root config, and the
-        // suppression count reads it as a source file. After it, the custom rule discovery of the
-        // project loads it again.
         expect({ afterSession: counts, beforeSession }).toStrictEqual({
           afterSession: { configLoads: 4, workspaceReads: 2 },
           beforeSession: { configLoads: 3, workspaceReads: 1 },
@@ -2336,7 +2248,6 @@ describe("harden", () => {
   it.effect("pass the verification of a session that appends a line to the decisions record", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
-        // The line that did not decode before the session does not fail it.
         files: { ...HEALTHY_FILES, [RECORD]: `${BROKEN_LINE}\n` },
         keys: ["enter"],
         onSession: (files) => {
@@ -2410,14 +2321,11 @@ describe("harden", () => {
     })
   )
 
-  // The CLI finds the Oxlint runtime before it starts Oxlint, so a missing Oxlint fails check with
-  // an error and no Oxlint output. Harden still runs Doctor and reports both.
   it.effect(
     "name the repair and still run Doctor when check cannot find Oxlint after the session",
     () =>
       Effect.gen(function* () {
         const { exit, logLines } = yield* runInteractiveHarden({
-          // Knip is installed without its managed config, so Doctor reports one finding.
           files: {
             ...ADAMANTITE_MODULE,
             ...makeLockfileFile(
@@ -2456,7 +2364,6 @@ describe("harden", () => {
   it.effect("fail and show the findings when Doctor finds issues after the session", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
-        // Knip is installed without its managed config, so Doctor reports one finding.
         files: {
           ...ADAMANTITE_MODULE,
           ...makeLockfileFile(
@@ -2489,7 +2396,6 @@ describe("harden", () => {
   it.effect("show the Doctor warnings and still pass when Doctor finds no issues", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
-        // Doctor cannot load a config that names an undefined variable, so it warns without a finding.
         files: {
           "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace('dir: "tooling/rules"', "dir: rulesDir"),
           ...INSTALLED,
@@ -2512,7 +2418,6 @@ describe("harden", () => {
   it.effect("fail and name the link when the session adds a link to a missing file", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runInteractiveHarden({
-        // The broken link that the project had before the session does not fail it.
         files: { "AGENTS.md": "Read [the old guide](docs/old.md).\n", ...HEALTHY_FILES },
         keys: ["enter"],
         onSession: (files) => {
@@ -2533,7 +2438,6 @@ describe("harden", () => {
 
   it.effect("pass the verification when the session adds a link that no heading matches", () =>
     Effect.gen(function* () {
-      // The agent decides whether such a link works, so it does not fail the session.
       const { exit } = yield* runInteractiveHarden({
         keys: ["enter"],
         onSession: (files) => {

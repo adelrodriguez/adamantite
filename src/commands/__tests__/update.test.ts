@@ -45,9 +45,6 @@ function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
 }
 
-/**
- * A project with the effect preset where only Oxlint is off its pin.
- */
 function makeEffectFiles(oxlintConfig: string) {
   return createFileSystemTestContext({
     files: {
@@ -61,14 +58,11 @@ function makeEffectFiles(oxlintConfig: string) {
   })
 }
 
-// A lockfile that a newer Adamantite version wrote.
-// The setup that `init --script check` records.
 const CHECK_SELECTION = makeSelection({ presets: ["core"], scripts: ["check"] })
 
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 describe("update", () => {
-  // Without a lockfile, update has no selection, so it hands off the one finding.
   it.effect("set up nothing without a lockfile, and report the finding that names init", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -135,13 +129,10 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      // Without a terminal, update prints no headings.
       expect(logLines).toStrictEqual(["✔ `.adamantite/adamantite-lock.json` updated. Commit it."])
     })
   )
 
-  // `check` fails a lockfile that an older Adamantite wrote, so an update that changes no managed
-  // file still records the installed version.
   it.effect(
     "record the installed version when only the version differs, so doctor and check pass",
     () =>
@@ -154,10 +145,8 @@ describe("update", () => {
           },
         })
 
-        // The setup writes files as Adamantite renders them, and starts no Oxfmt.
         const installed = makeModuleResolverLayer("/project", ADAMANTITE_RESOLUTION)
 
-        // `check` starts the stages, so it finds the tools too.
         const withTools = makeModuleResolverLayer("/project", {
           "oxfmt/package.json": "node_modules/oxfmt/package.json",
           "oxlint/package.json": "node_modules/oxlint/package.json",
@@ -235,7 +224,6 @@ describe("update", () => {
 
       const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
 
-      // An unreadable range would also install nothing, but it leaves a warning.
       expect({
         calls: installer.calls,
         succeeded: Exit.isSuccess(exit),
@@ -294,7 +282,6 @@ describe("update", () => {
     })
   )
 
-  // The recorded selection runs Oxlint, so Setup installs the managed version.
   it.effect("install an outdated managed package, and leave the adamantite package alone", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -406,7 +393,6 @@ describe("update", () => {
       expect(logLines).toStrictEqual([
         "● `analyze` script is up to date.",
         "✔ `.adamantite/adamantite-lock.json` updated. Commit it.",
-        // The lockfile selects no agent guidance, so Doctor checks no `AGENTS.md`.
         expect.stringMatching(
           /^# Adamantite doctor findings\n[\s\S]*## 1\. Conflicting knip configuration\n/u
         ),
@@ -460,7 +446,6 @@ describe("update", () => {
     "hand the findings off after the setup, and succeed when the session resolves them",
     () =>
       Effect.gen(function* () {
-        // Update keeps a `tsconfig.json` that it did not write, so the preset is missing after it.
         const files = createFileSystemTestContext({
           files: {
             ...makeLockfileFile(makeSelection({ typescript: "tsconfig" })),
@@ -535,7 +520,6 @@ describe("update", () => {
           scripts: [Setup.ScriptWrite.cases.Unchanged.make({ script: "analyze" })],
         },
       })
-      // The lines of the setup go to standard error, so standard output holds only the document.
       expect(errorLines).toContain("✔ `.adamantite/adamantite-lock.json` updated. Commit it.")
     })
   )

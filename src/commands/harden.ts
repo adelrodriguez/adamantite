@@ -34,9 +34,6 @@ import * as Resolution from "#terminal/resolution.ts"
 
 const version = getPackageVersion()
 
-/**
- * What `harden --json` prints: the harden context that the prompt is built from.
- */
 export const Report = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   ...HardenContext.fields,
@@ -65,9 +62,6 @@ const commits = Flag.Int("commits").pipe(
   )
 )
 
-/**
- * The lines of the decisions record that do not decode. A project without a record has none.
- */
 function listUndecodableLines(record: DecisionsRecord) {
   return DecisionsRecord.match(record, {
     Missing: () => [],
@@ -75,26 +69,15 @@ function listUndecodableLines(record: DecisionsRecord) {
   })
 }
 
-/**
- * What remains after a harden session. The agent verifies custom rules during the session with
- * temporary cases, which it removes before it hands back, and the project must still pass check and
- * Doctor after it. A link that was broken before the session is a gap that the user may not have
- * approved, so only a link that the session added remains. The same holds for a line of the
- * decisions record that does not decode: only a line that the session added remains. `before` is
- * the context that the session started from.
- */
 const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before: HardenContext) {
   const CHECK_FAILED = "`adamantite check` failed."
 
-  // A failed command already printed why it failed. Any other failure, such as a missing tool,
-  // printed nothing about itself, so its message joins the failures.
   const checkFailures = yield* Bridge.check().pipe(
     Effect.as([]),
     Effect.catchTag("CommandFailed", () => Effect.succeed([CHECK_FAILED])),
     Effect.catch((error) => Effect.succeed([error.message, CHECK_FAILED]))
   )
 
-  // The session can change the project, so agent reach and assessment share a new read.
   const project = yield* Project.read()
 
   const [reachAfter, assessment, recordAfter] = yield* Effect.all(
@@ -118,7 +101,6 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
     onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
   })
 
-  // A line has no key that survives a repair, so its text tells whether the session added it.
   const undecodableBefore = new Set(
     listUndecodableLines(before.decisionsRecord).map(({ text }) => text)
   )
@@ -140,14 +122,6 @@ const verify = Effect.fn("verify")(function* (cwd: string, scope: string, before
   } satisfies Resolution.Remaining
 })
 
-/**
- * Renders the prompt that tells a coding agent to move the project's coding standards up the
- * enforcement ladder, and offers it through `Resolution.offer` as a `Task`. The prompt shows what
- * `src/lib/hardening` computes as data: each Markdown file that git lists outside the skill
- * folders, the discovery gaps, the disable comments of each rule, the TypeScript directives, each
- * file of an override that turns a rule off, and the decisions of the decisions record. Harden
- * produces no findings, so it never changes Doctor's result.
- */
 export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   Command.withDescription(
     "Ask a coding agent to find the project's coding standards and move each one up the enforcement ladder"
@@ -162,7 +136,6 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
 
       const packageJson = yield* readPackageJson(cwd)
 
-      // The Adamantite repository runs its own build, so it does not depend on itself.
       const isAdamantiteRepository = packageJson.name === "adamantite"
 
       if (
@@ -173,7 +146,6 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
         return yield* new AdamantiteNotInstalled({ command: "harden" })
       }
 
-      // The prompt offers the presets and rules of this version, so the project must install it.
       const installedVersion = isAdamantiteRepository
         ? Option.fromUndefinedOr(packageJson.version)
         : yield* readInstalledVersion(cwd)
@@ -190,9 +162,8 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
         })
       }
 
-      // The current directory is a real path, so the scope must be one too. A scope through a
-      // directory symlink, such as `/var` for `/private/var` on macOS, then stays inside the
-      // project. The flag requires the folder to exist. Without it, the scope is the project.
+      // The working directory of a process is a real path, and a scope can pass through a
+      // directory symlink, such as `/var` for `/private/var` on macOS.
       const scopeDirectory = Option.isSome(scope)
         ? yield* fs
             .realPath(path.resolve(cwd, scope.value))
@@ -205,7 +176,6 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
         return yield* new ScopeOutsideProject({ cwd, scope: scopeDirectory })
       }
 
-      // Each step before the session takes this read of the workspace.
       const context = yield* readHardenContext(
         cwd,
         yield* Project.readWorkspace(),

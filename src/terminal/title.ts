@@ -7,9 +7,6 @@ import { getTitle } from "./title.macro.ts" with { type: "macro" }
 
 const title = getTitle()
 
-/**
- * Prints the wordmark when the command asks in a terminal and the complete wordmark fits.
- */
 export const printTitle = Effect.gen(function* () {
   const mode = yield* CurrentMode
 

@@ -25,11 +25,6 @@ const OUTDATED = new SetupOutdated({
 
 const DEFECT = new Error("version verification defect")
 
-/**
- * Reports `cause` as the CLI boundary does, and returns the lines on standard error, the exit of
- * the report, and the exit code that `src/index.ts` sets for that exit: the returned code, or the
- * runtime's code for a cause that the report leaves.
- */
 function report(cause: Cause.Cause<CommandFailed | SetupOutdated>) {
   return Effect.gen(function* () {
     const exit = yield* reportFailure(cause).pipe(Effect.exit)

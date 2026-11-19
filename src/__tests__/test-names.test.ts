@@ -8,9 +8,6 @@ const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const STACK_TEST = "A stack test, named after the fixture tree or the preset that it lints."
 
-/**
- * The test files that no module names, each with the reason.
- */
 const EXCEPTIONS = {
   "presets/__tests__/architecture.test.ts": STACK_TEST,
   "presets/__tests__/core.test.ts": STACK_TEST,
@@ -41,11 +38,6 @@ const EXCEPTIONS = {
   "src/__tests__/test-names.test.ts": "Checks the names of the test files.",
 } as const satisfies Readonly<Record<string, string>>
 
-/**
- * Whether a module has the name of the test file `<folder>/__tests__/<name>.test.ts`: the module
- * `<folder>/<name>.ts`, `<folder>/<name>/index.ts`, or `<folder>/<name>.macro.ts`, or the rule
- * `<folder>/rules/<name>.ts` of a RuleTester file.
- */
 function hasModule(test: string) {
   const name = basename(test, ".test.ts")
   const folder = dirname(dirname(test))

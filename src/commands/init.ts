@@ -48,36 +48,14 @@ import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 import { printTitle } from "#terminal/title.ts"
 
-/**
- * The setup that init applies. Each optional part exists only with the parts that it needs, so the
- * options cannot select a preset without linting.
- */
 export interface InitOptions {
-  /**
-   * Add the Adamantite section to `AGENTS.md` and the Adamantite skills.
-   */
   readonly agents: boolean
-  /**
-   * The editors to configure.
-   */
   readonly editors: Option.Option<Array.NonEmptyReadonlyArray<InitEditor>>
-  /**
-   * The package manager that the GitHub Actions workflow runs.
-   */
   readonly githubActions: Option.Option<SupportedPackageManager>
-  /**
-   * The Oxlint setup, which the `check` and `fix` scripts need.
-   */
   readonly lint: Option.Option<{
     readonly presets: readonly LintPreset[]
   }>
-  /**
-   * The managed scripts. `Setup.apply` sets each one in `package.json` and overwrites what it held.
-   */
   readonly scripts: readonly Script[]
-  /**
-   * The TypeScript preset that `tsconfig.json` extends. It needs no script.
-   */
   readonly typescript: Option.Option<TypeScriptPreset>
 }
 
@@ -90,10 +68,7 @@ interface InitOptionsInput {
   readonly typescript: Option.Option<TypeScriptPreset>
 }
 
-/**
- * Parses the flat options of the flags or the prompts into the setup that init applies.
- */
-const validateInitOptions = Effect.fn("validateInitOptions")(function* (
+const parseInitOptions = Effect.fn("parseInitOptions")(function* (
   input: InitOptionsInput,
   packageManager: SupportedPackageManager
 ) {
@@ -152,11 +127,6 @@ const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   } satisfies InitOptions
 })
 
-/**
- * The title and description that the interactive prompt shows for each editor. The `vscode`
- * settings also apply to the editors that read `.vscode/settings.json`, so the prompt calls them
- * universal.
- */
 const INIT_EDITOR_CHOICES = {
   vscode: {
     description:
@@ -166,10 +136,6 @@ const INIT_EDITOR_CHOICES = {
   zed: { description: "creates .zed/settings.json", title: "Zed" },
 } as const satisfies Record<InitEditor, { description: string; title: string }>
 
-/**
- * Asks which preset to keep of each selected pair that excludes each other, and removes the other
- * preset of the pair.
- */
 function keepOneOfExcludedPresets(
   selected: readonly LintPreset[]
 ): Effect.Effect<readonly LintPreset[], Terminal.QuitError, Prompt.Environment> {
@@ -189,10 +155,6 @@ function keepOneOfExcludedPresets(
   })
 }
 
-/**
- * Asks for the lint presets, keeps one preset of each pair that excludes each other, and adds each
- * preset that a selected preset requires.
- */
 const promptPresets = Effect.gen(function* () {
   const chosen = yield* Prompt.MultiSelect({
     choices: lintPresets.map((preset) => ({
@@ -329,8 +291,7 @@ const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
   )
 )
 
-// The CLI builds this description at startup, and the first `Intl` formatter loads ICU's data, so
-// the list joins its items by hand.
+// The first `Intl` formatter loads ICU's data, and the CLI builds this description at startup.
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
@@ -377,14 +338,11 @@ export default Command.make("init", {
   Command.withHandler(({ json, nonInteractive, ...setupFlags }) =>
     Effect.gen(function* () {
       const cwd = yield* Project.Directory
-      // Only a terminal that can prompt asks for the selection. With `--json`,
-      // `--non-interactive`, or no such terminal, init sets up from the flags.
       const prompts = Mode.is("Menu")(yield* Mode.CurrentMode)
       yield* printTitle
 
       yield* Output.intro("💠 adamantite init")
 
-      // First, so a lockfile that does not read fails init before it changes a file.
       const recorded = yield* readLockfile(cwd)
 
       const packageManager = yield* (yield* DependencyInstaller).detectPackageManager(cwd).pipe(
@@ -432,10 +390,8 @@ export default Command.make("init", {
 
       const input = prompts ? yield* collectInteractiveInitOptions(isMonorepo) : setupFlags
 
-      const initOptions = yield* validateInitOptions(input, packageManager.name)
+      const initOptions = yield* parseInitOptions(input, packageManager.name)
 
-      // GitHub Actions needs a script, so a run without scripts, TypeScript, editors, and agent
-      // guidance selects no setup at all.
       if (
         initOptions.scripts.length === 0
         && Option.isNone(initOptions.typescript)
@@ -454,7 +410,6 @@ export default Command.make("init", {
         onSome: (setup) => setup.presets,
       })
 
-      // What init was asked to set up, in the order of each source list.
       const asked = {
         agents: initOptions.agents,
         ci: Option.isSome(initOptions.githubActions) ? "github" : null,
@@ -474,8 +429,8 @@ export default Command.make("init", {
         onSome: (lockfile) => addSelection(lockfile.selection, asked),
       })
 
-      // Oxlint would load the config that init writes as a nested config of a parent project, and
-      // reject its `options`, which stops the lint of that project.
+      // Oxlint loads the config that init writes as a nested config of a parent project, and fails
+      // on its `options`.
       if (oxlint.selected(selection)) {
         const parent = yield* findParentConfig(cwd)
 
@@ -484,7 +439,7 @@ export default Command.make("init", {
         }
       }
 
-      // Zed installs extensions only from the user settings, so init links them.
+      // Zed installs extensions only from the user settings.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
         yield* Output.info("Install the Zed `oxc` extension: zed://extension/oxc")
 
@@ -499,7 +454,6 @@ export default Command.make("init", {
 
       yield* Output.outro("✅ Setup finished.")
     }).pipe(
-      // A cancel exits 1, as in the other commands.
       Effect.catchTag("QuitError", () =>
         Output.cancel("Setup was cancelled.").pipe(
           Effect.andThen(

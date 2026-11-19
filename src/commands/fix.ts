@@ -33,10 +33,6 @@ const only = Flag.Literals("only", ["format", "lint"]).pipe(
   Flag.withDescription("Run only format (Oxfmt) or lint (Oxlint). Pass tool arguments after --")
 )
 
-/**
- * The fix level that the flags select. `--all` and the pair of `--suggested` and `--dangerous`
- * select both kinds of fixes.
- */
 function toFixLevel(flags: {
   readonly all: boolean
   readonly dangerous: boolean

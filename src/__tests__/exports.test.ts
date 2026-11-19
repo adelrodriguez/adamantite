@@ -8,9 +8,6 @@ const exportedImports = Object.keys(packageJson.exports).map(
   (subpath) => `adamantite${subpath.slice(1)}`
 )
 
-/**
- * The imports in the README table of public imports, such as `adamantite/rules/plugin`.
- */
 function readDocumentedImports() {
   return readme
     .split("\n")

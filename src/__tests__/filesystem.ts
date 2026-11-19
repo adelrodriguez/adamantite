@@ -11,40 +11,16 @@ import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
 
 export interface FileSystemTestContext {
-  /**
-   * Absolute base directory that relative paths resolve against.
-   */
   readonly root: string
-  /**
-   * Layer that provides the in-memory `FileSystem.FileSystem` service.
-   */
   readonly layer: Layer.Layer<FileSystem.FileSystem>
   readonly exists: (path: string) => boolean
-  /**
-   * List the files relative to the root, in sorted order.
-   */
   readonly list: () => string[]
-  /**
-   * Read a file for assertions. Throws when the file does not exist.
-   */
   readonly read: (path: string) => string
-  /**
-   * Write a fixture file, creating parent directories.
-   */
   readonly write: (path: string, content: string) => void
-  /**
-   * Make writes to the path fail with a `PermissionDenied` system error.
-   */
   readonly makeReadOnly: (path: string) => void
-  /**
-   * Make reads and existence checks of the path fail with a `PermissionDenied` system error.
-   */
   readonly makeUnreadable: (path: string) => void
 }
 
-/**
- * Make the system error that the Node.js FileSystem backend fails with.
- */
 export function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path: string) {
   return PlatformError.systemError({
     _tag: tag,
@@ -82,24 +58,9 @@ function makeFileInfo(type: FileSystem.File.Type, size: number): FileSystem.File
   }
 }
 
-/**
- * Creates an isolated in-memory `FileSystem` for tests. Operations the production code does not use
- * stay unimplemented and die with a defect, so a test cannot absorb them as a typed failure and
- * pass for the wrong reason.
- *
- * Missing parent directories and removals of missing paths fail with the same `SystemError` tags
- * the Node backend reports, so error-path tests exercise realistic failures without touching the
- * host filesystem.
- */
 export function createFileSystemTestContext(options?: {
   readonly files?: Record<string, string>
-  /**
-   * Directory symlinks, from an absolute link path to its target. A target resolves from the root.
-   */
   readonly links?: Record<string, string>
-  /**
-   * The folder of the project, `/project` by default. `runCommand` runs a command in it.
-   */
   readonly root?: string
 }): FileSystemTestContext {
   const root = options?.root ?? "/project"
@@ -109,7 +70,6 @@ export function createFileSystemTestContext(options?: {
   const unreadablePaths = new Set<string>()
   let temporaryDirectories = 0
 
-  // Register every ancestor so strict parent-directory checks pass for roots.
   for (let current = root; dirname(current) !== current; current = dirname(current)) {
     directories.add(dirname(current))
   }
@@ -119,7 +79,7 @@ export function createFileSystemTestContext(options?: {
     target: resolve(root, target),
   }))
 
-  // Follow a directory symlink in the path, as the operating system does.
+  // The operating system follows a directory symlink in a path.
   function normalize(path: string) {
     const target = resolve(root, path)
     const match = links.find(({ link }) => target === link || target.startsWith(`${link}${sep}`))
@@ -127,7 +87,7 @@ export function createFileSystemTestContext(options?: {
     return match === undefined ? target : `${match.target}${target.slice(match.link.length)}`
   }
 
-  // Mirrors POSIX permissions: a read-only directory rejects writes anywhere below it.
+  // In POSIX, a read-only directory rejects writes anywhere below it.
   function checkIsReadOnly(path: string) {
     for (let current = path; ; current = dirname(current)) {
       if (readOnlyPaths.has(current)) {
@@ -231,7 +191,6 @@ export function createFileSystemTestContext(options?: {
         return Effect.void
       }),
     makeTempDirectory: makeUnimplemented("makeTempDirectory"),
-    // A temporary folder outside the root, which the scope removes with its entries.
     makeTempDirectoryScoped: (makeOptions) =>
       Effect.acquireRelease(
         Effect.sync(() => {
@@ -298,14 +257,12 @@ export function createFileSystemTestContext(options?: {
           return Effect.succeed(content)
         }
 
-        // The Node backend maps EISDIR to BadResource, so reading a directory must not report
-        // NotFound: NotFound means the path can be treated as absent.
+        // The Node backend maps EISDIR to BadResource.
         return directories.has(target)
           ? Effect.fail(makeSystemError("BadResource", "readFileString", path))
           : Effect.fail(makeSystemError("NotFound", "readFileString", path))
       }),
     readLink: makeUnimplemented("readLink"),
-    // The real path of an entry follows the directory symlinks.
     realPath: (path) =>
       Effect.suspend(() => {
         const target = normalize(path)
@@ -367,7 +324,6 @@ export function createFileSystemTestContext(options?: {
           ? Effect.succeed(makeFileInfo("Directory", 0))
           : Effect.fail(makeSystemError("NotFound", "stat", path))
       }),
-    // The bytes of a file, at most `bytesToRead` of them, in one chunk.
     stream: (path, streamOptions) =>
       Stream.suspend(() => {
         const target = normalize(path)

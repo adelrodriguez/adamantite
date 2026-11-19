@@ -9,11 +9,6 @@ import { getProjectDirectory, resolveOxlintLaunch } from "#lib/integrations/oxli
 import * as Project from "#lib/project/index.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
-// Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors start
-// this file in place of `oxlint`. The CLI starts Oxlint's CLI module with the same launch itself.
-// The build writes this file as `dist/oxlint.js`. It imports no macro module, so the Adamantite
-// repository runs it from source with `node src/oxlint/index.ts`.
-
 const entry = process.argv[1] ?? ""
 
 const result = await Effect.runPromise(
@@ -39,8 +34,7 @@ if (Result.isFailure(result)) {
 
 const { cli, env, preload } = result.success
 
-// The variables apply before Oxlint loads. A variable without a value leaves the environment, such
-// as an inherited `OXLINT_TSGOLINT_PATH` that a tsrs backend owns.
+// Oxlint reads the variables when it loads.
 for (const [name, value] of Object.entries(env)) {
   if (value === undefined) {
     // `process.env` is the environment of the process, not a record that a `Map` could replace.
@@ -50,7 +44,6 @@ for (const [name, value] of Object.entries(env)) {
   }
 }
 
-// The preload module of a plugin swaps the stock binding for the plugin's build when Oxlint loads it.
 if (Option.isSome(preload)) {
   await import(pathToFileURL(preload.value).href)
 }

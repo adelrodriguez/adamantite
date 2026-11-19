@@ -17,18 +17,12 @@ const LINES = {
   Unchanged: (path) => Output.info(`\`${path}\` is up to date.`),
 } as const satisfies Record<FileWrite["_tag"], (path: string) => ReturnType<typeof Output.info>>
 
-/**
- * Prints one line for each managed file that `Setup.apply` handled.
- */
 export const printFileWrites = (writes: readonly FileWrite[]) =>
   Effect.forEach(writes, ({ _tag, path }) => LINES[_tag](path), {
     concurrency: 1,
     discard: true,
   })
 
-/**
- * Prints the packages that `Setup.apply` installed or updated, with the version that each one had.
- */
 export const printInstalls = (installs: readonly PackageAction[]) =>
   installs.length === 0
     ? Effect.void
@@ -42,9 +36,6 @@ export const printInstalls = (installs: readonly PackageAction[]) =>
         ].join("\n")
       )
 
-/**
- * Prints one line for each managed script that `Setup.apply` set in `package.json`.
- */
 export const printScriptWrites = (writes: readonly ScriptWrite[]) =>
   Effect.forEach(
     writes,

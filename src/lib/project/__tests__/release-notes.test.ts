@@ -136,6 +136,39 @@ describe("readReleaseNotes", () => {
   )
 
   // A Git or file source records a version that is no release, so no range starts at it.
+  it.effect("read the changelog of a linked package from a project path through a symlink", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        links: {
+          "/tmp/link": "/tmp/workspace/app",
+          "/tmp/workspace/app/node_modules/adamantite": "/tmp/store",
+        },
+        root: "/",
+      })
+
+      files.write("tmp/workspace/app/package.json", "{}")
+      files.write("tmp/store/package.json", `{"name":"adamantite","version":"0.49.0"}`)
+      files.write("tmp/store/CHANGELOG.md", CHANGELOG)
+
+      const notes = yield* readReleaseNotes("/tmp/link", "0.49.0-beta.1").pipe(
+        Effect.provide([
+          files.layer,
+          Path.layer,
+          makeModuleResolverLayer("/", { "adamantite/lint": "/tmp/store/dist/presets/lint.js" }),
+        ])
+      )
+
+      expect(
+        Option.map(notes, ({ changelog, releases }) => ({ changelog, releases }))
+      ).toStrictEqual(
+        Option.some({
+          changelog: "../../store/CHANGELOG.md",
+          releases: [expect.objectContaining({ version: "0.49.0" })],
+        })
+      )
+    })
+  )
+
   it.effect("read nothing when the recorded version is no release", () =>
     Effect.gen(function* () {
       expect(yield* read("github:adelrodriguez/adamantite", { installed: "0.49.0" })).toStrictEqual(

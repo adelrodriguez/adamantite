@@ -74,10 +74,57 @@ If the selected presets include a managed plugin, check its setup:
 
 Continue when Doctor reports no findings for the selected plugins and editors.
 
+## Adopt Adamantite in existing code
+
+Code written before the setup can get many reports from `adamantite check`. Do not turn a preset
+rule off for the whole project, set it to `warn`, or add disable comments to make the check pass.
+Keep each rule at `error`, and turn it off only for the files that break it now.
+
+1. Run `adamantite fix` to apply the safe fixes and format the files. Review the diff, and commit
+   it apart from the setup.
+2. Count the remaining reports for each rule. Oxlint prints its JSON report when you pass
+   `--format json` after `--`, and `check --only lint` prints no heading above it. `check` exits 1
+   while reports remain, and the JSON is still complete.
+
+   ```sh
+   adamantite check --only lint -- --format json > lint.json
+   node -e '
+     const { diagnostics } = JSON.parse(require("node:fs").readFileSync("lint.json", "utf8"))
+     const files = new Map()
+     for (const { code, filename } of diagnostics) {
+       files.set(code, new Set([...(files.get(code) ?? []), filename]))
+     }
+     for (const [code, names] of [...files].sort((a, b) => b[1].size - a[1].size)) {
+       console.log(code, names.size, [...names].join(" "))
+     }
+   '
+   ```
+
+   Each line names a rule, the number of files that break it, and those files. A report's
+   `code` names the rule as `<plugin>(<rule>)`. In the config, the rule is `<plugin>/<rule>`, such
+   as `typescript/no-explicit-any` for `typescript(no-explicit-any)`. The core ESLint rules have
+   no prefix, so `eslint(no-debugger)` is `no-debugger`.
+
+3. Fix the code for the rules with few reports, when each fix keeps the behavior of the code.
+4. For each remaining rule, add an `overrides` entry to `oxlint.config.ts` that turns the rule off
+   only in the files that break it now, such as
+   `{ files: ["src/legacy/cart.ts"], rules: { "typescript/no-explicit-any": "off" } }`. In a
+   comment above the entry, state the change that removes each file from it. New files follow the
+   rule.
+5. Run `adamantite check` until it passes, and delete `lint.json`.
+
+Report the number of files in each override to the user. A later `adamantite harden` run finds the
+files that no longer break a rule, so the overrides can shrink.
+
+Continue when `adamantite check` passes without a disable comment or a rule that the project
+turned off for every file.
+
 ## Check the setup
 
 - Each selected managed script runs successfully.
 - `.adamantite/adamantite-lock.json` exists and is committed with the setup.
 - Doctor reports no findings, and its assessment warnings are recorded.
 - Existing scripts and configuration are preserved unless the task includes replacing them.
+- In existing code, each preset rule stays at `error`, and an override turns it off only for the
+  files that break it now.
 - Each command that a replaced script ran still runs where it ran before, such as in CI.

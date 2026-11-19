@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -474,11 +474,17 @@ describe("oxlint config load", () => {
 
       const assessment = await assess(root)
 
+      // The changelog of the installed package names the replacement of a retired preset.
+      const changelog = relative(root, join(realpathSync(REPO), "CHANGELOG.md"))
+
       expect(assessment.findings).toContainEqual(
         expect.objectContaining({
           currentState: expect.stringContaining(
             "Package subpath './lint/shadcn' is not defined by \"exports\""
           ),
+          goal: expect.arrayContaining([
+            `When the config imports an Adamantite preset that the installed package does not export, search the changelog of the installed Adamantite, \`${changelog}\`, for the import, and replace it with the preset that the changelog names.`,
+          ]),
           id: "oxlint-config-load-failure",
         })
       )

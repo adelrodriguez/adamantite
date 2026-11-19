@@ -1570,6 +1570,8 @@ describe("init", () => {
               },
               warnings: [],
             },
+            // Init starts a setup, so no release came before it.
+            releaseNotes: null,
             schemaVersion: 1,
             setup: {
               files: [Setup.FileWrite.cases.Created.make({ path: "tsconfig.json" })],

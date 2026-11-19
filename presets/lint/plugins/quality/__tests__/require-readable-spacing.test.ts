@@ -1,8 +1,7 @@
 import { RuleTester } from "oxlint/plugins-dev"
-import { describe, expect, it } from "vitest"
+import { describe, it } from "vitest"
 import format from "#presets/format.ts"
 import plugin from "#presets/lint/plugins/quality/index.ts"
-import { DEFAULT_PRINT_WIDTH } from "#presets/lint/plugins/quality/rules/require-readable-spacing.ts"
 import createPaddingLineRule from "#presets/lint/plugins/quality/stylistic/padding-line-between-statements.ts"
 
 RuleTester.describe = describe
@@ -25,12 +24,6 @@ function bindingEndingAt(name: string, column: number) {
 
   return `${start}${"x".repeat(column - start.length - 2)}")`
 }
-
-describe("require-readable-spacing print width", () => {
-  it("default to the print width of the format preset", () => {
-    expect(DEFAULT_PRINT_WIDTH).toBe(format.printWidth)
-  })
-})
 
 tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"], {
   invalid: [
@@ -140,16 +133,10 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
     },
     // Oxfmt wraps a line that ends past the print width, so the binding counts as multiline.
     {
-      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 110)}\n}`,
-      errors: [error],
-      name: "report a declaration past the print width after a short declaration",
-      output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 110)}\n}`,
-    },
-    {
-      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 101)}\n}`,
+      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", format.printWidth + 1)}\n}`,
       errors: [error],
       name: "report a declaration one column past the print width",
-      output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 101)}\n}`,
+      output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", format.printWidth + 1)}\n}`,
     },
     {
       code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 130)}\n  const c = 3\n}`,
@@ -241,7 +228,7 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
       name: "accept a blank line before a leading semicolon statement",
     },
     {
-      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 100)}\n}`,
+      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", format.printWidth)}\n}`,
       name: "accept a declaration that ends at the print width",
     },
     {

@@ -1,12 +1,11 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
+import format from "../../../../format.ts"
 import { readPositiveIntegerOption } from "../../shared/options.ts"
 import { fitsOnOneLine } from "../stylistic/padding-line-ast.ts"
 import createPaddingLineRule from "../stylistic/padding-line-between-statements.ts"
 
 import type { NodeTestObject } from "../stylistic/padding-line-between-statements.ts"
-
-export const DEFAULT_PRINT_WIDTH = 100
 
 function isSinglelineBinding(
   node: ESTree.Node,
@@ -78,7 +77,7 @@ const paddingRule = createPaddingLineRule(
     "singleline-binding": singlelineBinding,
     "undocumented-singleline-binding": undocumentedSinglelineBinding,
   },
-  (context) => readPositiveIntegerOption(context.options, "printWidth") ?? DEFAULT_PRINT_WIDTH
+  (context) => readPositiveIntegerOption(context.options, "printWidth") ?? format.printWidth
 )
 
 const rule: Rule = {

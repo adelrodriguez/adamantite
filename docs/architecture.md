@@ -107,10 +107,152 @@ The list holds `oxlint`, `oxfmt`, `knip`, `sherif`, `tsconfig`, `vscode`, `zed`,
 `src/lib/integrations/oxlint/plugins/managed.ts`, and `tsrs` in
 `src/lib/integrations/oxlint/tsrs.ts`.
 
-| Invariant                                                                                                                                                                                                                                                          | Held by                                   |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| The logic of one tool stays in its folder, such as `src/lib/integrations/knip/config.ts`. Only what several integrations share leaves it: `src/lib/integrations/config-file.ts`, `src/lib/integrations/tooling/base.ts`, and `src/lib/integrations/effect-sdk.ts`. | Nothing. `CODING_STANDARDS.md` states it. |
-| A command builder is not a member of `Integration`. The `command.ts` of a tool returns `CommandRunOptions` and starts no process, and the bridge and Setup import it.                                                                                              | Nothing                                   |
+`assess` reads the project and never writes. `packages` can depend on the project, as `sherif`
+installs Sherif only in a monorepo. `prepare` runs after the install and builds what an integration
+needs outside the files that the project commits, such as the Effect editor SDK of `vscode`. A
+failure that `assess` reports as a finding does not fail the setup. `doctor --json` prints each
+`Finding` and `PackageAction` as its schema encodes it, and `update` installs the package actions.
+
+`assessPackage` in `src/lib/integrations/tooling/base.ts` compares the version that the project
+declares for a managed package with the managed version. A version from a pnpm catalog gets a
+finding that asks for a change to the catalog, because `pnpm add` replaces the `catalog:`
+specifier, so `update` does not install it.
+
+The modules that end in `.macro.ts` run at build time and inline a file into the bundle, so a
+command reads no template from disk: the workflow template of `github`, the `AGENTS.md` section and
+the shipped skills of `agents`, and the config template of `oxfmt`.
+
+### Managed configs
+
+Oxlint, Oxfmt, and Knip each have one TypeScript config that the integration renders whole:
+`oxlint.config.ts`, `oxfmt.config.ts`, and `knip.config.ts`. The JSON configs of the tool conflict
+with it. When the project has one, `renderConfigFile` in `src/lib/integrations/config-file.ts`
+renders no config, because the tool would not load the managed config beside it, and
+`assessConfigFile` reports the conflict. It also reports a missing config, a config that does not
+load, and a loaded config that the inspection of the integration rejects. The Oxfmt and Knip
+inspections check that the config applies the Adamantite preset, by the identity key of
+`presets/identity.ts`, and the Oxlint inspection checks the options that Adamantite requires.
+
+The Knip config also spreads the `ignoreDependencies` lists of `adamantite/analyze` that the
+selection needs. `monorepo` ignores Sherif, which `adamantite analyze` runs and no Knip plugin sees,
+and `effect` ignores the `@effect/language-service` plugin name in `tsconfig.json`. The selection
+decides the lists, so the config of the `effect` preset is right in the first `init`, before the
+Oxlint config imports the preset.
+
+Oxfmt formats Astro and Svelte only through a bundled Prettier plugin, which imports a package from
+the project. `assessPluginLanguages` in `src/lib/integrations/oxfmt/languages.ts` reports a language
+whose framework `package.json` declares, but whose package Oxfmt cannot load in the version that
+its optional peer range names. The format preset turns on each plugin language, and the editor
+settings format each one with Oxfmt.
+
+### The Oxlint config
+
+`toOxlintTsConfigContent` in `src/lib/integrations/oxlint/config.ts` writes the imports sorted by
+module, as Oxfmt sorts them, and always extends `custom()`, which is an empty config until the
+project adds a rule to `.adamantite/lint`. `extends` lists core first, then the presets in the
+order of `LINT_PRESETS`, because a later entry replaces the rules of an earlier one. Doctor reports
+a preset before core with the `core-preset-order` finding.
+
+A selected preset counts as applied when any config that Oxlint loads applies it, in an override
+or in the config of a workspace package too. A config that does not load can apply any preset, so
+then Doctor reports no missing preset. The `oxlint-config-load-failure` finding reports an Oxlint
+that stops before it lints a file, with Oxlint's error, when no runtime finding explains it.
+
+`src/lib/integrations/oxlint/replacements.ts` imports the first-party plugin modules to read the
+`meta.docs.replaces` of each rule, because the presets load each plugin by file URL. A config with
+enough overrides of the kind that a rule replaces gets a warning, not a finding, because the config
+is valid.
+
+`src/lib/integrations/oxlint/custom.ts`, the `oxlint-custom` integration, reports a rules folder
+that no `custom()` call loads, a `dir` that names a missing folder, and rules folders that share a
+plugin name. A call without `dir` loads the default folder, which the project creates with its
+first rule, so only a call that names a folder expects the folder to exist. A config that does not
+load can load any folder, so then Doctor reports no unloaded folder, and warns. A rule file that
+does not load stops Oxlint, so `oxlint-config-load-failure` reports it. A saved rule test is the
+choice of the user, and gets no finding.
+
+### TypeScript config
+
+`src/lib/integrations/typescript/index.ts` writes a root `tsconfig.json` that extends the selected
+preset, with the Effect language service entry for the `effect` preset. The write rule keeps a
+config that the project changed, so Adamantite never adds the entry to it. The `@effect/tsgo`
+managed plugin reports a missing entry with `assessTsconfigPlugin` from
+`src/lib/integrations/effect-language-service.ts`, and warns in a monorepo, where each package can
+name the plugin in its own config.
+
+In a monorepo, a root config that extends a preset makes TypeScript treat all packages as one
+project, so Adamantite writes no root config there, and Doctor asks for the preset in each package.
+A root config that Adamantite wrote before the project became a monorepo stays managed, because
+other configs can extend it.
+
+Doctor follows the `extends` chain of the root config and of each workspace package config through
+its relative and absolute entries. A package entry that is not an Adamantite preset makes the base
+unknown, and Doctor reports neither a missing nor a mismatched preset for that config. A chain that
+names both presets uses `adamantite/typescript`. The project's own TypeScript tells whether a
+config loads the type resets, through `tsc --showConfig`, and Doctor runs it only for a config with
+`extends`. A package that is not private and declares `exports` or `types` is a library. A library
+uses `adamantite/tsconfig` whatever the selection, and gets a finding only when it loads the
+resets.
+
+### Editors
+
+`vscode` and `zed` write settings that start Oxlint through the Oxlint entry and format with
+Oxfmt. `EDITOR_OXLINT_ENTRY` in `src/lib/integrations/oxlint/entry.ts` is the path of the entry
+from the project root. `getProjectDirectory` finds the project from that path: the folder above the
+first `node_modules`, which also covers a package manager store inside the project, such as
+`node_modules/.pnpm/`. The Adamantite repository starts the entry as `src/oxlint/index.ts`, outside
+`node_modules`, so there the project is the working directory.
+
+When the project installs `@effect/tsgo`, `readEffectEditor` in `src/lib/integrations/effect-sdk.ts`
+gives the editors the Effect language server. Each editor turns off every `effecttsgo/` rule in the
+Oxlint server, so the Effect server alone gives their diagnostics and the semantic quick fixes, and
+CLI Oxlint keeps the rules.
+
+VS Code starts a copy of the Effect editor SDK in `node_modules/.cache/adamantite/effect`. The
+`prepare` of `vscode` copies the build of `@effect/tsgo` that matches the installed native
+TypeScript by its gitHead, and Doctor reports a copy that is stale or incomplete. A project without
+a matching build gets the `vscode-effect-sdk` finding, and its setup does not fail. Zed starts the
+installed `@effect/tsgo` CLI by its path in `node_modules`. A project whose CLI Zed cannot find gets
+the settings without the Effect server, and the `zed-effect-server` finding.
+
+### GitHub workflow
+
+`github` writes `.github/workflows/adamantite.yml`, with the install steps of the detected package
+manager and a job for each check and analyze script of the selection. It writes no workflow, and
+warns, when the selection runs no CI script or when Adamantite cannot detect the package manager.
+The workflow has no step that runs the saved rule tests, and Doctor requires none. A project can add
+one, and the write rule keeps the changed workflow. Doctor reports a workflow whose jobs no longer
+run a script of the selection, or that hard-codes a Node.js version.
+
+### Agents
+
+`agents` writes `AGENTS.md` with the Adamantite section, between its marker comments, only when the
+file does not exist, and never adds the section to a file that the project wrote. Doctor reports a
+missing root `AGENTS.md` and one without the section, and checks only the root in a monorepo.
+
+`getShippedSkillFiles` in `src/lib/integrations/agents/skill.macro.ts` inlines each file of
+`skills/` at build time, so the skills that `init` and `update` write match the running build. The
+first folder of a path is the name of its skill, so a new skill is a new folder of `skills/`, and
+a folder that starts with `_` is not a skill. `detectSkillFolders` in
+`src/lib/integrations/agents/skill.ts` gives the shared `.agents/skills` and each other skill folder
+whose agent folder exists, such as `.claude/skills`, and each skill goes to each of them.
+
+Doctor reports a copy that misses a shipped file, and a copy with a changed file or with a file
+that the skill does not ship. A file whose hash equals the hash in the lockfile is what Adamantite
+wrote, because Adamantite writes each file in the layout of the project's Oxfmt. `update` deletes a
+file of an earlier version that is unchanged since Adamantite wrote it, and keeps a file that the
+project added or changed, so Doctor reports that file. A `skills-lock.json` that records a shipped
+skill gets a finding, because `npx skills update` would then write the folders that Adamantite
+owns. The lock belongs to the `skills` CLI, so Adamantite does not edit it, and a lock that does
+not decode gets no finding.
+
+| Invariant                                                                                                                                                                                                                                                          | Held by                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| The logic of one tool stays in its folder, such as `src/lib/integrations/knip/config.ts`. Only what several integrations share leaves it: `src/lib/integrations/config-file.ts`, `src/lib/integrations/tooling/base.ts`, and `src/lib/integrations/effect-sdk.ts`. | Nothing. `CODING_STANDARDS.md` states it.                 |
+| A command builder is not a member of `Integration`. The `command.ts` of a tool returns `CommandRunOptions` and starts no process, and the bridge and Setup import it.                                                                                              | Nothing                                                   |
+| Each plugin language is an optional peer of the installed Oxfmt, and the format preset turns on each one.                                                                                                                                                          | `src/lib/integrations/oxfmt/__tests__/languages.test.ts`  |
+| The Oxlint config that `init` writes passes the inspection of Doctor.                                                                                                                                                                                              | `src/lib/integrations/oxlint/__tests__/config.test.ts`    |
+| A chain that names both TypeScript presets uses `adamantite/typescript`.                                                                                                                                                                                           | `src/lib/integrations/typescript/__tests__/index.test.ts` |
 
 ## Setup and the write rule
 
@@ -323,6 +465,7 @@ plugin.
 | A config that extends `jest` or `vitest` gets their rules only in the test files, and a project override that spreads its `plugins` and `rules` gets each rule.                                                                        | `presets/__tests__/jest.test.ts` and `presets/__tests__/vitest.test.ts`                                               |
 | Each lint preset besides core is in a stack of `presets/__tests__/stacks.ts`.                                                                                                                                                          | `presets/__tests__/stacks.test.ts`                                                                                    |
 | Each `effecttsgo` rule of the `effect` preset is in a category preset of `@effect/tsgo`, and the preset decides on each rule of those presets.                                                                                         | `presets/__tests__/effect.test.ts`                                                                                    |
+| Two presets that report the same defects exclude each other, and each lists the other in `excludes`.                                                                                                                                   | `src/lib/integrations/oxlint/__tests__/presets.test.ts`                                                               |
 
 ## Managed plugins
 
@@ -331,6 +474,47 @@ A preset can need a third-party Oxlint plugin from npm, such as `@shadcn/lint` f
 `src/lib/integrations/oxlint/runtime.ts` resolves the Oxlint runtime, with the native parts that a
 plugin replaces.
 
+`src/lib/integrations/oxlint/presets.ts` names the plugin of each preset. `oxlintPlugins` in
+`src/lib/integrations/oxlint/plugins/index.ts` collects them for the runtime, and `managedPlugins`
+in `src/lib/integrations/oxlint/plugins/managed.ts` adds the managed versions. Setup installs the
+package of a selected preset. `defineManagedPlugin` in `src/lib/integrations/oxlint/plugins/define.ts`
+builds each plugin on `definePackageTooling`, as tsrs is built, so Doctor and `update` require the
+package only while a managed script runs Oxlint and a config of the project applies the preset.
+
+A plugin has a `JavaScriptRuntime` when Oxlint loads it through the `jsPlugins` entry of its
+preset, which resolves from the target project. It has a `NativeRuntime` when its rules exist only
+in a native build of Oxlint. The `resolve` of a native runtime gives the overrides of the runtime
+parts, or none when the project does not install the plugin package.
+
+`resolveOxlintRuntime` gives an `OxlintRuntime`: the folder of the Oxlint package, the native
+binding, and the type-aware backend. The binding is `Stock`, or `Replaced` with the variables and
+the `preload` module that swaps Oxlint's binding for the build of the plugin. The backend is one of
+these:
+
+| Backend    | Meaning                                                                                                              |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `None`     | No `node_modules/.bin` has a tsrs launcher. Oxlint runs as installed, and fails only when it runs a type-aware rule. |
+| `Tsrs`     | Oxlint starts the installed tsrs through the nearest `tsrs-lint` launcher of the project.                            |
+| `Replaced` | Oxlint starts the backend of a plugin, with the variables of the plugin.                                             |
+
+An override replaces the whole backend, so the variables of the default and the native backends
+never mix. The project must install its own backend, so a launcher on `PATH` does not count.
+`toLaunch` turns the runtime into an `OxlintLaunch`, in which a variable without a value is removed
+from the environment. `getOxlintCommand` in `src/lib/integrations/oxlint/entry.ts` has Node.js load
+the preload module and then start Oxlint's CLI module, so the CLI loads Effect once, and no entry
+process resolves the runtime again.
+
+`@effect/tsgo` is the one native plugin. `resolveEffectRuntime` in
+`src/lib/integrations/oxlint/plugins/effect-tsgo/runtime.ts` takes the Effect builds of the Oxlint
+binding and of tsrs, for the installed versions, from the platform package of `@effect/tsgo`, so
+the project needs no patch. The installed package turns the builds on, so a nested config and a
+relative preset import get them too.
+
+`assessOxlintRuntime` in `src/lib/integrations/oxlint/runtime-assessment.ts` reports a runtime that
+the installed packages cannot supply, and the package findings report the declarations and the
+managed versions. A project that declares tsrs, but whose launcher does not resolve, gets a
+finding, although the entry still runs Oxlint without tsrs.
+
 | Invariant                                                                                                                                                                                                                                      | Held by                                                                                                   |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Each plugin package has a managed version.                                                                                                                                                                                                     | The type of `versions` in `src/lib/integrations/oxlint/plugins/managed.ts`                                |
@@ -338,6 +522,7 @@ plugin replaces.
 | One resolver serves the CLI, the Oxlint entry, and Doctor, so `src/lib/integrations/oxlint/runtime-assessment.ts` reports what a lint run finds.                                                                                               | Nothing holds the shared use. `src/lib/integrations/oxlint/__tests__/runtime.test.ts` holds the resolver. |
 | The resolver reads files and changes nothing. Only a process that starts Oxlint applies the `OxlintLaunch` of a runtime: the CLI starts Oxlint's CLI module with it, and the Oxlint entry, which editors start, applies it in its own process. | Nothing                                                                                                   |
 | Only the Effect plugin replaces native parts, so no two overrides replace one part.                                                                                                                                                            | Nothing                                                                                                   |
+| When `@effect/tsgo` has no build of either installed version, the resolver reports the missing tsrs build.                                                                                                                                     | `src/lib/integrations/oxlint/__tests__/runtime.test.ts`                                                   |
 
 ## Type resets
 

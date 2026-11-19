@@ -5,7 +5,8 @@ tooling in a target project. Product behavior is documented in the [README](../R
 domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 
 Each section says what an area is for, names the module that owns it, describes how the area
-works, and lists its invariants with the rule or the test that holds each one.
+works, and lists its invariants with the rule or the test that holds each one, or `Nothing` when
+none does.
 
 ## Runtime
 

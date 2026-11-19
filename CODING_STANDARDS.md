@@ -109,7 +109,8 @@ export const RuleSuppressions = Schema.Struct({
   rule: Schema.OptionFromNullOr(Schema.String),
 })
 
-// Prefer: the schema holds the format of a location.
+// Prefer: the schema holds the `<file>:<line>` format, and the architecture says what a location
+// and a missing rule mean.
 const Location = Schema.TemplateLiteral([Schema.String, ":", Schema.Int])
 
 export const RuleSuppressions = Schema.Struct({

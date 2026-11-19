@@ -34,8 +34,6 @@ describe("Knip setup", () => {
     })
   )
 
-  // The selection decides the ignore lists, so a config for the effect preset is right on the first
-  // init, before the Oxlint config imports the preset.
   it.effect("ignore Sherif in a monorepo and the language service with the effect preset", () =>
     Effect.gen(function* () {
       const files = makeProject({ "package.json": MONOREPO_PACKAGE_JSON })
@@ -53,7 +51,6 @@ describe("Knip setup", () => {
       const files = makeProject({ "package.json": MONOREPO_PACKAGE_JSON })
       yield* runLifecycle("init", files, INIT_ARGS)
 
-      // The config of a single package, without the Sherif ignore list that a monorepo needs.
       files.write(CONFIG, RENDERED)
 
       const init = yield* runLifecycle("init", files, INIT_ARGS)

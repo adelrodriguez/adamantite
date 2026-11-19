@@ -45,10 +45,6 @@ function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
 }
 
-/**
- * What `tsc --showConfig` reports for the package in each directory below `ROOT`: whether its
- * resolved `files` include the type resets, or that the command fails.
- */
 type ShowConfig = Readonly<Record<string, "fails" | "plain" | "resets">>
 
 function makeShowConfigLayer(showConfig: ShowConfig) {
@@ -81,7 +77,6 @@ function makeShowConfigLayer(showConfig: ShowConfig) {
   )
 }
 
-// TypeScript is installed at the root, so every package resolves it.
 const TYPESCRIPT_FILES = {
   "node_modules/typescript/package.json": JSON.stringify({ bin: { tsc: "./bin/tsc" } }),
 }
@@ -92,10 +87,6 @@ const TYPESCRIPT_RESOLUTIONS = {
 
 const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
 
-/**
- * What Doctor reports for a project whose lockfile selects `preset` and no script, so that only the
- * TypeScript integration applies. The root `package.json` declares Adamantite and `manifest`.
- */
 function assess(
   preset: TypeScriptPreset,
   manifest: PackageJson,
@@ -135,7 +126,6 @@ const MONOREPO_PACKAGE_JSON =
 
 const INIT_ARGS = ["--non-interactive", "--typescript", "typescript"]
 
-// The tests install no Oxfmt, so Setup writes each file as rendered.
 const RENDERED = `${Effect.runSync(formatJson({ extends: "adamantite/typescript" }))}\n`
 
 function makeProject(files: Record<string, string> = {}) {
@@ -156,7 +146,7 @@ describe("TypeScript setup", () => {
     })
   )
 
-  // TypeScript follows `extends` through the base config, and so does Doctor.
+  // TypeScript follows `extends` through the base config.
   it.effect.each([
     { finding: undefined, preset: "tsconfig" },
     { finding: "Mismatched TypeScript preset", preset: "typescript" },
@@ -179,8 +169,6 @@ describe("TypeScript setup", () => {
       })
   )
 
-  // Doctor follows no base config of another package, so it cannot tell which preset the package
-  // uses, and reports neither a missing nor a mismatched preset.
   it.effect.each([
     { preset: "tsconfig", specifier: "@company/config" },
     { preset: "typescript", specifier: "@company/config" },
@@ -242,7 +230,6 @@ describe("TypeScript setup", () => {
     })
   )
 
-  // Other configs can extend the root config, so Adamantite keeps it.
   it.effect("keep managing a root config that it wrote before the project became a monorepo", () =>
     Effect.gen(function* () {
       const files = makeProject()
@@ -278,7 +265,6 @@ describe("tsconfig", () => {
       })
     )
 
-    // Only `adamantite/typescript` loads the type resets.
     it.effect.each<{
       readonly extendsEntry: string | readonly string[]
       readonly preset: TypeScriptPreset
@@ -292,6 +278,11 @@ describe("tsconfig", () => {
       },
       { extendsEntry: "adamantite/tsconfig", preset: "tsconfig", showConfig: {} },
       { extendsEntry: ["./base.json", "adamantite/tsconfig"], preset: "tsconfig", showConfig: {} },
+      {
+        extendsEntry: ["adamantite/tsconfig", "adamantite/typescript"],
+        preset: "typescript",
+        showConfig: { "": "fails" },
+      },
     ])(
       "accept the selected $preset preset in extends: $extendsEntry",
       ({ extendsEntry, preset, showConfig }) =>

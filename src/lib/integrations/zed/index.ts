@@ -19,14 +19,8 @@ import {
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { checkIsJsonArray, checkIsJsonObject, formatJson, stringifyJson } from "#lib/shared/json.ts"
 
-/**
- * The project settings of Zed.
- */
 const SETTINGS_PATH = ".zed/settings.json"
 
-/**
- * The settings of a language that Oxfmt formats through its language server.
- */
 const OXFMT_LANGUAGE = {
   format_on_save: "on",
   formatter: [{ language_server: { name: "oxfmt" } }],
@@ -35,7 +29,6 @@ const OXFMT_LANGUAGE = {
 
 const CONFIG = {
   languages: {
-    // The format preset turns on Oxfmt for each plugin language.
     ...Object.fromEntries(pluginLanguages.map(({ editors }) => [editors.zed, OXFMT_LANGUAGE])),
     CSS: {
       format_on_save: "on",
@@ -97,8 +90,7 @@ const CONFIG = {
         },
       },
     },
-    // Zed starts the language server in the worktree root, so the relative entry path resolves. The
-    // entry finds the project from that path and loads the project's Oxlint runtime.
+    // Zed starts the language server in the worktree root, so the relative entry path resolves.
     oxlint: {
       binary: { arguments: [EDITOR_OXLINT_ENTRY, "--lsp"], path: "node" },
       initialization_options: {
@@ -113,8 +105,8 @@ const CONFIG = {
   },
 } as const
 
-// Keep the logical node_modules path. The resolver's real path can point into a machine's pnpm
-// store, which must not go into shared editor settings.
+// A real path can point into the pnpm store of one machine, which must not go into shared editor
+// settings, so the path stays in `node_modules`.
 const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -142,16 +134,11 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
   }
 })
 
-// The languages that the Effect language server checks, and the servers that Zed starts for them:
-// the Effect server in place of the other TypeScript servers, then Zed's defaults.
 const EFFECT_LANGUAGES = ["JavaScript", "JSX", "TypeScript", "TSX"] as const
 
+// In Zed, `!` turns off a language server, and `...` stands for the default servers.
 const EFFECT_LANGUAGE_SERVERS = ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
 
-/**
- * The command that starts the Effect language server, and the Oxlint rules that it reports, which
- * the Oxlint server hides. None when the project does not install `@effect/tsgo`.
- */
 const readEffectServer = Effect.fn("readEffectServer")(function* (cwd: string) {
   const effect = yield* readEffectEditor(cwd)
 
@@ -167,11 +154,6 @@ const readEffectServer = Effect.fn("readEffectServer")(function* (cwd: string) {
   return Option.some({ binary, rulesCustomization: effect.value.rulesCustomization })
 })
 
-/**
- * The settings that Adamantite writes, with the Effect language server when the project installs
- * `@effect/tsgo`. A project whose Effect CLI Zed cannot find gets the settings without it, and the
- * `zed-effect-server` finding.
- */
 const renderSettings = Effect.fn("renderSettings")(function* (cwd: string) {
   const server = yield* readEffectServer(cwd).pipe(
     Effect.catchTag("EffectEditorUnavailable", () => Effect.succeedNone)
@@ -209,10 +191,6 @@ function readObject(value: Schema.Json | undefined): Schema.JsonObject {
   return checkIsJsonObject(value) ? value : {}
 }
 
-/**
- * The finding for kept settings that do not select the Effect language server, or that do not hide
- * the duplicate Oxlint Effect reports.
- */
 const assessEffectServer = Effect.fn("assessEffectServer")(function* (
   cwd: string,
   config: Schema.JsonObject
@@ -274,11 +252,6 @@ const assessEffectServer = Effect.fn("assessEffectServer")(function* (
   ]
 })
 
-/**
- * The findings for `.zed/settings.json`. A file that the project changed gets a finding only for a
- * change that breaks the setup: the Oxlint entry, the Effect language server, and a plugin language
- * that Prettier still formats.
- */
 const assess = Effect.fn("assess")(function* (cwd: string) {
   const path = yield* Path.Path
   const settingsPath = path.join(cwd, SETTINGS_PATH)

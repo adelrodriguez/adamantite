@@ -11,17 +11,9 @@ const ANALYZE_PRESET_MODULE = publicImport("./analyze")
 
 interface KnipWorkspace {
   readonly isMonorepo: boolean
-  /**
-   * Whether the selection includes the `effect` preset, which names the `@effect/language-service`
-   * plugin in `tsconfig.json`.
-   */
   readonly usesEffectPreset: boolean
 }
 
-/**
- * The `ignoreDependencies` lists of `adamantite/analyze`, in the order that a generated config
- * spreads them.
- */
 const IGNORE_LISTS = ["monorepo", "effect"] as const satisfies ReadonlyArray<
   keyof typeof ignoreDependencies
 >
@@ -43,10 +35,7 @@ function getRequiredLists(workspace: KnipWorkspace) {
   return IGNORE_LISTS.filter((list) => IS_REQUIRED[list](workspace))
 }
 
-/**
- * What Adamantite reads from a loaded `knip.config.ts`: the preset that it applies, and its
- * `ignoreDependencies`, where Knip accepts a name or a regular expression.
- */
+// Knip accepts a name or a regular expression in `ignoreDependencies`.
 export const KnipConfig = Schema.Struct({
   [IDENTITY_KEY]: Schema.optional(PresetIdentity),
   ignoreDependencies: Schema.optional(
@@ -86,11 +75,6 @@ export function toKnipWorkspace(
   }
 }
 
-/**
- * In a monorepo the config must also ignore Sherif: `adamantite analyze` runs it, and Knip has no
- * plugin that sees that reference, so it reports Sherif as an unused devDependency. With the
- * `effect` lint preset it must ignore the `@effect/language-service` plugin name.
- */
 export function inspectRequiredKnipConfig(
   config: KnipConfig,
   workspace: KnipWorkspace

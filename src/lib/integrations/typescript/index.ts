@@ -29,27 +29,18 @@ import { publicImport } from "#lib/shared/package-exports.ts"
 
 const CONFIG_PATH = "tsconfig.json"
 
-/**
- * The import that `extends` names for each TypeScript preset.
- */
 const TYPESCRIPT_PRESETS = {
   tsconfig: publicImport("./tsconfig"),
   typescript: publicImport("./typescript"),
 } as const satisfies Record<TypeScriptPreset, string>
 
-// The type resets that `adamantite/typescript` lists in `files`, at the end of their path in the
-// installed package.
 const RESETS_FILE = "/dist/presets/typescript/resets/index.d.ts"
 
 const ShowConfig = Schema.Struct({ files: Schema.optional(Schema.Array(Schema.String)) })
 const decodeShowConfig = Schema.decodeUnknownOption(ShowConfig)
 
-/**
- * Whether the `tsconfig.json` in `directory` loads the type resets, by the files that the project's
- * own TypeScript resolves with `tsc --showConfig`. TypeScript follows `extends` by its own rules,
- * and a config that sets its own `files` drops the resets. None when TypeScript is not installed or
- * the command fails.
- */
+// `tsc --showConfig` prints the files that the project's TypeScript resolves. TypeScript follows
+// `extends` by its own rules, and a config that sets its own `files` drops the resets.
 const readLoadsResets = Effect.fn("readLoadsResets")(
   function* (directory: string) {
     const path = yield* Path.Path
@@ -106,9 +97,6 @@ const readLoadsResets = Effect.fn("readLoadsResets")(
   Effect.catchTag("PlatformError", () => Effect.succeed(Option.none<boolean>()))
 )
 
-/**
- * The `extends` entries of a `tsconfig.json`. None when the file is not a JSON object.
- */
 function readExtends(config: JsonValue) {
   if (!Predicate.isObject(config)) {
     return []
@@ -121,18 +109,12 @@ function readExtends(config: JsonValue) {
 
 const ADAMANTITE_PRESETS: readonly string[] = Object.values(TYPESCRIPT_PRESETS)
 
-/**
- * Whether `entry` names a file by a relative or absolute path. TypeScript resolves any other
- * `extends` entry as a package.
- */
+// TypeScript resolves an `extends` entry that is not a relative or absolute path as a package.
 function checkIsPath(path: Path.Path, entry: string) {
   return entry.startsWith("./") || entry.startsWith("../") || path.isAbsolute(entry)
 }
 
-/**
- * Whether `file` is a file, as TypeScript checks it before it reads a config. A folder, a missing
- * path, and a path that cannot be checked are not.
- */
+// TypeScript reads a base config only when its path is a file.
 const checkIsFile = (file: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.stat(file)),
@@ -140,13 +122,9 @@ const checkIsFile = (file: string) =>
     Effect.orElseSucceed(() => false)
   )
 
-/**
- * The `extends` entries of the TypeScript config at `file` and of each base config that a relative
- * or absolute entry names. TypeScript adds `.json` to such a path when it is not a file and does
- * not end in `.json`. Doctor follows no package entry. The chain stops at a base config that is not
- * a file, cannot be read, does not decode, or comes again. TypeScript reports a base config that it
- * cannot load, so Doctor reads such a base as one that names no preset.
- */
+// TypeScript adds `.json` to a path entry that is not a file and does not end in `.json`. It
+// reports a base config that it cannot load, so Doctor reads such a base as one that names no
+// preset.
 const readExtendsChain = (
   file: string,
   visited: ReadonlySet<string> = new Set()
@@ -185,31 +163,13 @@ const readExtendsChain = (
     return [...entries, ...bases.flat()]
   })
 
-/**
- * What the `extends` chain of a `tsconfig.json` shows about the Adamantite preset that it uses.
- */
 type Chain =
-  /**
-   * The chain names no Adamantite preset and reaches no other package.
-   */
   | { readonly _tag: "NoPreset" }
-  /**
-   * The chain names `preset`, or `adamantite/typescript` when it names both presets, and reaches no
-   * other package.
-   */
   | { readonly _tag: "Preset"; readonly preset: TypeScriptPreset }
-  /**
-   * The chain reaches the base config `entry` of another package. Doctor does not follow it, so the
-   * preset that the chain uses is unknown.
-   */
   | { readonly _tag: "UnknownBase"; readonly entry: string }
 
 const { $is: isChain, NoPreset, Preset, UnknownBase } = Data.taggedEnum<Chain>()
 
-/**
- * What the `extends` entries that a chain reaches show. Doctor follows each path entry, so only the
- * package entries count. `TYPESCRIPT_PRESET_NAMES` lists `typescript` first.
- */
 function toChain(path: Path.Path, entries: readonly string[]): Chain {
   const packages = entries.filter((entry) => !checkIsPath(path, entry))
   const unknown = packages.find((entry) => !ADAMANTITE_PRESETS.includes(entry))
@@ -223,8 +183,6 @@ function toChain(path: Path.Path, entries: readonly string[]): Chain {
   return preset === undefined ? NoPreset() : Preset({ preset })
 }
 
-// Another project imports a package that is not private and declares `exports` or `types`, so it
-// can read the declaration files that the package emits.
 function checkPublishesTypes(packageJson: PackageJson) {
   return (
     packageJson.private !== true
@@ -247,11 +205,6 @@ function toLibraryFinding(configPath: string): Finding {
   }
 }
 
-/**
- * The root and the workspace packages whose `tsconfig.json` names an Adamantite preset, directly or
- * through a base config, reaches a base config of another package, or loads the type resets, with
- * the chain that its `extends` entries show.
- */
 const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
   workspace,
 }: Project.Snapshot) {
@@ -279,12 +232,6 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
   return packages.flat()
 })
 
-/**
- * The `tsconfig.json` that Adamantite writes for the selection, with the Effect language service
- * entry when the selection includes the `effect` preset. The write rule keeps a config that the
- * project changed, so Adamantite never adds the entry to it, and the `@effect/tsgo` managed plugin
- * assesses the entry.
- */
 const render = (selection: Selection, preset: TypeScriptPreset) =>
   formatJson(
     selection.presets.includes("effect")
@@ -318,7 +265,6 @@ function toMissingPresetFinding(
     title: "Missing TypeScript preset",
   }
 
-  // `adamantite/typescript` adds the type resets, which a library must not publish.
   return preset === "typescript"
     ? {
         ...finding,
@@ -344,12 +290,6 @@ function toMismatchedPresetFinding(
   }
 }
 
-/**
- * Each configured package must use the selected preset. A library uses `adamantite/tsconfig`
- * whatever the selection, and the library finding covers it. Oxlint's type check runs without a
- * `tsconfig.json`. A config without `extends` cannot load the type resets, so Doctor runs
- * TypeScript only for the others.
- */
 const assess = Effect.fn("assess")(function* (
   project: Project.Snapshot,
   preset: TypeScriptPreset,
@@ -382,8 +322,6 @@ const assess = Effect.fn("assess")(function* (
           return loadsResets ? [toLibraryFinding(configPath)] : []
         }
 
-        // Doctor does not follow the base config of another package, so it cannot tell which
-        // preset the package uses.
         if (isChain("UnknownBase")(chain)) {
           return []
         }
@@ -401,12 +339,6 @@ const assess = Effect.fn("assess")(function* (
   return { findings: [...missing, ...findings.flat()], packageActions: [], warnings: [] }
 })
 
-/**
- * Whether Adamantite manages the root `tsconfig.json`. In a monorepo, a root config that extends a
- * preset makes TypeScript treat all packages as one project, so Adamantite creates none, and Doctor
- * asks for the preset in each package. A root config that Adamantite wrote before the project
- * became a monorepo stays managed, because other configs can extend it.
- */
 function checkIsManaged({ lockfile, workspace }: Project.Snapshot) {
   return (
     !workspace.isMonorepo

@@ -41,11 +41,8 @@ const CONFIG = {
 
 export const PACKAGE = { name: "oxlint", version: getDependencyVersion("oxlint") }
 
-/**
- * The Oxlint config of the nearest parent folder of `cwd`, relative to `cwd`, up to the filesystem
- * root. Oxlint run in that folder loads a config in `cwd` as a nested config, and rejects the
- * `options` that only a root config can set. A folder that holds `.git` does not stop it.
- */
+// Oxlint run in a parent folder loads a config in `cwd` as a nested config, and rejects the
+// `options` that only a root config can set. A folder that holds `.git` does not stop the search.
 export const findParentConfig = Effect.fn("findParentConfig")(function* (cwd: string) {
   const path = yield* Path.Path
   const parents: string[] = []
@@ -64,17 +61,10 @@ export const findParentConfig = Effect.fn("findParentConfig")(function* (cwd: st
   return Option.map(config, (file) => path.relative(cwd, file))
 })
 
-/**
- * The selected lint presets besides core, in the order of `LINT_PRESETS`.
- */
 function listPresets({ presets }: Selection): readonly LintPreset[] {
   return LINT_PRESETS.filter((preset) => presets.includes(preset))
 }
 
-/**
- * The finding for a config that lists an Adamantite preset before the core preset in `extends`.
- * Assessment does not write the config.
- */
 function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Finding {
   const presets = before.map((module) => `\`${module}\``).join(", ")
 
@@ -91,10 +81,6 @@ function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Findin
   }
 }
 
-/**
- * The finding for a lint preset that the lockfile selects and no Oxlint config of the project
- * applies. Assessment does not write the config.
- */
 function toMissingPresetFinding(preset: LintPreset): Finding {
   const module = publicImport(`./lint/${preset}`)
 
@@ -111,10 +97,6 @@ function toMissingPresetFinding(preset: LintPreset): Finding {
   }
 }
 
-/**
- * The finding for a config that extends two presets that report the same defects, such as jest and
- * vitest. Assessment does not write the config.
- */
 function toExcludedPresetsFinding({
   excluded,
   preset,
@@ -135,13 +117,8 @@ function toExcludedPresetsFinding({
   }
 }
 
-/**
- * The finding for an Oxlint that stops before it lints a file. Oxlint loads its native binding and
- * every config of the project before it lists the files to lint, so a failed list is a config that
- * fails to load, or a binding that the install left out. The finding passes Oxlint's error, which
- * names the cause, and gives the repair of each. A missing declared package or backend has its own
- * finding, and Oxlint does not run without it.
- */
+// Oxlint loads its native binding and every config of the project before it lists the files to
+// lint, so a failed list is a config that fails to load, or a binding that the install left out.
 const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
   project: Project.Snapshot,
   runtimeFindings: readonly Finding[]
@@ -183,7 +160,6 @@ export default {
       const loadFindings = yield* assessConfigLoad(project, runtimeFindings)
       const pkg = assessPackage(project, PACKAGE, "the managed lint scripts", "oxlint")
 
-      // The project read the root `oxlint.config.ts` already.
       const configFindings = yield* assessConfigFile(
         cwd,
         CONFIG,
@@ -200,8 +176,6 @@ export default {
         Option.toArray
       )
 
-      // A preset counts where any config that Oxlint loads applies it, also in an override or a
-      // workspace package config. A config that does not load can apply any preset.
       const applied = listAppliedLintPresets(project)
 
       const missingPresetFindings =
@@ -242,8 +216,6 @@ export default {
       )
     }),
   name: "oxlint",
-  // Oxlint runs the type-aware rules on tsrs, and a preset with a managed plugin loads that plugin
-  // from the project.
   packages: (_project: Project.Snapshot, selection: Selection) => [
     PACKAGE,
     { name: tsrs.name, version: tsrs.version },

@@ -92,7 +92,7 @@ describe("Oxfmt setup", () => {
     })
   )
 
-  // Oxfmt loads no config when it finds both, so Doctor hands the migration to an agent.
+  // Oxfmt loads no config when it finds both.
   it.effect("write no config beside a conflicting JSON config, and report it", () =>
     Effect.gen(function* () {
       const conflicting = '{ "semi": true }\n'

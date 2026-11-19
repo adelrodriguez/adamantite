@@ -8,10 +8,6 @@ const configTemplate = getConfigTemplate()
 
 const FORMAT_PRESET_MODULE = publicImport("./format")
 
-/**
- * What Adamantite reads from a loaded `oxfmt.config.ts`: the preset that it exports, alone or
- * spread into its own object.
- */
 export const OxfmtConfig = Schema.Struct({ [IDENTITY_KEY]: Schema.optional(PresetIdentity) })
 
 export function inspectRequiredOxfmtConfig(

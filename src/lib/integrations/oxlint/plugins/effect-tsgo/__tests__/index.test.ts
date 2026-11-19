@@ -22,7 +22,6 @@ const CONFIGURED_TSCONFIG = JSON.stringify({
   compilerOptions: { plugins: [{ diagnostics: true, name: "@effect/language-service" }] },
 })
 
-// The lockfile selects `scripts`, so the plugin applies only for a script that runs Oxlint.
 function makeFiles(files: Record<string, string>, scripts: readonly Script[] = ["check"]) {
   const selection = {
     agents: false,
@@ -56,9 +55,6 @@ function makePackageJson(manifest: PackageJson) {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...manifest }, null, 2)
 }
 
-/**
- * A project that meets every goal, so a test changes only the part it checks.
- */
 function makeConfiguredFiles(overrides: Record<string, string> = {}) {
   return makeFiles({
     "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),

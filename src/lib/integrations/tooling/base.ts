@@ -5,9 +5,6 @@ import { matchDeclaredVersion, parseDependencySpecifier } from "#lib/project/pac
 export type RequiredConfigInspection =
   | { readonly kind: "configured" }
   | {
-      /**
-       * The repair for `reason`.
-       */
       readonly goal: string
       readonly kind: "invalid"
       readonly reason: string
@@ -21,13 +18,6 @@ interface PackageAssessment {
 
 const CURRENT: PackageAssessment = { findings: [], packageActions: [], warnings: [] }
 
-/**
- * Compare the version that the project declares for a managed package with the version that
- * Adamantite requires. `adamantite update` installs a missing or outdated package from the package
- * action, and Doctor reports the finding, which says to run `update`. A version from a pnpm catalog
- * needs a change to the catalog, which `update` does not make, because `pnpm add` replaces the
- * `catalog:` specifier.
- */
 export function assessPackage(
   { packageJson, workspace: { catalogs } }: Pick<Project.Snapshot, "packageJson" | "workspace">,
   pkg: ToolingPackage,
@@ -100,7 +90,7 @@ export function assessPackage(
         return unreadable(specifier)
       }
 
-      // A catalog entry is itself a specifier, but a catalog cannot refer to another catalog.
+      // A pnpm catalog entry is itself a specifier, but it cannot refer to another catalog.
       return matchDeclaredVersion(parseDependencySpecifier(entry), {
         Catalog: () => unreadable(specifier),
         Unreadable: () => unreadable(specifier),

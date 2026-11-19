@@ -35,12 +35,6 @@ const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
   )
 })
 
-/**
- * The `oxlint-custom` integration, which only assesses. It reports a rules folder that no
- * `custom()` call loads, a `dir` that names a missing folder, and rules folders that share a plugin
- * name. A rule file that does not load stops Oxlint, so the `oxlint-config-load-failure` finding of
- * the Oxlint integration reports it. A saved test is the user's choice, so it gets no finding.
- */
 export default {
   assess: ({ customRules, workspace }: Project.Snapshot) =>
     Effect.gen(function* () {
@@ -53,7 +47,6 @@ export default {
 
       const packageDirectories = [cwd, ...workspace.packageDirectories]
       const { calls, unloadedConfigs } = customRules
-      // A config that does not load can load any folder.
       const isComplete = customRules.unloadedConfigs.length === 0
 
       const defaultFolders = packageDirectories.map((directory) =>
@@ -71,8 +64,6 @@ export default {
       const existingFolders = Array.getSomes(readFolders)
       const folders = existingFolders.filter((folder) => folder.ruleFiles.length > 0)
 
-      // A call without `dir` loads the default folder, which a project creates with its first rule.
-      // A call that names a folder expects it to exist, and `custom()` loads nothing without it.
       const missingFolderCalls = Array.dedupeWith(
         calls.filter(
           (call) =>
@@ -102,7 +93,6 @@ export default {
         title: `The rules folder \`${relative(call.dir)}\` does not exist`,
       }))
 
-      // An unloaded folder is reported only when discovery is complete.
       if (isComplete) {
         for (const folder of folders) {
           if (loadedFolders.includes(folder.dir)) {

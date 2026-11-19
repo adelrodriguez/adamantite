@@ -24,15 +24,8 @@ const list = [
 
 type Member = (typeof list)[number]
 
-// The effects of every member, so a caller that iterates the list keeps their errors and services.
 type MemberEffect = ReturnType<Member["assess" | "files"] | typeof vscode.prepare>
 
-/**
- * The integrations that own a folder in `src/lib/integrations/`. `Setup.apply` writes their managed
- * files and installs their packages, and the assessment runs each one that the selection includes.
- * The integrations that only assess, such as `tsrs`, are in `assessment/index.ts`, and the Oxlint
- * integration installs their packages.
- */
 export const integrations: ReadonlyArray<
   Integration<Effect.Error<MemberEffect>, Effect.Services<MemberEffect>>
 > = list

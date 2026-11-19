@@ -28,10 +28,7 @@ const readVersion = Effect.fn("readVersion")(function* (directory: string) {
   return version ?? ""
 })
 
-/**
- * The one file in `artifacts/<tool>/<version>/` of the platform package that `isArtifact` accepts.
- * The version folder is missing when this `@effect/tsgo` release has no build of that version.
- */
+// The version folder is missing when the `@effect/tsgo` release has no build of that version.
 const findArtifact = Effect.fn("findArtifact")(function* (
   platformDirectory: string,
   effectVersion: string,
@@ -65,13 +62,6 @@ const findArtifact = Effect.fn("findArtifact")(function* (
   })
 })
 
-/**
- * The Effect builds of the Oxlint binding and tsrs for the installed Oxlint and tsrs versions. They
- * come from the `@effect/tsgo` platform package, so the project needs no patch. No overrides when
- * the project does not install `@effect/tsgo`. The installed package turns the Effect builds on, so
- * a nested config and a relative preset import get them too. Whether Adamantite requires the
- * package depends on the configs instead, as `defineManagedPlugin` says.
- */
 export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* (
   project: string,
   oxlint: string
@@ -102,7 +92,6 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
 
   const tsrsFile = process.platform === "win32" ? "tsrs.exe" : "tsrs"
 
-  // Resolve the backend first so a project missing both builds always gets the backend error.
   const backend = yield* findArtifact(
     platformDirectory.value,
     effectVersion,

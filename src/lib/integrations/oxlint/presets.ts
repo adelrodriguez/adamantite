@@ -17,33 +17,14 @@ import vitestPreset from "#presets/lint/vitest.ts"
 import vuePreset from "#presets/lint/vue.ts"
 
 interface LintPresetDefinition {
-  /**
-   * The config that the preset module exports.
-   */
   readonly config: OxlintConfig
-  /**
-   * The presets that cannot be selected with this one, because they report the same defects. A
-   * selection of the two gives two reports for each defect. The exclusion goes both ways, so each
-   * preset lists the other.
-   */
   readonly excludes?: readonly LintPreset[]
-  /**
-   * What the preset's rules check, for the init choice. `describeLintPreset` adds the plugin
-   * package and the required presets.
-   */
   readonly hint: string
   readonly label: string
-  /**
-   * The managed plugin that init installs, and Doctor and update maintain, for this preset.
-   */
   readonly plugin?: OxlintPlugin
-  /**
-   * The presets that must be selected with this one.
-   */
   readonly requires?: readonly LintPreset[]
 }
 
-// `satisfies` fails for a preset without a definition, and for a definition without a preset.
 const definitions = {
   architecture: {
     config: architecturePreset,
@@ -108,18 +89,8 @@ const definitions = {
   },
 } as const satisfies Record<LintPreset, LintPresetDefinition>
 
-/**
- * Each lint preset of `LINT_PRESETS` with its definition, in the order that init offers them. Init
- * builds its choices, the presets that it adds for a required preset, and its `--preset` check from
- * this list.
- */
 export const lintPresets = LINT_PRESETS.map((name) => ({ ...definitions[name], name }))
 
-/**
- * The init hint: what the rules check, then the package that init installs, the presets that it
- * selects, and the presets that it excludes, so the user knows what a choice adds before selecting
- * it.
- */
 export function describeLintPreset(preset: LintPresetDefinition): string {
   const setup = [
     ...(preset.plugin === undefined ? [] : [`installs ${preset.plugin.name}`]),
@@ -133,9 +104,6 @@ export function describeLintPreset(preset: LintPresetDefinition): string {
   ].join(" ")
 }
 
-/**
- * Each preset that a selected preset requires but the selection lacks.
- */
 export function findMissingRequiredPresets(
   selected: readonly LintPreset[]
 ): ReadonlyArray<{ readonly required: LintPreset; readonly requiredBy: LintPreset }> {
@@ -148,10 +116,6 @@ export function findMissingRequiredPresets(
   )
 }
 
-/**
- * Each selected preset with a selected preset that it excludes, in the order of the catalog. Each
- * preset of an excluded pair lists the other, so the pair appears once for each preset.
- */
 export function findExcludedPresets(
   selected: readonly string[]
 ): ReadonlyArray<{ readonly excluded: LintPreset; readonly preset: LintPreset }> {

@@ -13,38 +13,20 @@ import type {
   PackageNotInstalled,
 } from "#lib/shared/errors.ts"
 
-/**
- * The native binding that Oxlint loads in place of its own. The entry sets `env` and loads the
- * `preload` module before Oxlint loads its binding, and that module swaps the binding.
- */
 export class BindingOverride extends Data.TaggedClass("Binding")<{
   readonly env: Readonly<Record<string, string>>
   readonly preload: string
 }> {}
 
-/**
- * The variables that start the type-aware backend in place of the default backend.
- */
 export class BackendOverride extends Data.TaggedClass("Backend")<{
   readonly env: Readonly<Record<string, string>>
 }> {}
 
 export type NativeOverride = BindingOverride | BackendOverride
 
-/**
- * A plugin that Oxlint loads through the `jsPlugins` entry of its preset, which resolves from the
- * target project.
- */
 export class JavaScriptRuntime extends Data.TaggedClass("JavaScript") {}
 
-/**
- * A plugin whose rules exist only in a native build of Oxlint, which replaces parts of the Oxlint
- * runtime.
- */
 export class NativeRuntime extends Data.TaggedClass("Native")<{
-  /**
-   * Returns no overrides when the target project does not install the plugin package.
-   */
   readonly resolve: (
     cwd: string,
     oxlint: string
@@ -66,9 +48,6 @@ export interface OxlintPlugin {
   readonly runtime: JavaScriptRuntime | NativeRuntime
 }
 
-/**
- * Keep package names and capabilities precise without importing version macros.
- */
 export function defineOxlintPlugin<const Plugin extends OxlintPlugin>(plugin: Plugin): Plugin {
   return plugin
 }

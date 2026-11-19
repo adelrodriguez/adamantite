@@ -27,7 +27,6 @@ function loadConfig(content: string) {
 }
 
 describe("toOxlintTsConfigContent", () => {
-  // Doctor reads the config that init writes, so the two must agree.
   it.effect("write a config that applies each preset in order, with the required options", () =>
     Effect.gen(function* () {
       const config = yield* loadConfig(toOxlintTsConfigContent(LINT_PRESETS))

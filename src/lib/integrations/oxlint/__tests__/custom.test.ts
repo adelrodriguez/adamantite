@@ -40,11 +40,6 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
   ].join("\n")
 }
 
-/**
- * Assess with a fake resolver: each specifier in `resolutions` resolves to that path below the
- * root, and other relative specifiers to their exact path. The smoke test covers the real
- * resolver.
- */
 function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
   return Project.read().pipe(
     Effect.flatMap((project) => oxlintCustom.assess(project)),
@@ -255,7 +250,6 @@ describe("oxlint-custom", () => {
         root: ROOT,
       })
 
-      // The `dir` resolves from the tooling module, so the folder exists and loads.
       expect(
         getFindings(yield* runAssess(files, { "@acme/lint": "tooling/lint/index.ts" }))
       ).toStrictEqual([])

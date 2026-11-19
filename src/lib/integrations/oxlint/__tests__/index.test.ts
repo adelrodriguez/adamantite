@@ -34,7 +34,6 @@ const OPTIONS = [
   "",
 ]
 
-// The imports in the order that Oxfmt sorts them, and `extends` in the order of the presets.
 const RENDERED = [
   'import core from "adamantite/lint"',
   'import vitest from "adamantite/lint/vitest"',
@@ -46,7 +45,6 @@ const RENDERED = [
   ...OPTIONS,
 ].join("\n")
 
-// The rendered config without the selected vitest preset.
 const WITHOUT_VITEST = RENDERED.replace(
   'import vitest from "adamantite/lint/vitest"\n',
   ""
@@ -141,7 +139,7 @@ describe("Oxlint setup", () => {
     })
   )
 
-  // Oxlint loads the config of each workspace package, so a preset that a package applies counts.
+  // Oxlint loads the config of each workspace package.
   it.effect("report no missing preset that a workspace package config applies", () =>
     Effect.gen(function* () {
       const files = makeProject()
@@ -166,8 +164,6 @@ describe("Oxlint setup", () => {
     })
   )
 
-  // The `excluded-presets` repair scopes each preset to its own files, as the documentation comment
-  // of each preset shows.
   it.effect("report neither a missing nor an excluded preset in disjoint overrides", () =>
     Effect.gen(function* () {
       const files = makeProject({
@@ -198,7 +194,7 @@ describe("Oxlint setup", () => {
     })
   )
 
-  // Oxlint fails when it finds both in one folder, so Doctor hands the migration to an agent.
+  // Oxlint fails when it finds both in one folder.
   it.effect.each([".oxlintrc.json", ".oxlintrc.jsonc"])(
     "write no config beside a conflicting %s, and report it",
     (file) =>
@@ -225,12 +221,10 @@ describe("Oxlint setup", () => {
 
 const PATTERNS = '["error", { patterns: ["**/commands/**"] }]'
 
-// An override that restricts the imports of one folder below `src`.
 function restrict(folder: string, rule: string) {
   return `    { files: ["src/${folder}/**"], rules: { "no-restricted-imports": ${rule} } },`
 }
 
-// `config` with an `overrides` entry of each line in `overrides`.
 function withOverrides(config: string, overrides: readonly string[]) {
   return config.replace(
     "  ignorePatterns:",
@@ -238,7 +232,6 @@ function withOverrides(config: string, overrides: readonly string[]) {
   )
 }
 
-// sanely builds its overrides from a table of folders.
 const MAPPED = RENDERED.replace(
   "  ignorePatterns:",
   [
@@ -250,7 +243,6 @@ const MAPPED = RENDERED.replace(
   ].join("\n")
 )
 
-// A shared config object that the project extends counts as the project's own config.
 const EXTENDED = RENDERED.replace(
   "export default defineConfig({",
   [
@@ -265,7 +257,6 @@ const EXTENDED = RENDERED.replace(
   ].join("\n")
 ).replace("[core, vitest, custom()]", "[core, vitest, layers, custom()]")
 
-// The part of the `doctor --json` document that shows whether a report is a finding or a warning.
 const decodeReport = Schema.decodeUnknownEffect(
   Schema.fromJsonString(
     Schema.Struct({
@@ -282,9 +273,6 @@ function readReport(files: ReturnType<typeof makeProject>) {
   )
 }
 
-// The configs below load no first-party plugin, so the warning starts with the step that loads it.
-// It names the one preset that loads the plugin without turning on rules, and places it after core,
-// where the `core-preset-order` finding expects it.
 const PLUGIN_STEP =
   "Import `adamantite/lint/architecture` in `oxlint.config.ts`, and add it to `extends` after the core preset. It loads the `adamantite` plugin."
 
@@ -316,7 +304,6 @@ describe("hand-written layer maps", () => {
 
       expect(doctor.output).toContain(describeLayerMapWarning(CONFIG, count))
       expect(doctor.output).toContain(`\n  1. ${PLUGIN_STEP}`)
-      // The overrides add one warning and no finding.
       expect(after).toStrictEqual({
         findings: before.findings,
         warnings: [...before.warnings, expect.stringContaining("states import layers by hand")],
@@ -382,8 +369,6 @@ describe("hand-written layer maps", () => {
     })
   )
 
-  // Spreading a preset copies its identity into the project's own object, so the identity cannot
-  // tell the project's overrides apart from the preset's.
   it.effect("warn about the overrides of a config that spreads a preset", () =>
     Effect.gen(function* () {
       const files = makeProject()
@@ -405,8 +390,6 @@ describe("hand-written layer maps", () => {
     })
   )
 
-  // Doctor counts the overrides of every config object, so no Adamantite preset may have overrides
-  // that a first-party rule replaces.
   it.effect("do not warn about a config that extends every preset", () =>
     Effect.gen(function* () {
       const files = makeProject()
@@ -428,7 +411,6 @@ describe("hand-written layer maps", () => {
 
       const report = yield* readReport(files)
 
-      // Only a loaded config that applies jest and vitest gets `excluded-presets`.
       expect(report.findings).toContain("excluded-presets")
       expect(report.warnings).toStrictEqual([])
     })

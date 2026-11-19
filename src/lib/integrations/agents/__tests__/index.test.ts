@@ -58,7 +58,6 @@ describe("agent guidance setup", () => {
     })
   )
 
-  // Adamantite writes AGENTS.md only when it does not exist, and never splices its section.
   it.effect("keep an AGENTS.md that the project wrote, and report the missing section", () =>
     Effect.gen(function* () {
       const own = "# Team instructions\n\nRun the tests before a commit.\n"
@@ -73,7 +72,6 @@ describe("agent guidance setup", () => {
     })
   )
 
-  // The skill copy of an earlier release has no recorded hash, so update keeps it.
   it.effect("keep a skill copy that differs from the shipped skill, and report it", () =>
     Effect.gen(function* () {
       const files = makeProject({ [SKILL]: "# An older skill\n" })
@@ -93,7 +91,6 @@ describe("agent guidance setup", () => {
       const initialized = makeProject()
       yield* runLifecycle("init", initialized, INIT_ARGS)
 
-      // The project after the user deleted the skill file.
       const files = createFileSystemTestContext({
         files: Object.fromEntries(
           initialized
@@ -114,8 +111,7 @@ describe("agent guidance setup", () => {
     })
   )
 
-  // `npx skills update` would write the folders that Adamantite owns. The lock belongs to the
-  // `skills` CLI, so update leaves it as it is, and Doctor hands the edit off.
+  // `npx skills update` would write the folders that Adamantite owns.
   it.effect("keep a skills lock that records the skill, and report its entry", () =>
     Effect.gen(function* () {
       const lock =
@@ -135,8 +131,6 @@ describe("agent guidance setup", () => {
     })
   )
 
-  // The skill loads for an Adamantite task, so AGENTS.md sends an agent to it after a fix, and
-  // before a disable comment.
   it.effect("send an agent to the section of the skill for a fixed mistake and a suppression", () =>
     Effect.gen(function* () {
       const files = makeProject()
@@ -170,7 +164,6 @@ describe("agent guidance setup", () => {
       const initialized = makeProject()
       yield* runLifecycle("init", initialized, INIT_ARGS)
 
-      // The project after the user deleted the hardening skill.
       const files = createFileSystemTestContext({
         files: Object.fromEntries(
           initialized
@@ -191,8 +184,6 @@ describe("agent guidance setup", () => {
     })
   )
 
-  // An earlier version shipped one skill. Its guides for coding standards moved to the hardening
-  // skill, so update deletes each one that is unchanged since Adamantite wrote it.
   it.effect("move a project from one skill to two in update", () =>
     Effect.gen(function* () {
       const initialized = makeProject()
@@ -201,7 +192,6 @@ describe("agent guidance setup", () => {
       const moved = ".agents/skills/adamantite/references/corrections.md"
       const lockfile = readLockfile(initialized)
 
-      // The project as the earlier version left it: one skill, with a guide that has moved.
       const files = createFileSystemTestContext({
         files: {
           ...Object.fromEntries(
@@ -232,8 +222,6 @@ describe("agent guidance setup", () => {
     })
   )
 
-  // Update keeps a file that the project changed, also when the skill no longer ships it. Nothing
-  // links to that file any more, so Doctor reports it.
   it.effect("report a changed guide that the skill no longer ships, and keep it in update", () =>
     Effect.gen(function* () {
       const files = makeProject()

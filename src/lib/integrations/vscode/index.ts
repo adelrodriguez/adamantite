@@ -14,16 +14,14 @@ import { FailedToParseFile, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject, formatJson, stringifyJson } from "#lib/shared/json.ts"
 
-/**
- * The settings that VS Code and the editors built on it read, such as Cursor and Windsurf.
- */
+// VS Code and the editors built on it, such as Cursor and Windsurf, read these settings.
 const SETTINGS_PATH = ".vscode/settings.json"
 
 const EXTENSIONS_PATH = ".vscode/extensions.json"
 
 const SETTINGS = {
   // The Astro and Svelte extensions set their own formatters, which take priority over the global
-  // default. The format preset turns on Oxfmt for each plugin language.
+  // default.
   ...Object.fromEntries(
     pluginLanguages.map(({ editors }) => [
       `[${editors.vscode}]`,
@@ -60,18 +58,13 @@ const SETTINGS = {
   "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.formatOnPaste": true,
   "editor.formatOnSave": true,
-  // The entry runs Oxlint with the project's Oxlint runtime. The Oxc extension resolves a relative path
-  // against the first workspace folder, and it expands no `${workspaceFolder}`. It starts a `.js`
-  // path with Node.js, without a working directory in the project, so the entry finds the project
-  // from its own path.
+  // The Oxc extension resolves a relative path against the first workspace folder, and it expands
+  // no `${workspaceFolder}`. It starts a `.js` path with Node.js, without a working directory in the
+  // project.
   "oxc.path.oxlint": EDITOR_OXLINT_ENTRY,
   "oxc.typeAware": true,
 } as const
 
-/**
- * The extension that each part of the selection needs, in the order that `.vscode/extensions.json`
- * lists them.
- */
 const EXTENSIONS = [
   { id: "oxc.oxc-vscode", selected: ({ scripts }) => checkRunsTool(scripts, "oxlint") },
   { id: "webpro.vscode-knip", selected: ({ scripts }) => checkRunsTool(scripts, "knip") },
@@ -91,10 +84,8 @@ function listRecommendations(selection: Selection): readonly string[] {
 
 const Extensions = Schema.Struct({ recommendations: Schema.optional(Schema.Array(Schema.String)) })
 
-/**
- * Reads a VS Code JSON file of the project. None when the file does not exist. VS Code accepts
- * comments and trailing commas, which the JSON5 parser reads and the JSONC parser rejects.
- */
+// VS Code accepts comments and trailing commas, which the JSON5 parser reads and the JSONC parser
+// rejects.
 const readConfig = Effect.fn("readConfig")(function* (cwd: string, file: string) {
   const path = yield* Path.Path
   const target = path.join(cwd, file)
@@ -112,9 +103,6 @@ const readConfig = Effect.fn("readConfig")(function* (cwd: string, file: string)
   )
 })
 
-/**
- * The settings with the Effect language server when the project installs `@effect/tsgo`.
- */
 const renderSettings = Effect.fn("renderSettings")(function* (cwd: string) {
   const effect = yield* readEffectEditor(cwd)
 
@@ -142,10 +130,6 @@ function missingFileFinding(file: string, id: string, title: string, reference: 
   }
 }
 
-/**
- * The findings for `.vscode/settings.json`: the Oxlint entry, and the Effect language server when
- * the project installs `@effect/tsgo`.
- */
 const assessSettings = Effect.fn("assessSettings")(function* (cwd: string) {
   const path = yield* Path.Path
   const settings = yield* readConfig(cwd, SETTINGS_PATH)
@@ -254,10 +238,6 @@ const assessSettings = Effect.fn("assessSettings")(function* (cwd: string) {
   return [...entry, ...server, ...sdk]
 })
 
-/**
- * The finding for `.vscode/extensions.json` when it does not recommend an extension that the
- * selection needs. VS Code compares extension IDs without case.
- */
 const assessExtensions = Effect.fn("assessExtensions")(function* (
   cwd: string,
   selection: Selection
@@ -286,6 +266,7 @@ const assessExtensions = Effect.fn("assessExtensions")(function* (
     content.value
   ).pipe(Effect.mapError(() => new InvalidConfigFormat({ path: path.join(cwd, EXTENSIONS_PATH) })))
 
+  // VS Code compares extension IDs without case.
   const recommended = new Set(recommendations.map((id) => id.toLowerCase()))
   const missing = expected.filter((id) => !recommended.has(id.toLowerCase()))
 
@@ -338,7 +319,6 @@ export default {
     }),
   name: "vscode",
   packages: (_project: Project.Snapshot, _selection: Selection): readonly ToolingPackage[] => [],
-  // A project without a matching Effect build gets the `vscode-effect-sdk` finding instead.
   prepare: (_project: Project.Snapshot) =>
     Effect.gen(function* () {
       const effect = yield* readEffectEditor(yield* Project.Directory)

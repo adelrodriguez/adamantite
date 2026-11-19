@@ -47,10 +47,8 @@ function makeManifest(name: string, version: string) {
   return JSON.stringify({ name, version })
 }
 
-/**
- * A project with Oxlint `oxlintVersion` and tsrs `tsrsVersion` installed, and Effect builds for
- * Oxlint 1.88.0 and 1.89.0 and tsrs 0.21.0-ts7.1.0-beta, in the layout of @effect/tsgo 0.67.1.
- */
+// The layout of @effect/tsgo 0.67.1, with Effect builds for Oxlint 1.88.0 and 1.89.0 and tsrs
+// 0.21.0-ts7.1.0-beta.
 function makeFiles(oxlintVersion = "1.88.0", tsrsVersion = TSRS_VERSION) {
   return createFileSystemTestContext({
     files: Object.fromEntries([
@@ -80,9 +78,6 @@ function runResolve(
   )
 }
 
-/**
- * Run `effect` as Node.js runs it on `platform`, and restore the real platform after it.
- */
 function onPlatform<A, E, R>(platform: NodeJS.Platform, effect: Effect.Effect<A, E, R>) {
   const real = process.platform
 
@@ -93,10 +88,6 @@ function onPlatform<A, E, R>(platform: NodeJS.Platform, effect: Effect.Effect<A,
   )
 }
 
-/**
- * A monorepo that installs Oxlint and tsrs at the root, where the package manager writes the
- * `tsrs-lint` bin as `launcher`, and a workspace package at `packages/app`.
- */
 function makeWorkspaceFiles(launcher: string) {
   return createFileSystemTestContext({
     files: {
@@ -332,7 +323,6 @@ describe("Oxlint runtime", () => {
 describe("toBackendEnv", () => {
   it.each([
     { backend: new NoBackend(), env: {} },
-    // The tsrs backend owns the variable, so an inherited path leaves the environment.
     {
       backend: new TsrsBackend({ launcher: "/tsrs-lint" }),
       env: { OXLINT_TSGOLINT_PATH: undefined },

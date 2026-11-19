@@ -8,7 +8,6 @@ import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type:
 
 export const PACKAGE = { name: "sherif", version: getDependencyVersion("sherif") }
 
-// `adamantite analyze` runs Sherif only in a monorepo.
 export default {
   assess: (project: Project.Snapshot, _selection: Selection) =>
     Effect.sync(() =>

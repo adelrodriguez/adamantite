@@ -9,14 +9,8 @@ import { listLintedFiles } from "#lib/integrations/oxlint/files.ts"
 import { probeComments } from "#lib/integrations/oxlint/probe.ts"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
-/**
- * Source files and component files whose embedded scripts Oxlint lints.
- */
 const SOURCE_FILE = /(?:\.[cm]?[jt]sx?|\.(?:vue|svelte|astro))$/u
 
-/**
- * Text that a disable comment or a TypeScript directive has.
- */
 const SUPPRESSION_TEXT = /-disable|@ts-/iu
 
 /**
@@ -28,11 +22,7 @@ const DISABLE_DIRECTIVE =
 
 const REASON = /\s--[\s\S]*$/u
 
-/**
- * The rules that a disable comment names, or none when it is not a disable comment. A comment that
- * names no rule turns off all rules, so it names `[undefined]`.
- */
-function readDisabledRules(comment: string): ReadonlyArray<string | undefined> {
+function readDisabledRules(comment: string): ReadonlyArray<Option.Option<string>> {
   const match = DISABLE_DIRECTIVE.exec(comment)
 
   if (match === null) {
@@ -45,7 +35,8 @@ function readDisabledRules(comment: string): ReadonlyArray<string | undefined> {
     .map((rule) => rule.trim())
     .filter((rule) => rule.length > 0)
 
-  return rules.length === 0 ? [undefined] : rules
+  // A disable comment that names no rule turns off all rules.
+  return rules.length === 0 ? [Option.none()] : rules.map((rule) => Option.some(rule))
 }
 
 /**
@@ -62,19 +53,12 @@ const BLOCK_DIRECTIVE = /^[*/]*\s*@(ts-expect-error|ts-ignore)/u
 const PRAGMA = /^\/?\s*@([^\s:]+)(?:(?:[^\S\n\r]|:).*)?$/u
 const LINE_BREAK = /\r\n?|[\n\u2028\u2029]/u
 
-/**
- * A TypeScript directive that turns type checks off.
- */
 export const Directive = Schema.Literals(["@ts-expect-error", "@ts-ignore", "@ts-nocheck"])
 
 export type Directive = typeof Directive.Type
 
 const decodeDirective = Schema.decodeUnknownOption(Directive)
 
-/**
- * A comment as the probe reads it: its text without the comment markers, its kind, and whether only
- * whitespace and other comments come before it.
- */
 interface ProbedComment {
   readonly leading: boolean
   readonly type: "Block" | "Line"
@@ -92,9 +76,6 @@ function readLastLine(value: string) {
   return lines.length === 1 ? `/*${value}` : (lines.at(-1) ?? "")
 }
 
-/**
- * The TypeScript directive of a comment, or none when TypeScript reads no directive in it.
- */
 function readTypeScriptDirective({ leading, type, value }: ProbedComment) {
   const name =
     type === "Block"
@@ -110,47 +91,24 @@ function readTypeScriptDirective({ leading, type, value }: ProbedComment) {
   return pragma === "ts-nocheck" ? Option.some<Directive>("@ts-nocheck") : Option.none<Directive>()
 }
 
-/**
- * The comments that turn off one rule, or all rules.
- */
+const Location = Schema.TemplateLiteral([Schema.String, ":", Schema.Int])
+
 export const RuleSuppressions = Schema.Struct({
-  /**
-   * Each comment as `<file>:<line>`, with the file relative to the project root.
-   */
-  locations: Schema.Array(Schema.String),
-  /**
-   * The rule, or none for a comment that names no rule and so turns off all rules.
-   */
+  locations: Schema.Array(Location),
   rule: Schema.OptionFromNullOr(Schema.String),
 })
 
 export type RuleSuppressions = typeof RuleSuppressions.Type
 
-/**
- * The comments of one TypeScript directive that turns type checks off.
- */
 export const DirectiveSuppressions = Schema.Struct({
   directive: Directive,
-  /**
-   * Each comment as `<file>:<line>`, with the file relative to the project root.
-   */
-  locations: Schema.Array(Schema.String),
+  locations: Schema.Array(Location),
 })
 
 export type DirectiveSuppressions = typeof DirectiveSuppressions.Type
 
-/**
- * The comments that turn checks off. A disable comment turns off lint rules and a TypeScript
- * directive turns off type checks, so each list has its own key: the rule or the directive.
- */
 export const Suppressions = Schema.Struct({
-  /**
-   * The comments of each TypeScript directive, the directive with the most comments first.
-   */
   directives: Schema.Array(DirectiveSuppressions),
-  /**
-   * The disable comments of each rule, the rule with the most comments first.
-   */
   rules: Schema.Array(RuleSuppressions),
 })
 
@@ -161,17 +119,12 @@ const byCount = Order.mapInput(
   (entry: { readonly locations: readonly string[] }) => entry.locations.length
 )
 
-/**
- * Counts the disable comments of each rule, and the comments of each TypeScript directive, in the
- * files that Oxlint lints in `scope`, a folder relative to `cwd`, or in the whole project when
- * `scope` is `null`. A comment in a file that the config ignores turns no rule off, so it does not
- * count. None when Oxlint cannot list its files or read their comments.
- */
 export const readSuppressions = Effect.fn("readSuppressions")(function* (
   cwd: string,
   scope: ProjectPath | null
 ) {
   const path = yield* Path.Path
+  // A comment in a file that the config ignores turns no rule off, so only linted files count.
   const files = yield* listLintedFiles(cwd).pipe(Effect.option)
 
   if (Option.isNone(files)) {
@@ -182,7 +135,6 @@ export const readSuppressions = Effect.fn("readSuppressions")(function* (
     return scope === null || scope === "." || file.startsWith(`${scope}/`)
   }
 
-  // Most files have no such comment, so Oxlint parses only the files that can have one.
   const candidates = yield* Effect.filter(
     files.value.filter((file) => SOURCE_FILE.test(file) && isInScope(file)),
     (file) =>
@@ -196,14 +148,14 @@ export const readSuppressions = Effect.fn("readSuppressions")(function* (
 
   return Option.map(probed, (sources): Suppressions => {
     const comments = sources.flatMap(({ comments: found, file }) =>
-      found.map((comment) => ({ ...comment, location: `${file}:${comment.line}` }))
+      found.map((comment) => ({ ...comment, location: `${file}:${comment.line}` as const }))
     )
 
     const byRule = Array.groupBy(
       comments.flatMap((comment) =>
         readDisabledRules(comment.value).map((rule) => ({
           location: comment.location,
-          rule: Option.fromUndefinedOr(rule),
+          rule,
         }))
       ),
       (entry) => Option.getOrElse(entry.rule, () => "")

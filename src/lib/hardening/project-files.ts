@@ -10,28 +10,19 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as String from "effect/String"
 
-/**
- * A path relative to the project root, with `/` between folders, as git and Oxlint list files.
- * Discovery gives absolute paths, so the brand keeps one from reaching code that joins a project
- * path with the project root.
- */
+// Node.js `path.join` does not restart at an absolute argument, as `path.resolve` does, so joining
+// the project root with an absolute config path names a file that does not exist.
+// https://nodejs.org/api/path.html#pathjoinpaths
 export const ProjectPath = Schema.String.pipe(Schema.brand("ProjectPath"))
 
 export type ProjectPath = typeof ProjectPath.Type
 
 const ProjectPathBrand = Brand.nominal<ProjectPath>()
 
-/**
- * The project path of `target`, an absolute path inside `cwd`. The root itself is `.`.
- */
 export function toProjectPath(path: Path.Path, cwd: string, target: string): ProjectPath {
   return ProjectPathBrand((path.relative(cwd, target) || ".").split(path.sep).join("/"))
 }
 
-/**
- * What `git` prints on standard output for `args` in `cwd`. None when git fails, for example
- * outside a repository.
- */
 const readGit = Effect.fn("readGit")(
   function* (cwd: string, args: readonly string[]) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -52,10 +43,6 @@ const readGit = Effect.fn("readGit")(
   Effect.orElseSucceed(() => Option.none<string>())
 )
 
-/**
- * The files that `git ls-files` lists with `args` in `cwd`, as paths relative to `cwd` with `/`
- * between folders. None when git cannot list them, for example outside a repository.
- */
 function listGitFiles(cwd: string, args: readonly string[]) {
   return readGit(cwd, ["ls-files", "-z", ...args]).pipe(
     Effect.map(
@@ -78,10 +65,6 @@ export function listProjectFiles(cwd: string, pathspecs: readonly string[] = [])
   return listGitFiles(cwd, ["--cached", "--others", "--exclude-standard", "--", ...pathspecs])
 }
 
-/**
- * The files in `folder`, a folder relative to `cwd`, that git ignores, such as build output,
- * without the files of `node_modules` folders.
- */
 export function listIgnoredFiles(cwd: string, folder: string) {
   return listGitFiles(cwd, [
     "--others",
@@ -105,10 +88,6 @@ function parseCommit(output: string) {
   return Option.liftPredicate(line.trim(), (hash) => COMMIT_HASH.test(hash))
 }
 
-/**
- * The commit that `HEAD` names in the repository of `cwd`. None in a repository without a commit,
- * or when git is unavailable.
- */
 export function readHead(cwd: string) {
   return readGit(cwd, ["rev-parse", "--verify", "HEAD"]).pipe(
     Effect.map(Option.flatMap((output) => parseCommit(output)))

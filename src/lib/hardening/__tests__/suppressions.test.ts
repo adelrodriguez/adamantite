@@ -17,7 +17,6 @@ import { readTestOxlint } from "#presets/__tests__/rule-fixtures.ts"
 // the minimum Oxlint version that `peerDependencies` allows.
 const TEST_OXLINT = readTestOxlint()
 
-// The build writes the probe beside the CLI, so a run from source loads its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
   ModuleResolver.layer,
@@ -72,7 +71,6 @@ describe("readSuppressions", () => {
       write("src/b.tsx", "/* oxlint-disable */\nexport const b = <div />\n")
 
       expect((yield* read()).rules).toStrictEqual([
-        // A comment that names no rule turns off all rules, and comes first among equal counts.
         { locations: ["src/a.ts:4", "src/b.tsx:1"], rule: Option.none() },
         { locations: ["src/a.ts:1", "src/a.ts:3"], rule: Option.some("no-console") },
         { locations: ["src/a.ts:1"], rule: Option.some("eslint/no-alert") },

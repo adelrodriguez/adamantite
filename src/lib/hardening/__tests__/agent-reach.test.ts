@@ -5,9 +5,6 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 
-// The reach that harden computes is tested through `harden --json`. These cases are states that
-// the command does not create: harden leaves out a listed file that is gone, and a test cannot make
-// a file of the command unreadable.
 describe("readAgentReach", () => {
   it.effect("fail when an AGENTS.md file cannot be read, instead of reaching nothing", () => {
     const context = createFileSystemTestContext({
@@ -43,8 +40,6 @@ describe("readAgentReach", () => {
     })
   )
 
-  // Each heading gives a fixed number of candidates, and each pattern takes time linear in the
-  // heading, so a heading that repeats a construct finishes.
   it.effect.each([
     {
       // A heading of 25 collapsed reference links, which GitHub renders as 25 `x`.
@@ -53,7 +48,6 @@ describe("readAgentReach", () => {
       name: "25 collapsed reference links",
     },
     {
-      // Each pattern of the rule stops early on this text, where a backtracking pattern would not.
       heading: `${"](<a {# _ ".repeat(20_000)}${"{#x".repeat(200_000)}${"#".repeat(20_000)}tail`,
       matched: "top",
       name: "a very long heading of unclosed markup",

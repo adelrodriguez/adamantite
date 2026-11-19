@@ -247,6 +247,154 @@ compares the text of the lines.
 | `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                                                                               | `src/commands/__tests__/rule.test.ts`                                                                   |
 | Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).                                                        | `secondPasses` in `presets/__tests__/idioms.ts`, which `src/lib/bridge/__tests__/index.test.ts` reads   |
 
+## Hardening
+
+`readHardenContext` in `src/lib/hardening/index.ts` computes the facts of a harden session, and
+`renderHardenPrompt` renders them into the prompt. `harden --json` prints the facts as the
+`HardenContext` schema encodes them. Build macros in `src/lib/hardening/harden-prompt.macro.ts`
+inline `harden-prompt.md` and the enforcement ladder of the `adamantite-hardening` skill, so the
+prompt and the skill state the ladder from one file.
+
+### Scope
+
+A `--path` scope keeps the workspace packages inside the folder, or the innermost package that
+contains it, which owns each of its files. For each kept package, the context keeps the nearest
+config that discovery finds in the package or in an ancestor package, and the rules folders that
+those configs load, also outside the scope. A nested config in a folder that is not a workspace
+package is not on the list, although Oxlint uses it for the files below it. It keeps the Markdown
+files outside each workspace package too, because the root documentation applies to every package.
+`unloadedConfigs` lists each config that Node.js cannot load, because only the agent can find the
+rules folders that its `custom()` calls load.
+
+### Documentation reach
+
+Each coding agent starts from `AGENTS.md`, so harden starts the traversal from no instruction file
+of one vendor, such as `CLAUDE.md`. Such a file is still documentation, and a reference can reach
+it. The documentation is each Markdown file that git lists and the working tree has, except the
+changesets, the changelogs, and the skill folders of the coding agents, because an agent finds its
+skills on its own. `readAgentReach` in `src/lib/hardening/agent-reach.ts` follows the references
+from the `AGENTS.md` files that an agent in the scope reads: the ones above the scope and inside it,
+but not the ones of a sibling package. It reads the whole project, because a root file can link to
+the files of each package.
+
+- A Markdown link resolves from the folder of its file, or from the root when it starts with `/`.
+- A code span resolves from the folder of its file, then from the root, because instructions often
+  name a root path.
+- A reference to a folder reaches each Markdown file directly in it. A folder of code, such as
+  `src/lib`, does not point to the docs below it.
+- A fenced code block and a code span hold examples, so their links do not count.
+
+The reach lists the Markdown files that no chain of references reaches, the links to Markdown files
+that do not exist on disk, and the links whose anchor matches no heading. Adamantite does not render
+Markdown, so each heading gives two candidate anchors in GitHub's slug: the text as written, and the
+text without link targets, HTML tags, and emphasis underscores. A repeated heading adds `-1`, `-2`,
+and so on, and an explicit id, such as `{#tests}` or an HTML `id`, is an anchor too. Only the
+headings of a file that git lists are known, so a link to another file keeps its anchor unchecked.
+A heading with other markup can still miss, so the agent checks each unmatched anchor. Harden does
+not check the paths that code spans name, because docs name example paths, the paths of a target
+project, and files that a plan creates.
+
+### Suppressions
+
+`readSuppressions` in `src/lib/hardening/suppressions.ts` counts the disable comments of each rule
+and the comments of each TypeScript directive in the files that Oxlint lints in the scope. The
+probe plugin reads the comments of each file whose text has `-disable` or `@ts-`. A disable comment
+that names no rule counts under no rule, because it turns off all rules. Each location is
+`<file>:<line>`, with the file relative to the project root. Each list puts the rule or the
+directive with the most comments first, and the prompt shows up to five locations of each.
+
+### Override trials
+
+`readOverrides` in `src/lib/hardening/overrides.ts` reads each override that turns a rule off, and
+lints the files that it names inside the scope in a copy of the project.
+`renderOverrideTrialConfig` removes only the rule from the override, so the setting of the earlier
+layers applies again. The rule stays off when no earlier layer turns it on, or when another
+override still turns it off. Each file gets a mark:
+
+| Mark         | Meaning                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `breaks`     | The rule still reports the file.                                                         |
+| `clean`      | The rule no longer reports the file. Only a file that Oxlint linted and parsed is clean. |
+| `ignored`    | The config ignores the file.                                                             |
+| `missing`    | The file does not exist.                                                                 |
+| `unparsable` | Oxlint cannot parse the file.                                                            |
+
+A glob is a scope decision, so harden lists the globs of an override and does not expand them. A
+file that a glob matches is linted only when an override also names it literally.
+A config that does not load has no override to read, and Doctor reports it.
+
+### Rule trials
+
+`tryRule` in `src/lib/hardening/trial.ts` lints cases in a copy of the project, with the rule at
+the project's setting or at `error` with given options, and returns the reports of the rule on each
+case. `rule try` reads a case as a project path, or as `<path>=<file>` to lint the content of
+`<file>` at `<path>`. The cases run in rounds in which each path appears once, so two cases can
+share a path, such as the code before and after a fix.
+
+`makeProjectCopy` makes the copy in a temporary folder that the scope removes. The copy has the
+files that git lists and the working tree has, with their uncommitted changes, and none of the
+files that git ignores, except those of a linked package inside the project, such as the build
+output that its `exports` name. A linked package can be any project folder outside `node_modules`,
+not only a workspace package. The `node_modules` folder of the root and of each workspace package
+is a real folder in the copy, with a link for each package of the original folder except `.cache`,
+so the entry modules that `custom()` writes to `node_modules/.cache` stay in the copy. A scope
+folder, such as `@acme`, is a real folder too, with a link for each of its packages. A package that
+links to a project folder links to the copy of the folder.
+
+`replaceConfigs` takes only a `ProjectCopy`, which only `makeProjectCopy` makes. It moves each
+config that the caller names to `oxlint.trial-base.config` in the same folder, with the extension
+of the config, so its relative imports and `custom()` calls still work. In its place, it writes the
+config that the caller renders, which imports the moved config. A rule trial adds the trial setting
+as the last override, and an override trial removes the rule from the overrides that turn it off.
+
+### Decisions record
+
+`.adamantite/decisions.jsonl`, beside the lockfile, is the memory of harden. A monorepo has one
+record at the workspace root, also when `--path` selects a package. The coding agent appends to it
+after the user answers a session, as step 8 of the prompt says, and Adamantite never writes it. Its
+keys tell its two kinds of lines apart:
+
+- A decision line has an `id`. A decision is its `id` together with its `scope`, so a standard can
+  have a decision for the project and another for a folder. A later line replaces an earlier line
+  of the same `id` and scope. An `approved` line ends the decision, and a `decided` line resolves
+  an item of the Decisions list, with the choice in `reason`.
+- A session line has the `session` date, and it can have the `head` commit that the session read
+  the history up to and the `scope` of the session. A session of the whole project has no `scope`.
+  A session has no `head` when it read a `--commits` count, or when git cannot resolve `HEAD`.
+
+`readDecisionsRecord` in `src/lib/hardening/decisions-record.ts` keeps the last line of each `id`
+and scope, and leaves out a decision whose last line is `approved`. A scope keeps a decision without
+a scope, and a decision whose scope contains the scope of the session or lies inside it. A `scope`
+decodes only as the harden context writes it, so another spelling of the same folder, such as
+`./packages/web`, does not decode. A line that does not decode is listed for the agent to repair.
+
+### Fix history
+
+The agent reads the commits of the fix history for fixed mistakes. The prompt gives a `git log`
+command with `--no-merges` and the scope as a pathspec, or `.` for the whole project, so a count or
+a range applies only to the commits that are not merges and change a file in the scope.
+`--commits` sets a count. Without it, the history starts after the common ancestor of `HEAD` and
+the `head` of the last session line with a `head` that covers the scope, which `findCoveringSession`
+gives. A line covers a scope when it has no scope, or when its scope is that folder or a parent of
+it. Without such a line, or without a common ancestor, the history is the last 200 commits.
+
+The boundary skips no commit that came after the earlier session. The boundary is an ancestor of
+`head`, so `git log <boundary>..HEAD` lists each commit that the filters keep and that is reachable
+from `HEAD` and not from `head`. A commit that is reachable from `head` stays out of the range, also
+when the earlier session did not read it because its count left the commit out. While `head` is an
+ancestor of `HEAD`, the range is exact. After a squash or a rebase, the range can list some commits
+again.
+
+A session that reads the default count or the commits after a boundary records `HEAD` in its
+session line. A session that reads a `--commits` count records no `head`, because it can leave out
+older commits, so later sessions start from an earlier session line.
+
+| Invariant                                                                                                     | Held by                                                |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| A line of the decisions record that does not decode hides no other line.                                      | `src/lib/hardening/__tests__/decisions-record.test.ts` |
+| The decision line schema grows only by optional keys, so an older Adamantite reads the record of a newer one. | Nothing                                                |
+| Harden produces no findings, so it never changes Doctor's result.                                             | Nothing                                                |
+
 ## Preset layout
 
 ```text

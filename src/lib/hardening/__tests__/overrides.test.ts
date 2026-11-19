@@ -69,7 +69,6 @@ function makeConfig(body: string) {
   ].join("\n")
 }
 
-// An override that spreads the rules of the vitest preset and turns a project rule off.
 const VITEST_RULES_CONFIG = [
   `import vitest from ${JSON.stringify(join(REPO_ROOT, "presets/lint/vitest.ts"))}`,
   makeConfig(
@@ -77,13 +76,10 @@ const VITEST_RULES_CONFIG = [
   ),
 ].join("\n")
 
-// The fixtures without a workspace package declare no workspace.
 const NO_WORKSPACE: Project.Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
 
 describe("hardening paths", () => {
   it("take project paths, not absolute paths, for configs and the scope", () => {
-    // Discovery gives absolute config paths, and `path.join(cwd, config)` of one names a file that
-    // does not exist, so only a project path type-checks.
     expectTypeOf<readonly string[]>().not.toExtend<Parameters<typeof readOverrides>[2]>()
     expectTypeOf<string>().not.toExtend<Parameters<typeof readOverrides>[3]>()
     expectTypeOf<string>().not.toExtend<Parameters<typeof readSuppressions>[1]>()
@@ -98,9 +94,6 @@ describe("readOverrides", () => {
     writeFileSync(join(project, file), content)
   }
 
-  /**
-   * Each file and folder of the project, also in `node_modules`, so a test sees every write.
-   */
   function listProject() {
     return EffectArray.sort(readdirSync(project, { recursive: true }).map(String), Order.String)
   }
@@ -168,7 +161,6 @@ describe("readOverrides", () => {
     })
   )
 
-  // The rules of the vitest preset name the preset under the identity key, which is not a rule.
   it.live("read an override that spreads the rules of a preset", () =>
     Effect.gen(function* () {
       write("oxlint.config.ts", VITEST_RULES_CONFIG)

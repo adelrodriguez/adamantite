@@ -21,8 +21,7 @@ const OxlintConfig = Schema.Struct({ rules: Schema.Record(Schema.String, Schema.
 const decodeOxlintConfig = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintConfig))
 
 /**
- * The plugin and the name of a rule. A rule without a plugin, such as `no-debugger`, belongs to
- * `eslint`, as in Oxlint.
+ * A rule without a plugin, such as `no-debugger`, belongs to `eslint`, as in Oxlint.
  */
 export function splitRuleName(rule: string): { readonly name: string; readonly plugin: string } {
   const separator = rule.lastIndexOf("/")
@@ -44,10 +43,6 @@ interface ResolvedRule {
   readonly plugin: string
 }
 
-/**
- * Lints `files` in `cwd` with Oxlint, and returns its JSON report. Oxlint finds the config of each
- * file.
- */
 export const lintFiles = Effect.fn("lintFiles")(function* (cwd: string, files: readonly string[]) {
   const { output, stdout } = yield* runOxlint(cwd, ["-f", "json", ...files])
   const report = parseOxlintReport(stdout)

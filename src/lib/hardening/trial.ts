@@ -22,41 +22,21 @@ import {
 } from "#lib/shared/errors.ts"
 import { checkExists, readDirectoryIfExists, readFile, writeFile } from "#lib/shared/filesystem.ts"
 
-/**
- * What a case must get from the rule: a report, because it has the mistake, or no report, because
- * it is correct code.
- */
 const TrialExpectation = Schema.Literals(["accepted", "reported"])
 
-/**
- * A file that a trial lints.
- */
 export const TrialCase = Schema.Struct({
   expected: TrialExpectation,
-  /**
-   * The path of the case in the project, relative to the project root, with `/` between folders.
-   */
   path: Schema.String,
-  /**
-   * The file whose content the trial puts at `path`, relative to the project root or absolute, or
-   * none to lint the project file as it is.
-   */
   source: Schema.OptionFromNullOr(Schema.String),
 })
 
 export type TrialCase = typeof TrialCase.Type
 
-/**
- * The trial sets the rule as the project config sets it now.
- */
 export class CurrentSetting extends Schema.TaggedClass<
   CurrentSetting,
   { readonly brand: unique symbol }
 >()("Current", {}) {}
 
-/**
- * The trial sets the rule at `error` with the options that come after the severity.
- */
 export class ErrorSetting extends Schema.TaggedClass<
   ErrorSetting,
   { readonly brand: unique symbol }
@@ -64,9 +44,6 @@ export class ErrorSetting extends Schema.TaggedClass<
   options: Schema.Array(Schema.Json),
 }) {}
 
-/**
- * How a trial sets the rule.
- */
 export const TrialSetting = Schema.Union([CurrentSetting, ErrorSetting])
 
 export type TrialSetting = typeof TrialSetting.Type
@@ -77,42 +54,18 @@ const TrialDiagnostic = Schema.Struct({
   message: Schema.String,
 })
 
-/**
- * What the rule reported on one case of a trial.
- */
 export const TrialCaseResult = Schema.Struct({
   case: TrialCase,
-  /**
-   * The Oxlint config that lints the case, relative to the project root.
-   */
   config: Schema.String,
-  /**
-   * The reports of the rule on the case.
-   */
   diagnostics: Schema.Array(TrialDiagnostic),
 })
 
 export type TrialCaseResult = typeof TrialCaseResult.Type
 
-/**
- * The file name that a trial gives the config that lints the cases, in the copy. The trial config
- * takes the name of that config, so Oxlint finds it in the same way, and it imports the config
- * under this name.
- */
 const BASE_CONFIG_NAME = "oxlint.trial-base.config"
 
-/**
- * The `node_modules` entry that the copy does not link to the project. `custom()` writes its entry
- * modules below it, in the cache folder of `presets/rules/folder.ts`, so they stay in the copy. The
- * tests in `src/lib/hardening/__tests__/trial.test.ts` check that the project's cache stays as it
- * is.
- */
 const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
 
-/**
- * Parses a case of `rule try`: a project path, or `<path>=<file>` to lint the content of `<file>`
- * at `<path>`. The path must stay inside the project.
- */
 export const parseTrialCase = Effect.fn("parseTrialCase")(function* (
   value: string,
   expected: typeof TrialExpectation.Type
@@ -146,10 +99,9 @@ export const parseTrialCase = Effect.fn("parseTrialCase")(function* (
 })
 
 /**
- * The config that a trial writes in place of the config that lints the cases. An override at the
- * end of the list wins, so the trial setting replaces the setting of the project for the cases.
- * Oxlint ignores a built-in rule whose plugin the config does not turn on, so the override turns it
- * on.
+ * An override at the end of the list wins, so the trial setting replaces the setting of the project
+ * for the cases. Oxlint ignores a built-in rule whose plugin the config does not turn on, so the
+ * override turns it on.
  */
 export function renderTrialConfig(options: {
   readonly config: string
@@ -179,19 +131,10 @@ export function renderTrialConfig(options: {
   ].join("\n")
 }
 
-/**
- * A temporary copy of the project. Only `makeProjectCopy` makes one, so a trial cannot change the
- * files of the project itself.
- */
 type ProjectCopy = string & Brand.Brand<"ProjectCopy">
 
 const toProjectCopy = Brand.nominal<ProjectCopy>()
 
-/**
- * Replaces each config in the copy with the trial config that its render gives for the name of the
- * moved config. Each key is a config path relative to the copy, so each config moves one time. The
- * moved config stays in its folder, so its relative imports and `custom()` calls work.
- */
 export const replaceConfigs = Effect.fn("replaceConfigs")(function* (
   copy: ProjectCopy,
   renders: ReadonlyMap<string, (base: string) => string>
@@ -208,15 +151,8 @@ export const replaceConfigs = Effect.fn("replaceConfigs")(function* (
   }
 })
 
-/**
- * The config that turns each rule on again in each override that turns it off. It removes only the
- * rule from the override, so the setting of the earlier layers applies again.
- */
 export function renderOverrideTrialConfig(options: {
   readonly config: string
-  /**
-   * The rules to remove from each override, by the index of the override in `overrides`.
-   */
   readonly removals: ReadonlyMap<number, readonly string[]>
 }): string {
   return [
@@ -240,16 +176,6 @@ export function renderOverrideTrialConfig(options: {
   ].join("\n")
 }
 
-/**
- * A copy of the project in a temporary folder that the scope removes. It has the files that git
- * lists, with their uncommitted changes, and the dependencies of the root and the packages of
- * `workspace`. A file that git ignores, such as generated code, is not in the copy.
- *
- * Each `node_modules` folder of the copy is a real folder with a link to each entry of the project
- * folder, except `.cache`. `custom()` writes its entry module to `node_modules/.cache`, so the
- * module stays in the copy and leaves with it. An entry that links to a workspace package links to
- * the copy of the package, so a config that imports the package loads the copy.
- */
 export const makeProjectCopy = Effect.fn("makeProjectCopy")(
   function* (cwd: string, workspace: Project.Workspace) {
     const fs = yield* FileSystem.FileSystem
@@ -410,10 +336,6 @@ const findConfig = Effect.fn("findConfig")(function* (copy: string, file: string
   return yield* Effect.findFirst(candidates, (candidate) => checkExists(candidate))
 })
 
-/**
- * Splits the cases into rounds in which each path is there one time, so that two cases can have the
- * same path, such as the code before and after a fix.
- */
 function toRounds<A extends { readonly case: TrialCase }>(entries: readonly A[]) {
   const rounds: A[][] = []
 
@@ -432,10 +354,6 @@ function toRounds<A extends { readonly case: TrialCase }>(entries: readonly A[])
   return rounds
 }
 
-/**
- * Lints each case in a copy of the project, with the rule at the setting of the trial, and returns
- * the reports of the rule on each case, in the order of the cases. The project stays unchanged.
- */
 export const tryRule = Effect.fn("tryRule")(
   function* (options: {
     readonly cases: readonly TrialCase[]
@@ -475,7 +393,6 @@ export const tryRule = Effect.fn("tryRule")(
           Option.isNone(trialCase.source)
           && !(yield* fs.exists(path.join(copy, trialCase.path)))
         ) {
-          // The copy has only the files that git lists.
           return yield* new InvalidTrialCase({
             reason: (yield* fs.exists(path.join(cwd, trialCase.path)))
               ? "Git ignores this file, so the copy of the project does not have it. Use `<path>=<file>` to lint its content."
@@ -530,7 +447,6 @@ export const tryRule = Effect.fn("tryRule")(
     const results = new Map<TrialCase, TrialCaseResult>()
 
     for (const round of toRounds(linted)) {
-      // Each case with a source replaces the project file at its path for this round only.
       const placed = round.flatMap((entry) =>
         Option.match(entry.case.source, {
           onNone: () => [],

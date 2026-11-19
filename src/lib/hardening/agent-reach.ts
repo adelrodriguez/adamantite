@@ -6,19 +6,10 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
-/**
- * The Markdown files that a coding agent can find from `AGENTS.md`. Paths are relative to the
- * project root, with `/` between folders, as git prints them.
- */
 export const BrokenLink = Schema.Struct({ file: Schema.String, target: Schema.String })
 
 export type BrokenLink = typeof BrokenLink.Type
 
-/**
- * A Markdown link with an anchor that Adamantite could not match to a heading of its Markdown file.
- * The match is a simple rule, so the link can work: the agent decides. `target` is the file of the
- * heading, and is `file` for a link such as `#tests`.
- */
 export const UnmatchedAnchor = Schema.Struct({
   anchor: Schema.String,
   file: Schema.String,
@@ -28,18 +19,8 @@ export const UnmatchedAnchor = Schema.Struct({
 export type UnmatchedAnchor = typeof UnmatchedAnchor.Type
 
 export const AgentReach = Schema.Struct({
-  /**
-   * The Markdown links to Markdown files that do not exist.
-   */
   brokenLinks: Schema.Array(BrokenLink),
-  /**
-   * The Markdown links with an anchor that Adamantite could not match to a heading of a Markdown
-   * file of the project.
-   */
   unmatchedAnchors: Schema.Array(UnmatchedAnchor),
-  /**
-   * The Markdown files that no chain of references from an `AGENTS.md` reaches.
-   */
   unreached: Schema.Array(Schema.String),
 })
 
@@ -104,17 +85,10 @@ function matchAll(content: string, pattern: RegExp) {
   return [...content.matchAll(pattern)].map((match) => match[1] ?? "")
 }
 
-/**
- * The anchor that GitHub makes from text: lower case, without punctuation, and with a hyphen for
- * each space.
- */
 function toSlug(text: string) {
   return text.toLowerCase().replaceAll(SLUG_REMOVED, "").replaceAll(" ", "-")
 }
 
-/**
- * The text of an ATX heading without its closing `#` characters, such as `Tests` for `Tests ##`.
- */
 function removeClosingSequence(heading: string) {
   const trimmed = heading.trimEnd()
   let end = trimmed.length
@@ -128,15 +102,6 @@ function removeClosingSequence(heading: string) {
   return before === "" || before.endsWith(" ") || before.endsWith("\t") ? before.trimEnd() : trimmed
 }
 
-/**
- * The anchors of the headings of a Markdown file that a link can match. Adamantite does not render
- * Markdown, so each heading gives two candidates in GitHub's slug: the text as written, which is
- * right for a heading of plain words and code spans, and the text without the targets of links,
- * HTML tags, and emphasis underscores. A heading that repeats adds `-1`, `-2`, and so on to each
- * candidate. An explicit id, such as `{#tests}` or an HTML `id`, is an anchor too. A link to a
- * heading that has other markup, such as an image or an entity, can still miss: the agent checks
- * each link that no candidate matches.
- */
 function readAnchors(prose: string) {
   const anchors = new Set<string>()
   const written = new Map<string, number>()
@@ -190,20 +155,6 @@ function readAnchors(prose: string) {
   return anchors
 }
 
-/**
- * Reads which Markdown files the given `AGENTS.md` files reach, and the references of the
- * documentation that point to nothing. A Markdown link resolves from the folder of its file, or
- * from the root when it starts with `/`. A code span resolves from the folder of its file, then
- * from the root, because instructions often name a root path. A reference to a folder reaches each
- * Markdown file directly in it. A fenced code block holds examples, so its links and paths do not
- * count, and a link inside a code span is an example too.
- *
- * A link with an anchor to a Markdown file that git lists should name a heading of that file, and
- * each link whose anchor no candidate of `readAnchors` matches is listed for the agent to check.
- * Harden does not check the paths that code spans name: docs name example paths, the paths of a
- * target project, and files that a plan creates, so most such paths that do not exist are not
- * mistakes.
- */
 export const readAgentReach = Effect.fn("readAgentReach")(function* (
   cwd: string,
   files: readonly string[],
@@ -251,8 +202,6 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       return [file]
     }
 
-    // A folder of code, such as `src/lib`, is not a pointer to the docs below it, so only the
-    // Markdown files directly in the folder count.
     const folder = normalized.find((candidate) =>
       files.some((listedFile) => posix.dirname(listedFile) === candidate)
     )
@@ -262,10 +211,6 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       : files.filter((listedFile) => posix.dirname(listedFile) === folder)
   }
 
-  /**
-   * The links of `file` to a file of the project, with the anchor of each. A link to a heading of
-   * `file` itself, such as `#tests`, has `file` as its target.
-   */
   function getLinks(file: string) {
     const text = (prose.get(file) ?? "").replaceAll(CODE_SPAN, "")
 
@@ -326,21 +271,22 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       .map((target) => ({ file, target }))
   )
 
-  const isMissing = (target: string) =>
+  const isMissingOnDisk = (target: string) =>
     fs.exists(path.join(cwd, target)).pipe(
       Effect.map((exists) => !exists),
       Effect.orElseSucceed(() => true)
     )
 
-  // A Markdown file that git ignores still exists.
-  const brokenLinks = yield* Effect.filter(linksToMarkdown, (link) => isMissing(link.target), {
-    concurrency: "unbounded",
-  })
+  const brokenLinks = yield* Effect.filter(
+    linksToMarkdown,
+    (link) => isMissingOnDisk(link.target),
+    {
+      concurrency: "unbounded",
+    }
+  )
 
   const anchors = new Map(files.map((file) => [file, readAnchors(prose.get(file) ?? "")]))
 
-  // Only the headings of a Markdown file that git lists are known, so a link to another file
-  // keeps its anchor unchecked.
   const unmatchedAnchors = files.flatMap((file) =>
     getLinks(file).flatMap(({ anchor, target }) => {
       const known = anchors.get(target)

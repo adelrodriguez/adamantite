@@ -36,34 +36,40 @@ function parseChangelog(content: string) {
     })
 }
 
-export const findChangelog = Effect.fn("findChangelog")(function* (root: string) {
+const locateChangelog = Effect.fn("locateChangelog")(function* (root: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const installed = yield* findInstalledPackage(root)
 
   if (Option.isNone(installed)) {
-    return Option.none<string>()
+    return Option.none<{ readonly file: string; readonly relative: string }>()
   }
 
   // The resolver returns real paths, so a project path through a symlink compares as a real path.
   const real = yield* fs.realPath(root).pipe(Effect.orElseSucceed(() => root))
+  const file = path.join(installed.value.directory, "CHANGELOG.md")
 
-  return Option.some(path.relative(real, path.join(installed.value.directory, "CHANGELOG.md")))
+  return Option.some({ file, relative: path.relative(real, file) })
 })
+
+export const findChangelog = (root: string) =>
+  Effect.map(
+    locateChangelog(root),
+    Option.map(({ relative }) => relative)
+  )
 
 export const readReleaseNotes = Effect.fn("readReleaseNotes")(function* (
   root: string,
   from: string
 ) {
-  const path = yield* Path.Path
   const start = parseRelease(from)
-  const changelog = yield* findChangelog(root)
+  const changelog = yield* locateChangelog(root)
 
   if (Option.isNone(start) || Option.isNone(changelog)) {
     return Option.none<ReleaseNotes>()
   }
 
-  const content = yield* readFileIfExists(path.resolve(root, changelog.value))
+  const content = yield* readFileIfExists(changelog.value.file)
 
   if (Option.isNone(content)) {
     return Option.none<ReleaseNotes>()
@@ -77,5 +83,5 @@ export const readReleaseNotes = Effect.fn("readReleaseNotes")(function* (
     )
   )
 
-  return Option.some<ReleaseNotes>({ changelog: changelog.value, from, releases })
+  return Option.some<ReleaseNotes>({ changelog: changelog.value.relative, from, releases })
 })

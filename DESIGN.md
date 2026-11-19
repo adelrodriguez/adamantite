@@ -83,13 +83,14 @@ exits 130 for an interruption. Every other line
 goes to standard output, so the lines and the prompts keep their order. With `--json`, standard
 output holds only the JSON document, and every other line goes to standard error.
 
-`check` prints a bold heading above the output of each stage, such as
+`check`, `fix`, and `analyze` print a bold heading above the output of each stage, such as
 `🔍 Linting · adamantite (oxlint)`, and a blank line before each heading after the first. Only a
 plain run prints the headings, with or without files. With `--only` or forwarded arguments, the
 stage output is the tool's own, for a script that parses it. When Oxlint prints its agent report
-because the environment names a coding agent, a passing lint prints nothing, so `check` prints no
-heading. [Oxlint's agent report](src/lib/integrations/oxlint/agent-report.ts) lists the
-variables that Oxlint reads.
+because the environment names a coding agent, a passing lint prints nothing, so the three commands
+print no heading. They decide alike, so an agent reads the same kind of output from each.
+[Oxlint's agent report](src/lib/integrations/oxlint/agent-report.ts) lists the variables that
+Oxlint reads.
 
 A status message that spans several lines indents each continuation line by two spaces, under the
 text after the symbol. [Findings](src/terminal/resolution.ts) appear as numbered notes: a blank line,

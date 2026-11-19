@@ -81,8 +81,9 @@ function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
 
 type BindingName = Definition["name"]
 
-// A non-null assertion keeps the type of its operand. An `as` or `satisfies` expression can
-// change it.
+// A non-null assertion only removes `null` and `undefined` from the type of its operand, so an
+// owned type stays owned. An `as` expression can replace the type, and `satisfies` gives its
+// operand a contextual type, so the walk stops at both.
 function operandRoot(argument: ESTree.Expression): ESTree.IdentifierReference | null {
   let current = argument
 

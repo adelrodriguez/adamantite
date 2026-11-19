@@ -78,8 +78,8 @@ export function childNodes(
 ): readonly ESTree.Node[] {
   const fields = new Map(Object.entries(node))
 
-  // Oxlint builds each node as a plain object with own enumerable fields. A later version that
-  // does not would leave the rules without child nodes, and without an error.
+  // Oxlint builds each node as a plain object with own enumerable fields. Without this guard, a
+  // later version that does not would leave the rules without child nodes, and without an error.
   if (!fields.has("type")) {
     throw new Error("Child node invariant: AST node fields are not own enumerable properties")
   }

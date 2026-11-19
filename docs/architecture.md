@@ -712,7 +712,8 @@ loads a first-party plugin by a file URL inside this package, and names a manage
 Oxlint loads a plugin by file URL from the Adamantite package, so a target project installs
 nothing more. `entry.ts` imports no plugin code, so a preset loads no rule module. Each plugin
 folder holds an `index.ts` that registers the rules, a `rules` folder with one module for each
-rule, and a `shared` folder with the helpers that only that plugin uses.
+rule, and, when the plugin needs one, a `shared` folder with the helpers that only that plugin
+uses.
 `presets/lint/plugins/shared` holds the helpers that more than one plugin uses.
 
 `quality` started as a copy of [anti-slop](https://github.com/dmmulroy/anti-slop),
@@ -721,22 +722,24 @@ rule, and a `shared` folder with the helpers that only that plugin uses.
 license of its source. `testing` drops the per-file allowlists of landmines: a file that needs an
 exception suppresses the rule with a reason, as `adamantite/require-suppression-reason` asks.
 
-`Replacement` in `presets/lint/plugins/shared/replacement.d.ts` is the type of
-`meta.docs.replaces`. It names the `overrides` entries that each turn on one of `rules` with
-`option` set to a non-empty array, the fewest such entries that state what the rule states, what
-they state, and the steps that move them into the rule. Doctor names the replaced rule by the first
-name in `rules`. The type is in a declaration file, so the build ships no module for a type that
-only the rules and Doctor read.
+`Replacement` in `presets/lint/plugins/shared/replacement.d.ts` is the type of `meta.docs.replaces`.
+Doctor counts the `overrides` entries that turn on one of `rules` and set the property that `option`
+names to a non-empty array. It warns when the count reaches `minimum`, and the warning says what the
+entries state, from `states`, and gives the `steps` that move them into the rule. Doctor names the
+replaced rule by the first name in `rules`. The type is in a declaration file, so the build ships no
+module for a type that only the rules and Doctor read.
 
 ### Import resolution
 
 `adamantite/layers` and `adamantite/import-owners` resolve imports with `resolveImport` in
-`presets/lint/plugins/adamantite/shared/resolver.ts`, so both rules agree on the file that an
-import reaches. `identifyPath` keeps a path through `node_modules` as it is, so a linked workspace
-package keeps its package. It gives every other path its real path, so a symlink cannot give a
-protected file a second path. A rule identifies both paths of a comparison, so a project below a
-linked folder, such as `/tmp` on macOS, compares a real path with a real path. An import that does
-not resolve is not checked, because TypeScript reports it.
+`presets/lint/plugins/adamantite/shared/resolver.ts`, so both rules share its extensions,
+`tsconfig.json` paths, and default conditions. A layer map can add conditions of its own, so
+`layers` can reach another file than `import-owners` for the same import. `identifyPath` keeps a
+path through `node_modules` as it is, so a linked workspace package keeps its package. It gives
+every other path its real path, so a symlink cannot give a protected file a second path. A rule
+identifies both paths of a comparison, so a project below a linked folder, such as `/tmp` on macOS,
+compares a real path with a real path. `layers` does not check an import that does not resolve,
+because TypeScript reports it. `import-owners` matches such an import only by its text.
 
 ### Layer maps
 
@@ -748,9 +751,9 @@ own entries, ignores, isolation, type-import setting, and conditions. Two maps w
 concrete root report `duplicateMap` and check nothing.
 
 A dependency, or a file outside the package, is outside every map, even below a `.` root. No layer
-imports an entry, and a file in no layer is reported where another file imports it. In an isolated
-layer, a file and the folder of the same name, such as `routes/settings.tsx` and
-`routes/settings/`, are one unit.
+imports an entry. A file of a map that is in no layer is reported, and so is each import that
+reaches it from a file in a layer of that map. In an isolated layer, a file and the folder of the
+same name, such as `routes/settings.tsx` and `routes/settings/`, are one unit.
 
 The message of a violation names the repairs. `findLowerRepairs` gives the highest layers that both
 sides import, where the code that both need can move. `findUpperRepairs` gives the lowest layers
@@ -760,11 +763,11 @@ itself does not count.
 ### Import owners
 
 `createImportOwnersRule` in `presets/lint/plugins/adamantite/rules/import-owners.ts` reads owner
-paths from the workspace root: the nearest folder that lists workspace packages, in
-`pnpm-workspace.yaml` or in the `workspaces` field of `package.json`. Outside a workspace, it reads
-them from the nearest folder with a `package.json`. A `package.json` that does not parse lists no
-workspace, because the package manager reports it. A message names the kind of root, not its path,
-because the path is different on each machine.
+paths from the workspace root: the nearest folder with a `pnpm-workspace.yaml` that has a `packages`
+key, or with a `package.json` that has a `workspaces` field. Outside a workspace, it reads them from
+the nearest folder with a `package.json`. A `package.json` that does not parse lists no workspace,
+because the package manager reports it. A message names the kind of root, not its path, because the
+path is different on each machine.
 
 The start of the `import` option sets how the rule matches an import:
 
@@ -782,22 +785,23 @@ real path, because a link can give the file a name in the module that its real p
 
 ### Scope analysis
 
-A rule that needs the scope analysis to resolve a name, such as
-`quality/no-widen-then-assert` and `quality/no-known-value-widening`, first collects the names that
-a report needs, so most files never build it. `withTypeBindings` in
-`presets/lint/plugins/quality/shared/type-alias-resolution.ts` records the type bindings of a file
-during Oxlint's own traversal, one time for every rule that uses it. It runs each deferred check at
-the end of the file, when a type declared after its use is known too.
+A rule that needs the scope analysis to resolve a name, such as `quality/no-widen-then-assert` and
+`quality/no-known-value-widening`, first collects the names that a report needs, so most files never
+build it. `withTypeBindings` in `presets/lint/plugins/quality/shared/type-alias-resolution.ts`
+records the type bindings of a file during Oxlint's own traversal. The first rule that uses it
+records them once for each program, and the other rules read the same bindings. It runs each
+deferred check at the end of the file, when a type declared after its use is known too.
 
 ### Readable spacing
 
 `quality/require-readable-spacing` configures the vendored rule in
 `presets/lint/plugins/quality/stylistic`, which its `UPSTREAM.md` describes. `adamantite fix` runs
 lint before Oxfmt, so the rule predicts the lines that Oxfmt writes. A statement on one line that
-ends past `printWidth` counts as multiline, because Oxfmt wraps it. If Oxfmt keeps that line, as
-for a long template literal, the statement only gets blank lines that the policy allows. The rule
-measures the line as written, so it can miss a wrap when Oxfmt makes the line longer, for example
-when it changes `{a:1}` to `{ a: 1 }`, indents the line deeper, or expands tabs.
+ends past `printWidth` counts as multiline, because Oxfmt usually wraps it. The rule cannot know
+what Oxfmt will do. If Oxfmt keeps that line, as for a long template literal, the statement only
+gets blank lines that the policy allows. The rule measures the line as written, so it can miss a
+wrap when Oxfmt makes the line longer, for example when it changes `{a:1}` to `{ a: 1 }`, indents
+the line deeper, or expands tabs.
 
 | Invariant                                                                                                                                                                                                             | Held by                                                                                                                                |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |

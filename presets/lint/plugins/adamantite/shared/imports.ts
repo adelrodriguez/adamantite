@@ -18,6 +18,7 @@ export function readDynamicSource(node: ESTree.ImportExpression): ModuleSource |
   return specifier === null ? undefined : { mode: "import", node: node.source, specifier }
 }
 
+// A type alias or an interface named `require` leaves the runtime `require` in place.
 const TYPE_DECLARATIONS: ReadonlySet<string> = new Set([
   "TSInterfaceDeclaration",
   "TSTypeAliasDeclaration",
@@ -66,7 +67,6 @@ export function readImportEqualsSource(
     : undefined
 }
 
-// A type alias or an interface named `require` leaves the runtime `require` in place.
 export interface ImportedCall {
   readonly call: ESTree.CallExpression
   readonly name: string

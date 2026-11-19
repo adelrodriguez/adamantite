@@ -154,7 +154,7 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
     {
       code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 130)}\n  const c = 3\n}`,
       errors: [error, error],
-      name: "report a declaration past the printWidth option with blank lines on both sides",
+      name: "report a declaration past the printWidth option that needs blank lines on both sides",
       options: [{ printWidth: 120 }],
       output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 130)}\n\n  const c = 3\n}`,
     },

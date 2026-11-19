@@ -27,7 +27,7 @@ const BUILT_INS = new Set([
 
 const TRANSPARENT_WRAPPERS = new Set(["Readonly", "Partial", "Required", "NonNullable"])
 
-// These intrinsic string types map each key to one key, so the key set keeps its size.
+// These intrinsic string types map each key to one key, so a finite key set stays finite.
 const KEY_CASE_CHANGES = new Set(["Uppercase", "Lowercase", "Capitalize", "Uncapitalize"])
 
 type TypeAliasEnvironment = ReadonlyMap<string, ResolvedType>

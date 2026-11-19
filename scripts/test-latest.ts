@@ -11,12 +11,14 @@ import {
   writeFileSync,
 } from "node:fs"
 import { arch, release, tmpdir, type } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, join, resolve } from "node:path"
 import process from "node:process"
 import { parseArgs } from "node:util"
 import type { TestModuleState, TestState } from "vitest/node"
 import * as EffectArray from "effect/Array"
+import * as Data from "effect/Data"
 import * as Order from "effect/Order"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
@@ -117,7 +119,7 @@ const Failure = Schema.Struct({
   fixtures: Schema.Array(Schema.String),
   id: Schema.String,
   rules: Schema.Array(Schema.String),
-  status: Schema.Union([ReportedState, Schema.Literal("missing")]),
+  status: Schema.Union([ReportedState, Schema.Literals(["missing", "unreadable"])]),
 })
 
 type Failure = typeof Failure.Type
@@ -153,7 +155,7 @@ const LatestResults = Schema.Struct({
   tests: Schema.Array(Schema.Struct({ ...ReportedResult.fields, module: Schema.String })),
 })
 
-const decodeLatestResults = Schema.decodeSync(Schema.fromJsonString(LatestResults))
+const decodeLatestResults = Schema.decodeResult(Schema.fromJsonString(LatestResults))
 
 const PackageJson = Schema.Struct({
   dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
@@ -294,21 +296,46 @@ interface TestRun {
   readonly tests: ReadonlyMap<string, ReportedTest>
 }
 
-function readTestRun(path: string): TestRun | undefined {
+type TestRunRead = Data.TaggedEnum<{
+  Missing: { readonly path: string }
+  Read: { readonly run: TestRun }
+  Unreadable: { readonly failure: Failure }
+}>
+
+const TestRunRead = Data.taggedEnum<TestRunRead>()
+
+const isRead = TestRunRead.$is("Read")
+
+function readTestRun(path: string): TestRunRead {
   if (!existsSync(path)) {
-    return undefined
+    return TestRunRead.Missing({ path })
   }
 
-  const results = decodeLatestResults(readFileSync(path, "utf8"))
+  return Result.match(decodeLatestResults(readFileSync(path, "utf8")), {
+    onFailure: (error) =>
+      TestRunRead.Unreadable({ failure: toFailure(basename(path), "unreadable", [error.message]) }),
+    onSuccess: (results) =>
+      TestRunRead.Read({
+        run: {
+          failedModules: new Map(
+            results.modules.flatMap((module) =>
+              module.errors.length > 0 ? [[module.id, module.errors] as const] : []
+            )
+          ),
+          tests: new Map(results.tests.map((test) => [test.id, test])),
+        },
+      }),
+  })
+}
 
-  return {
-    failedModules: new Map(
-      results.modules.flatMap((module) =>
-        module.errors.length > 0 ? [[module.id, module.errors] as const] : []
-      )
-    ),
-    tests: new Map(results.tests.map((test) => [test.id, test])),
-  }
+function listUnreadable(reads: readonly TestRunRead[]): Failure[] {
+  return reads.flatMap(
+    TestRunRead.$match({
+      Missing: () => [],
+      Read: () => [],
+      Unreadable: ({ failure }) => [failure],
+    })
+  )
 }
 
 const ANSI = new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, "g")
@@ -373,8 +400,8 @@ function isSkipped(test: ReportedTest | undefined): boolean {
   return test?.state === "skipped" || test?.state === "pending"
 }
 
-function listSkipped(runs: ReadonlyArray<TestRun | undefined>): string[] {
-  const [first, ...rest] = runs.filter((run) => run !== undefined)
+function listSkipped(runs: readonly TestRun[]): string[] {
+  const [first, ...rest] = runs
 
   const skipped = [...(first?.tests.values() ?? [])].flatMap((test) =>
     isSkipped(test) && rest.every((run) => isSkipped(run.tests.get(test.id))) ? [test.id] : []
@@ -410,9 +437,9 @@ interface Classification {
 }
 
 interface RunResults {
-  readonly baseline: TestRun | undefined
+  readonly baseline: TestRunRead
   readonly baselinePassed: boolean
-  readonly candidate: TestRun | undefined
+  readonly candidate: TestRunRead
   readonly candidatePassed: boolean
   readonly updated: boolean
 }
@@ -422,7 +449,7 @@ function classify(results: RunResults): Classification {
 
   if (!results.baselinePassed) {
     return {
-      failures: baseline === undefined ? [] : listFailures(baseline),
+      failures: isRead(baseline) ? listFailures(baseline.run) : listUnreadable([baseline]),
       outcome: "baseline-failure",
     }
   }
@@ -431,13 +458,13 @@ function classify(results: RunResults): Classification {
     return { failures: [], outcome: "install-failure" }
   }
 
-  if (baseline === undefined || candidate === undefined) {
-    return { failures: [], outcome: "process-failure" }
+  if (!isRead(baseline) || !isRead(candidate)) {
+    return { failures: listUnreadable([baseline, candidate]), outcome: "process-failure" }
   }
 
-  const failures = listRegressions(baseline, candidate)
+  const failures = listRegressions(baseline.run, candidate.run)
 
-  if (![...candidate.tests.values()].some((test) => test.state === "passed")) {
+  if (![...candidate.run.tests.values()].some((test) => test.state === "passed")) {
     return { failures, outcome: "process-failure" }
   }
 
@@ -607,7 +634,10 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     writeFileSync(join(out, "lockfiles.diff"), read("git", ["diff", "--", ...LOCKFILES], worktree))
 
     const candidatePassed = updated && testPresets("candidate")
-    const candidate = updated ? readTestRun(join(out, "candidate.results.json")) : undefined
+
+    const candidate: TestRunRead = updated
+      ? readTestRun(join(out, "candidate.results.json"))
+      : TestRunRead.Missing({ path: join(out, "candidate.results.json") })
 
     const { failures, outcome } = classify({
       baseline,
@@ -643,7 +673,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
         os: `${type()} ${release()} ${arch()}`,
         pnpm: read("pnpm", ["--version"]).trim(),
       },
-      skipped: listSkipped([baseline, candidate]),
+      skipped: listSkipped([baseline, candidate].flatMap((run) => (isRead(run) ? [run.run] : []))),
       steps,
     }
 

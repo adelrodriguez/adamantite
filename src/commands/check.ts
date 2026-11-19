@@ -19,24 +19,17 @@ const only = Flag.Literals("only", ["format", "lint"]).pipe(
   Flag.withDescription("Run only format (Oxfmt) or lint (Oxlint). Pass tool arguments after --")
 )
 
-// Agents copy the code that they read, so a warning that passes `check` spreads like code that
-// has no report. `check` fails on warnings unless the user allows them.
 const allowWarnings = Flag.Boolean("allow-warnings").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Allow the lint check to pass when Oxlint reports only warnings")
 )
 
-// A setup that an older Adamantite wrote checks the code with presets that it was not written for,
-// so `check` fails until `adamantite update` runs. The stages run first, so an agent that runs
-// `check` after an edit reads the reports of its code. The CLI then prints the error of a stage
-// that did not start, and the setup repair last.
 export default Command.make("check", { allowWarnings, files, only }).pipe(
   Command.withDescription("Check formatting, lint issues, and TypeScript types"),
   Command.withHandler(({ allowWarnings, files, only }) =>
     Effect.gen(function* () {
       const root = yield* Project.Directory
 
-      // Doctor reports a lockfile that does not read, and the stages run as without a lockfile.
       const lockfile = yield* readLockfile(root).pipe(
         Effect.catchTag(["InvalidLockfile", "UnsupportedLockfile"], () => Effect.succeedNone)
       )
@@ -51,8 +44,6 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
 
       const setup = yield* verifyLockfileVersion(root, lockfile).pipe(Effect.exit)
 
-      // Both failures reach the CLI, the stage's first, so a stage that did not start still says
-      // why, and the drift still fails the run.
       return yield* Exit.asVoidAll([stages, setup])
     })
   )

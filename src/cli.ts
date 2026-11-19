@@ -26,9 +26,6 @@ import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 import * as Output from "#terminal/output.ts"
 
-// The commands that run tools through the bridge forward the arguments after `--` to one stage,
-// which the bridge chooses. A lifecycle command coordinates several operations, so it forwards
-// none.
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
 const commands = [
@@ -53,12 +50,6 @@ const main = Command.make("adamantite").pipe(
   Command.withSubcommands(commands)
 )
 
-/**
- * Every service the CLI needs. `@effect/platform-node` supplies the filesystem, path, process, and
- * terminal services. The other external behavior, such as prompts and child commands, is behind
- * services too, so a test runs a command without changing a real project. The runner is a parameter
- * so tests exercise this exact wiring while stubbing process spawning.
- */
 export const makeAppLayer = (
   runner: Layer.Layer<CommandRunner, never, ChildProcessSpawner.ChildProcessSpawner>
 ) =>
@@ -70,19 +61,12 @@ export const makeAppLayer = (
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
     DependencyInstaller.layer.pipe(Layer.provide(NodeServices.layer)),
     Digest.layerWebCrypto,
-    // Harden gives the agent the date of today, in the time zone of the user.
     DateTime.layerCurrentZoneLocal,
     Project.Directory.layer
   )
 
-/**
- * Reports the cause that ended the CLI, and returns the exit code. `Output.failures` prints each
- * typed error. A defect or an interruption in the same cause is not an error that a command
- * expected, so it fails again without the typed errors, and the runtime reports it: a defect with
- * its stack and exit code 1, and an interruption with exit code 130.
- */
 export function reportFailure<E extends { readonly message: string }>(cause: Cause.Cause<E>) {
-  // A defect or an interruption holds no typed error, which inference cannot see from the reasons.
+  // Inference cannot see from the reasons that a defect or an interruption holds no typed error.
   const unexpected = Cause.fromReasons<never>(
     cause.reasons.flatMap((reason) => (Cause.isFailReason(reason) ? [] : [reason]))
   )

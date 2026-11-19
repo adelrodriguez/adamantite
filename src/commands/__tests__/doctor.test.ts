@@ -44,7 +44,6 @@ function getHeadings(markdown: string) {
   return markdown.match(/^#{1,2} .+$/gm) ?? []
 }
 
-// The setup that init records for the analyze script and the agent guidance.
 const ANALYZE_SELECTION = {
   agents: true,
   ci: null,
@@ -68,8 +67,6 @@ function makeFindingsFixture() {
   })
 }
 
-// Runs doctor on the findings fixture in an interactive terminal with the given keys. The installed
-// agents come before the copy choice in the menu.
 function runResolution(keys: readonly TestKey[], runner = makeHandoffRunner()) {
   return Effect.gen(function* () {
     const files = makeFindingsFixture()
@@ -115,7 +112,6 @@ const MISSING_BINDING_ERROR = [
   "  [cause]: Error: Cannot find module '@oxlint/binding-darwin-arm64'",
 ].join("\n")
 
-// A lockfile that a newer Adamantite version wrote.
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 const HEALTHY_FILES = {
@@ -133,8 +129,6 @@ function runtimeListener() {
   // Stands in for the SIGINT listener of the runtime. Only its identity matters.
 }
 
-// The healthy project, with a lockfile that Adamantite `recorded` wrote and Adamantite 0.47.0
-// installed.
 function runOnSetup(recorded: string) {
   return Effect.gen(function* () {
     const logLines: unknown[] = []
@@ -205,7 +199,6 @@ describe("doctor", () => {
 
   it.effect("report a missing install before it reads the workspace packages", () =>
     Effect.gen(function* () {
-      // A workspace package manifest that does not parse must not hide the install instruction.
       const files = createFileSystemTestContext({
         files: {
           "package.json": manifest({ workspaces: ["packages/*"] }),
@@ -239,7 +232,6 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      // One line: no intro, note, or outro comes with the Markdown.
       expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
         [
           "# Adamantite doctor findings",
@@ -397,7 +389,6 @@ describe("doctor", () => {
       const files = makeFindingsFixture()
       const logLines: unknown[] = []
 
-      // A nonzero agent exit must not matter: reassessment is the oracle.
       const runner = makeHandoffRunner({
         agentExit: 1,
         onAgentRun: () => {
@@ -415,7 +406,6 @@ describe("doctor", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)).toStrictEqual([
         expect.objectContaining({
-          // The seeded agent often cannot reach `adamantite` on PATH; the prompt must say how.
           args: [
             expect.stringMatching(
               /^# Adamantite doctor findings\n[\s\S]*knip[\s\S]*`npx` or `pnpm exec`/u
@@ -450,7 +440,6 @@ describe("doctor", () => {
         FINDING_NOTE,
         FOUND_ISSUES,
       ])
-      // The copy offer defaults to yes, and the user declines it.
       expect(terminal.output()).toContain(
         "? Copy the agent prompt? › (Y/n)✔ Copy the agent prompt? … no"
       )
@@ -459,7 +448,6 @@ describe("doctor", () => {
 
   it.effect("print and copy the prompt when the agent CLI is missing", () =>
     Effect.gen(function* () {
-      // Installed at menu time, gone at spawn time: the race the fallback covers.
       const { exit, logLines, terminal } = yield* runResolution(
         ["enter"],
         makeHandoffRunner({ agentExit: "not-found" })
@@ -499,8 +487,7 @@ describe("doctor", () => {
     })
   )
 
-  // The session inherits stdin, so a Ctrl-C reaches the agent and Adamantite. Adamantite must not
-  // stop the agent mid-edit.
+  // The session inherits stdin, so a Ctrl-C reaches the agent and Adamantite.
   it.effect("ignore SIGINT while the agent session runs and restore the listeners after it", () =>
     Effect.gen(function* () {
       const listenersBefore = process.listeners("SIGINT")
@@ -548,7 +535,6 @@ describe("doctor", () => {
           "enter",
         ])
 
-        // Later catalog entries answer sooner, so the probes finish in the reverse of the menu order.
         const runner = createRunnerTestContext({
           implementation: ({ command }) =>
             Effect.sleep(
@@ -583,7 +569,6 @@ describe("doctor", () => {
         const exit = yield* runCommand(doctorCommand, ["--json"], {
           errorLines,
           files: makeFindingsFixture(),
-          // A terminal that can prompt, so the test shows that `--json` opens no menu.
           layers: [runner.layer, promptingLayer],
           logLines,
           terminal,

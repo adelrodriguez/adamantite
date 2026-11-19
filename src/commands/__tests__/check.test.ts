@@ -34,14 +34,12 @@ import {
 } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
-// The test project installs Oxfmt, Oxlint, and Adamantite.
 const installedLayer = makeModuleResolverLayer("/project", {
   "oxfmt/package.json": "node_modules/oxfmt/package.json",
   "oxlint/package.json": "node_modules/oxlint/package.json",
   ...ADAMANTITE_RESOLUTION,
 })
 
-// The test project installs Adamantite and only `tool`.
 function makeInstalledLayer(tool: "oxfmt" | "oxlint") {
   return makeModuleResolverLayer("/project", {
     [`${tool}/package.json`]: `node_modules/${tool}/package.json`,
@@ -49,8 +47,6 @@ function makeInstalledLayer(tool: "oxfmt" | "oxlint") {
   })
 }
 
-// A project that installs Adamantite `installed`, with a lockfile that Adamantite `recorded` wrote
-// when it names one.
 function makeSetupFiles(options: { installed: string; recorded?: string; selection?: Selection }) {
   const files = createFileSystemTestContext({
     files: makeAdamantitePackageFile(options.installed),
@@ -277,9 +273,6 @@ describe("check", () => {
         })
     )
 
-    // The CLI resolves the Oxlint runtime before it starts Oxlint, so the format stage still runs.
-    // The CLI prints the failure that the check returns, so the missing Oxlint stays that failure
-    // when the format stage fails too.
     it.effect.each([0, 1])(
       "check the formatting, then name the init command when the lockfile selects no script and Oxlint is missing, with Oxfmt exit %i",
       (formatExit) =>
@@ -324,7 +317,6 @@ describe("check", () => {
         })
     )
 
-    // `adamantite update` installs a selected tool, so its own failure stands.
     it.effect("keep the missing-package failure of a tool that the lockfile selects", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
@@ -342,7 +334,6 @@ describe("check", () => {
       })
     )
 
-    // Doctor reports the lockfile, and the tools fail as without a lockfile.
     it.effect("keep the missing-package failure when the lockfile does not decode", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
@@ -416,15 +407,12 @@ describe("check", () => {
         })
     )
 
-    // A failed stage already printed its report, so the last line names the setup repair.
     const OUTDATED = new SetupOutdated({
       installed: "0.47.0",
       path: LOCKFILE_PATH,
       recorded: "0.46.0",
     })
 
-    // The CLI prints each error after the stage reports, in this order, so the agent reads why a
-    // stage did not run, then the setup repair. The first error decides the exit code.
     it.effect.each([
       {
         args: [],
@@ -519,8 +507,6 @@ describe("check", () => {
       })
     )
 
-    // A CLI from another install, such as `npx adamantite@latest check`, judges the project as the
-    // project's own CLI does.
     it.effect("pass when the installed Adamantite wrote the lockfile and another one runs", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
@@ -536,7 +522,6 @@ describe("check", () => {
       })
     )
 
-    // Doctor reports the lockfile, and the stages run as without a lockfile.
     it.effect("pass when the lockfile does not decode", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()

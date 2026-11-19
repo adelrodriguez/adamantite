@@ -13,9 +13,6 @@ import * as Resolution from "#terminal/resolution.ts"
 
 const version = getPackageVersion()
 
-/**
- * What `doctor --json` prints: the assessment of the project.
- */
 export const Report = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   ...ProjectAssessment.fields,

@@ -9,18 +9,9 @@ import * as Project from "#lib/project/index.ts"
 import * as Output from "#terminal/output.ts"
 
 interface ResolutionMenuOptions {
-  /**
-   * The command's display name, such as `Doctor`, in "Exit the agent to return to Doctor."
-   */
   readonly command: string
-  /**
-   * The question of the resolution menu.
-   */
   readonly message: string
   readonly prompt: string
-  /**
-   * What the command hands off, such as `findings`, in "Doctor can hand findings off when…"
-   */
   readonly subject: string
 }
 
@@ -28,16 +19,10 @@ class PromptCopied extends Data.TaggedClass("Copied") {}
 
 class ResolutionDeclined extends Data.TaggedClass("Declined") {}
 
-/**
- * The handoff ran and the agent session ended.
- */
 export class AgentSessionEnded extends Data.TaggedClass("Ended")<{
   readonly agent: CodingAgent
 }> {}
 
-/**
- * The agent CLI did not start.
- */
 class AgentStartFailed extends Data.TaggedClass("Failed")<{ readonly agent: CodingAgent }> {}
 
 type ResolveAction = CodingAgent | "copy" | "done"
@@ -46,8 +31,7 @@ const copyPrompt = Effect.fn("copyPrompt")(function* (prompt: string) {
   const terminal = yield* Terminal.Terminal
 
   yield* Console.log(prompt)
-  // OSC 52 asks the terminal to put the text on the system clipboard. A terminal that cannot write
-  // its own output cannot continue, so a failed write is a defect.
+  // OSC 52 asks the terminal to put the text on the system clipboard.
   yield* terminal
     .display(`\u001B]52;c;${Buffer.from(prompt).toString("base64")}\u0007`)
     .pipe(Effect.orDie)
@@ -65,20 +49,12 @@ export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: s
   }
 })
 
-/**
- * How long the menu waits after its prompt before it starts a coding agent. Effect's Node terminal
- * turns raw mode off 10 ms after the last prompt ends, and it does not wait for that release. A
- * release after the agent starts would turn off the raw mode that the agent set for itself. Effect
- * keeps the delay because a quick raw mode toggle between prompts can hang a Windows TTY
- * (https://github.com/Effect-TS/effect/pull/7106).
- */
+// Effect's Node terminal turns raw mode off 10 ms after the last prompt ends, and does not wait for
+// that release, which would turn off the raw mode of an agent that started before it. Effect keeps
+// the delay because a quick raw mode toggle between prompts can hang a Windows TTY
+// (https://github.com/Effect-TS/effect/pull/7106).
 export const RAW_MODE_RELEASE_WAIT = Duration.millis(200)
 
-/**
- * Offers a handoff to each installed coding agent, a copy of the Markdown prompt, or nothing, and
- * runs the choice. When the agent CLI does not start, it prints and copies the prompt instead. It
- * returns the user's choice, and `Resolution.offer` decides what happens next.
- */
 export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
 ) {
@@ -86,7 +62,6 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   const agents = yield* CodingAgents
   const installedAgents = yield* agents.detectInstalled(cwd)
 
-  // The menu names each installed agent, so only an empty result needs a line.
   if (installedAgents.length === 0) {
     yield* Output.info(
       `No supported coding agent was found on PATH. ${options.command} can hand ${options.subject} off when one of these CLIs is installed: ${codingAgents
@@ -120,7 +95,6 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
     `Handing the terminal to ${agent.name}. Exit the agent to return to ${options.command}.`
   )
 
-  // The agent sets its own terminal mode, so Effect's late raw mode release must run first.
   yield* Effect.sleep(RAW_MODE_RELEASE_WAIT)
 
   const started = yield* agents.handoff({ agent, cwd, prompt: options.prompt }).pipe(

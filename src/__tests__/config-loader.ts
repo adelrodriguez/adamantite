@@ -16,7 +16,6 @@ import packageJson from "../../package.json" with { type: "json" }
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 
-// The source file of each public module, such as `presets/lint/core.ts` for `adamantite/lint`.
 const PRESET_SOURCES = new Map<string, string>(
   Object.entries(packageJson.exports).flatMap(([subpath, target]) => {
     const built = Predicate.isString(target) ? target : target.default
@@ -28,9 +27,6 @@ const PRESET_SOURCES = new Map<string, string>(
   })
 )
 
-/**
- * The namespace of a config module, as `import()` gives it.
- */
 const ConfigModule = Schema.Struct({ default: Schema.optional(Schema.Unknown) })
 
 const decodeModule = Schema.decodeUnknownEffect(ConfigModule)
@@ -43,7 +39,6 @@ const decodeEncoder = Schema.decodeUnknownEffect(
   })
 )
 
-// The JSON that the encoder of the child process prints.
 const decodeEncoded = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ value: Schema.optional(Schema.Unknown) }))
 )
@@ -55,11 +50,6 @@ function toDataUrl(source: string) {
   return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
 }
 
-/**
- * The `custom()` of `adamantite/rules` for the module at `file`. It names its rules folder, plugin
- * name, and caller under the identity key, as `presets/rules/custom.ts` does, without the rule
- * files, which live in the in-memory files.
- */
 function makeCustomModule(file: string) {
   return toDataUrl(
     [
@@ -80,20 +70,12 @@ function makeCustomModule(file: string) {
   )
 }
 
-/**
- * A `ConfigLoader` that reads the in-memory files and starts no process. It strips the types of the
- * module and imports it in this process. An import of an Adamantite module loads its source, an
- * import that the `ModuleResolver` finds loads that in-memory module, and another package import
- * loads the package of this repository. The process tests and the smoke test cover the loader that
- * runs Node.js.
- */
 export const configLoaderLayer = Layer.effect(
   ConfigLoader,
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const resolver = yield* ModuleResolver
 
-    // The encoder of the child process, as a function of this process.
     const { encode } = yield* Effect.promise(
       () => import(toDataUrl(`export ${ENCODE_SOURCE}`))
     ).pipe(Effect.flatMap(decodeEncoder))
@@ -192,9 +174,6 @@ export const configLoaderLayer = Layer.effect(
   })
 )
 
-/**
- * The services of `layer`, with the in-memory `ConfigLoader` on its files and module resolver.
- */
 export function withConfigLoader<ROut, E, RIn>(
   layer: Layer.Layer<ROut | FileSystem.FileSystem | ModuleResolver, E, RIn>
 ) {

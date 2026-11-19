@@ -9,22 +9,11 @@ import * as Option from "effect/Option"
 import * as Queue from "effect/Queue"
 import * as Terminal from "effect/Terminal"
 
-/**
- * A key that a test sends to a prompt, such as `down`, `space`, or `enter`. `y` and `n` answer a
- * confirm prompt. `ctrl+c` quits the prompt, as Ctrl-C does in a terminal.
- */
 export type TestKey = "ctrl+c" | "down" | "enter" | "n" | "space" | "up" | "y"
 
 export interface TerminalTestContext {
-  /**
-   * The text of each OSC 52 clipboard write, decoded, in display order. `output` drops these writes
-   * with the other escape codes.
-   */
   readonly copied: () => string[]
   readonly layer: Layer.Layer<Terminal.Terminal>
-  /**
-   * Every frame that the prompts displayed, without ANSI escape codes, joined in display order.
-   */
   readonly output: () => string
 }
 
@@ -38,11 +27,6 @@ function toUserInput(key: TestKey): Terminal.UserInput {
   }
 }
 
-/**
- * A terminal that answers prompts with the given keys, in order. After the last key, the next
- * prompt dies, so a test that queues too few keys fails at once instead of waiting forever. A
- * `ctrl+c` key ends the input, so the prompt fails with `QuitError`.
- */
 export function createTerminalTestContext(keys: readonly TestKey[] = []): TerminalTestContext {
   const frames: string[] = []
 

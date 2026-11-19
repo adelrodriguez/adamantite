@@ -14,7 +14,6 @@ import updateCommand from "#commands/update.ts"
 
 type RunOptions = Parameters<typeof runCommand>[2]
 
-// One exit type for the three commands, so a test reads each exit the same way.
 const widen = Effect.map((exit: Exit.Exit<unknown, unknown>) => exit)
 
 const COMMANDS = {
@@ -26,10 +25,6 @@ const COMMANDS = {
     widen(runCommand(updateCommand, args, options)),
 }
 
-/**
- * Runs `init`, `update`, or `doctor` in `files` with an installer that installs nothing, and
- * returns the exit and the output lines.
- */
 export function runLifecycle(
   command: keyof typeof COMMANDS,
   files: FileSystemTestContext,
@@ -49,16 +44,10 @@ export function runLifecycle(
   })
 }
 
-/**
- * The hash of each file in `files`, by its path.
- */
 export function listHashes(files: FileSystemTestContext) {
   return Object.fromEntries(files.list().map((file) => [file, hashContent(files.read(file))]))
 }
 
-/**
- * A selection with nothing in it but `parts`.
- */
 export function makeSelection(parts: Partial<Selection>): Selection {
   return {
     agents: false,

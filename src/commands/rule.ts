@@ -37,10 +37,6 @@ const astFile = Argument.File("file", { mustExist: true }).pipe(
   Argument.withDescription("The JavaScript or TypeScript file to parse")
 )
 
-/**
- * What `rule ast --json` prints: the file, relative to the current directory, and its syntax tree
- * in the ESTree shape that Oxlint gives rules.
- */
 export const AstReport = Schema.Struct({
   file: Schema.String,
   program: Schema.Unknown,
@@ -240,9 +236,6 @@ function isAsExpected(result: TrialCaseResult) {
   return result.diagnostics.length > 0 === (result.case.expected === "reported")
 }
 
-/**
- * The verdict of a trial: one line for each case, with the reports of the rule below it.
- */
 export function renderTrial(
   rule: string,
   setting: TrialSetting,
@@ -286,10 +279,6 @@ export function renderTrial(
   return [`Trial of ${described}, in ${configs}.`, "", ...lines, "", summary].join("\n")
 }
 
-/**
- * What `rule try --json` prints: the rule, the setting of the trial, and what the rule reported on
- * each case.
- */
 export const TrialReport = Schema.Struct({
   results: Schema.Array(TrialCaseResult),
   rule: Schema.String,
@@ -340,8 +329,6 @@ const trial = Command.make("try", {
           workspace: yield* Project.readWorkspace(),
         })
       }).pipe(
-        // Exit code 1 means that a case differs. A failure before the verdict checked no case, so
-        // every failure here exits with 2.
         Effect.catch((error) =>
           Output.error(error.message).pipe(
             Effect.andThen(

@@ -9,12 +9,8 @@ import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 
 const ENTRY = join(import.meta.dirname, "../index.ts")
 
-/**
- * What the entry prints to standard error, and its exit code, in a project without Oxlint whose
- * lockfile selects `scripts`.
- */
 function runWithoutOxlint(scripts: Selection["scripts"]) {
-  // The entry takes its working directory as the project, and the working directory has no links.
+  // The working directory of a process is a real path.
   const project = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-entry-")))
 
   try {

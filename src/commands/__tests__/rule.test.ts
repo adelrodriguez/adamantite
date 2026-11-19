@@ -39,12 +39,10 @@ import {
 import { stringifyJson } from "#lib/shared/json.ts"
 import { readTestOxlint } from "#presets/__tests__/rule-fixtures.ts"
 
-// The Oxlint package folder of the project. CI sets `ADAMANTITE_TEST_OXLINT` to run `rule ast`,
-// with the probe, and `rule try` with the minimum Oxlint version that `peerDependencies` allows.
+// CI sets `ADAMANTITE_TEST_OXLINT` to run `rule ast`, with the probe, and `rule try` with the
+// minimum Oxlint version that `peerDependencies` allows.
 const TEST_OXLINT = readTestOxlint()
 
-// The build writes the Oxlint entry and the probe beside the CLI, so a run from source starts their
-// source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
   TestConsole.layer,
@@ -191,7 +189,6 @@ describe("rule test add", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      // The first frame offers the two rules only, because the helper file is not a rule.
       expect(terminal.output()).toBe(
         "? Which rule needs a test? › \n❯ no-debugger \n  no-window ✔ Which rule needs a test? …  no-debugger\n"
       )
@@ -569,7 +566,6 @@ describe("rule test", () => {
       name: "a rules folder without tests",
     },
     {
-      // Oxlint does not load a rules folder that no `custom()` call names, so its tests do not run.
       files: { ".adamantite/lint/no-a.test.ts": "// test\n", "package.json": PACKAGE_JSON },
       name: "tests in a folder that no custom() call loads",
     },
@@ -660,7 +656,6 @@ describe("rule try", () => {
     Effect.gen(function* () {
       const logLines: unknown[] = []
 
-      // The test spawner dies on each process, so the error comes before the copy.
       const exit = yield* runCommand(ruleCommand, ["try", "no-console", ...args], {
         files: createFileSystemTestContext(),
         logLines,
@@ -668,7 +663,6 @@ describe("rule try", () => {
 
       const failure = Option.getOrThrow(Exit.findErrorOption(exit))
 
-      // Exit code 1 means that a case differs, so an input that checks no case must not use it.
       expect(failure).toStrictEqual(
         new CommandFailed({ command: "rule try", exitCode: ChildProcessSpawner.ExitCode(2) })
       )
@@ -690,7 +684,6 @@ describe("rule try", () => {
       writeFileSync(join(project, "package.json"), JSON.stringify({ name: "app", type: "module" }))
       writeFileSync(join(project, "oxlint.config.ts"), "export default {}\n")
       writeFileSync(join(project, "src/index.ts"), "export const value = 1\n")
-      // The trial copies the files that git lists.
       spawnSync("git", ["init", "-q"], { cwd: project })
     })
 
@@ -705,7 +698,6 @@ describe("rule try", () => {
 
         writeFileSync(before, 'import fs from "node:fs"\nexport const cart = fs\n')
 
-        // `rule try` runs in the project, as the CLI does from the project folder.
         const exit = yield* Command.runWith(ruleCommand, { version: "test" })([
           "try",
           "no-restricted-imports",
@@ -756,8 +748,7 @@ describe("rule ast", () => {
     writeFileSync(join(project, file), content)
   }
 
-  // `rule ast` runs in the project. The CLI checks that the file exists from the process working
-  // directory, so the file path is absolute.
+  // `Argument.File` checks that the file exists from the working directory of the process.
   function runAst([file = "", ...args]: readonly string[]) {
     return Command.runWith(ruleCommand, { version: "test" })([
       "ast",
@@ -778,7 +769,6 @@ describe("rule ast", () => {
     mkdirSync(join(project, "node_modules"))
     symlinkSync(TEST_OXLINT, join(project, "node_modules/oxlint"))
     write("package.json", JSON.stringify({ name: "app", type: "module" }))
-    // The project config does not apply to the tree, so a rule that it turns on reports nothing.
     write("oxlint.config.ts", 'export default { rules: { "no-debugger": "error" } }\n')
   })
 
@@ -788,7 +778,6 @@ describe("rule ast", () => {
 
   it.live("print the tree that Oxlint gives rules, without parenthesized expressions", () =>
     Effect.gen(function* () {
-      // JSON has no bigint, so the tree writes the digits of `1n`.
       write(
         "src/value.ts",
         "debugger\nexport const value = (1 + 2) as number\nexport const big = 1n\n"
@@ -810,7 +799,6 @@ describe("rule ast", () => {
 
   it.live("print the file and its tree as JSON that decodes with the report schema", () =>
     Effect.gen(function* () {
-      // A disable comment does not hide the tree.
       write("src/value.ts", "/* oxlint-disable */\nexport const value = 1 // oxlint-disable-line\n")
 
       const { exit, logLines } = yield* runAst(["src/value.ts", "--json"])

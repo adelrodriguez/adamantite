@@ -17,25 +17,16 @@ import { printFileWrites, printInstalls, printScriptWrites } from "#terminal/set
 
 const version = getPackageVersion()
 
-/**
- * What `init --json` and `update --json` print: what Setup did, or null when it did not run, and
- * the assessment of the project that it left.
- */
 export const Report = Schema.Struct({
   assessment: ProjectAssessment,
   schemaVersion: Schema.Literal(1),
   setup: Schema.NullOr(Setup.Result),
 })
 
-/**
- * Assesses the target project after `setup`, and offers the repair of its findings through
- * `Resolution.offer`. The command fails while findings remain.
- */
 export const offerRepair = Effect.fn("offerRepair")(function* (
   command: "init" | "update",
   setup: Setup.Result | null
 ) {
-  // The lockfile decides which integrations apply, so each assessment reads the project again.
   const assess = Project.read().pipe(Effect.flatMap(assessProject))
   const assessment = yield* assess
 
@@ -50,11 +41,6 @@ export const offerRepair = Effect.fn("offerRepair")(function* (
   })
 })
 
-/**
- * The backend that `init` and `update` share once each has its selection: `Setup.apply`, then the
- * repair of the findings that remain in the project that it left. It prints what Setup did. It
- * returns whether Setup changed the project.
- */
 export const applySetup = Effect.fn("applySetup")(function* (
   command: "init" | "update",
   project: Project.Snapshot,

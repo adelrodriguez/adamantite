@@ -26,10 +26,6 @@ interface Row {
 
 const byFolder = Order.mapInput(Order.String, (row: Row) => row.folder)
 
-/**
- * Each layer of the `src` map and of the maps that it nests, with its folder and its direct
- * imports.
- */
 function listMapLayers() {
   const [, ...maps] = Schema.decodeSync(LayersRule)(config.rules["adamantite/layers"])
 
@@ -48,11 +44,6 @@ function listMapLayers() {
 
 const IMPORT_NAME = /^`([\w-]+)`$/u
 
-/**
- * The imports that one cell of the layer table states: exactly "None", or a comma-separated list of
- * backtick-quoted layer names. Any other entry stays in the list as `invalid: <text>`, so the
- * comparison with the layer map fails and shows it.
- */
 function parseImportsCell(cell: string): string[] {
   const text = cell.trim()
 
@@ -63,10 +54,6 @@ function parseImportsCell(cell: string): string[] {
         .map((entry) => IMPORT_NAME.exec(entry.trim())?.[1] ?? `invalid: ${entry.trim()}`)
 }
 
-/**
- * The rows of the layer table in `docs/architecture.md`: a folder, a job, and the imports, such as
- * `` | `src/lib/setup` | … | `integrations` | ``.
- */
 function listDocumentedLayers() {
   return architecture.split("\n").flatMap((line): Row[] => {
     const match = /^\| `(src\/[\w/-]+)` +\|[^|]+\|([^|]+)\|$/u.exec(line)

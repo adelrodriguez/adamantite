@@ -15,19 +15,12 @@ import { AgentSessionEnded, chooseResolution, offerPromptCopy } from "#terminal/
 
 const version = getPackageVersion()
 
-/**
- * What is left to resolve: the findings, the checks that failed, and the warnings that come with
- * them. Nothing remains when there is no finding and no failure.
- */
 export interface Remaining {
   readonly failures: readonly string[]
   readonly findings: readonly Finding[]
   readonly warnings: readonly string[]
 }
 
-/**
- * The findings and warnings of an assessment, as what remains.
- */
 export function fromAssessment({
   findings,
   warnings,
@@ -35,11 +28,6 @@ export function fromAssessment({
   return { failures: [], findings, warnings }
 }
 
-/**
- * What a command hands to an agent. A `Repair` resolves what remains, and the command fails while
- * something remains. `doctor`, `init`, and `update` offer the repair prompt of an assessment as
- * one. A `Task`, such as harden, is work that the user can decline.
- */
 type Work = { readonly _tag: "Repair"; readonly remaining: Remaining } | { readonly _tag: "Task" }
 
 const Works = Data.taggedEnum<Work>()
@@ -47,30 +35,11 @@ const Works = Data.taggedEnum<Work>()
 export const { Repair, Task } = Works
 
 interface Offer<E, R> {
-  /**
-   * The command, such as `doctor`. The menu and its lines name it, as in "Exit the agent to return
-   * to Doctor."
-   */
   readonly command: "doctor" | "harden" | "init" | "update"
-  /**
-   * Prints the JSON document of `--json`, such as `Output.json(Report, report)`.
-   */
   readonly document: Effect.Effect<void>
-  /**
-   * The question of the resolution menu.
-   */
   readonly message: string
-  /**
-   * The Markdown prompt that the agent gets, and that a run without a terminal prints.
-   */
   readonly prompt: string
-  /**
-   * What the command hands off, such as `findings`, in "Doctor can hand findings off when…"
-   */
   readonly subject: string
-  /**
-   * Reads the project again after an agent session, and returns what remains.
-   */
   readonly verify: Effect.Effect<Remaining, E, R>
   readonly work: Work
 }
@@ -83,7 +52,6 @@ function isPending(work: Work) {
   return Works.$is("Repair")(work) && hasRemaining(work.remaining)
 }
 
-// The warnings and the failures, without the findings.
 const printProblems = Effect.fn("printProblems")(function* (remaining: Remaining) {
   for (const warning of new Set(remaining.warnings)) {
     yield* Output.warning(warning)
@@ -111,17 +79,12 @@ function renderFinding(finding: Finding): string {
   return sections.join("\n\n")
 }
 
-// Each finding as a numbered note.
 const printFindings = Effect.fn("printFindings")(function* (findings: readonly Finding[]) {
   for (const [index, finding] of findings.entries()) {
     yield* Output.note(`${index + 1}. ${finding.title}`, renderFinding(finding))
   }
 })
 
-/**
- * The resolution menu, then the handoff and its verification. It returns the agent whose session
- * left nothing to resolve, or none when no agent session ran.
- */
 function resolve<E, R>(options: Offer<E, R>) {
   const name = String.capitalize(options.command)
 
@@ -154,7 +117,6 @@ function resolve<E, R>(options: Offer<E, R>) {
 
     const { agent } = resolution
 
-    // The agent's exit code does not decide the result. The project after the session does.
     const remaining = yield* options.verify
 
     yield* printProblems(remaining)
@@ -191,7 +153,6 @@ function resolve<E, R>(options: Offer<E, R>) {
   )
 }
 
-// A repair with only warnings still prints its warning report.
 function hasPrompt(work: Work) {
   return Works.$match(work, {
     Repair: ({ remaining }) => hasRemaining(remaining) || remaining.warnings.length > 0,
@@ -199,16 +160,7 @@ function hasPrompt(work: Work) {
   })
 }
 
-/**
- * Hands the prompt of a command to a coding agent, the one way that a command does. The mode of the
- * command decides how: `--json` prints the JSON document, a terminal shows the resolution menu, and
- * any other run prints the Markdown prompt. After an agent session it runs `verify`, and the
- * command succeeds only when nothing remains. An agent CLI that does not start leaves the prompt
- * printed instead. The command fails while a `Repair` has something left. It returns the agent
- * whose session left nothing to resolve, or none when no agent session ran.
- */
 export function offer<E, R>(options: Offer<E, R>) {
-  // Without a menu, nothing hands off, so the work stays as the command found it.
   const unattended = isPending(options.work)
     ? Effect.fail(
         new CommandFailed({ command: options.command, exitCode: ChildProcessSpawner.ExitCode(1) })

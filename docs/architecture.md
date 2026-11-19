@@ -17,6 +17,10 @@ command tree and the services, and each module of `src/commands` defines one com
 entry, `src/oxlint/index.ts`, and the probe plugin, `src/oxlint/probe.ts`, run in Oxlint's process,
 and build as `dist/oxlint.js` and `dist/probe.js`.
 
+`makeAppLayer` takes the `CommandRunner` layer as a parameter, so `src/__tests__/cli.test.ts` runs
+the same wiring with a runner that starts no process. It provides the local time zone, so the date
+that harden gives the agent is the date of the user.
+
 | Invariant                                                                                                                                                        | Held by                                                                                                                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A command runs in the target project, the folder that `yield* Project.Directory` gives, and no other code reads or changes the working directory of the process. | `eslint/no-restricted-properties` in `oxlint.config.ts`                                                                                             |
@@ -174,7 +178,7 @@ flowchart TD
 a coding agent, and `CodingAgents` in `src/lib/handoff/coding-agents.ts` does the handoff. A
 `Repair` fails the command while findings remain, and a `Task`, such as harden, is work that the
 user can decline. The command decides its mode once, with `Mode.provide` from
-`src/terminal/mode.ts`:
+`src/terminal/mode.ts`, and a command that decides none prints as `Plain`:
 
 | Mode    | When                                                 | The offer                                                                                                |
 | ------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -212,13 +216,36 @@ Each command is one module of `src/commands`:
 | `harden`       | Offer a prompt that tells a coding agent to move the project's coding standards up the enforcement ladder, from the facts that `src/lib/hardening/index.ts` computes. It produces no findings. |
 | `rule`         | Write a custom rule stub, print a syntax tree, run the saved rule tests, and run a trial in a copy of the project through `src/lib/hardening/trial.ts`.                                        |
 
-| Invariant                                                                                                                                                                                   | Held by                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Only `check`, `fix`, and `analyze` forward the arguments after `--`. The bridge gives them to one stage: the lint stage, the unused stage of `analyze`, or the stage that `--only` selects. | `src/__tests__/cli.test.ts`, for the commands, and the tests in `src/commands/__tests__`, for the stage |
-| A missing tool that no selected script runs fails with `ToolNotSelected`, which names the `init` command that adds the script.                                                              | The tests in `src/commands/__tests__`                                                                   |
-| A trial changes no file of the project.                                                                                                                                                     | `src/lib/hardening/__tests__/trial.test.ts`                                                             |
-| `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                                               | `src/commands/__tests__/rule.test.ts`                                                                   |
-| Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).                        | `secondPasses` in `presets/__tests__/idioms.ts`, which `src/lib/bridge/__tests__/index.test.ts` reads   |
+By default, `check` fails on Oxlint warnings, because agents copy the code that they read, and a
+warning that passes `check` spreads like code that has no report. It runs its stages before it
+compares the lockfile version, so an agent that runs `check` after an edit reads the reports of its
+code before the setup repair. A lockfile that fails with `InvalidLockfile` or `UnsupportedLockfile`
+leaves the stages as without a lockfile, and Doctor reports it.
+
+Without a lockfile, `update` has no selection to apply, so it offers the one finding, which names
+`adamantite init`.
+
+In a target project, `harden` runs only when the Adamantite version in `node_modules` is the
+running version, because the prompt offers the presets and rules of that version. The Adamantite
+repository does not install itself, so there `harden` compares the running version with the
+`version` of the root `package.json`, and does not check `node_modules`. After an agent session,
+`verify` in `src/commands/harden.ts` runs the checks of the bridge, reads the project again, and
+assesses it. A failed check, or a finding that remains, fails the session. A failed command already
+printed its report, so only another failure, such as a missing tool, adds its message. A link that
+was broken before the session, or a line of the decisions record that did not decode before it, is
+a gap that the user may not have approved, so a broken link or an undecodable line fails the
+session only when the session added it. A line has no key that survives a repair, so `verify`
+compares the text of the lines.
+
+| Invariant                                                                                                                                                                                                                   | Held by                                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Only `check`, `fix`, and `analyze` forward the arguments after `--`. The bridge gives them to one stage: the lint stage, the unused stage of `analyze`, or the stage that `--only` selects.                                 | `src/__tests__/cli.test.ts`, for the commands, and the tests in `src/commands/__tests__`, for the stage |
+| A missing tool that no selected script runs fails with `ToolNotSelected`, which names the `init` command that adds the script.                                                                                              | The tests in `src/commands/__tests__`                                                                   |
+| A trial changes no file of the project.                                                                                                                                                                                     | `src/lib/hardening/__tests__/trial.test.ts`                                                             |
+| `harden` fails before it computes its context when the Adamantite version that it reads is not the running version. It reads the version from `node_modules`, or in the Adamantite repository from the root `package.json`. | `src/commands/__tests__/harden.test.ts`                                                                 |
+| A broken link or an undecodable line of the decisions record fails the session of `harden` only when the session added it.                                                                                                  | `src/commands/__tests__/harden.test.ts`                                                                 |
+| `rule try` exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence.                                                                                                               | `src/commands/__tests__/rule.test.ts`                                                                   |
+| Oxlint applies one pass of fixes, so some fixes need a second `fix`, until Oxlint repeats its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).                                                        | `secondPasses` in `presets/__tests__/idioms.ts`, which `src/lib/bridge/__tests__/index.test.ts` reads   |
 
 ## Preset layout
 

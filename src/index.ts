@@ -7,8 +7,6 @@ import { makeAppLayer, reportFailure, runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
-// The entry of the CLI. Tsdown bundles it as `dist/index.js`, which `bin/adamantite` loads.
-
 const version = getPackageVersion()
 
 const program = Effect.gen(function* () {

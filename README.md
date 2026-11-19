@@ -524,10 +524,11 @@ adamantite check src -- --format github
 adamantite analyze --only monorepo -- --ignore-package package-a
 ```
 
-`check` prints a heading above each stage only on a plain run, such as `adamantite check` or
-`adamantite check src`. With `--only` or forwarded arguments, the output is the tool's own, so
-`adamantite check --only lint -- --format json` prints one JSON document. In a coding agent's
-shell, where Oxlint prints its agent report, `check` prints no heading either.
+`check`, `fix`, and `analyze` print a heading above each stage only on a plain run, such as
+`adamantite check` or `adamantite fix src`. With `--only` or forwarded arguments, the output is
+the tool's own, so `adamantite check --only lint -- --format json` prints one JSON document. In a
+coding agent's shell, where Oxlint prints its agent report, the three commands print no heading
+either.
 
 Package managers consume one separator, so package scripts need a second one:
 

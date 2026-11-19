@@ -29,6 +29,13 @@ function explainMissingTool<E>(selection: Option.Option<Selection>, error: E, to
   return Effect.fail(Option.getOrElse(toToolNotSelected(selection, tool), () => error))
 }
 
+const printsStageHeadings = Effect.fn("printsStageHeadings")(function* (
+  only: string | undefined,
+  forwardedArguments: readonly string[]
+) {
+  return only === undefined && forwardedArguments.length === 0 && !(yield* printsAgentReport)
+})
+
 function withoutHeading<E, R>(step: Effect.Effect<CommandRunOptions, E, R>) {
   return Effect.map(step, (command): CommandRunOptions => Struct.omit(command, ["title"]))
 }
@@ -68,10 +75,7 @@ export const check = Effect.fn("Bridge.check")(function* (
     }),
   }
 
-  const printsHeadings =
-    only === undefined && forwardedArguments.length === 0 && !(yield* printsAgentReport)
-
-  const stages = printsHeadings
+  const stages = (yield* printsStageHeadings(only, forwardedArguments))
     ? commands
     : { format: withoutHeading(commands.format), lint: withoutHeading(commands.lint) }
 
@@ -107,7 +111,7 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
   const targets = Array.dedupe(files)
   const forwardedStage = only ?? "lint"
 
-  const stages = {
+  const commands = {
     format: oxfmt.fix({
       cwd,
       files: targets,
@@ -120,6 +124,10 @@ export const fix = Effect.fn("Bridge.fix")(function* (options: {
       level,
     }),
   }
+
+  const stages = (yield* printsStageHeadings(only, forwardedArguments))
+    ? commands
+    : { format: withoutHeading(commands.format), lint: withoutHeading(commands.lint) }
 
   // Oxlint applies one pass of fixes, so a fix that causes a new report needs a second `fix`:
   // https://github.com/oxc-project/oxc/issues/16118
@@ -185,9 +193,13 @@ export const analyze = Effect.fn("Bridge.analyze")(function* (options: {
     }),
   }
 
+  const printsHeadings = yield* printsStageHeadings(only, forwardedArguments)
+
   const steps = (
     only === undefined ? [...(isMonorepo ? [stages.monorepo] : []), stages.unused] : [stages[only]]
-  ).map((step) => Effect.succeed(step))
+  ).map((step) =>
+    printsHeadings ? Effect.succeed(step) : withoutHeading(Effect.succeed<CommandRunOptions>(step))
+  )
 
   // A failed Sherif fix means no install happened, and Knip would then delete from a stale
   // dependency graph.

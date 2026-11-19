@@ -4,6 +4,7 @@ import * as Cause from "effect/Cause"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
+import * as ConfigProvider from "effect/ConfigProvider"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -315,6 +316,11 @@ const unexpectedInstallerLayer = Layer.succeed(DependencyInstaller)({
 
 export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
   readonly configLoads?: string[]
+  /**
+   * The environment variables that the command reads. The default is none, so a variable of the
+   * shell that runs the tests, such as `CLAUDECODE`, does not change the result.
+   */
+  readonly env?: Readonly<Record<string, string>>
   readonly errorLines?: unknown[]
   readonly files?: FileSystemTestContext
   readonly forwardedArguments?: readonly string[]
@@ -408,6 +414,10 @@ export function runCommand<
             })
           ),
           Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
+          Effect.provideService(
+            ConfigProvider.ConfigProvider,
+            ConfigProvider.fromUnknown(options.env ?? {})
+          ),
           Effect.provideService(Project.Directory, files.root),
           Effect.provide(testLayer)
         )

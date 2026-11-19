@@ -55,6 +55,12 @@ function makeSpawnerLayer(
 const FORMAT = Effect.succeed<CommandRunOptions>({ args: [], command: "oxfmt", title: "Format" })
 const LINT = Effect.succeed<CommandRunOptions>({ args: [], command: "oxlint", title: "Lint" })
 
+// The steps of `check` when it prints no heading, such as in an agent's shell.
+const UNTITLED = [
+  Effect.succeed<CommandRunOptions>({ args: [], command: "oxfmt" }),
+  Effect.succeed<CommandRunOptions>({ args: [], command: "oxlint" }),
+]
+
 /**
  * A step that finds no command, as the Oxlint step does in a project without Oxlint.
  */
@@ -198,6 +204,17 @@ describe("CommandRunner", () => {
       })
     )
 
+    it.effect("print no blank line between sections without a heading", () =>
+      Effect.gen(function* () {
+        const terminal = makeTerminal()
+        const runner = CommandRunner.make(() => Effect.succeed(ChildProcessSpawner.ExitCode(0)))
+
+        yield* runner.runConcurrently(UNTITLED).pipe(Effect.provide(terminal.layer))
+
+        expect(yield* TestConsole.logLines.pipe(Effect.provide(terminal.layer))).toStrictEqual([])
+      })
+    )
+
     it.effect("run every step, then fail with the first failure in the order of the steps", () =>
       Effect.gen(function* () {
         const terminal = makeTerminal()
@@ -279,6 +296,23 @@ describe("CommandRunner", () => {
 
         expect(seen).toStrictEqual([env])
       })
+    )
+  })
+
+  describe("sections without a heading", () => {
+    it.effect.each(["runAll", "runUntilFailure"] as const)(
+      "$0 prints no blank line between them",
+      (method) =>
+        Effect.gen(function* () {
+          const runner = CommandRunner.make(() => Effect.succeed(ChildProcessSpawner.ExitCode(0)))
+
+          const logs = yield* runner[method](UNTITLED).pipe(
+            Effect.andThen(TestConsole.logLines),
+            Effect.provide(TestConsole.layer)
+          )
+
+          expect(logs).toStrictEqual([])
+        })
     )
   })
 

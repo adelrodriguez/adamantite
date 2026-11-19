@@ -81,7 +81,6 @@ describe("check", () => {
           {
             ...OXLINT_COMMAND,
             args: [...OXLINT_COMMAND.args, "--deny-warnings", "--format", "github"],
-            title: "🔍 Linting",
           },
         ])
       })
@@ -103,7 +102,6 @@ describe("check", () => {
             command: "node",
             cwd: "/project",
             name: "oxfmt",
-            title: "✨ Checking formatting",
           },
         ])
       })
@@ -210,6 +208,72 @@ describe("check", () => {
         ])
       })
     )
+
+    it.effect("print a heading before each tool for the files that the user names", () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: { "index.ts": "export const value = 1\n" },
+        })
+
+        const runner = createRunnerTestContext()
+        const logLines: unknown[] = []
+
+        yield* runCommand(checkCommand, ["index.ts"], {
+          files,
+          layers: [runner.layer, toolsInstalledLayer],
+          logLines,
+        })
+
+        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toStrictEqual([
+          "✨ Checking formatting · adamantite (oxfmt)",
+          "",
+          "🔍 Linting · adamantite (oxlint)",
+        ])
+      })
+    )
+
+    // A heading is for a person who reads the stages of a plain run. With `--only` or forwarded
+    // arguments, the output is the tool's own, such as `--format json` that a script parses. An
+    // agent reads Oxlint's agent report, which prints nothing for a passing lint, so a heading
+    // would end the output with no result.
+    it.effect.each<{
+      readonly args: readonly string[]
+      readonly env: Readonly<Record<string, string>>
+      readonly forwardedArguments: readonly string[]
+      readonly name: string
+    }>([
+      { args: ["--only", "lint"], env: {}, forwardedArguments: [], name: "with --only lint" },
+      { args: ["--only", "format"], env: {}, forwardedArguments: [], name: "with --only format" },
+      {
+        args: [],
+        env: {},
+        forwardedArguments: ["--format", "json"],
+        name: "with forwarded arguments",
+      },
+      {
+        args: [],
+        env: { CLAUDECODE: "1" },
+        forwardedArguments: [],
+        name: "when Oxlint prints its agent report",
+      },
+    ])("print no heading $name", ({ args, env, forwardedArguments }) =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+        const logLines: unknown[] = []
+
+        const exit = yield* runCommand(checkCommand, args, {
+          env,
+          forwardedArguments,
+          layers: [runner.layer, toolsInstalledLayer],
+          logLines,
+        })
+
+        expect({ logLines, success: Exit.isSuccess(exit) }).toStrictEqual({
+          logLines: [],
+          success: true,
+        })
+      })
+    )
   })
 
   describe("passthrough arguments", () => {
@@ -234,7 +298,6 @@ describe("check", () => {
             command: "node",
             cwd: "/project",
             name: "oxfmt",
-            title: "✨ Checking formatting",
           },
           {
             ...OXLINT_COMMAND,
@@ -245,7 +308,6 @@ describe("check", () => {
               "--format",
               "github",
             ],
-            title: "🔍 Linting",
           },
         ])
       })

@@ -122,10 +122,14 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       yield* toResult(options, yield* exitCode(options))
     })
 
+    // A blank line separates a heading from the section above it. A section without a heading
+    // follows the one above it directly.
     function toSections<E, R>(steps: ReadonlyArray<Step<E, R>>) {
       return steps.map((step, index) =>
         Effect.flatMap(step, (options) =>
-          index === 0 ? run(options) : Effect.andThen(Console.log(""), run(options))
+          index === 0 || options.title === undefined
+            ? run(options)
+            : Effect.andThen(Console.log(""), run(options))
         )
       )
     }
@@ -188,11 +192,11 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
           ),
           ({ queue, step }, index) =>
             Effect.gen(function* () {
-              if (index > 0) {
-                yield* Console.log("")
-              }
-
               if (step.title !== undefined) {
+                if (index > 0) {
+                  yield* Console.log("")
+                }
+
                 yield* Console.log(toHeading({ ...step, title: step.title }))
               }
 

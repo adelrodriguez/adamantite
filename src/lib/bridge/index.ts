@@ -3,15 +3,17 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as Struct from "effect/Struct"
 import type { FixLevel } from "#lib/integrations/oxlint/command.ts"
 import * as knip from "#lib/integrations/knip/command.ts"
 import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
+import { printsAgentReport } from "#lib/integrations/oxlint/agent-report.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
 import { probeAst } from "#lib/integrations/oxlint/probe.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
 import * as Project from "#lib/project/index.ts"
 import { type Selection, toToolNotSelected } from "#lib/project/selection.ts"
-import { CommandRunner } from "#lib/shared/command-runner.ts"
+import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
 import {
   CliNotFound,
   FailedToParseSource,
@@ -34,10 +36,21 @@ function explainMissingTool<E>(selection: Option.Option<Selection>, error: E, to
 }
 
 /**
+ * The command of `step` without the heading that the runner prints above it.
+ */
+function withoutHeading<E, R>(step: Effect.Effect<CommandRunOptions, E, R>) {
+  return Effect.map(step, (command): CommandRunOptions => Struct.omit(command, ["title"]))
+}
+
+/**
  * Checks the formatting with Oxfmt and lints with Oxlint at the same time, and prints the format
  * stage first. Both stages run. The operation fails with a missing Oxlint before a failed stage,
  * since a failed stage already printed why, or else with the first failure. The forwarded arguments
  * go to the lint stage, or to the stage that `only` selects.
+ *
+ * Only a plain run prints a heading for each stage. With `only` or forwarded arguments, the output
+ * is the tool's own, such as JSON that a script parses. When Oxlint prints its agent report, a
+ * passing lint prints nothing, and a heading would end the output with no result.
  */
 export const check = Effect.fn("Bridge.check")(function* (
   options: {
@@ -64,7 +77,7 @@ export const check = Effect.fn("Bridge.check")(function* (
   const runner = yield* CommandRunner
   const forwardedStage = only ?? "lint"
 
-  const stages = {
+  const commands = {
     format: oxfmt.check({
       cwd,
       files,
@@ -77,6 +90,13 @@ export const check = Effect.fn("Bridge.check")(function* (
       forwardedArguments: forwardedStage === "lint" ? forwardedArguments : [],
     }),
   }
+
+  const printsHeadings =
+    only === undefined && forwardedArguments.length === 0 && !(yield* printsAgentReport)
+
+  const stages = printsHeadings
+    ? commands
+    : { format: withoutHeading(commands.format), lint: withoutHeading(commands.lint) }
 
   // The stages read the files and write nothing, so they run at the same time.
   yield* (

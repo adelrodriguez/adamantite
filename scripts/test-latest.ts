@@ -14,6 +14,7 @@ import { arch, release, tmpdir, type } from "node:os"
 import { join, resolve } from "node:path"
 import process from "node:process"
 import { parseArgs } from "node:util"
+import type { TestModuleState, TestState } from "vitest/node"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
@@ -101,12 +102,22 @@ const Step = Schema.Struct({
 
 type Step = typeof Step.Type
 
+const REPORTED_STATES = {
+  failed: "failed",
+  passed: "passed",
+  pending: "pending",
+  queued: "queued",
+  skipped: "skipped",
+} as const satisfies { readonly [State in TestModuleState | TestState]: State }
+
+const ReportedState = Schema.Literals(Object.values(REPORTED_STATES))
+
 const Failure = Schema.Struct({
   diagnostic: Schema.String,
   fixtures: Schema.Array(Schema.String),
   id: Schema.String,
   rules: Schema.Array(Schema.String),
-  status: Schema.String,
+  status: Schema.Union([ReportedState, Schema.Literal("missing")]),
 })
 
 type Failure = typeof Failure.Type
@@ -134,7 +145,7 @@ const decodeReport = Schema.decodeSync(Schema.fromJsonString(Report))
 const ReportedResult = Schema.Struct({
   errors: Schema.Array(Schema.String),
   id: Schema.String,
-  state: Schema.String,
+  state: ReportedState,
 })
 
 const LatestResults = Schema.Struct({
@@ -316,7 +327,7 @@ function matchAll(text: string, group: "fixture" | "rule", patterns: readonly Re
   return EffectArray.sort(new Set(matches), Order.String)
 }
 
-function toFailure(id: string, status: string, messages: readonly string[]): Failure {
+function toFailure(id: string, status: Failure["status"], messages: readonly string[]): Failure {
   const diagnostic = messages.join("\n\n").replaceAll(ANSI, "")
 
   return {

@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { applySetup, offerRepair } from "#commands/setup.ts"
 import * as Project from "#lib/project/index.ts"
+import { readReleaseNotes } from "#lib/project/release-notes.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -18,7 +19,12 @@ export default Command.make("update", { json: Mode.json }).pipe(
 
       const changed = yield* Option.match(project.lockfile, {
         onNone: () => Effect.as(offerRepair("update", null), false),
-        onSome: (lockfile) => applySetup("update", project, lockfile.selection),
+        onSome: (lockfile) =>
+          // The lockfile still names the version that wrote it, so the notes are read first.
+          Effect.flatMap(
+            Effect.flatMap(Project.Directory, (root) => readReleaseNotes(root, lockfile.version)),
+            (releaseNotes) => applySetup("update", project, lockfile.selection, releaseNotes)
+          ),
       })
 
       yield* Output.outro(changed ? "✅ Update finished." : "✅ No managed updates were applied.")

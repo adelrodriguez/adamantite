@@ -65,7 +65,8 @@ Continue when the intended test files receive the configured rules.
 When Doctor reports that Oxlint cannot load a config or a rule file, read the error that it
 names. Load the rules folder with the default import from `adamantite/rules`, and import
 `definePlugin`, `defineRule`, and the authoring types from `adamantite/rules/plugin`. For a name
-that the installed package does not export, use the replacement that the changelog names. A rule
+that the installed package does not export, search the `CHANGELOG.md` of the installed
+`adamantite` package for the name, and use the replacement that it names. A rule
 file must load with type stripping, so replace TypeScript that Node.js cannot erase, such as an
 `enum`.
 

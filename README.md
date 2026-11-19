@@ -502,17 +502,25 @@ JSON document on standard output, and its other lines on standard error. With `-
 never asks a question and never starts an agent. The exit codes stay the same. Each document has a
 `schemaVersion`:
 
-| Command          | Document                                                                                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`.           |
-| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, decisions record, and fix history of the prompt. |
-| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `assessment` of the project after it.                             |
-| `rule ast`       | The `file` and its `program`.                                                                                                                                |
-| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                                      |
+| Command          | Document                                                                                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctor`         | The `selection`, or `null` when the lockfile does not read, the applicable integrations, the `findings`, the `warnings`, and the `packageActions`.               |
+| `harden`         | The configs, rules folders, instructions, documentation, agent reach, suppressions, override trials, scope, decisions record, and fix history of the prompt.     |
+| `init`, `update` | The `setup`: the file writes, the script writes, the installs, and the lockfile write. The `releaseNotes` of `update`. The `assessment` of the project after it. |
+| `rule ast`       | The `file` and its `program`.                                                                                                                                    |
+| `rule try`       | The `rule`, the `setting` of the trial, and the `results` of each case.                                                                                          |
 
 Each finding keeps its `id`, `integration`, `title`, `currentState`, and `goal`, and its `notes`
 and `reference` when it has them. The `setup` of `update` is `null` in a project that has no
 lockfile and no setup to record.
+
+The `releaseNotes` of `update` hold the `changelog` path, the version that the lockfile recorded
+in `from`, and the `releases` since that version, oldest first, each with its `version` and
+`notes`. The notes come from the `CHANGELOG.md` that the installed `adamantite` package ships, so
+they end at the installed version. `releaseNotes` is `null` for `init`, in a project without a
+lockfile, when the project installs no Adamantite, and when the installed package has no
+changelog. Without `--json`, `update` prints the notes as Markdown, or one link for each release
+in a terminal.
 
 ### Pass arguments to underlying tools
 

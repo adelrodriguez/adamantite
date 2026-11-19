@@ -27,6 +27,7 @@
   },
   "files": [
     "bin",
+    "CHANGELOG.md",
     "dist",
     "skills",
     "!skills/_artifacts"

@@ -180,7 +180,7 @@ folder, and no other file. The report has one outcome:
 | Outcome            | When                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `pass`             | The candidate passes, and no test regresses.                                                                                         |
-| `baseline-failure` | The baseline fails, so the run tests no newest version. Fix `main` first.                                                            |
+| `baseline-failure` | The baseline fails, so the run tests no newest version. Fix the tested `HEAD` first, which is `main` in the weekly workflow.         |
 | `install-failure`  | The update or an override does not install.                                                                                          |
 | `process-failure`  | The candidate writes no result, passes no test, such as when a test module cannot load its imports, or fails without a failing test. |
 | `regression`       | A test that the baseline passes fails, skips, or does not run in the candidate.                                                      |

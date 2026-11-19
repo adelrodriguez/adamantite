@@ -715,8 +715,8 @@ folder holds an `index.ts` that registers the rules, a `rules` folder with one m
 rule, and a `shared` folder with the helpers that only that plugin uses.
 `presets/lint/plugins/shared` holds the helpers that more than one plugin uses.
 
-`quality` and `quality-effect` started as a copy of
-[anti-slop](https://github.com/dmmulroy/anti-slop), and `testing` as a copy of
+`quality` started as a copy of [anti-slop](https://github.com/dmmulroy/anti-slop),
+`quality-effect` as a copy of its Effect rules, and `testing` as a copy of
 [landmines](https://github.com/interfere-inc/landmines). The `license.md` of each folder keeps the
 license of its source. `testing` drops the per-file allowlists of landmines: a file that needs an
 exception suppresses the rule with a reason, as `adamantite/require-suppression-reason` asks.

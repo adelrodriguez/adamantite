@@ -13,8 +13,7 @@ import { checkIsJsonArray, checkIsJsonObject, stringifyJson } from "#lib/shared/
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"
 
-// Semantic quick fixes need the language service diagnostics. Editor integrations hide the
-// corresponding Oxlint reports; CLI Oxlint still uses the Effect preset.
+// The semantic quick fixes need the diagnostics of the language service.
 export const LANGUAGE_SERVICE_PLUGIN = { diagnostics: true, name: LANGUAGE_SERVICE }
 
 const TSCONFIG_REFERENCE = `${JSON.stringify(
@@ -32,10 +31,6 @@ function findLanguageServicePlugin(plugins: JsonValue | undefined) {
     : undefined
 }
 
-/**
- * A finding when the root `tsconfig.json` lacks the language service entry, or the entry reports no
- * diagnostics. A monorepo gets guidance instead.
- */
 export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* (
   { workspace }: Project.Snapshot,
   integration: string

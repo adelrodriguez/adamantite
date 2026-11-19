@@ -33,16 +33,11 @@ function getScriptGuidance(
   }
 }
 
-/**
- * The Adamantite section of `AGENTS.md`, between its two marker comments.
- */
 export function renderAgentsSection({ isMonorepo, packageManager, scripts }: AgentsSectionOptions) {
   const selectedScriptGuidance = SCRIPT_ORDER.flatMap((script) =>
     scripts.includes(script) ? [getScriptGuidance(packageManager, script, isMonorepo)] : []
   )
 
-  // The scripts and customRules values carry their own trailing newline, so an empty value leaves
-  // no blank line.
   return fillTemplate(agentsSectionTemplate, {
     correctionsSection: CORRECTIONS_SECTION,
     customRules: checkRunsTool(scripts, "oxlint")

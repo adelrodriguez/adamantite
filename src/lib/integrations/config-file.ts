@@ -7,24 +7,13 @@ import type { Finding } from "#lib/integrations/base.ts"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
 
-/**
- * A TypeScript config that a tool integration renders whole, and the tool's own JSON configs, which
- * conflict with it. Oxlint, Oxfmt, and Knip each have one.
- */
 export interface ConfigFile {
   readonly conflicting: readonly string[]
   readonly path: string
   readonly tool: string
-  /**
-   * Why the project cannot keep a conflicting config beside the managed one, such as "Oxfmt loads
-   * no config when it finds both".
-   */
   readonly whyConflicting: string
 }
 
-/**
- * The conflicting JSON configs of `config` that the project at `cwd` has.
- */
 const findConflictingConfigs = Effect.fn("findConflictingConfigs")(function* (
   cwd: string,
   config: ConfigFile
@@ -37,11 +26,6 @@ const findConflictingConfigs = Effect.fn("findConflictingConfigs")(function* (
   })
 })
 
-/**
- * The managed config of the project at `cwd`, or nothing when a conflicting config is there. The
- * tool would not load the managed config beside it, so the project gets the conflict finding
- * instead.
- */
 export const renderConfigFile = Effect.fn("renderConfigFile")(function* (
   cwd: string,
   config: ConfigFile,
@@ -56,11 +40,6 @@ function listFiles(files: readonly string[]) {
   return files.map((file) => `\`${file}\``).join(", ")
 }
 
-/**
- * The findings for a managed config, as `readConfig` loads it: a conflicting JSON config, a missing
- * config, a config that does not load, and a loaded config that `inspect` rejects. `reference` is
- * what Adamantite writes.
- */
 export const assessConfigFile = Effect.fn("assessConfigFile")(function* <A>(
   cwd: string,
   config: ConfigFile,

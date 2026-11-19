@@ -27,10 +27,8 @@ import { formatJson } from "#lib/shared/json.ts"
 const SETTINGS = ".vscode/settings.json"
 const EXTENSIONS = ".vscode/extensions.json"
 
-// The project depends on Adamantite already, so init installs only the tools, and Doctor assesses.
 const PACKAGE_JSON = '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" } }\n'
 
-// The scripts that need the Oxc and Knip extensions, and VS Code.
 const INIT_ARGS = [
   "--non-interactive",
   "--script",
@@ -41,17 +39,12 @@ const INIT_ARGS = [
   "vscode",
 ]
 
-// The tests install no Oxfmt, so Setup writes each file as rendered.
-// `src/lib/setup/__tests__/index.test.ts` covers the layout that the project's Oxfmt gives it.
 const RECOMMENDATIONS = `${Effect.runSync(formatJson({ recommendations: ["oxc.oxc-vscode", "webpro.vscode-knip"] }))}\n`
 
 function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { ...files, "package.json": PACKAGE_JSON } })
 }
 
-/**
- * Runs a command in `files`. `installed` resolves the Effect packages of `effectEditorFiles()`.
- */
 function run(
   command: Parameters<typeof runLifecycle>[0],
   files: FileSystemTestContext,
@@ -170,7 +163,6 @@ describe("VS Code setup", () => {
     })
   )
 
-  // An earlier version wrote this file, and nobody changed it since (#837).
   it.effect("replace a file whose hash equals the hash that the lockfile recorded", () =>
     Effect.gen(function* () {
       const older = '{\n  "recommendations": ["oxc.oxc-vscode"]\n}\n'
@@ -208,7 +200,6 @@ describe("VS Code setup", () => {
         yield* run("init", files, INIT_ARGS)
         files.write(EXTENSIONS, '{ "recommendations": [] }\n')
 
-        // The selection no longer names VS Code.
         const { selection, written } = readLockfile(files)
 
         files.write(

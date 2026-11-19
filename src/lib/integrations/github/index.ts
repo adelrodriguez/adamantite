@@ -26,11 +26,7 @@ import { FailedToParseYaml } from "#lib/shared/errors.ts"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
-/**
- * A pattern that matches a package manager command that runs a script that `script` matches, as
- * `formatRunScript` writes it, such as `pnpm run check` or `deno task check`. Flags can come
- * between the package manager and its run verb, such as `pnpm --filter web run check`.
- */
+// A package manager accepts flags before its run verb, such as `pnpm --filter web run check`.
 function makeScriptCommandPattern(script: string) {
   return SUPPORTED_PACKAGE_MANAGERS.map((packageManager) => {
     const verb = getRunVerb(packageManager)
@@ -43,15 +39,10 @@ const workflowTemplate = getWorkflowTemplate()
 
 const WORKFLOWS_DIRECTORY = ".github/workflows"
 
-/**
- * The workflow that Adamantite writes whole, with a job for each check and analyze script of the
- * selection. It has no step that runs the saved rule tests, and Doctor requires none. A project can
- * add one, and the write rule keeps the changed workflow.
- */
 const WORKFLOW_PATH = `${WORKFLOWS_DIRECTORY}/adamantite.yml`
 
-// Only the parts of a job that the assessment reads. A matrix can be an expression, such as
-// `${{ fromJSON(needs.setup.outputs.matrix) }}`, so the matrix decodes on its own.
+// A matrix can be an expression, such as `${{ fromJSON(needs.setup.outputs.matrix) }}`, so the
+// matrix decodes on its own.
 const Job = Schema.Struct({
   steps: Schema.optionalKey(
     Schema.Array(
@@ -74,10 +65,6 @@ const Matrix = Schema.Struct({
   include: Schema.Array(Schema.Struct({ command: Schema.optionalKey(Schema.String) })),
 })
 
-/**
- * The commands that the jobs run, from the `run` of each step and the `command` of each matrix
- * `include` entry, and the `node-version` inputs of their steps.
- */
 function readJobs(jobs: ReadonlyArray<typeof Job.Type>) {
   const steps = jobs.flatMap((job) => job.steps ?? [])
 
@@ -181,10 +168,6 @@ type WorkflowSetup = Data.TaggedEnum<{
 
 const { Available, Unavailable } = Data.taggedEnum<WorkflowSetup>()
 
-/**
- * The package manager that the workflow installs with, or why Adamantite cannot write a workflow:
- * the selection runs no script in CI, or Adamantite cannot detect the project's package manager.
- */
 const readWorkflowSetup = Effect.fn("readWorkflowSetup")(function* (
   cwd: string,
   { scripts }: Selection
@@ -218,10 +201,6 @@ const parseJobs = (content: string, path: string) =>
     Effect.option
   )
 
-/**
- * The findings for the workflow: a missing workflow, and a workflow that the project changed, whose
- * jobs no longer run a CI script of the selection, or that hard-codes a Node.js version.
- */
 const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection) {
   const path = yield* Path.Path
   const setup = yield* readWorkflowSetup(cwd, selection)

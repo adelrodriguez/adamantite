@@ -7,7 +7,6 @@ const files = getShippedSkillFiles()
 
 const skills = [...new Set(Object.keys(files).map((file) => file.slice(0, file.indexOf("/"))))]
 
-// The anchor that GitHub gives a heading.
 function toAnchor(heading: string) {
   return heading
     .toLowerCase()
@@ -15,8 +14,6 @@ function toAnchor(heading: string) {
     .replaceAll(" ", "-")
 }
 
-// Each relative link of a skill file that leaves its skill, names no shipped file, or names no
-// heading of its target.
 function listBrokenLinks() {
   return Object.entries(files).flatMap(([file, content]) => {
     const skill = file.slice(0, file.indexOf("/"))
@@ -53,7 +50,6 @@ describe("shipped skills", () => {
   it.each([CUSTOM_RULES_SECTION, CORRECTIONS_SECTION])(
     "have the %s section that the prompts name",
     (section) => {
-      // AGENTS.md, rule add, and the harden prompt send agents to these sections by their names.
       expect(files[`${HARDENING_SKILL}/SKILL.md`]).toMatch(new RegExp(`^## ${section}$`, "mu"))
     }
   )
@@ -65,8 +61,6 @@ describe("shipped skills", () => {
   })
 
   it("name each skill folder that init writes in the setup guide", () => {
-    // The setup guide tells agents where `--agents` writes the skills, so a new agent folder must
-    // reach it.
     const { "adamantite/references/setup.md": setup } = files
     const folders = [...new Set(codingAgents.map((agent) => agent.skillsFolder))]
 

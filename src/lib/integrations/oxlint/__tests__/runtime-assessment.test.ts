@@ -73,9 +73,6 @@ function runAssess(
   )
 }
 
-/**
- * A project with Oxlint and tsrs and no native plugin.
- */
 function makeStockFiles() {
   return makeFiles({
     "node_modules/.bin/tsrs-lint": "",
@@ -87,9 +84,6 @@ function makeStockFiles() {
   })
 }
 
-/**
- * The finding of an Oxlint runtime that cannot run, with its one repair step.
- */
 function unavailable(currentState: string, goal: string) {
   return {
     currentState,

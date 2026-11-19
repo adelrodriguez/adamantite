@@ -31,13 +31,7 @@ const decodeOxfmtManifest = Schema.decodeUnknownSync(
 const OXFMT_PEERS = { "@astrojs/compiler-rs": "^0.5.0", svelte: "^5.0.0", "vite-plus": "*" }
 
 interface Fixture {
-  /**
-   * The framework that `package.json` declares, with its specifier.
-   */
   readonly declares: Readonly<Record<string, string>>
-  /**
-   * The packages installed in `node_modules`, with their versions. Oxfmt is one of them.
-   */
   readonly installed: Readonly<Record<string, string>>
 }
 

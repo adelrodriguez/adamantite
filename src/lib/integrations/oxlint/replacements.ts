@@ -18,8 +18,6 @@ import qualityEffect from "#presets/lint/plugins/quality-effect/index.ts"
 import quality from "#presets/lint/plugins/quality/index.ts"
 import testing from "#presets/lint/plugins/testing/index.ts"
 
-// Each first-party plugin by its name. Presets load a plugin by file URL through `entry.ts`, so the
-// CLI imports the plugin modules here to read the metadata of their rules.
 const plugins: Readonly<Record<FirstPartyPlugin, Plugin>> = {
   adamantite,
   quality,
@@ -27,7 +25,6 @@ const plugins: Readonly<Record<FirstPartyPlugin, Plugin>> = {
   testing,
 }
 
-// The type of the declaration checks this Schema, so the two cannot drift apart.
 const ReplacementSchema: Schema.Codec<Replacement> = Schema.Struct({
   kind: Schema.Literal("overrides"),
   minimum: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
@@ -39,20 +36,14 @@ const ReplacementSchema: Schema.Codec<Replacement> = Schema.Struct({
 
 const decodeReplacement = Schema.decodeUnknownOption(ReplacementSchema)
 
-/**
- * A first-party rule and the hand-written config that it replaces.
- */
 interface Declaration {
   readonly plugin: FirstPartyPlugin
   readonly replacement: Replacement
   readonly rule: string
 }
 
-/**
- * Each first-party rule that declares `meta.docs.replaces`. Oxlint lets a rule keep its own
- * properties in `meta.docs`, so the value is unknown until it decodes. This module names no rule,
- * so a new declaration needs no change outside its rule.
- */
+// Oxlint lets a rule keep its own properties in `meta.docs`, so the value is unknown until it
+// decodes.
 export const declarations: readonly Declaration[] = Struct.keys(plugins).flatMap((plugin) =>
   Object.entries(plugins[plugin].rules).flatMap(([name, rule]) =>
     Option.toArray(decodeReplacement(rule.meta?.docs?.["replaces"])).map((replacement) => ({
@@ -63,19 +54,12 @@ export const declarations: readonly Declaration[] = Struct.keys(plugins).flatMap
   )
 )
 
-/**
- * A rule setting that turns the rule on: a severity other than off, then the options.
- */
 const isEnabled = Schema.is(
   Schema.TupleWithRest(Schema.Tuple([Schema.Literals(["deny", "error", "warn", 1, 2])]), [
     Schema.Unknown,
   ])
 )
 
-/**
- * The number of overrides that `config` has of the kind that `replacement` names: each turns on one
- * of its `rules` with its `option` set to a non-empty array.
- */
 function countOverrides(config: LintConfig, { option, rules }: Replacement): number {
   const setsOption = Schema.is(Schema.Struct({ [option]: Schema.NonEmptyArray(Schema.Unknown) }))
 
@@ -88,11 +72,6 @@ function countOverrides(config: LintConfig, { option, rules }: Replacement): num
   ).length
 }
 
-/**
- * The step that loads the plugin of a rule, or none when `config` loads it already. The step names
- * the presets that load the plugin without turning on rules, such as `architecture`, when there are
- * any, and places the preset after core, where the `core-preset-order` finding expects it.
- */
 function toPluginStep(
   file: string,
   config: LintConfig,
@@ -121,11 +100,6 @@ function toPluginStep(
   ]
 }
 
-/**
- * The warning for the config at `file` when it has enough overrides of the kind that a rule
- * replaces. The config is valid, so the report is a warning and fails no Doctor gate. Each step
- * takes its own numbered line.
- */
 function toWarning(
   file: string,
   config: LintConfig,
@@ -151,11 +125,7 @@ function toWarning(
   )
 }
 
-/**
- * The warnings for each config that Oxlint loads in the project, the root config and the config of
- * each workspace package, that states by hand what a first-party rule states in its options. Oxlint
- * replaces override options within one config, so each config counts apart.
- */
+// Oxlint replaces override options within one config, so each config counts apart.
 export const listReplacementWarnings = Effect.fn("listReplacementWarnings")(function* (
   project: Project.Snapshot
 ) {

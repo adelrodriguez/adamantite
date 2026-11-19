@@ -19,9 +19,7 @@ const PACKAGE_JSON = '{ "name": "test-project", "devDependencies": { "adamantite
 
 const ANALYZE = makeSelection({ scripts: ["analyze"] })
 
-// `adamantite analyze` runs Sherif only in a monorepo, so only a monorepo installs it.
 describe("Sherif setup", () => {
-  // A monorepo installs at the workspace root.
   it.effect.each([
     {
       name: "a monorepo",

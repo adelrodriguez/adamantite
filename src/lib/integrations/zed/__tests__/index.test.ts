@@ -54,7 +54,6 @@ describe("Zed setup", () => {
     })
   )
 
-  // Init never merges its settings into settings with comments, or stops on them.
   it.effect("keep settings that the user wrote, and report a broken Oxlint entry in doctor", () =>
     Effect.gen(function* () {
       const own = '{\n  // Team setting\n  "tab_size": 4,\n}\n'

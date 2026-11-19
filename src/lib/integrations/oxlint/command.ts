@@ -28,10 +28,6 @@ export const check = Effect.fn("Oxlint.check")(function* (
   } satisfies CommandRunOptions
 })
 
-/**
- * The Oxlint fixes to apply on top of the safe fixes: none, the suggested fixes, the dangerous
- * fixes, or both.
- */
 export type FixLevel = "all" | "dangerous" | "safe" | "suggested"
 
 const FIX_LEVEL_FLAGS = {

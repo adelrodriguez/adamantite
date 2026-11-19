@@ -10,15 +10,11 @@ import * as Stream from "effect/Stream"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
 
-/**
- * Oxlint prints a line, such as "No files found to lint.", before its JSON report.
- */
+// Oxlint prints a line, such as "No files found to lint.", before its JSON report.
 const JSON_REPORT_START = /^\{/mu
 
-/**
- * A path in an Oxlint report, with `/` between folders. Oxlint prints the separators of the
- * platform, and the trial and the overrides compare the path with project paths that git prints.
- */
+// Oxlint prints the folder separators of the platform, and the trial and the overrides compare a
+// report path with the project paths that git prints.
 const ReportPath = Schema.String.pipe(
   Schema.decodeTo(
     Schema.String,
@@ -46,9 +42,6 @@ const OxlintReport = Schema.Struct({
 
 const decodeOxlintReport = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintReport))
 
-/**
- * The JSON report in the output of `oxlint -f json`, or none when the output has no report.
- */
 export function parseOxlintReport(stdout: string) {
   const start = stdout.search(JSON_REPORT_START)
 
@@ -60,19 +53,15 @@ export const OxlintCommand = Context.Reference<typeof getOxlintCommand>(
   { defaultValue: () => getOxlintCommand }
 )
 
-/**
- * Runs Oxlint in `cwd`, with the Oxlint runtime of `project`. `output` has stdout and stderr
- * together, because Oxlint prints a config error to either stream.
- */
 export const runOxlint = Effect.fn("runOxlint")(
   function* (cwd: string, args: readonly string[], project: string = cwd) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const command = yield* (yield* OxlintCommand)(project)
 
-    // Oxlint loads TypeScript configs through Node, which warns about every typeless
-    // `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
-    // Any string decodes, and the default covers a missing variable, so only a provider that
-    // cannot read its source fails. That failure is a defect.
+    // Oxlint loads TypeScript configs through Node.js, which warns about each typeless `package.json`
+    // that it reparses as ESM, and the user cannot act on the warning. Any string decodes, and the
+    // default covers a missing variable, so only a provider that cannot read its source fails, which
+    // is a defect.
     const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
       Config.withDefault(""),
       Config.map((options) =>
@@ -99,6 +88,7 @@ export const runOxlint = Effect.fn("runOxlint")(
       { concurrency: "unbounded" }
     )
 
+    // Oxlint prints a config error to stdout or to stderr.
     return { exitCode, output: `${stdout}${stderr}`.trim(), stdout }
   },
   Effect.scoped,
@@ -110,11 +100,6 @@ export const runOxlint = Effect.fn("runOxlint")(
   )
 )
 
-/**
- * The files that Oxlint lints in `cwd`, relative to `cwd` with `/` between folders: the given
- * `files`, or all files when none are given, without the files that an ignore pattern or
- * `.gitignore` matches.
- */
 export const listLintedFiles = Effect.fn("listLintedFiles")(function* (
   cwd: string,
   files: readonly string[] = []

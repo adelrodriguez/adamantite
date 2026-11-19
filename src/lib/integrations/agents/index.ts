@@ -22,15 +22,8 @@ import { readDirectoryIfExists, readFileIfExists, readFileIfFile } from "#lib/sh
 
 const AGENTS_PATH = "AGENTS.md"
 
-/**
- * The files of the skills that this Adamantite build ships, keyed by POSIX paths relative to a
- * skill folder of an agent, such as `adamantite/SKILL.md`.
- */
 const shippedSkillFiles = getShippedSkillFiles()
 
-/**
- * Each shipped skill, with its files keyed by POSIX paths relative to its own folder.
- */
 const shippedSkills = Object.entries(
   Array.groupBy(Object.entries(shippedSkillFiles), ([file]) => file.slice(0, file.indexOf("/")))
 ).map(([name, files]) => ({
@@ -38,10 +31,6 @@ const shippedSkills = Object.entries(
   name,
 }))
 
-/**
- * The Adamantite section of `AGENTS.md` for the selection, with the commands of the project's
- * package manager. None when Adamantite cannot detect the package manager.
- */
 const readAgentsSection = Effect.fn("readAgentsSection")(function* (
   { workspace }: Project.Snapshot,
   { scripts }: Selection
@@ -54,11 +43,6 @@ const readAgentsSection = Effect.fn("readAgentsSection")(function* (
   )
 })
 
-/**
- * The findings for `AGENTS.md`: a missing file, and a file without the Adamantite section.
- * Adamantite writes `AGENTS.md` only when it does not exist, and never adds the section to a file
- * that the project wrote. In a monorepo, Doctor checks only the root.
- */
 const assess = Effect.fn("assess")(function* (cwd: string) {
   const path = yield* Path.Path
   const content = yield* readFileIfExists(path.join(cwd, AGENTS_PATH))
@@ -99,11 +83,6 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
   ]
 })
 
-/**
- * The state of one file of a skill copy: missing, what Adamantite writes, or changed. Adamantite
- * writes the shipped file in the layout that the project's Oxfmt gives it, so a file whose hash
- * equals the hash that the lockfile recorded is what Adamantite wrote.
- */
 const readSkillFile = Effect.fn("readSkillFile")(function* (
   { lockfile }: Project.Snapshot,
   file: string,
@@ -125,12 +104,6 @@ const readSkillFile = Effect.fn("readSkillFile")(function* (
     : "changed"
 })
 
-/**
- * The files of a skill copy that the shipped skill does not have, and that `update` keeps: a file
- * that the project added, or a file of an earlier version that the project changed. `update`
- * deletes a file of an earlier version that is unchanged since Adamantite wrote it, so that file is
- * not one.
- */
 const readKeptExtraFiles = Effect.fn("readKeptExtraFiles")(function* (
   { lockfile }: Project.Snapshot,
   copy: string,
@@ -147,7 +120,6 @@ const readKeptExtraFiles = Effect.fn("readKeptExtraFiles")(function* (
   return yield* Effect.filter(
     extras,
     Effect.fnUntraced(function* (entry) {
-      // A folder holds no content of its own. Its files are entries too.
       const content = yield* readFileIfFile(path.join(cwd, copy, entry))
 
       const recorded = Option.flatMapNullishOr(
@@ -164,12 +136,6 @@ const readKeptExtraFiles = Effect.fn("readKeptExtraFiles")(function* (
   )
 })
 
-/**
- * The findings for each copy of a shipped skill in the skill folders of the agents that the project
- * uses: a copy that misses a file of the skill, which `update` writes, and a copy with a changed
- * file, or with a file that the skill does not ship. An earlier version wrote that file before the
- * lockfile recorded it, or the project changed it, so `update` keeps it.
- */
 const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapshot) {
   const folders = yield* detectSkillFolders(yield* Project.Directory)
 
@@ -252,17 +218,10 @@ const assessSkill = Effect.fn("assessSkill")(function* (project: Project.Snapsho
 
 const SKILLS_LOCK_PATH = "skills-lock.json"
 
-// Only the part of the `skills` CLI's lock that the assessment reads.
 const SkillsLock = Schema.Struct({
   skills: Schema.Record(Schema.String, Schema.Unknown),
 })
 
-/**
- * The finding for each entry of a shipped skill in `skills-lock.json`. `npx skills add` records the
- * skill there, and `skills update` would then write the skill folders that Adamantite owns.
- * Adamantite does not edit a file that another tool owns, so a lock that does not decode gets no
- * finding.
- */
 const assessSkillsLock = Effect.fn("assessSkillsLock")(function* (cwd: string) {
   const path = yield* Path.Path
   const content = yield* readFileIfExists(path.join(cwd, SKILLS_LOCK_PATH))
@@ -305,7 +264,6 @@ export default {
 
       return { findings: [...agents, ...skill, ...lock], packageActions: [], warnings: [] }
     }),
-  // The skill goes to each skill folder of the agents that the project uses.
   files: (project: Project.Snapshot, selection: Selection) =>
     Effect.gen(function* () {
       const folders = yield* detectSkillFolders(yield* Project.Directory)

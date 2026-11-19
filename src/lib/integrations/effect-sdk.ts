@@ -17,10 +17,6 @@ import {
 import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject, formatJson } from "#lib/shared/json.ts"
 
-/**
- * The copy of the Effect editor SDK that VS Code starts, from the project root. The `prepare` of
- * the `vscode` integration builds it in `init` and `update`.
- */
 export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
 
@@ -29,10 +25,6 @@ const NATIVE_TYPESCRIPT = Schema.Struct({
   version: Schema.NonEmptyString,
 })
 
-/**
- * The version and gitHead of the first installed TypeScript 7 or later package, or none when that
- * package has no gitHead or no such package is installed.
- */
 const findNativeTypescript = Effect.fn("findNativeTypescript")(function* (cwd: string) {
   for (const name of ["typescript", "@typescript/native"]) {
     const directory = yield* resolvePackageDirectory(cwd, name)
@@ -58,10 +50,7 @@ const findNativeTypescript = Effect.fn("findNativeTypescript")(function* (cwd: s
   return Option.none()
 })
 
-// Match the installed native TypeScript by gitHead, as @effect/tsgo/lib/getExePath does. The source
-// is the folder of the Effect build of that compiler, with its standard libraries, which
-// `prepareSdk` copies. Resolving through Effect services keeps assessment read-only and tests off
-// the host filesystem.
+// Match the installed native TypeScript by gitHead, as @effect/tsgo/lib/getExePath does.
 const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   cwd: string,
   effectDirectory: string,
@@ -138,10 +127,6 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   })
 })
 
-/**
- * Whether the SDK copy holds the build that `source` names, with each of its files. Doctor reports
- * a stale or incomplete copy, and writes no file.
- */
 const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
   cwd: string,
   source: Effect.Success<ReturnType<typeof resolveSdkSource>>
@@ -178,10 +163,6 @@ const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
   return copied.every(Boolean)
 })
 
-/**
- * Shared facts for the editor integrations. Each editor owns its settings. Only VS Code needs a
- * local SDK copy; Zed starts the installed upstream CLI directly.
- */
 export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: string) {
   const directory = yield* resolvePackageDirectory(cwd, "@effect/tsgo")
 
@@ -207,9 +188,7 @@ export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: st
     return yield* new InvalidConfigFormat({ path: presetPath })
   }
 
-  // The schema lists every Effect rule, including rules excluded from upstream presets. Each editor
-  // integration turns them off in the Oxlint server, so the Effect server alone supplies their
-  // diagnostics and the semantic quick fixes.
+  // The schema lists every Effect rule, also the rules that the upstream presets leave out.
   const rulesCustomization = Object.fromEntries(
     Object.keys(properties)
       .filter((rule) => rule.startsWith("effecttsgo/"))

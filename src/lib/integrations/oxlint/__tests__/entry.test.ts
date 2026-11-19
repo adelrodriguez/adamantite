@@ -16,10 +16,6 @@ import { ToolNotSelected } from "#lib/shared/errors.ts"
 
 const CWD = "/somewhere/else"
 
-/**
- * The Oxlint command of the project at `/project`, with `files` and the packages that `resolver`
- * finds.
- */
 function runIn(files: Readonly<Record<string, string>>, resolver: Layer.Layer<ModuleResolver>) {
   return getOxlintCommand("/project").pipe(
     Effect.provide([createFileSystemTestContext({ files }).layer, Path.layer, resolver])

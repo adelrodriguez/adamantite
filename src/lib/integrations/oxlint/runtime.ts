@@ -14,52 +14,25 @@ import { oxlintPlugins } from "#lib/integrations/oxlint/plugins/index.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { PackageNotInstalled } from "#lib/shared/errors.ts"
 
-/**
- * Oxlint finds its own file.
- */
 export class StockPart extends Data.TaggedClass("Stock") {}
 
-/**
- * Oxlint loads a plugin's build in place of its own file, after the entry sets `env` and loads the
- * `preload` module that swaps the file.
- */
 export class ReplacedPart extends Data.TaggedClass("Replaced")<{
   readonly env: Readonly<Record<string, string>>
   readonly preload: string
 }> {}
 
-/**
- * A file that Oxlint loads.
- */
 export type RuntimePart = StockPart | ReplacedPart
 
-/**
- * Oxlint runs as it is installed, so it fails only when it runs a type-aware rule.
- */
 export class NoBackend extends Data.TaggedClass("None") {}
 
-/**
- * Oxlint starts the installed tsrs through the `tsrs-lint` launcher at `launcher`.
- */
 export class TsrsBackend extends Data.TaggedClass("Tsrs")<{ readonly launcher: string }> {}
 
-/**
- * Oxlint starts the backend of a plugin that replaces the whole backend, with the plugin's
- * variables.
- */
 export class ReplacedBackend extends Data.TaggedClass("Replaced")<{
   readonly env: Readonly<Record<string, string>>
 }> {}
 
-/**
- * The type-aware backend that Oxlint starts.
- */
 type RuntimeBackend = NoBackend | ReplacedBackend | TsrsBackend
 
-/**
- * The variables that make Oxlint start the backend on `platform`. A variable without a value is
- * removed from the environment.
- */
 export function toBackendEnv(
   backend: RuntimeBackend,
   platform = process.platform
@@ -78,36 +51,18 @@ export function toBackendEnv(
   })
 }
 
-/**
- * What runs Oxlint for one project: the Oxlint package, its native binding, and its type-aware
- * backend.
- */
 export interface OxlintRuntime {
   readonly backend: RuntimeBackend
   readonly binding: RuntimePart
-  /**
-   * The folder of the Oxlint package that the project installs.
-   */
   readonly oxlint: string
 }
 
-/**
- * How a process starts Oxlint with a runtime: the variables to set, or to remove when a value is
- * undefined, the module to load before Oxlint, and the CLI module of Oxlint.
- */
 export interface OxlintLaunch {
   readonly cli: string
   readonly env: Readonly<Record<string, string | undefined>>
-  /**
-   * The preload module of a plugin, which swaps the stock binding for the plugin's build when
-   * Oxlint loads it.
-   */
   readonly preload: Option.Option<string>
 }
 
-/**
- * How a process starts Oxlint with `runtime` on `platform`.
- */
 export const toLaunch = Effect.fn("toLaunch")(function* (
   { backend, binding, oxlint }: OxlintRuntime,
   platform: NodeJS.Platform = process.platform
@@ -126,12 +81,8 @@ export const toLaunch = Effect.fn("toLaunch")(function* (
   }) satisfies OxlintLaunch
 })
 
-/**
- * The nearest `tsrs-lint` launcher in a `node_modules/.bin` folder from `project` up to the root,
- * as Oxlint looks for its backend. A workspace package often uses the launcher of the root
- * installation. Oxlint then also looks on `PATH`, but the project must install its own backend, so
- * a launcher on `PATH` does not count.
- */
+// Oxlint looks for its backend in each `node_modules/.bin` folder from the project up to the root,
+// and then on `PATH`. A workspace package often uses the launcher of the root installation.
 const findLauncher = Effect.fn("findLauncher")(function* (project: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -156,9 +107,6 @@ const findLauncher = Effect.fn("findLauncher")(function* (project: string) {
   )
 })
 
-/**
- * The installed tsrs, or no backend when no `node_modules/.bin` folder has a launcher for it.
- */
 const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (project: string) {
   return Option.match(yield* findLauncher(project), {
     onNone: (): RuntimeBackend => new NoBackend(),
@@ -166,12 +114,6 @@ const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (proj
   })
 })
 
-/**
- * The Oxlint runtime for the project at `project`. An Oxlint plugin with a native capability can
- * replace the binding or the backend when the project installs it. Only one plugin has one, so no
- * two overrides replace the same part. Without a backend override, Oxlint starts the installed
- * tsrs. The resolution reads files, but it loads no Oxlint module and changes no process variable.
- */
 export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* (project: string) {
   const oxlint = yield* resolvePackageDirectory(project, "oxlint")
 
@@ -189,8 +131,6 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
   const backend = overrides.flat().find((override) => override instanceof BackendOverride)
 
   return {
-    // An override replaces the whole backend, so the default and the native backend variables never
-    // mix.
     backend:
       backend === undefined
         ? yield* resolveDefaultBackend(project)

@@ -6,28 +6,16 @@ import * as Path from "effect/Path"
 import { codingAgents } from "#lib/handoff/coding-agents.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 
-/**
- * A project folder that coding agents load skills from, such as `.agents/skills`.
- */
 type SkillFolder = (typeof codingAgents)[number]["skillsFolder"]
 
-/**
- * Each skill folder once, in alphabetical order, which puts the shared `.agents/skills` first.
- */
 export const skillFolders: readonly SkillFolder[] = Array.sort(
   Array.dedupe(codingAgents.map((agent) => agent.skillsFolder)),
   Order.String
 )
 
-/**
- * The folder that most agents read: Codex, Cursor, Gemini CLI, and OpenCode.
- */
+// Codex, Cursor, Gemini CLI, and OpenCode read this folder.
 const SHARED_SKILL_FOLDER: SkillFolder = ".agents/skills"
 
-/**
- * The skill folders of the agents that a project uses: the shared `.agents/skills`, and each other
- * skill folder whose agent folder exists, such as `.claude` for `.claude/skills`.
- */
 export const detectSkillFolders = Effect.fn("detectSkillFolders")(function* (cwd: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path

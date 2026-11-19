@@ -267,11 +267,11 @@ const rule: Rule = {
     const predicateNames = new Set<string>()
     const annotatedNames = new Set<string>()
 
-    const reportFlow = (
+    function reportFlow(
       expression: ESTree.Expression,
       destination: WideningTarget | null,
       subject: string
-    ) => {
+    ) {
       if (destination === null) {
         return
       }
@@ -291,7 +291,7 @@ const rule: Rule = {
       })
     }
 
-    const checkAssignment = (node: ESTree.AssignmentExpression, environment: TypeEnvironment) => {
+    function checkAssignment(node: ESTree.AssignmentExpression, environment: TypeEnvironment) {
       if (node.left.type !== "Identifier" || !annotatedNames.has(node.left.name)) {
         return
       }
@@ -315,7 +315,7 @@ const rule: Rule = {
       )
     }
 
-    const checkPredicateCall = (node: ESTree.CallExpression, environment: TypeEnvironment) => {
+    function checkPredicateCall(node: ESTree.CallExpression, environment: TypeEnvironment) {
       const callee = unwrapExpression(node.callee)
 
       if (callee.type === "Identifier" && !predicateNames.has(callee.name)) {
@@ -367,7 +367,7 @@ const rule: Rule = {
       })
     }
 
-    const recordPredicateOwner = (node: ESTree.TSTypePredicate) => {
+    function recordPredicateOwner(node: ESTree.TSTypePredicate) {
       const owner = node.parent.parent
 
       if (
@@ -401,11 +401,11 @@ const rule: Rule = {
     }
 
     return withTypeBindings(context, (defer) => {
-      const checkAnnotated = (
+      function checkAnnotated(
         expression: ESTree.Expression,
         annotation: ESTree.TSTypeAnnotation | null | undefined,
         subject: () => string
-      ) => {
+      ) {
         if (annotation === null || annotation === undefined) {
           return
         }
@@ -415,7 +415,7 @@ const rule: Rule = {
         })
       }
 
-      const checkAssertion = (node: ESTree.TSAsExpression | ESTree.TSTypeAssertion) => {
+      function checkAssertion(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion) {
         if (hasParentAssertion(node)) {
           return
         }
@@ -429,7 +429,7 @@ const rule: Rule = {
         })
       }
 
-      const checkProperty = (node: ESTree.AccessorProperty | ESTree.PropertyDefinition) => {
+      function checkProperty(node: ESTree.AccessorProperty | ESTree.PropertyDefinition) {
         if (node.value === null) {
           return
         }

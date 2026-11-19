@@ -154,7 +154,7 @@ export type HardenContext = typeof HardenContext.Type
  * contains it. The root and the selected packages own the files that the scope keeps.
  */
 function selectPackages(path: Path.Path, cwd: string, workspace: Project.Workspace, scope: string) {
-  const contains = (folder: string, target: string) => {
+  function contains(folder: string, target: string) {
     const fromFolder = path.relative(folder, target)
 
     return (
@@ -174,7 +174,7 @@ function selectPackages(path: Path.Path, cwd: string, workspace: Project.Workspa
   const selectedPackages = packagesInScope.length > 0 ? packagesInScope : owner
 
   // The innermost package that contains the file owns it.
-  const isSelectedFile = (file: string) => {
+  function isSelectedFile(file: string) {
     const [innermost = cwd] = Array.sort(
       packageDirectories.filter((directory) => contains(directory, path.join(cwd, file))),
       byDepth
@@ -200,7 +200,7 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
   const path = yield* Path.Path
   const { contains, isSelectedFile } = selectPackages(path, cwd, workspace, scope)
 
-  const isReadInScope = (file: string) => {
+  function isReadInScope(file: string) {
     const folder = path.dirname(path.join(cwd, file))
 
     return contains(folder, scope) || contains(scope, folder)
@@ -307,7 +307,11 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   commits: Option.Option<number>
 ) {
   const path = yield* Path.Path
-  const relative = (target: string) => path.relative(cwd, target) || "."
+
+  function relative(target: string) {
+    return path.relative(cwd, target) || "."
+  }
+
   const { packageDirectories, selectedPackages } = selectPackages(path, cwd, workspace, scope)
   const projectScope = scope === cwd ? null : toProjectPath(path, cwd, scope)
 
@@ -649,16 +653,18 @@ function renderFixHistory(history: FixHistory, scope: HardenContext["scope"]) {
   // repository.
   const folder = quoteShellArgument(scope ?? ".")
 
-  const command = (range: string) =>
-    `\`git log ${range} --no-merges --format="%h %s" -- ${folder}\``
+  function command(range: string) {
+    return `\`git log ${range} --no-merges --format="%h %s" -- ${folder}\``
+  }
 
   // The agent reads a default count and a requested count in the same way.
-  const renderLast = ({ count }: { readonly count: number }) =>
-    [
+  function renderLast({ count }: { readonly count: number }) {
+    return [
       "Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.",
       "",
       command(`-n ${count}`),
     ].join("\n")
+  }
 
   return FixHistory.match(history, {
     Last: renderLast,

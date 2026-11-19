@@ -46,7 +46,11 @@ export default {
     Effect.gen(function* () {
       const cwd = yield* Project.Directory
       const path = yield* Path.Path
-      const relative = (target: string) => path.relative(cwd, target) || "."
+
+      function relative(target: string) {
+        return path.relative(cwd, target) || "."
+      }
+
       const packageDirectories = [cwd, ...workspace.packageDirectories]
       const { calls, unloadedConfigs } = customRules
       // A config that does not load can load any folder.

@@ -42,10 +42,10 @@ and this repository instruction.
 ### Use a standalone arrow only for an Effect chain
 
 Write a standalone function as an arrow only when the call that it returns is an Effect chain, and
-declare every other standalone function. The distinction keeps plain helpers separate from Effect
-composition. `project/standalone-functions` reports a module-level arrow that has a block body or
-returns a plain value, such as an object or a comparison. A rule gets no types, so it accepts an
-arrow that returns any call.
+declare every other standalone function, in a module and inside another function. The distinction
+keeps plain helpers separate from Effect composition. `project/standalone-functions` reports an
+arrow that a variable holds when the arrow has a block body or returns a plain value, such as an
+object or a comparison. A rule gets no types, so it accepts an arrow that returns any call.
 
 Spot it: A standalone arrow returns a call that is not an Effect chain, such as a type guard that
 calls `Array.isArray`.

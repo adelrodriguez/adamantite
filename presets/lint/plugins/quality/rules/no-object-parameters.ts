@@ -95,7 +95,7 @@ function resolvesToObject(type: ESTree.TSType, environment: TypeAliasEnvironment
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => {
-      const checkParameters = (node: ParameterOwner) => {
+      function checkParameters(node: ParameterOwner) {
         for (const parameter of node.params) {
           const annotation = functionParameterTypeAnnotation(parameter)
 

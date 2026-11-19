@@ -282,7 +282,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
     // copy. A real path can differ from `cwd` in a folder link, such as `/var` on macOS.
     const root = yield* fs.realPath(cwd)
 
-    const toProjectFolder = (file: string) => {
+    function toProjectFolder(file: string) {
       const relative = path.relative(root, file)
 
       return Option.liftPredicate(
@@ -450,11 +450,14 @@ export const tryRule = Effect.fn("tryRule")(
     const { name: ruleName, plugin } = splitRuleName(rule)
     const resolved = yield* resolveRule(rule, cwd)
     const copy = yield* makeProjectCopy(cwd, workspace)
-    const toProjectPath = (file: string) => path.relative(copy, file).split(path.sep).join("/")
+
+    function toProjectPath(file: string) {
+      return path.relative(copy, file).split(path.sep).join("/")
+    }
 
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
     // config can add a rule that the project config does not have.
-    const toRuleNotFound = (error: TrialLintFailed) => {
+    function toRuleNotFound(error: TrialLintFailed) {
       const detail = [
         `Rule '${ruleName}' not found in plugin '${plugin}'`,
         `Plugin '${plugin}' not found`,

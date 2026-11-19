@@ -94,6 +94,34 @@ tester.run("standalone-functions", rule, {
       code: "const compare = (order: Order) => (left: Item, right: Item) => {\n  return order(left.name, right.name)\n}",
       errors: [declare("compare")],
     },
+    // A function inside another function is standalone too.
+    {
+      code: `export function makeReader(path: Path) {
+  const relativePath = (file: string) => {
+    return path.relative("/", file)
+  }
+  return relativePath
+}`,
+      errors: [declare("relativePath")],
+    },
+    {
+      code: `export const listHidden = Effect.gen(function* () {
+  const isHidden = (file: string) => file === ".git"
+  return (yield* listFiles).filter(isHidden)
+})`,
+      errors: [declare("isHidden")],
+    },
+    {
+      code: `export const handlers = {
+  run(items: Item[]) {
+    const toName = (item: Item) => {
+      return item.name
+    }
+    return items.map(toName)
+  },
+}`,
+      errors: [declare("toName")],
+    },
   ],
   valid: [
     `export function toKnipWorkspace({ workspace }: Project, { presets }: Selection): KnipWorkspace {
@@ -121,12 +149,16 @@ tester.run("standalone-functions", rule, {
 })
 export const handlers = { run: () => 1, stop: function () {} }`,
     'const run = Effect.fn("run")(function* (path: string) {\n  return yield* readFile(path)\n})',
-    // The rule covers only the functions of the module scope.
-    `export function makeReader(path: Path) {
-  const relativePath = (file: string) => {
-    return path.relative("/", file)
-  }
-  return relativePath
+    // A function inside another function that directly returns an Effect chain.
+    `export function makeReader(fs: FileSystem) {
+  const read = (path: string) => fs.readFileString(path).pipe(Effect.orDie)
+  return read
+}`,
+    // A callback inside a function has no name of its own.
+    `export function listNames(items: Item[]) {
+  return items.map((item) => {
+    return item.name
+  })
 }`,
   ],
 })

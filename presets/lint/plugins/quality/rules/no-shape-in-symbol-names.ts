@@ -32,7 +32,7 @@ function moduleExportName(name: ESTree.ModuleExportName): string {
  */
 const rule: Rule = {
   createOnce(context) {
-    const report = (node: DeclaredName) => {
+    function report(node: DeclaredName) {
       if (!containsForbiddenSymbolName(node.name)) {
         return
       }
@@ -44,7 +44,7 @@ const rule: Rule = {
       })
     }
 
-    const reportMemberKey = ({ computed, key }: Member) => {
+    function reportMemberKey({ computed, key }: Member) {
       if (!computed && (key.type === "Identifier" || key.type === "PrivateIdentifier")) {
         report(key)
       }

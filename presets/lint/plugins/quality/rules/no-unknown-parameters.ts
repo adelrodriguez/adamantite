@@ -340,7 +340,7 @@ function isParserInput(
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => {
-      const checkParameters = (node: ParameterOwner) => {
+      function checkParameters(node: ParameterOwner) {
         for (const [index, parameter] of node.params.entries()) {
           const annotation = functionParameterTypeAnnotation(parameter)
 

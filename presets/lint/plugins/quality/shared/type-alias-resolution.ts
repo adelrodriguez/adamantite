@@ -115,7 +115,7 @@ export function withTypeBindings(
   let bindingsByName: BindingIndex | null = null
   let environment: TypeAliasEnvironment | null = null
 
-  const record = (node: TypeBindingNode) => {
+  function record(node: TypeBindingNode) {
     if (bindingsByName !== null) {
       recordBinding(node, bindingsByName)
     }
@@ -410,11 +410,11 @@ export function resolvedTypeMatches(
   environment: TypeAliasEnvironment,
   matcher: ResolvedTypeMatcher
 ): boolean {
-  const evaluate = (
+  function evaluate(
     current: ESTree.TSType,
     substitutions: Substitutions,
     resolvingAliases: ReadonlySet<ESTree.TSTypeAliasDeclaration>
-  ): boolean => {
+  ): boolean {
     if (current.type === "TSTypeReference") {
       const reference = namedTypeReference(current)
       const name = reference === null || reference.global ? null : reference.name

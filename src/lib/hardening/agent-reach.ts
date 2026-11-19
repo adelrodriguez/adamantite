@@ -142,7 +142,7 @@ function readAnchors(prose: string) {
   const written = new Map<string, number>()
   const cleaned = new Map<string, number>()
 
-  const addNumbered = (occurrences: Map<string, number>, slug: string) => {
+  function addNumbered(occurrences: Map<string, number>, slug: string) {
     let anchor = slug
 
     while (occurrences.has(anchor)) {
@@ -236,7 +236,7 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
     )
   )
 
-  const resolve = (candidates: readonly string[]) => {
+  function resolve(candidates: readonly string[]) {
     const normalized = candidates.flatMap((candidate) => {
       const normalizedCandidate = posix.normalize(candidate)
 
@@ -266,7 +266,7 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
    * The links of `file` to a file of the project, with the anchor of each. A link to a heading of
    * `file` itself, such as `#tests`, has `file` as its target.
    */
-  const getLinks = (file: string) => {
+  function getLinks(file: string) {
     const text = (prose.get(file) ?? "").replaceAll(CODE_SPAN, "")
 
     return [...matchAll(text, INLINE_LINK), ...matchAll(text, LINK_DEFINITION)].flatMap((link) => {
@@ -291,15 +291,22 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
     })
   }
 
-  const getLinkTargets = (file: string) =>
-    getLinks(file).flatMap((link) => (link.target === file ? [] : [link.target]))
+  function getLinkTargets(file: string) {
+    return getLinks(file).flatMap((link) => (link.target === file ? [] : [link.target]))
+  }
 
-  const getCodeSpans = (file: string) => matchAll(prose.get(file) ?? "", CODE_SPAN)
+  function getCodeSpans(file: string) {
+    return matchAll(prose.get(file) ?? "", CODE_SPAN)
+  }
 
-  const getReferences = (file: string) => [
-    ...getLinkTargets(file).flatMap((target) => resolve([target])),
-    ...getCodeSpans(file).flatMap((span) => resolve([posix.join(posix.dirname(file), span), span])),
-  ]
+  function getReferences(file: string) {
+    return [
+      ...getLinkTargets(file).flatMap((target) => resolve([target])),
+      ...getCodeSpans(file).flatMap((span) =>
+        resolve([posix.join(posix.dirname(file), span), span])
+      ),
+    ]
+  }
 
   const reached = new Set(agentsFiles)
   const queue = [...agentsFiles]

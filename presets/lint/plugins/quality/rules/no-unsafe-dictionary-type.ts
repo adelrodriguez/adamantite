@@ -180,11 +180,11 @@ function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): bo
  */
 const rule: Rule = {
   createOnce(context) {
-    const report = (node: ESTree.Node, value: string) => {
+    function report(node: ESTree.Node, value: string) {
       context.report({ data: { value }, messageId: "unsafeDictionary", node })
     }
 
-    const reportIfUnsafe = (node: ESTree.TSType, environment: TypeEnvironment) => {
+    function reportIfUnsafe(node: ESTree.TSType, environment: TypeEnvironment) {
       const unsafe = classifyUnsafeDictionary(node, environment)
 
       if (unsafe === null || !shouldReportType(node, environment)) {
@@ -194,7 +194,7 @@ const rule: Rule = {
       report(node, unsafe.unsafeValue)
     }
 
-    const reportUnsafeHeritage = (node: Heritage, environment: TypeEnvironment) => {
+    function reportUnsafeHeritage(node: Heritage, environment: TypeEnvironment) {
       const unsafe = classifyUnsafeHeritage(node, environment)
 
       if (unsafe !== null) {
@@ -203,13 +203,13 @@ const rule: Rule = {
     }
 
     return withTypeBindings(context, (defer) => {
-      const checkType = (node: ESTree.TSType) => {
+      function checkType(node: ESTree.TSType) {
         defer((typeAliases) => {
           reportIfUnsafe(node, { typeAliases })
         })
       }
 
-      const checkHeritage = (node: Heritage) => {
+      function checkHeritage(node: Heritage) {
         defer((typeAliases) => {
           reportUnsafeHeritage(node, { typeAliases })
         })

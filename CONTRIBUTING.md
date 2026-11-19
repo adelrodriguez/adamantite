@@ -60,6 +60,13 @@ Build and verify the packaged CLI:
 pnpm run test:build
 ```
 
+`pnpm run test:dist` also runs `scripts/test-smoke.ts`, which packs this checkout and installs the
+tarball in temporary projects: an npm project, an Effect project, a pnpm monorepo, and a pnpm
+project with Astro and Svelte files. The script installs the tarball before it runs `init`, because
+`init` keeps a dependency that the project already has, so the run tests this checkout and never
+installs `adamantite` from the registry. It then runs the commands of the packed CLI with the real
+tool binaries. When a step fails, the script keeps the projects and prints their folders.
+
 ## Make a change
 
 - Add or update tests for behavior changes, in the folder that [Place a test](#place-a-test)
@@ -88,6 +95,8 @@ Each kind of test has one place:
 - A test of one `src` module goes in the `__tests__` folder beside it. The helpers that tests in
   several folders share go in `src/__tests__/`.
 - Tests of a script in `scripts/` go in `scripts/__tests__/<script>.test.ts`.
+- RuleTester tests of the custom rules of this repository go in `.adamantite/lint/__tests__/`,
+  where `adamantite rule test`, which runs `node:test` files, does not look.
 - Benchmarks go in a `<name>.bench.ts` file beside the test of the module that they time, such as
   `src/lib/bridge/__tests__/index.bench.ts`.
 
@@ -97,9 +106,11 @@ Name each test file after the module that it tests, as `<folder>/__tests__/<name
 A test file with a test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest,
 belongs in the `PROCESS_RUN_TESTS` list of `config/tests.ts`. Keep that test in the file of its
 module, beside the unit tests, which then run with it. That list is the `presets` Vitest project,
-which `pnpm run test:presets` runs. Every other test file runs in the `unit` project, which must not
-touch the host filesystem. `pnpm run check` reports a unit test that imports a host layer, or a
-`node:fs` function that does more than read the repository.
+which `pnpm run test:presets` runs. The project installs the fixture packages in its
+`globalSetup`, `presets/__tests__/fixture-packages.ts`, and runs the benchmarks. Every other test
+file runs in the `unit` project, which must not touch the host filesystem. `pnpm run check`
+reports a unit test that imports a host layer, or a `node:fs` function that does more than read
+the repository.
 
 ## Validate a change
 
@@ -123,8 +134,9 @@ npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm run test:minimum-oxlint
 ```
 
-Without `ADAMANTITE_TEST_OXLINT`, the script runs the same tests with the Oxlint of the
-repository.
+With `ADAMANTITE_TEST_OXLINT`, the RuleTester tests import `oxlint/plugins-dev` from that folder,
+and `presets/__tests__/rule-fixtures.ts` lints the preset fixtures with its Oxlint. Without it, the
+script runs the same tests with the Oxlint of the repository.
 
 A fixture that imports a package, such as `vue`, needs the package in the fixture packages, not in
 the root `package.json`. Add it with an exact version, and commit the lockfile of the fixture
@@ -153,6 +165,32 @@ node scripts/test-latest.ts run --out /tmp/latest
 
 To test a chosen version instead of the newest, add `--override <package>@<version>`. A manual
 run of the workflow takes the same values in its `overrides` input.
+
+`run` installs the locked versions, the fixture packages included, and runs the preset tests: the
+baseline. It then updates the packages that `ROOT_PACKAGES` in `scripts/test-latest.ts` lists, with
+the packages that keep the version of one of them, such as `@vitest/ui`, and every fixture package.
+It applies each override and runs the same tests again: the candidate. The script installs the
+fixture packages itself, not in the `globalSetup` of the tests, so the report names their versions
+and a failed install is not a test failure. `scripts/latest-reporter.ts` writes the results of each
+run with the diff of each failure, which names the fixture file and the rule. The steps share a
+budget of 45 minutes, so a step that hangs ends before the job limit of the workflow, and the run
+still writes a report. Before it starts, `run` deletes the files that it writes from the report
+folder, and no other file. The report has one outcome:
+
+| Outcome            | When                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `pass`             | The candidate passes, and no test regresses.                                                                                         |
+| `baseline-failure` | The baseline fails, so the run tests no newest version. Fix `main` first.                                                            |
+| `install-failure`  | The update or an override does not install.                                                                                          |
+| `process-failure`  | The candidate writes no result, passes no test, such as when a test module cannot load its imports, or fails without a failing test. |
+| `regression`       | A test that the baseline passes fails, skips, or does not run in the candidate.                                                      |
+
+A test that both runs skip is not a failure, because the environment skips it, such as a Bun test
+on a machine without Bun. `node scripts/test-latest.ts publish --out <folder> --repo <owner/name>`
+reads the report. For a failure, it comments on the open issue with the same fingerprint, or opens
+one. The fingerprint holds the outcome, the failing tests, and their rules, or the error codes of
+the logs, and no version, so a failure that repeats with a newer patch release keeps its issue.
+`--dry-run` prints the `gh` command instead of running it.
 
 ### Time the toolchain
 

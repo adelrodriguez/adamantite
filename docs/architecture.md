@@ -152,7 +152,9 @@ that it names replace the recorded ones.
 The install uses the package manager that `detectPackageManager` in
 `src/lib/project/package-manager.ts` finds: the one that the `packageManager` field of
 `package.json` names, or else the one of a lockfile, in the project folder or the nearest folder
-above it that has either. A field that names an unsupported package manager does not count. In a
+above it that has either. A field that names an unsupported package manager does not count. When
+neither the field nor the lockfile shows the Yarn version, Adamantite treats the project as Yarn 1,
+so it adds root packages with `-W`. In a
 monorepo, `addRootDevDependencies` adds the packages at the workspace root. It clears the cache of
 `ModuleResolver` after the install, also when the install fails part way, because the install
 changes `node_modules`.

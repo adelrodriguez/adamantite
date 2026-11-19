@@ -66,7 +66,6 @@ const PACKAGE_MANAGERS = {
     lockfiles: ["yarn.lock"],
     run: "run",
     specifier: (pkg: string) => pkg,
-    // A project whose version neither the field nor the lockfile shows uses Yarn 1.
     workspaceRoot: (version: string | undefined) =>
       version === undefined || version.split(".")[0] === "1" ? ["-W"] : [],
   },

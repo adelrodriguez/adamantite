@@ -283,17 +283,19 @@ presets, so the presets agree on what a test is.
 The `effect` preset turns on the native `effecttsgo` rules of `@effect/tsgo`, which only the Effect
 builds of the Oxlint binding and of tsrs have. It enables the rules that report Effect code, and none
 that bans a platform API in code that is not Effect code. `EXCLUDED_RULES` in
-`presets/__tests__/effect.test.ts` lists each upstream rule that the preset leaves out, with the
-reason, and the test fails when `@effect/tsgo` adds a rule that is in neither list.
+`presets/__tests__/effect.test.ts` lists each rule of the four category presets of `@effect/tsgo`
+that the preset leaves out, with the reason, and the test fails when a category preset adds a rule
+that is in neither list. The preset also enables every rule of the first-party `quality-effect`
+plugin.
 
 | Invariant                                                                                                                                                                                                                              | Held by                                                                                                               |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Each preset of the list has a definition and a file in `presets/lint`.                                                                                                                                                                 | The type of `definitions`, and `src/lib/integrations/oxlint/__tests__/presets.test.ts`                                |
 | `package.json` exports core as `adamantite/lint` and each preset as `adamantite/lint/<name>`, without a wildcard, so the other modules below `presets/lint` stay private. The export map, the list, and the README import table agree. | `src/lib/integrations/oxlint/__tests__/presets.test.ts`, `src/__tests__/exports.test.ts`, and `scripts/test-smoke.ts` |
 | CLI code gets a public import from `publicImport()` in `src/lib/shared/package-exports.ts`, which accepts only a key of the export map.                                                                                                | The type checker. Nothing rejects a literal import.                                                                   |
-| A config that extends `jest` or `vitest` lints only the test files, and a project override that spreads its `plugins` and `rules` gets each rule.                                                                                      | `presets/__tests__/jest.test.ts` and `presets/__tests__/vitest.test.ts`                                               |
+| A config that extends `jest` or `vitest` gets their rules only in the test files, and a project override that spreads its `plugins` and `rules` gets each rule.                                                                        | `presets/__tests__/jest.test.ts` and `presets/__tests__/vitest.test.ts`                                               |
 | Each lint preset besides core is in a stack of `presets/__tests__/stacks.ts`.                                                                                                                                                          | `presets/__tests__/stacks.test.ts`                                                                                    |
-| The `effect` preset enables only rules that `@effect/tsgo` defines, and decides on each of them.                                                                                                                                       | `presets/__tests__/effect.test.ts`                                                                                    |
+| Each `effecttsgo` rule of the `effect` preset is in a category preset of `@effect/tsgo`, and the preset decides on each rule of those presets.                                                                                         | `presets/__tests__/effect.test.ts`                                                                                    |
 
 ## Managed plugins
 
@@ -313,7 +315,7 @@ plugin replaces.
 ## Type resets
 
 `adamantite/typescript` loads the type resets in `presets/typescript/resets`, through
-`presets/typescript/resets/index.d.ts`. Each reset replaces the type of one built-in API. Doctor
+`presets/typescript/resets/index.d.ts`. The resets change the types of built-in APIs. Doctor
 reports a library that loads them, from `src/lib/integrations/typescript/index.ts`.
 
 | Invariant                                                                                                                                                                                                    | Held by                                |
@@ -353,11 +355,12 @@ a rule.
 
 `custom()` in `presets/rules/custom.ts` runs while Oxlint loads the config. It finds the file that
 called it in the stack, resolves `dir` from that file, and turns on each rule file that
-`listRuleFiles` in `presets/rules/folder.ts` lists: a JavaScript or TypeScript file directly in the
-folder that is not a declaration or a test file and whose name does not start with `_`. Helpers live
-in `_` files and in subfolders. Oxlint then loads an entry module that calls `loadRules` from
-`presets/rules/load.ts` for the folder. `presets/rules/folder.ts` holds what `custom()`, `loadRules`,
-and the CLI share, and the export map does not list it.
+`listRuleFiles` in `presets/rules/folder.ts` lists: a regular file directly in the folder, not a
+symlink, whose extension is `.js`, `.mjs`, `.mts`, or `.ts`, that is not a declaration or a test
+file, and whose name does not start with `_`. Helpers live in `_` files and in subfolders. Oxlint
+then loads an entry module that calls `loadRules` from `presets/rules/load.ts` for the folder.
+`presets/rules/folder.ts` holds what `custom()`, `loadRules`, and the CLI share, and the export map
+does not list it.
 
 `writeEntryModule` writes the entry module to `node_modules/.cache/adamantite` above the rules
 folder, or to a folder in the OS temporary directory that only the current user can write. The
@@ -368,8 +371,8 @@ nothing in the project. The result names the folder, the plugin, and the caller 
 when the folder holds no rule, so Adamantite finds each rules folder that a loaded config reaches.
 
 `adamantite/rules/testing` connects RuleTester to `node:test`, so a rule test reports each case and
-sets the exit code. It is a separate export from `adamantite/rules/plugin`, so a rule never loads
-the test runner.
+sets the exit code. It is a separate export from `adamantite/rules/plugin`, so importing
+`adamantite/rules/plugin` does not load `node:test`.
 
 | Invariant                                                                                                                                                         | Held by                                                                                                              |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |

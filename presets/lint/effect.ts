@@ -10,7 +10,8 @@ const config: OxlintConfig = {
   },
   // Only the Effect builds of the Oxlint binding and tsrs, which @effect/tsgo ships, have the
   // `effecttsgo` rules, so plain `oxlint` stops with "Unknown plugin: 'effecttsgo'". The rules read
-  // their options from the `@effect/language-service` plugin entry in `tsconfig.json`.
+  // their options from the `@effect/language-service` plugin entry in `tsconfig.json`. See
+  // https://github.com/Effect-TS/tsgo
   // @ts-expect-error - Oxlint's `LintPluginOptionsSchema` lists only its built-in plugins. Remove
   // this line when Oxlint's config types accept `effecttsgo`.
   plugins: ["effecttsgo"],

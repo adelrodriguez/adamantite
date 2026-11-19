@@ -11,11 +11,14 @@ import {
   writeFileSync,
 } from "node:fs"
 import { arch, release, tmpdir, type } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, join, resolve } from "node:path"
 import process from "node:process"
 import { parseArgs } from "node:util"
+import type { TestModuleState, TestState } from "vitest/node"
 import * as EffectArray from "effect/Array"
+import * as Data from "effect/Data"
 import * as Order from "effect/Order"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
@@ -101,12 +104,22 @@ const Step = Schema.Struct({
 
 type Step = typeof Step.Type
 
+const REPORTED_STATES = {
+  failed: "failed",
+  passed: "passed",
+  pending: "pending",
+  queued: "queued",
+  skipped: "skipped",
+} as const satisfies { readonly [State in TestModuleState | TestState]: State }
+
+const ReportedState = Schema.Literals(Object.values(REPORTED_STATES))
+
 const Failure = Schema.Struct({
   diagnostic: Schema.String,
   fixtures: Schema.Array(Schema.String),
   id: Schema.String,
   rules: Schema.Array(Schema.String),
-  status: Schema.String,
+  status: Schema.Union([ReportedState, Schema.Literals(["missing", "unreadable"])]),
 })
 
 type Failure = typeof Failure.Type
@@ -134,7 +147,7 @@ const decodeReport = Schema.decodeSync(Schema.fromJsonString(Report))
 const ReportedResult = Schema.Struct({
   errors: Schema.Array(Schema.String),
   id: Schema.String,
-  state: Schema.String,
+  state: ReportedState,
 })
 
 const LatestResults = Schema.Struct({
@@ -142,7 +155,7 @@ const LatestResults = Schema.Struct({
   tests: Schema.Array(Schema.Struct({ ...ReportedResult.fields, module: Schema.String })),
 })
 
-const decodeLatestResults = Schema.decodeSync(Schema.fromJsonString(LatestResults))
+const decodeLatestResults = Schema.decodeResult(Schema.fromJsonString(LatestResults))
 
 const PackageJson = Schema.Struct({
   dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
@@ -283,21 +296,48 @@ interface TestRun {
   readonly tests: ReadonlyMap<string, ReportedTest>
 }
 
-function readTestRun(path: string): TestRun | undefined {
-  if (!existsSync(path)) {
-    return undefined
-  }
+type TestRunRead = Data.TaggedEnum<{
+  Missing: { readonly path: string }
+  Read: { readonly run: TestRun }
+  Unreadable: { readonly failure: Failure }
+}>
 
-  const results = decodeLatestResults(readFileSync(path, "utf8"))
+const TestRunRead = Data.taggedEnum<TestRunRead>()
 
-  return {
-    failedModules: new Map(
-      results.modules.flatMap((module) =>
-        module.errors.length > 0 ? [[module.id, module.errors] as const] : []
-      )
-    ),
-    tests: new Map(results.tests.map((test) => [test.id, test])),
-  }
+const isRead = TestRunRead.$is("Read")
+
+function readTestRun(path: string): TestRunRead {
+  return existsSync(path)
+    ? parseTestRun(basename(path), readFileSync(path, "utf8"))
+    : TestRunRead.Missing({ path })
+}
+
+export function parseTestRun(file: string, text: string): TestRunRead {
+  return Result.match(decodeLatestResults(text), {
+    onFailure: (error) =>
+      TestRunRead.Unreadable({ failure: toFailure(file, "unreadable", [error.message]) }),
+    onSuccess: (results) =>
+      TestRunRead.Read({
+        run: {
+          failedModules: new Map(
+            results.modules.flatMap((module) =>
+              module.errors.length > 0 ? [[module.id, module.errors] as const] : []
+            )
+          ),
+          tests: new Map(results.tests.map((test) => [test.id, test])),
+        },
+      }),
+  })
+}
+
+function listUnreadable(reads: readonly TestRunRead[]): Failure[] {
+  return reads.flatMap(
+    TestRunRead.$match({
+      Missing: () => [],
+      Read: () => [],
+      Unreadable: ({ failure }) => [failure],
+    })
+  )
 }
 
 const ANSI = new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, "g")
@@ -316,7 +356,7 @@ function matchAll(text: string, group: "fixture" | "rule", patterns: readonly Re
   return EffectArray.sort(new Set(matches), Order.String)
 }
 
-function toFailure(id: string, status: string, messages: readonly string[]): Failure {
+function toFailure(id: string, status: Failure["status"], messages: readonly string[]): Failure {
   const diagnostic = messages.join("\n\n").replaceAll(ANSI, "")
 
   return {
@@ -362,11 +402,13 @@ function isSkipped(test: ReportedTest | undefined): boolean {
   return test?.state === "skipped" || test?.state === "pending"
 }
 
-function listSkipped(runs: ReadonlyArray<TestRun | undefined>): string[] {
-  const [first, ...rest] = runs.filter((run) => run !== undefined)
+export function listSkipped(baseline: TestRunRead, candidate: TestRunRead): string[] {
+  if (!isRead(baseline) || !isRead(candidate)) {
+    return []
+  }
 
-  const skipped = [...(first?.tests.values() ?? [])].flatMap((test) =>
-    isSkipped(test) && rest.every((run) => isSkipped(run.tests.get(test.id))) ? [test.id] : []
+  const skipped = [...baseline.run.tests.values()].flatMap((test) =>
+    isSkipped(test) && isSkipped(candidate.run.tests.get(test.id)) ? [test.id] : []
   )
 
   return EffectArray.sort(skipped, Order.String)
@@ -399,19 +441,19 @@ interface Classification {
 }
 
 interface RunResults {
-  readonly baseline: TestRun | undefined
+  readonly baseline: TestRunRead
   readonly baselinePassed: boolean
-  readonly candidate: TestRun | undefined
+  readonly candidate: TestRunRead
   readonly candidatePassed: boolean
   readonly updated: boolean
 }
 
-function classify(results: RunResults): Classification {
+export function classify(results: RunResults): Classification {
   const { baseline, candidate } = results
 
   if (!results.baselinePassed) {
     return {
-      failures: baseline === undefined ? [] : listFailures(baseline),
+      failures: isRead(baseline) ? listFailures(baseline.run) : listUnreadable([baseline]),
       outcome: "baseline-failure",
     }
   }
@@ -420,13 +462,13 @@ function classify(results: RunResults): Classification {
     return { failures: [], outcome: "install-failure" }
   }
 
-  if (baseline === undefined || candidate === undefined) {
-    return { failures: [], outcome: "process-failure" }
+  if (!isRead(baseline) || !isRead(candidate)) {
+    return { failures: listUnreadable([baseline, candidate]), outcome: "process-failure" }
   }
 
-  const failures = listRegressions(baseline, candidate)
+  const failures = listRegressions(baseline.run, candidate.run)
 
-  if (![...candidate.tests.values()].some((test) => test.state === "passed")) {
+  if (![...candidate.run.tests.values()].some((test) => test.state === "passed")) {
     return { failures, outcome: "process-failure" }
   }
 
@@ -596,7 +638,10 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     writeFileSync(join(out, "lockfiles.diff"), read("git", ["diff", "--", ...LOCKFILES], worktree))
 
     const candidatePassed = updated && testPresets("candidate")
-    const candidate = updated ? readTestRun(join(out, "candidate.results.json")) : undefined
+
+    const candidate: TestRunRead = updated
+      ? readTestRun(join(out, "candidate.results.json"))
+      : TestRunRead.Missing({ path: join(out, "candidate.results.json") })
 
     const { failures, outcome } = classify({
       baseline,
@@ -632,7 +677,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
         os: `${type()} ${release()} ${arch()}`,
         pnpm: read("pnpm", ["--version"]).trim(),
       },
-      skipped: listSkipped([baseline, candidate]),
+      skipped: listSkipped(baseline, candidate),
       steps,
     }
 
@@ -722,33 +767,35 @@ function publishLatest(out: string, repo: string, dryRun: boolean): void {
   console.info(dryRun ? `Dry run: gh ${args.join(" ")}` : read("gh", args).trim())
 }
 
-const { positionals, values } = parseArgs({
-  allowPositionals: true,
-  options: {
-    "dry-run": { default: false, type: "boolean" },
-    out: { type: "string" },
-    override: { default: [], multiple: true, type: "string" },
-    repo: { type: "string" },
-  },
-})
+if (import.meta.main) {
+  const { positionals, values } = parseArgs({
+    allowPositionals: true,
+    options: {
+      "dry-run": { default: false, type: "boolean" },
+      out: { type: "string" },
+      override: { default: [], multiple: true, type: "string" },
+      repo: { type: "string" },
+    },
+  })
 
-const [command] = positionals
+  const [command] = positionals
 
-if (values.out === undefined) {
-  throw new Error("Expected --out <folder>.")
-}
-
-// Absolute, because Vitest writes the results from the temporary worktree.
-const out = resolve(values.out)
-
-if (command === "run") {
-  process.exitCode = runLatest(out, values.override) === "pass" ? 0 : 1
-} else if (command === "publish") {
-  if (values.repo === undefined) {
-    throw new Error("Expected --repo <owner/name>.")
+  if (values.out === undefined) {
+    throw new Error("Expected --out <folder>.")
   }
 
-  publishLatest(out, values.repo, values["dry-run"])
-} else {
-  throw new Error(`Expected the command run or publish, not ${command ?? "nothing"}.`)
+  // Absolute, because Vitest writes the results from the temporary worktree.
+  const out = resolve(values.out)
+
+  if (command === "run") {
+    process.exitCode = runLatest(out, values.override) === "pass" ? 0 : 1
+  } else if (command === "publish") {
+    if (values.repo === undefined) {
+      throw new Error("Expected --repo <owner/name>.")
+    }
+
+    publishLatest(out, values.repo, values["dry-run"])
+  } else {
+    throw new Error(`Expected the command run or publish, not ${command ?? "nothing"}.`)
+  }
 }

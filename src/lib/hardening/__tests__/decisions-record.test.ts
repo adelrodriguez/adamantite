@@ -33,17 +33,10 @@ const LATER_COMMIT = "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b"
 
 const encodeRecord = Schema.encodeSync(DecisionsRecord)
 
-/**
- * The text of a record that has one of `decisions` on each line.
- */
 function toLines(decisions: readonly object[]) {
   return decisions.map((decision) => `${JSON.stringify(decision)}\n`).join("")
 }
 
-/**
- * Reads a record with `content`. `scope` is the folder that `--path` selects, relative to the
- * project root.
- */
 function readRecord(content: string, scope?: string) {
   const context = createFileSystemTestContext({ files: { [DECISIONS_RECORD_PATH]: content } })
 
@@ -53,9 +46,6 @@ function readRecord(content: string, scope?: string) {
   ).pipe(Effect.provide([context.layer, Path.layer]))
 }
 
-/**
- * Reads a record with `content`, as `harden --json` prints it.
- */
 function readEncodedRecord(content: string, scope?: string) {
   return readRecord(content, scope).pipe(Effect.map((record) => encodeRecord(record)))
 }
@@ -111,8 +101,6 @@ describe("readDecisionsRecord", () => {
     })
   )
 
-  // A session of `packages/web` keeps the `id` of a standard and writes its own scope, so its line
-  // must not replace the decision that a session of `packages/api` recorded for the same standard.
   it.effect("keep a decision of each scope that has the same id", () =>
     Effect.gen(function* () {
       const api = { ...REQUIRED, scope: "packages/api" }
@@ -152,8 +140,6 @@ describe("readDecisionsRecord", () => {
       name: "leave out an id whose last line is approved",
     },
     {
-      // The user approves, for the whole project, what a session of `packages/web` rejected. The
-      // agent appends the `approved` line with the scope of the decision that it ends.
       decisions: [],
       lines: [
         { ...REQUIRED, scope: "packages/web" },
@@ -259,7 +245,6 @@ describe("readDecisionsRecord", () => {
     Effect.gen(function* () {
       const other = { ...REQUIRED, id: "default-exports" }
 
-      // The blank line is not a decision, and it keeps its place in the line numbers.
       const record = yield* readEncodedRecord(
         `${toLines([REQUIRED])}\n${text}\n${toLines([other])}`
       )
@@ -281,7 +266,6 @@ describe("readDecisionsRecord", () => {
           { head: LATER_COMMIT, session: "2026-04-01", tool: "a later key" },
         ]
 
-        // A session line is not a decision, and a scope does not leave one out.
         const record = yield* readEncodedRecord(toLines([REQUIRED, ...sessions]), "packages/api")
 
         expect(record).toHaveProperty("decisions", [REQUIRED])
@@ -308,12 +292,8 @@ describe("readDecisionsRecord", () => {
   })
 })
 
-// A session line of the whole project that recorded a commit.
 const SESSION = { head: COMMIT, session: "2026-03-14" }
 
-/**
- * The session line that covers `scope` in a record with `lines`.
- */
 function findSession(lines: readonly object[], scope?: string) {
   return readRecord(toLines(lines), scope).pipe(
     Effect.map((record) =>

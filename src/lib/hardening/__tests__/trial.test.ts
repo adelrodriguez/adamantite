@@ -76,7 +76,6 @@ const SILENT_RULE = [
   "",
 ].join("\n")
 
-// A workspace package that loads its own rules, and a root config that imports it by name.
 const WORKSPACE_FILES = {
   "oxlint.config.ts":
     'import { defineConfig } from "oxlint"\nimport tooling from "tooling"\n\nexport default defineConfig({ extends: [tooling] })\n',
@@ -90,7 +89,6 @@ const WORKSPACE_FILES = {
   }),
 }
 
-// The same package with its config in build output that git ignores.
 const BUILT_WORKSPACE_FILES = {
   ...WORKSPACE_FILES,
   ".gitignore": "node_modules\ndist\n",
@@ -103,8 +101,6 @@ const BUILT_WORKSPACE_FILES = {
   }),
 }
 
-// The same package with a dependency in its own `node_modules`, which git ignores, so the copy
-// links it.
 const WORKSPACE_DEPENDENCY_FILES = {
   ...WORKSPACE_FILES,
   "packages/tooling/index.ts": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\nimport { name } from "rules-name"\n\nexport default custom({ name })\n`,
@@ -134,7 +130,6 @@ function makeConfig(body: string) {
   ].join("\n")
 }
 
-// The fixtures without a workspace package declare no workspace.
 const NO_WORKSPACE: Project.Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
 
 function makeCase(filePath: string, expected: TrialCase["expected"], source?: string): TrialCase {
@@ -195,10 +190,8 @@ describe("renderTrialConfig", () => {
 
 describe("replaceConfigs", () => {
   it("take only a project copy, and each config one time", () => {
-    // A path in the project would rename the user's config, so it must not type-check.
     expectTypeOf<Parameters<typeof replaceConfigs>[0]>().not.toEqualTypeOf<string>()
     expectTypeOf<string>().not.toExtend<Parameters<typeof replaceConfigs>[0]>()
-    // A map holds each config one time, so a second replacement cannot move the trial config.
     expectTypeOf<Parameters<typeof replaceConfigs>[1]>().toEqualTypeOf<
       ReadonlyMap<string, (base: string) => string>
     >()
@@ -220,9 +213,6 @@ describe("tryRule", () => {
     return join(cases, name)
   }
 
-  /**
-   * Each file and folder of the project, also in `node_modules`, so a test sees every write.
-   */
   function listProject() {
     return EffectArray.sort(readdirSync(project, { recursive: true }).map(String), Order.String)
   }
@@ -317,14 +307,12 @@ describe("tryRule", () => {
       ])
 
       expect(getReportCounts(results)).toStrictEqual([1, 0])
-      // `custom()` writes its entry module to the `node_modules` of the copy, not of the project.
       expect(listProject()).toStrictEqual(before)
     })
   )
 
   it.live("leave the entry module cache of the project as it is", () =>
     Effect.gen(function* () {
-      // A project that already ran `check` has a cache folder for the entry modules of `custom()`.
       write("node_modules/.cache/adamantite/rules-earlier.mjs", "export default {}\n")
 
       const before = listProject()
@@ -397,7 +385,6 @@ describe("tryRule", () => {
       )
 
       expect(getReportCounts(results)).toStrictEqual([1])
-      // `custom()` in the package writes its entry module to the copy, not to the project.
       expect(listProject()).toStrictEqual(before)
     })
   )

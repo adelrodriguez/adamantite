@@ -11,50 +11,23 @@ import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib
 import { IDENTITY_KEY, readConfig } from "#lib/project/config-loader.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 
-/**
- * An entry of `overrides` in an Oxlint config that turns one or more rules off.
- */
 interface RuleOffOverride {
-  /**
-   * The `files` of the override, as the config writes them, relative to the folder of the config.
-   */
   readonly files: readonly string[]
-  /**
-   * The position of the override in `overrides`.
-   */
   readonly index: number
   readonly rules: readonly string[]
 }
 
-/**
- * What Adamantite found for one file of an override that turns a rule off: the rule still reports
- * the file, the rule no longer reports it, the config ignores it, it does not parse, or it does not
- * exist. Only a file that Oxlint linted and parsed can be clean.
- */
 const OverrideFileMark = Schema.Literals(["breaks", "clean", "ignored", "missing", "unparsable"])
 
 type OverrideFileMark = typeof OverrideFileMark.Type
 
-/**
- * The files for which an override turns a rule off, with paths relative to the project root.
- */
 const OverriddenRule = Schema.Struct({
-  /**
-   * The config of the override, relative to the project root.
-   */
   config: Schema.String,
   files: Schema.Array(Schema.Struct({ file: Schema.String, mark: OverrideFileMark })),
-  /**
-   * The globs of the override, as the config writes them. A glob is a scope decision, so Adamantite
-   * does not lint its files.
-   */
   globs: Schema.Array(Schema.String),
   rule: Schema.String,
 })
 
-/**
- * The overrides that turn a rule off, with a mark for each file that they name.
- */
 export class LintedOverrides extends Schema.TaggedClass<
   LintedOverrides,
   { readonly brand: unique symbol }
@@ -62,9 +35,6 @@ export class LintedOverrides extends Schema.TaggedClass<
   rules: Schema.Array(OverriddenRule),
 }) {}
 
-/**
- * The reason why Adamantite could not lint the files of the overrides.
- */
 export class OverridesLintFailed extends Schema.TaggedClass<
   OverridesLintFailed,
   { readonly brand: unique symbol }
@@ -78,30 +48,16 @@ export type OverridesReport = typeof OverridesReport.Type
 
 const GLOB_CHARACTERS = /[!*?[\]{}]/u
 
-/**
- * The severity of a rule setting, such as `"off"`, `"error"`, or `2`.
- */
 const Severity = Schema.Union([Schema.String, Schema.Finite])
 
-/**
- * A rule setting: a severity, alone or as the first item of an array with the options.
- */
 const RuleSetting = Schema.Union([
   Severity,
   Schema.TupleWithRest(Schema.Tuple([Severity]), [Schema.Unknown]),
 ])
 
-/**
- * The name of a rule in the `rules` of a loaded override. The rules of a preset, such as vitest,
- * name the preset under `IDENTITY_KEY`, which is not a rule, and a record skips each key that its
- * key schema rejects.
- */
+// A record skips each key that its key schema rejects.
 const RuleName = Schema.String.check(Schema.makeFilter((key: string) => key !== IDENTITY_KEY))
 
-/**
- * What Adamantite reads from a loaded Oxlint config for the trials: the `files` and `rules` of each
- * override, in the order of `overrides`.
- */
 const OverridesConfig = Schema.Struct({
   overrides: Schema.optional(
     Schema.Array(
@@ -113,18 +69,12 @@ const OverridesConfig = Schema.Struct({
   ),
 })
 
-/**
- * Whether a rule setting turns the rule off: `"off"`, `"allow"`, or `0`.
- */
 function isOff(setting: typeof RuleSetting.Type): boolean {
   const [severity] = Array.isArray(setting) ? setting : [setting]
 
   return severity === "off" || severity === "allow" || severity === 0
 }
 
-/**
- * The overrides of a loaded Oxlint config that turn a rule off for the files that they list.
- */
 function listRuleOffOverrides({ overrides = [] }: typeof OverridesConfig.Type): RuleOffOverride[] {
   return overrides.flatMap(({ files = [], rules = {} }, index) => {
     const offRules = Object.entries(rules).flatMap(([rule, setting]) =>
@@ -135,11 +85,6 @@ function listRuleOffOverrides({ overrides = [] }: typeof OverridesConfig.Type): 
   })
 }
 
-/**
- * Lints the files that each override of `configs` turns a rule off for, in a copy of the project
- * with the rule on again, and marks each file. Only the files inside `scope` count. A glob is not
- * linted. One Oxlint run covers each config.
- */
 export const readOverrides = Effect.fn("readOverrides")(
   function* (
     cwd: string,
@@ -160,7 +105,6 @@ export const readOverrides = Effect.fn("readOverrides")(
         .join("/")
     }
 
-    // A config that does not load has no override that Adamantite can read. Doctor reports it.
     const found = yield* Effect.forEach(
       configs,
       (config) =>

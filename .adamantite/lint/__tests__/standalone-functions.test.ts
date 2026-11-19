@@ -18,7 +18,6 @@ function declare(name: string) {
 
 tester.run("standalone-functions", rule, {
   invalid: [
-    // The form that `CODING_STANDARDS.md` showed for the Knip workspace helper.
     {
       code: `export const toKnipWorkspace = ({ workspace }: Project, { presets }: Selection): KnipWorkspace => ({
   isMonorepo: workspace.isMonorepo,
@@ -26,7 +25,6 @@ tester.run("standalone-functions", rule, {
 })`,
       errors: [declare("toKnipWorkspace")],
     },
-    // A block body returns nothing directly, also when a statement of it returns an Effect.
     {
       code: `const offer = (work: Work) => {
   const unattended = Effect.succeed(work)
@@ -42,7 +40,6 @@ tester.run("standalone-functions", rule, {
       code: "const load = async (path: string) => readFile(path)",
       errors: [declare("load")],
     },
-    // A condition is a plain value, whatever its last operand is.
     {
       code: 'const isTagMember = (node: Node) => node.type === "MemberExpression" && names.has(node.name)',
       errors: [declare("isTagMember")],
@@ -59,7 +56,6 @@ tester.run("standalone-functions", rule, {
       code: 'const toLabel = (count: number) => (count === 1 ? "file" : "files")',
       errors: [declare("toLabel")],
     },
-    // One plain side is enough: the function then returns more than an Effect chain.
     {
       code: 'const find = (name: string) => (name === "" ? null : lookup(name))',
       errors: [declare("find")],
@@ -80,7 +76,6 @@ tester.run("standalone-functions", rule, {
       code: "const skip = () => undefined",
       errors: [declare("skip")],
     },
-    // A TypeScript expression around the function keeps it a plain function.
     {
       code: "export const render = (() => {\n  return 1\n}) satisfies () => number",
       errors: [declare("render")],
@@ -89,7 +84,6 @@ tester.run("standalone-functions", rule, {
       code: "const toResult = ((value: string) => ({ ok: true, value })) as Convert",
       errors: [declare("toResult")],
     },
-    // An arrow that returns a function returns what that function returns.
     {
       code: "const compare = (order: Order) => (left: Item, right: Item) => {\n  return order(left.name, right.name)\n}",
       errors: [declare("compare")],
@@ -130,7 +124,6 @@ tester.run("standalone-functions", rule, {
     usesEffectPreset: presets.includes("effect"),
   }
 }`,
-    // A function that directly returns an Effect chain.
     `export const readFile = (path: string) =>
   FileSystem.FileSystem.pipe(Effect.flatMap((fs) => fs.readFileString(path)))`,
     `const readWorkspace = (cwd: string) =>
@@ -138,12 +131,10 @@ tester.run("standalone-functions", rule, {
     return yield* readPackageJson(cwd)
   })`,
     "const log = (status: Status) => (message: string) => Effect.flatMap(CurrentMode, (mode) => write(mode, status, message))",
-    // A condition between two Effects gives no plain value.
     `const toResult = (options: Options, code: ExitCode) =>
   code === 0 ? Effect.void : Effect.fail(new CommandFailed({ command: options.command }))`,
     "const orElse = (fallback: Fallback) => fallback.effect ?? Effect.void",
     "const readPath = ((path: string) => Effect.succeed(path)) satisfies Reader",
-    // A callback and an object method are not standalone functions.
     `export const names = items.map((item) => {
   return item.name
 })

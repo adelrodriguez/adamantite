@@ -4,14 +4,9 @@ import { Macros } from "unplugin-macros"
 import { configDefaults, defineConfig } from "vitest/config"
 import { PROCESS_RUN_TESTS } from "./config/tests.ts"
 
-// An Oxlint package folder, such as `<folder>/node_modules/oxlint`, that replaces the Oxlint of the
-// repository. CI sets it to test the rules with the minimum Oxlint version that `peerDependencies`
-// allows. The RuleTester tests import `oxlint/plugins-dev` from it, and
-// `presets/__tests__/rule-fixtures.ts` lints the preset fixtures with it.
 const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 
-// Fixtures are code that the preset tests lint, not tests of this repository. Vitest cannot run some
-// of them, such as a Jest test that imports `@jest/globals`.
+// Vitest cannot run some fixtures, such as a Jest test that imports `@jest/globals`.
 const FIXTURES = "src/__tests__/presets/fixtures/**"
 
 const MACRO_IMPORT = /with\s*\{\s*type:\s*["']macro["']\s*\}/
@@ -41,18 +36,12 @@ export default defineConfig({
   },
   test: {
     isolate: false,
-    // Tests that start real processes are slower, so CI runs them apart from the package's
-    // unit tests. `pnpm run test` runs both projects.
     projects: [
       {
         extends: true,
         test: {
-          // `pnpm run bench` runs the benchmarks in the presets project, which installs the fixture
-          // packages.
           benchmark: { include: [] },
           exclude: [...configDefaults.exclude, ...PROCESS_RUN_TESTS, FIXTURES],
-          // The custom rule tests sit in `__tests__`, where `adamantite rule test`, which runs
-          // `node:test` files, does not look.
           include: [
             ".adamantite/lint/__tests__/*.test.ts",
             "presets/**/*.test.ts",
@@ -65,15 +54,13 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          // The benchmarks start real processes, and `vitest bench` runs them one at a time, after
-          // no test. `scripts/bench-reporter.ts` keeps the duration of each run.
+          // Vitest keeps the duration of each run only with `retainSamples`, and
+          // `scripts/bench-reporter.ts` reads them.
           benchmark: { include: ["src/**/*.bench.ts"], retainSamples: true },
-          // The fixture projects link the fixture packages, which have their own lockfile.
           globalSetup: ["presets/__tests__/fixture-packages.ts"],
           // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds
-          // while the other test files run, so the default timeouts fail these tests at random.
-          // Fixture tests lint in a `beforeAll` hook, so hooks get the same limit as tests. The
-          // longer timeouts still stop a process that hangs.
+          // while the other test files run, so the default timeouts of Vitest fail these tests at
+          // random. Fixture tests lint in a `beforeAll` hook, so hooks get the same limit as tests.
           hookTimeout: 30_000,
           include: PROCESS_RUN_TESTS,
           name: "presets",

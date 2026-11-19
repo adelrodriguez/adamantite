@@ -124,6 +124,7 @@ tester.run("layers", createLayersRule(MODULES), {
       code: 'import { value } from "#conditional"',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/conditional.ts"),
+      name: "report an import that resolves upward under its condition",
       options: [{ ...LIB_OPTIONS, conditions: ["development"] }],
     },
     {
@@ -136,6 +137,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
+      name: "report a sibling import with its fix",
       options: [LIB_OPTIONS],
     },
     {
@@ -146,12 +148,14 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("shared/errors.ts"),
+      name: "report an upward relative import with its fix",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { harden } from "../../../hardening/index.ts"',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/nested/deep/file.ts"),
+      name: "report an upward import from a nested folder",
       options: [LIB_OPTIONS],
     },
     {
@@ -162,65 +166,109 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("assessment/index.ts"),
+      name: "report a sibling import whose fix names two lower layers",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import type { Finding } from "#lib/integrations/base.ts"',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/types.ts"),
+      name: "report a type-only import",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { type Finding } from "#lib/integrations/base.ts"',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/types.ts"),
+      name: "report an inline type import",
       options: [LIB_OPTIONS],
     },
     {
       code: 'export { base } from "#lib/integrations/base.ts"',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/index.ts"),
+      name: "report a named re-export",
       options: [LIB_OPTIONS],
     },
     {
       code: 'export * from "#lib/integrations/base.ts"',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/index.ts"),
+      name: "report export star",
       options: [LIB_OPTIONS],
     },
     {
       code: 'const base = await import("#lib/integrations/base.ts")',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/lazy.ts"),
+      name: "report a dynamic import",
       options: [LIB_OPTIONS],
     },
     ...[
-      "import(`#lib/integrations/base.ts`)",
-      'import("#lib/integrations/base.ts" as string)',
-      'import("#lib/integrations/base.ts" satisfies string)',
-      'import("#lib/integrations/base.ts"!)',
-      'import(<string>"#lib/integrations/base.ts")',
-      'import(("#lib/integrations/base.ts" as const)!)',
-    ].map((code) => ({
+      {
+        code: "import(`#lib/integrations/base.ts`)",
+        name: "report a template literal dynamic import",
+      },
+      {
+        code: 'import("#lib/integrations/base.ts" as string)',
+        name: "report a dynamic import of a source under as",
+      },
+      {
+        code: 'import("#lib/integrations/base.ts" satisfies string)',
+        name: "report a dynamic import of a source under satisfies",
+      },
+      {
+        code: 'import("#lib/integrations/base.ts"!)',
+        name: "report a dynamic import of a non-null source",
+      },
+      {
+        code: 'import(<string>"#lib/integrations/base.ts")',
+        name: "report a dynamic import of a source under an angle-bracket assertion",
+      },
+      {
+        code: 'import(("#lib/integrations/base.ts" as const)!)',
+        name: "report a dynamic import of a source under a const assertion and a non-null assertion",
+      },
+    ].map(({ code, name }) => ({
       code,
       errors: [{ column: 7, line: 1, messageId: "upward" }],
       filename: lib("workspace/lazy.ts"),
+      name,
       options: [LIB_OPTIONS],
     })),
     ...[
-      'const base = require("#lib/integrations/base.ts")',
-      "const base = require(`#lib/integrations/base.ts`)",
-      'import base = require("#lib/integrations/base.ts")',
-      'export import base = require("#lib/integrations/base.ts")',
-      'import type base = require("#lib/integrations/base.ts")',
+      { code: 'const base = require("#lib/integrations/base.ts")', name: "report require" },
+      {
+        code: "const base = require(`#lib/integrations/base.ts`)",
+        name: "report require of a template literal",
+      },
+      { code: 'import base = require("#lib/integrations/base.ts")', name: "report import-equals" },
+      {
+        code: 'export import base = require("#lib/integrations/base.ts")',
+        name: "report an exported import-equals",
+      },
+      {
+        code: 'import type base = require("#lib/integrations/base.ts")',
+        name: "report a type-only import-equals",
+      },
       // A type named `require` leaves the runtime `require` in place.
-      'type require = string\nconst base = require("#lib/integrations/base.ts")',
-      'interface require {}\nconst base = require("#lib/integrations/base.ts")',
-      'type require = string\nfunction load() {\n  return require("#lib/integrations/base.ts")\n}',
-    ].map((code) => ({
+      {
+        code: 'type require = string\nconst base = require("#lib/integrations/base.ts")',
+        name: "report require beside a type named require",
+      },
+      {
+        code: 'interface require {}\nconst base = require("#lib/integrations/base.ts")',
+        name: "report require beside an interface named require",
+      },
+      {
+        code: 'type require = string\nfunction load() {\n  return require("#lib/integrations/base.ts")\n}',
+        name: "report require inside a function beside a type named require",
+      },
+    ].map(({ code, name }) => ({
       code,
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/lazy.ts"),
+      name,
       options: [LIB_OPTIONS],
     })),
     {
@@ -228,12 +276,14 @@ tester.run("layers", createLayersRule(MODULES), {
       code: 'const value = require("#dual")',
       errors: [{ column: 22, line: 1, messageId: "upward" }],
       filename: lib("workspace/dual.ts"),
+      name: "report require with the require condition",
       options: [LIB_OPTIONS],
     },
     {
       code: 'type Finding = import("#lib/integrations/base.ts").Finding',
       errors: [{ messageId: "upward" }],
       filename: lib("workspace/types.ts"),
+      name: "report a type import",
       options: [LIB_OPTIONS],
     },
     {
@@ -244,6 +294,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
+      name: "report an import of an unmapped folder",
       options: [LIB_OPTIONS],
     },
     {
@@ -262,6 +313,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("cache/index.ts"),
+      name: "report a file in an unmapped folder",
       options: [LIB_OPTIONS],
     },
     {
@@ -273,6 +325,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("index.ts"),
+      name: "report a file at the root that no layer holds",
       options: [LIB_OPTIONS],
     },
     {
@@ -284,6 +337,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
+      name: "report an import of a file at the root that no layer holds",
       options: [LIB_OPTIONS],
     },
     {
@@ -294,6 +348,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: app("features/billing/checkout.ts"),
+      name: "report an import between isolated feature units",
       options: [APP_OPTIONS],
     },
     {
@@ -304,6 +359,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: app("routes/index.tsx"),
+      name: "report an import between isolated route units",
       options: [APP_OPTIONS],
     },
     {
@@ -314,6 +370,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: app("features/auth/navigate.ts"),
+      name: "report an import of an entry",
       options: [APP_OPTIONS],
     },
     {
@@ -324,6 +381,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
+      name: "report a layer that imports an unknown layer",
       options: [
         { layers: { shared: { imports: [] }, workspace: { imports: ["shard"] } }, root: "src/lib" },
       ],
@@ -337,6 +395,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: app("features/auth/index.ts"),
+      name: "report an isolate entry that is not a layer",
       options: [
         {
           isolate: ["feature"],
@@ -355,6 +414,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
+      name: "report a cycle in the layer map",
       options: [
         {
           layers: { shared: { imports: ["workspace"] }, workspace: { imports: ["shared"] } },
@@ -370,6 +430,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("shared/errors.ts"),
+      name: "report an upward import in the outer map",
       options: [SRC_OPTIONS, LIB_OPTIONS],
     },
     {
@@ -379,6 +440,7 @@ tester.run("layers", createLayersRule(MODULES), {
         { line: 2, messageId: "upward" },
       ],
       filename: lib("shared/errors.ts"),
+      name: "report upward imports in both maps",
       options: [SRC_OPTIONS, LIB_OPTIONS],
     },
     {
@@ -391,6 +453,7 @@ tester.run("layers", createLayersRule(MODULES), {
         { line: 1, message: /^`shared` cannot import `integrations`/u },
       ],
       filename: lib("shared/errors.ts"),
+      name: "report an outer map that leaves the inner root unmapped and an inner map that still applies",
       options: [{ ...SRC_OPTIONS, layers: { terminal: { imports: [] } } }, LIB_OPTIONS],
     },
     {
@@ -401,6 +464,7 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
+      name: "report an unknown layer in the second option with its anchor",
       options: [
         SRC_OPTIONS,
         { layers: { shared: { imports: [] }, workspace: { imports: ["shard"] } }, root: "src/lib" },
@@ -411,59 +475,99 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import { value } from "#conditional"',
       filename: lib("workspace/conditional.ts"),
+      name: "accept an import that resolves outside the map without its condition",
       options: [LIB_OPTIONS],
     },
     ...[
-      'const path = "#lib/integrations/base.ts"\nconst base = import(path)',
-      'const base = import("#lib/integrations/" + "base.ts")',
-      `const name = "base"\nconst base = import(\`#lib/integrations/\${name}.ts\`)`,
-      'const base = import("#lib/shared/errors.ts", { with: { type: "#lib/integrations/base.ts" } })',
-    ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
+      {
+        code: 'const path = "#lib/integrations/base.ts"\nconst base = import(path)',
+        name: "accept a dynamic import of a constant",
+      },
+      {
+        code: 'const base = import("#lib/integrations/" + "base.ts")',
+        name: "accept a dynamic import of a concatenation",
+      },
+      {
+        code: `const name = "base"\nconst base = import(\`#lib/integrations/\${name}.ts\`)`,
+        name: "accept a dynamic import of a template literal with an expression",
+      },
+      {
+        code: 'const base = import("#lib/shared/errors.ts", { with: { type: "#lib/integrations/base.ts" } })',
+        name: "accept an import attribute that names a higher layer",
+      },
+    ].map(({ code, name }) => ({
+      code,
+      filename: lib("workspace/lazy.ts"),
+      name,
+      options: [LIB_OPTIONS],
+    })),
     ...[
-      'function load(require: (path: string) => unknown) {\n  return require("#lib/integrations/base.ts")\n}',
-      'const require = (path: string) => path\nrequire("#lib/integrations/base.ts")',
-      'const path = require.resolve("#lib/integrations/base.ts")',
-      "import Base = Integrations.Base",
-    ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
+      {
+        code: 'function load(require: (path: string) => unknown) {\n  return require("#lib/integrations/base.ts")\n}',
+        name: "accept a parameter named require",
+      },
+      {
+        code: 'const require = (path: string) => path\nrequire("#lib/integrations/base.ts")',
+        name: "accept a local function named require",
+      },
+      {
+        code: 'const path = require.resolve("#lib/integrations/base.ts")',
+        name: "accept require.resolve",
+      },
+      { code: "import Base = Integrations.Base", name: "accept a namespace alias" },
+    ].map(({ code, name }) => ({
+      code,
+      filename: lib("workspace/lazy.ts"),
+      name,
+      options: [LIB_OPTIONS],
+    })),
     {
       code: 'const errors = require("#lib/shared/errors.ts")\nimport files = require("./files.ts")',
       filename: lib("workspace/lazy.ts"),
+      name: "accept require and import-equals of a lower layer and the same layer",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import type base = require("#lib/integrations/base.ts")',
       filename: lib("workspace/lazy.ts"),
+      name: "accept a type-only import-equals with ignoreTypes",
       options: [{ ...LIB_OPTIONS, ignoreTypes: true }],
     },
     {
       // `import` resolves with the `import` condition, which selects a lower layer here.
       code: 'import { value } from "#dual"\nconst lazy = import("#dual")',
       filename: lib("workspace/dual.ts"),
+      name: "accept import and dynamic import with the import condition",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { errors } from "#lib/shared/errors.ts"',
       filename: lib("workspace/files.ts"),
+      name: "accept an import of a lower layer",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { files } from "#lib/workspace/files.ts"\nimport { run } from "#lib/execution/run.ts"',
       filename: lib("assessment/index.ts"),
+      name: "accept imports of lower layers",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { config } from "./config.ts"',
       filename: lib("integrations/tooling/knip/index.ts"),
+      name: "accept an import inside the same unit",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import packageJson from "../../../package.json"\nimport { title } from "#terminal/title.ts"\nimport { Effect } from "effect"\nimport dep from "#dep"',
       filename: lib("shared/version.ts"),
+      name: "accept imports outside the map",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import dep from "#dep"\nimport { other } from "../../other/index.ts"',
       filename: "/project/shared/index.ts",
+      name: "accept imports outside the package",
       options: [
         { layers: { features: { imports: ["shared"] }, shared: { imports: [] } }, root: "." },
       ],
@@ -471,41 +575,49 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import { missing } from "#missing/integrations/base.ts"',
       filename: lib("shared/errors.ts"),
+      name: "accept an import that does not resolve",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import type { Finding } from "#lib/integrations/base.ts"',
       filename: lib("workspace/types.ts"),
+      name: "accept a type-only import of a higher layer with ignoreTypes",
       options: [{ ...LIB_OPTIONS, ignoreTypes: true }],
     },
     {
       code: 'import { helpers } from "#lib/assessment/__tests__/helpers.ts"',
       filename: lib("workspace/__tests__/files.test.ts"),
+      name: "accept an import in an ignored file",
       options: [{ ...LIB_OPTIONS, ignore: ["**/__tests__/**"] }],
     },
     {
       code: 'import { run } from "#lib/execution/run.ts"',
       filename: "/project/src/commands/run.ts",
+      name: "accept an import from a file outside the root",
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { signIn } from "./sign-in.ts"',
       filename: app("features/auth/index.ts"),
+      name: "accept an import inside an isolated unit",
       options: [APP_OPTIONS],
     },
     {
       code: 'import { Form } from "./-components/form.tsx"',
       filename: app("routes/settings/index.tsx"),
+      name: "accept an import of a route-private folder",
       options: [APP_OPTIONS],
     },
     {
       code: 'import { auth } from "#features/auth/index.ts"\nimport { Settings } from "#routes/settings.tsx"',
       filename: app("router.tsx"),
+      name: "accept imports of isolated units from an entry",
       options: [APP_OPTIONS],
     },
     {
       code: 'import { run } from "#lib/execution/run.ts"\nimport { prompt } from "#terminal/prompter.ts"',
       filename: lib("hardening/index.ts"),
+      name: "accept an import that the outer map allows and the inner map does not reach",
       options: [
         { ...SRC_OPTIONS, layers: { lib: { imports: ["terminal"] }, terminal: { imports: [] } } },
         LIB_OPTIONS,
@@ -514,6 +626,7 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import { errors } from "#lib/shared/errors.ts"\nimport { prompt } from "#terminal/prompter.ts"',
       filename: app("commands/check.ts"),
+      name: "accept imports of both maps from the outer map",
       options: [SRC_OPTIONS, LIB_OPTIONS],
     },
   ],
@@ -703,24 +816,28 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
         { message: /root `src\/lib`.*`options\[0\]\.layers\.lib\.layers`/u },
       ],
       filename: "/project/src/lib/shared/value.ts",
+      name: "report each map with its own anchor",
       options: [NESTED_OPTIONS],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report the nested map when the outer map ignores its folder",
       options: [{ ...NESTED_OPTIONS, ignore: ["lib/**"] }],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report the nested map when the outer map lists its folder as an entry",
       options: [{ ...NESTED_OPTIONS, entries: ["lib/**"] }],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       errors: [{ messageId: "cycle" }, { messageId: "sibling" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report a cycle in the outer map and a sibling import in the nested map",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -732,54 +849,63 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
       code: 'import type { Run } from "../execution/run.ts"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report a type-only import when only the outer map sets ignoreTypes",
       options: [{ ...NESTED_OPTIONS, ignoreTypes: true }],
     },
     {
       code: 'import { value } from "../shared/value.ts"',
       errors: [{ messageId: "isolated" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report an import between units when the outer map isolates the layer",
       options: [{ ...NESTED_OPTIONS, isolate: ["lib"] }],
     },
     {
       code: 'import { value } from "#conditional"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report with the default conditions when only the outer map sets conditions",
       options: [{ ...NESTED_OPTIONS, conditions: ["development"] }],
     },
     {
       code: 'import { harden } from "../hardening/index.ts"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/src/lib/assessment/index.ts",
+      name: "report a sibling import in the nested map",
       options: [NESTED_OPTIONS],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/lib/workspace/project.ts",
+      name: "report a sibling import under the root .",
       options: [{ ...NESTED_OPTIONS, root: "." }],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       errors: [{ messageId: "sibling" }],
       filename: "/project/apps/web/src/lib/workspace/project.ts",
+      name: "report a sibling import under a glob root",
       options: [{ ...NESTED_OPTIONS, root: "apps/*/src" }],
     },
     {
       code: "export const value = 1",
       errors: [{ messageId: "duplicateMap" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report a nested map that another option maps again",
       options: [NESTED_OPTIONS, { ...NESTED_LIB, root: "src/lib" }],
     },
     {
       code: "export const value = 1",
       errors: [{ messageId: "unmappedFolder" }],
       filename: "/project/src/lib/cache/index.ts",
+      name: "report an unmapped folder in the nested map",
       options: [NESTED_OPTIONS],
     },
     {
       code: "export const value = 1",
       errors: [{ messageId: "unknownImport" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report an unknown layer in the nested map",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -791,6 +917,7 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
       code: 'import { compose } from "../compose.ts"',
       errors: [{ messageId: "entry" }],
       filename: "/project/src/lib/workspace/project.ts",
+      name: "report an import of an entry of the nested map",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -805,6 +932,7 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
       code: 'import { value } from "../two/value.ts"',
       errors: [{ messageId: "isolated" }],
       filename: "/project/src/lib/workspace/one/value.ts",
+      name: "report an import between isolated units of the nested map",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -819,12 +947,14 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
       code: "export const value = 1",
       errors: [{ messageId: "unmappedFile" }],
       filename: "/project/src/lib/index.ts",
+      name: "report an unmapped file in the nested map",
       options: [NESTED_OPTIONS],
     },
     {
       code: 'import { tool } from "../tooling/tool.ts"',
       errors: [{ messageId: "upward" }],
       filename: "/project/src/lib/integrations/base/value.ts",
+      name: "report an upward import three maps deep",
       options: [
         {
           layers: {
@@ -847,11 +977,13 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
     {
       code: 'import { value } from "../shared/value.ts"',
       filename: "/project/src/lib/workspace/project.ts",
+      name: "accept an import of a lower layer in the nested map",
       options: [NESTED_OPTIONS],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       filename: "/project/src/lib/workspace/ignored.ts",
+      name: "accept an import in a file that the nested map ignores",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -865,6 +997,7 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
     {
       code: 'import type { Run } from "../execution/run.ts"',
       filename: "/project/src/lib/workspace/project.ts",
+      name: "accept a type-only import with ignoreTypes in the nested map",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -878,6 +1011,7 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
     {
       code: 'import { value } from "#conditional"',
       filename: "/project/src/lib/workspace/project.ts",
+      name: "accept an import that resolves downward under a condition of the nested map",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -891,6 +1025,7 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
     {
       code: 'import { run } from "../execution/run.ts"',
       filename: "/project/src/feature/src/lib/workspace/project.ts",
+      name: "accept a layer without a nested map under a glob root",
       options: [
         {
           ...NESTED_OPTIONS,
@@ -902,6 +1037,7 @@ tester.run("nested layers", createLayersRule(NESTED_MODULES), {
     {
       code: 'import { run } from "#other-app"',
       filename: "/project/apps/web/src/lib/workspace/project.ts",
+      name: "accept an import into another root that the glob matches",
       options: [{ ...NESTED_OPTIONS, root: "apps/*/src" }],
     },
   ],

@@ -15,15 +15,23 @@ tester.run("prefer-effect-match", plugin.rules["prefer-effect-match"], {
     {
       code: 'kind === "a" ? first : kind === "b" ? second : fallback;',
       errors: [{ messageId: "preferMatch" }],
+      name: "report a ternary chain that compares one value with string literals",
     },
     {
       code: "`a` !== kind ? first : `b` === kind ? second : fallback;",
       errors: [{ messageId: "preferMatch" }],
+      name: "report a chain that compares template literals on the left with either operator",
     },
   ],
   valid: [
-    'kind === "a" ? first : fallback;',
-    'kind === "a" ? first : other === "b" ? second : fallback;',
-    "condition ? first : otherCondition ? second : fallback;",
+    { code: 'kind === "a" ? first : fallback;', name: "accept a single ternary" },
+    {
+      code: 'kind === "a" ? first : other === "b" ? second : fallback;',
+      name: "accept a chain that compares different values",
+    },
+    {
+      code: "condition ? first : otherCondition ? second : fallback;",
+      name: "accept a chain of conditions that compare no value",
+    },
   ],
 })

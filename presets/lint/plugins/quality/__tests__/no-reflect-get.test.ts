@@ -13,124 +13,141 @@ const error = { messageId: "reflectGet" }
 
 tester.run("no-reflect-get", plugin.rules["no-reflect-get"], {
   invalid: [
-    { code: "const value = Reflect.get(owner, key);", errors: [error], name: "static access" },
-    { code: "const value = Reflect['get'](owner, key);", errors: [error], name: "computed access" },
+    {
+      code: "const value = Reflect.get(owner, key);",
+      errors: [error],
+      name: "report static access",
+    },
+    {
+      code: "const value = Reflect['get'](owner, key);",
+      errors: [error],
+      name: "report computed access",
+    },
     {
       code: "const value = Reflect.get(owner, key, owner);",
       errors: [error],
-      name: "receiver that repeats the target",
+      name: "report a receiver that repeats the target",
     },
     {
       code: "const value = Reflect.get(owner, ...rest);",
       errors: [error],
-      name: "spread arguments",
+      name: "report spread arguments",
     },
     {
       code: "const { get } = Reflect; const value = get(owner, key);",
       errors: [error],
-      name: "method destructured from Reflect",
+      name: "report a method destructured from Reflect",
     },
     {
       code: "const { get: read } = Reflect; const value = read(owner, key);",
       errors: [error],
-      name: "method destructured from Reflect under another name",
+      name: "report a method destructured from Reflect under another name",
     },
     {
       code: "const R = Reflect; const value = R.get(owner, key);",
       errors: [error],
-      name: "constant alias of Reflect",
+      name: "report a constant alias of Reflect",
     },
     {
       code: "const read = Reflect.get; const value = read(owner, key);",
       errors: [error],
-      name: "constant alias of the method",
+      name: "report a constant alias of the method",
     },
     {
       code: "const value = globalThis.Reflect.get(owner, key);",
       errors: [error],
-      name: "Reflect read from globalThis",
+      name: "report Reflect read from globalThis",
     },
     {
       code: "const { get } = globalThis.Reflect; const value = get(owner, key);",
       errors: [error],
-      name: "method destructured from globalThis.Reflect",
+      name: "report a method destructured from globalThis.Reflect",
     },
     {
       code: "const value = Reflect.get.call(null, owner, key);",
       errors: [error],
-      name: "method called with call",
+      name: "report the method called with call",
     },
     {
       code: "const value = Reflect.get.call(null, owner, key, owner);",
       errors: [error],
-      name: "method called with call and a receiver that repeats the target",
+      name: "report the method called with call and a receiver that repeats the target",
     },
     {
       code: "const value = Reflect.get.apply(null, [owner, key]);",
       errors: [error],
-      name: "method called with apply",
+      name: "report the method called with apply",
     },
     {
       code: "const value = Reflect.get.apply(null, args);",
       errors: [error],
-      name: "method called with apply and an argument list that the rule cannot read",
+      name: "report the method called with apply and an argument list that the rule cannot read",
     },
     {
       code: "const value = Reflect[`get`](owner, key);",
       errors: [error],
-      name: "template literal key",
+      name: "report a template literal key",
     },
   ],
   valid: [
     {
       code: "const proxy = new Proxy(target, { get(obj, key, receiver) { return Reflect.get(obj, key, receiver); } });",
-      name: "Proxy get trap that forwards the receiver",
+      name: "accept a Proxy get trap that forwards the receiver",
     },
     {
       code: "const value = Reflect['get'](owner, key, receiver);",
-      name: "computed access with a receiver",
+      name: "accept computed access with a receiver",
     },
     {
       code: "const R = Reflect; const value = R.get(owner, key, receiver);",
-      name: "constant alias of Reflect with a receiver",
+      name: "accept a constant alias of Reflect with a receiver",
     },
     {
       code: "const value = Reflect.get.call(null, owner, key, receiver);",
-      name: "method called with call and a receiver",
+      name: "accept the method called with call and a receiver",
     },
     {
       code: "const value = Reflect.get.apply(null, [owner, key, receiver]);",
-      name: "method called with apply and a receiver",
+      name: "accept the method called with apply and a receiver",
     },
     {
       code: "let R = Reflect; R = other; const value = R.get(owner, key);",
-      name: "variable that the code reassigns",
+      name: "accept a variable that the code reassigns",
     },
     {
       code: "const { get } = other; const value = get(owner, key);",
-      name: "method destructured from another object",
+      name: "accept a method destructured from another object",
     },
     {
       code: "const { get } = Reflect; function read(get) { return get(owner, key); }",
-      name: "parameter that shadows the destructured method",
+      name: "accept a parameter that shadows the destructured method",
     },
     {
       code: "function read(globalThis) { return globalThis.Reflect.get(owner, key); }",
-      name: "parameter that shadows globalThis",
+      name: "accept a parameter that shadows globalThis",
     },
     {
       code: `const value = Reflect[\`\${name}\`](owner, key);`,
-      name: "template literal key with an expression",
+      name: "accept a template literal key with an expression",
     },
     {
       code: "const { set } = Reflect; set(owner, key, value);",
-      name: "other method destructured from Reflect",
+      name: "accept another method destructured from Reflect",
     },
-    "Reflect.set.call(null, owner, key, value);",
-    "const value = owner.property;",
-    "const value = owner[key];",
-    "Reflect.set(owner, key, value);",
-    "const Reflect = { get() { return 1; } }; Reflect.get();",
-    "function read(Reflect: { get(): number }) { return Reflect.get(); }",
+    {
+      code: "Reflect.set.call(null, owner, key, value);",
+      name: "accept another Reflect method called with call",
+    },
+    { code: "const value = owner.property;", name: "accept property access" },
+    { code: "const value = owner[key];", name: "accept computed property access" },
+    { code: "Reflect.set(owner, key, value);", name: "accept another Reflect method" },
+    {
+      code: "const Reflect = { get() { return 1; } }; Reflect.get();",
+      name: "accept a local Reflect binding",
+    },
+    {
+      code: "function read(Reflect: { get(): number }) { return Reflect.get(); }",
+      name: "accept a parameter named Reflect",
+    },
   ],
 })

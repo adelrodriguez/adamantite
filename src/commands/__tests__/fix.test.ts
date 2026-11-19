@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -47,6 +48,65 @@ describe("fix", () => {
     )
   })
 
+  describe("output", () => {
+    it.effect("print a heading before each tool", () =>
+      Effect.gen(function* () {
+        const logLines: unknown[] = []
+
+        yield* runCommand(fixCommand, [], {
+          layers: [createRunnerTestContext().layer, toolsInstalledLayer],
+          logLines,
+        })
+
+        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toStrictEqual([
+          "🔧 Fixing lint issues · adamantite (oxlint)",
+          "",
+          "✨ Formatting · adamantite (oxfmt)",
+        ])
+      })
+    )
+
+    // `check`, `fix`, and `analyze` print a heading only on a plain run, so an agent and a script
+    // read the tools' own output.
+    it.effect.each<{
+      readonly args: readonly string[]
+      readonly env: Readonly<Record<string, string>>
+      readonly forwardedArguments: readonly string[]
+      readonly name: string
+    }>([
+      { args: ["--only", "lint"], env: {}, forwardedArguments: [], name: "with --only lint" },
+      { args: ["--only", "format"], env: {}, forwardedArguments: [], name: "with --only format" },
+      {
+        args: [],
+        env: {},
+        forwardedArguments: ["--format", "json"],
+        name: "with forwarded arguments",
+      },
+      {
+        args: [],
+        env: { CLAUDECODE: "1" },
+        forwardedArguments: [],
+        name: "when Oxlint prints its agent report",
+      },
+    ])("print no heading $name", ({ args, env, forwardedArguments }) =>
+      Effect.gen(function* () {
+        const logLines: unknown[] = []
+
+        const exit = yield* runCommand(fixCommand, args, {
+          env,
+          forwardedArguments,
+          layers: [createRunnerTestContext().layer, toolsInstalledLayer],
+          logLines,
+        })
+
+        expect({ logLines, success: Exit.isSuccess(exit) }).toStrictEqual({
+          logLines: [],
+          success: true,
+        })
+      })
+    )
+  })
+
   describe("fix mode flags", () => {
     it.effect.each([
       { args: ["--all"], name: "all is requested" },
@@ -85,7 +145,6 @@ describe("fix", () => {
           {
             ...OXLINT_COMMAND,
             args: [...OXLINT_COMMAND.args, "--fix", "--fix-suggestions", "--deny-warnings"],
-            title: "🔧 Fixing lint issues",
           },
         ])
       })
@@ -107,7 +166,6 @@ describe("fix", () => {
             command: "node",
             cwd: "/project",
             name: "oxfmt",
-            title: "✨ Formatting",
           },
         ])
       })
@@ -177,14 +235,12 @@ describe("fix", () => {
           {
             ...OXLINT_COMMAND,
             args: [...OXLINT_COMMAND.args, "--fix", "--fix-dangerously", "--deny-warnings"],
-            title: "🔧 Fixing lint issues",
           },
           {
             args: [OXFMT_CLI, "--write"],
             command: "node",
             cwd: "/project",
             name: "oxfmt",
-            title: "✨ Formatting",
           },
         ])
       })

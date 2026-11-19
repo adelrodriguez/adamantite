@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -26,19 +27,12 @@ function createMonorepoFiles() {
   })
 }
 
-const sherifStep = {
-  command: "sherif",
-  cwd: "/project",
-  stdin: "inherit",
-  title: "📦 Analyzing the monorepo",
-}
+// A run with `--only` or forwarded arguments prints no heading, so its steps have no title.
+const sherifCommand = { command: "sherif", cwd: "/project", stdin: "inherit" }
+const knipCommand = { command: "knip", cwd: "/project", stdin: "ignore" }
 
-const knipStep = {
-  command: "knip",
-  cwd: "/project",
-  stdin: "ignore",
-  title: "🧹 Analyzing unused code",
-}
+const sherifStep = { ...sherifCommand, title: "📦 Analyzing the monorepo" }
+const knipStep = { ...knipCommand, title: "🧹 Analyzing unused code" }
 
 describe("analyze", () => {
   describe("default invocation", () => {
@@ -119,7 +113,7 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
+        expect(runner.invocations).toStrictEqual([{ ...knipCommand, args: [] }])
       })
     )
 
@@ -276,6 +270,67 @@ describe("analyze", () => {
     )
   })
 
+  describe("output", () => {
+    it.effect("print a heading before each tool", () =>
+      Effect.gen(function* () {
+        const logLines: unknown[] = []
+
+        yield* runCommand(analyzeCommand, [], {
+          files: createMonorepoFiles(),
+          layers: [createRunnerTestContext().layer],
+          logLines,
+        })
+
+        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toStrictEqual([
+          "📦 Analyzing the monorepo · adamantite (sherif)",
+          "",
+          "🧹 Analyzing unused code · adamantite (knip)",
+        ])
+      })
+    )
+
+    // `check`, `fix`, and `analyze` print a heading only on a plain run, so an agent and a script
+    // read the tools' own output.
+    it.effect.each<{
+      readonly args: readonly string[]
+      readonly env: Readonly<Record<string, string>>
+      readonly forwardedArguments: readonly string[]
+      readonly name: string
+    }>([
+      { args: ["--only", "unused"], env: {}, forwardedArguments: [], name: "with --only unused" },
+      {
+        args: ["--only", "monorepo"],
+        env: {},
+        forwardedArguments: [],
+        name: "with --only monorepo",
+      },
+      {
+        args: [],
+        env: {},
+        forwardedArguments: ["--reporter", "json"],
+        name: "with forwarded arguments",
+      },
+      { args: [], env: { CLAUDECODE: "1" }, forwardedArguments: [], name: "in an agent's shell" },
+    ])("print no heading $name", ({ args, env, forwardedArguments }) =>
+      Effect.gen(function* () {
+        const logLines: unknown[] = []
+
+        const exit = yield* runCommand(analyzeCommand, args, {
+          env,
+          files: createMonorepoFiles(),
+          forwardedArguments,
+          layers: [createRunnerTestContext().layer],
+          logLines,
+        })
+
+        expect({ logLines, success: Exit.isSuccess(exit) }).toStrictEqual({
+          logLines: [],
+          success: true,
+        })
+      })
+    )
+  })
+
   describe("--only", () => {
     it.effect("forward arguments to sherif with --only monorepo --fix", () =>
       Effect.gen(function* () {
@@ -289,7 +344,7 @@ describe("analyze", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
-          { ...sherifStep, args: ["--fix", "--select", "highest"] },
+          { ...sherifCommand, args: ["--fix", "--select", "highest"] },
         ])
       })
     )
@@ -306,7 +361,10 @@ describe("analyze", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
-          { ...knipStep, args: ["--fix", "--allow-remove-files", "--directory", "packages/app"] },
+          {
+            ...knipCommand,
+            args: ["--fix", "--allow-remove-files", "--directory", "packages/app"],
+          },
         ])
       })
     )

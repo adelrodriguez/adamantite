@@ -119,6 +119,11 @@ interactive only when both standard input and standard output are terminals. A c
 4. One line for the lockfile: `written. Commit it with the setup.`, `updated. Commit it.`, or
    `already records this setup.`
 
+After the lockfile line, `update` prints the notes of each release since the version that the
+lockfile recorded, oldest first. A terminal gets one `info` line for each release with the link of
+its GitHub release, such as `Adamantite 0.49.0 release notes: <url>`. A run without a terminal
+prints the notes as one Markdown document for an agent.
+
 A change prints as a `success` line, and a file or script that stays as it is prints as an `info`
 line. [Setup lines](src/terminal/setup.ts) define the messages.
 

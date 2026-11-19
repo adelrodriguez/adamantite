@@ -62,7 +62,139 @@ const CHECK_SELECTION = makeSelection({ presets: ["core"], scripts: ["check"] })
 
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
+// The changelog that the installed Adamantite 0.47.0 ships, newest release first.
+const CHANGELOG = `# adamantite
+
+## 0.47.0
+
+### Minor Changes
+
+- Rename the shadcn preset to tailwind
+
+  To migrate, replace \`adamantite/lint/shadcn\` with \`adamantite/lint/tailwind\`.
+
+## 0.46.1
+
+### Patch Changes
+
+- Fix a report of the layers rule
+
+## 0.46.0
+
+### Minor Changes
+
+- Record the setup in a lockfile
+`
+
+function runUpgrade(args: readonly string[], options: { prompting?: boolean } = {}) {
+  return Effect.gen(function* () {
+    const files = createFileSystemTestContext({
+      files: {
+        ...makeLockfileFile(makeSelection({}), {}, "0.46.0"),
+        ...makeAdamantitePackageFile("0.47.0"),
+        "node_modules/adamantite/CHANGELOG.md": CHANGELOG,
+        "package.json": manifest({ devDependencies: { adamantite: "0.47.0" } }),
+      },
+    })
+
+    const logLines: unknown[] = []
+    const errorLines: unknown[] = []
+
+    const exit = yield* runCommand(updateCommand, args, {
+      errorLines,
+      files,
+      layers: [
+        createDependencyInstallerTestContext().layer,
+        makeModuleResolverLayer("/project", ADAMANTITE_RESOLUTION),
+        ...(options.prompting === true ? [promptingLayer] : []),
+      ],
+      logLines,
+    })
+
+    return { errorLines, exit, logLines }
+  })
+}
+
 describe("update", () => {
+  describe("release notes", () => {
+    it.effect("print the notes of each release since the recorded version as Markdown", () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runUpgrade([])
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(logLines).toStrictEqual([
+          "✔ `.adamantite/adamantite-lock.json` updated. Commit it.",
+          [
+            "# Adamantite release notes since 0.46.0",
+            "",
+            "These notes come from `node_modules/adamantite/CHANGELOG.md`, oldest release first. Follow each migration step that applies to this project.",
+            "",
+            "## 0.46.1",
+            "",
+            "### Patch Changes",
+            "",
+            "- Fix a report of the layers rule",
+            "",
+            "## 0.47.0",
+            "",
+            "### Minor Changes",
+            "",
+            "- Rename the shadcn preset to tailwind",
+            "",
+            "  To migrate, replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind`.",
+          ].join("\n"),
+        ])
+      })
+    )
+
+    it.effect("link each release since the recorded version in a terminal", () =>
+      Effect.gen(function* () {
+        const { exit, logLines } = yield* runUpgrade([], { prompting: true })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          "✔ `.adamantite/adamantite-lock.json` updated. Commit it.",
+          "● Adamantite 0.46.1 release notes: https://github.com/adelrodriguez/adamantite/releases/tag/v0.46.1",
+          "● Adamantite 0.47.0 release notes: https://github.com/adelrodriguez/adamantite/releases/tag/v0.47.0",
+          "✅ Update finished.",
+        ])
+      })
+    )
+
+    it.effect("put the notes in the JSON document", () =>
+      Effect.gen(function* () {
+        const { errorLines, exit, logLines } = yield* runUpgrade(["--json"])
+        const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect({
+          errorLines,
+          lines: logLines.length,
+          releaseNotes: report.releaseNotes,
+        }).toStrictEqual({
+          errorLines: ["✔ `.adamantite/adamantite-lock.json` updated. Commit it."],
+          lines: 1,
+          releaseNotes: {
+            changelog: "node_modules/adamantite/CHANGELOG.md",
+            from: "0.46.0",
+            releases: [
+              {
+                notes: "### Patch Changes\n\n- Fix a report of the layers rule",
+                version: "0.46.1",
+              },
+              {
+                notes:
+                  "### Minor Changes\n\n- Rename the shadcn preset to tailwind\n\n  To migrate, replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind`.",
+                version: "0.47.0",
+              },
+            ],
+          },
+        })
+      })
+    )
+  })
+
   it.effect("set up nothing without a lockfile, and report the finding that names init", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

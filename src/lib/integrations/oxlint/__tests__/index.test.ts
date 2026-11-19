@@ -448,12 +448,28 @@ describe("hand-written layer maps", () => {
 describe("oxlint config load", () => {
   it("report the error of a workspace config that imports a preset the package does not export", async () => {
     expect.hasAssertions()
-    const root = mkdtempSync(join(tmpdir(), "adamantite-config-load-"))
+    const folder = mkdtempSync(join(tmpdir(), "adamantite-config-load-"))
+    // The project path goes through a symlink, while the resolver returns real paths.
+    const root = join(folder, "link")
 
     try {
+      mkdirSync(join(folder, "project"))
+      symlinkSync(join(folder, "project"), root, "dir")
       mkdirSync(join(root, "node_modules"))
       symlinkSync(join(REPO, "node_modules/oxlint"), join(root, "node_modules/oxlint"), "dir")
-      symlinkSync(REPO, join(root, "node_modules/adamantite"), "dir")
+      // An installed Adamantite that exports no `./lint/shadcn`, apart from the build of this
+      // repository, so the test runs without `dist`.
+      mkdirSync(join(root, "node_modules/adamantite"))
+      writeFileSync(
+        join(root, "node_modules/adamantite/package.json"),
+        JSON.stringify({
+          exports: { "./lint": "./lint.js" },
+          name: "adamantite",
+          type: "module",
+          version: "0.47.0",
+        })
+      )
+      writeFileSync(join(root, "node_modules/adamantite/lint.js"), "export default {}\n")
       mkdirSync(join(root, "packages/app"), { recursive: true })
       writeFileSync(
         join(root, "package.json"),
@@ -479,11 +495,14 @@ describe("oxlint config load", () => {
           currentState: expect.stringContaining(
             "Package subpath './lint/shadcn' is not defined by \"exports\""
           ),
+          goal: expect.arrayContaining([
+            "When the config imports an Adamantite preset that the installed package does not export, search the changelog of the installed Adamantite, `node_modules/adamantite/CHANGELOG.md`, for the import, and replace it with the preset that the changelog names.",
+          ]),
           id: "oxlint-config-load-failure",
         })
       )
     } finally {
-      rmSync(root, { force: true, recursive: true })
+      rmSync(folder, { force: true, recursive: true })
     }
   })
 })

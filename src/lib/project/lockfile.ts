@@ -5,7 +5,11 @@ import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
-import { readInstalledVersion } from "#lib/project/adamantite-version.ts"
+import {
+  parseRelease,
+  readInstalledVersion,
+  releaseOrder,
+} from "#lib/project/adamantite-version.ts"
 import { Selection } from "#lib/project/selection.ts"
 import {
   InvalidLockfile,
@@ -80,23 +84,6 @@ export const readSelection = (root: string) =>
     }),
     Effect.map((lockfile) => Option.map(lockfile, ({ selection }) => selection))
   )
-
-const RELEASE = /^(\d+)\.(\d+)\.(\d+)(-)?/u
-
-const releaseOrder = Order.Tuple([Order.Number, Order.Number, Order.Number, Order.Boolean])
-
-function parseRelease(version: string) {
-  const match = RELEASE.exec(version)
-
-  if (match === null) {
-    return Option.none()
-  }
-
-  const [, major, minor, patch, prerelease] = match
-  const isRelease = prerelease === undefined
-
-  return Option.some([Number(major), Number(minor), Number(patch), isRelease] as const)
-}
 
 export const verifyLockfileVersion = Effect.fn("verifyLockfileVersion")(function* (
   root: string,

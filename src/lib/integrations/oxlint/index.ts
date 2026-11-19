@@ -27,6 +27,7 @@ import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
 import * as Project from "#lib/project/index.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
+import { findChangelog } from "#lib/project/release-notes.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
@@ -130,23 +131,32 @@ const assessConfigLoad = Effect.fn("assessConfigLoad")(function* (
     return []
   }
 
-  return yield* listLintedFiles(yield* Project.Directory).pipe(
+  const root = yield* Project.Directory
+
+  return yield* listLintedFiles(root).pipe(
     Effect.as([]),
     Effect.catchTag("TrialLintFailed", ({ output }) =>
-      Effect.succeed([
-        {
-          currentState: `Oxlint stops before it lints a file, so \`adamantite check\` and \`adamantite fix\` stop too. Oxlint printed:\n\n\`\`\`text\n${output}\n\`\`\``,
-          goal: [
-            "When the error says `Cannot find native binding`, the install left out Oxlint's binding for this platform. Reinstall the dependencies with the optional dependencies for this platform, and keep the config unchanged.",
-            "Otherwise, repair the config or the rule file that the error names. Keep its rules and all other project settings.",
-            "When the config imports an Adamantite preset that the installed package does not export, replace the import with the preset that the changelog at https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md names for it.",
-            "Run `adamantite check --only lint`, then run `adamantite doctor` again.",
-          ],
-          id: "oxlint-config-load-failure",
-          integration: "oxlint",
-          title: "Oxlint stops before it lints a file",
-        } satisfies Finding,
-      ])
+      Effect.map(findChangelog(root), (changelog) => {
+        const location = Option.match(changelog, {
+          onNone: () => "`CHANGELOG.md` in the `adamantite` package",
+          onSome: (path) => `\`${path}\``,
+        })
+
+        return [
+          {
+            currentState: `Oxlint stops before it lints a file, so \`adamantite check\` and \`adamantite fix\` stop too. Oxlint printed:\n\n\`\`\`text\n${output}\n\`\`\``,
+            goal: [
+              "When the error says `Cannot find native binding`, the install left out Oxlint's binding for this platform. Reinstall the dependencies with the optional dependencies for this platform, and keep the config unchanged.",
+              "Otherwise, repair the config or the rule file that the error names. Keep its rules and all other project settings.",
+              `When the config imports an Adamantite preset that the installed package does not export, search the changelog of the installed Adamantite, ${location}, for the import, and replace it with the preset that the changelog names.`,
+              "Run `adamantite check --only lint`, then run `adamantite doctor` again.",
+            ],
+            id: "oxlint-config-load-failure",
+            integration: "oxlint",
+            title: "Oxlint stops before it lints a file",
+          } satisfies Finding,
+        ]
+      })
     )
   )
 })

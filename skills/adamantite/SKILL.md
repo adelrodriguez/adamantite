@@ -95,8 +95,9 @@ Follow each finding's current state, goal, reference, and verification command.
 For the `oxlint-config-load-failure` finding, read the error that Oxlint printed. When it says
 `Cannot find native binding`, reinstall the dependencies as "Check and fix code" says, and keep the
 config unchanged. Otherwise, repair the config or the rule file that the error names. When it
-imports an Adamantite preset or a name that the installed package does not export, use the
-replacement that the [changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md) names for it. For
+imports an Adamantite preset or a name that the installed package does not export, search the
+changelog that the finding names, the `CHANGELOG.md` of the installed `adamantite` package, for
+the import, and use the replacement that it names. For
 a custom rule or a rules folder, use the repair step in
 [How to repair preset rule reports](references/lint-rules.md#repair-an-existing-rules-folder).
 When Doctor warns that a config states import layers by hand, use the `adamantite-hardening`
@@ -113,6 +114,11 @@ missing or unchanged since Adamantite wrote them, and writes
 `.adamantite/adamantite-lock.json`. In a project without a lockfile, it sets up nothing and reports
 one finding: run `adamantite init`. Commit the lockfile. The JSON lists the file writes, the script writes, and the installs in `setup`, and the
 findings that remain in `assessment`. It exits 1 while findings remain.
+
+`releaseNotes` holds the notes of each release since the version that the lockfile recorded, oldest
+first, from the changelog of the installed package. Follow each migration step in them that applies
+to the project, such as a renamed preset. `update` writes the installed version to the lockfile, so
+a second run has no notes. Read them from the first run.
 
 Run it after each update of the `adamantite` package. Until the lockfile records the installed
 version, `adamantite check` fails and Doctor reports the `setup-outdated` finding.

@@ -375,6 +375,19 @@ do two prereleases of one release, because `update` with the installed version t
 | A lockfile that another Adamantite version than the installed one wrote fails `check` after its stages, and Doctor reports it as a finding. `verifyLockfileVersion` is the one comparison of the two versions. | `src/commands/__tests__/check.test.ts` and `src/commands/__tests__/doctor.test.ts` |
 | `Project.read` decodes the lockfile one time, and the rest of the code trusts `project.lockfile`.                                                                                                              | Nothing                                                                            |
 
+### Release notes
+
+Before `update` writes the installed version to the lockfile, `readReleaseNotes` in
+`src/lib/project/release-notes.ts` reads the notes of each release after the recorded version from
+the `CHANGELOG.md` of the installed package. That changelog ends at the installed version, so the
+notes never name a release that the project does not run. The releases come oldest first, so an
+agent applies the migrations in the order of the releases. A recorded version that does not start
+with release numbers, such as a git source, a project without Adamantite, and a package without a
+changelog give no notes. `printReleaseNotes` in `src/terminal/release-notes.ts` prints one link for
+each release in a terminal, the notes as one Markdown document without a terminal, and nothing with
+`--json`, whose `releaseNotes` field holds them instead. The `oxlint-config-load-failure` finding
+names the same changelog, relative to the project, for the replacement of a retired preset.
+
 ## Assessment
 
 `Project.read` in `src/lib/project/index.ts` reads the target project one time into a snapshot.

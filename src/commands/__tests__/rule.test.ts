@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import process from "node:process"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Command from "effect/cli/Command"
@@ -38,17 +37,11 @@ import {
   InvalidRuleName,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+import { readTestOxlint } from "#presets/__tests__/rule-fixtures.ts"
 
 // The Oxlint package folder of the project. CI sets `ADAMANTITE_TEST_OXLINT` to run `rule ast`,
 // with the probe, and `rule try` with the minimum Oxlint version that `peerDependencies` allows.
-const OXLINT_OVERRIDE = process.env["ADAMANTITE_TEST_OXLINT"]
-
-const TEST_OXLINT =
-  OXLINT_OVERRIDE === undefined || OXLINT_OVERRIDE === ""
-    ? join(REPO_ROOT, "node_modules/oxlint")
-    : OXLINT_OVERRIDE
+const TEST_OXLINT = readTestOxlint()
 
 // The build writes the Oxlint entry and the probe beside the CLI, so a run from source starts their
 // source.

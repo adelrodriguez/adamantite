@@ -19,10 +19,15 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
+import { readTestOxlint } from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
 const RULES_MODULE = join(REPO_ROOT, "presets/rules/plugin.ts")
+
+// The Oxlint package folder of each project. CI sets `ADAMANTITE_TEST_OXLINT` to lint the projects
+// with the minimum Oxlint version that `peerDependencies` allows.
+const TEST_OXLINT = readTestOxlint()
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(
@@ -103,10 +108,11 @@ describe("custom preset", () => {
    * Runs Oxlint in the project, and returns its exit code with the diagnostics that it prints.
    */
   function run(...args: string[]) {
-    const result = spawnSync(join(REPO_ROOT, "node_modules/.bin/oxlint"), ["-f", "json", ...args], {
-      cwd: project,
-      encoding: "utf8",
-    })
+    const result = spawnSync(
+      process.execPath,
+      [join(TEST_OXLINT, "bin/oxlint"), "-f", "json", ...args],
+      { cwd: project, encoding: "utf8" }
+    )
 
     try {
       return {
@@ -128,7 +134,7 @@ describe("custom preset", () => {
     project = mkdtempSync(join(tmpdir(), "adamantite-custom-rules-"))
     // A real node_modules folder keeps the entry modules that custom() writes inside the project.
     mkdirSync(join(project, "node_modules"))
-    symlinkSync(join(REPO_ROOT, "node_modules/oxlint"), join(project, "node_modules/oxlint"))
+    symlinkSync(TEST_OXLINT, join(project, "node_modules/oxlint"))
     write("src/index.ts", "export function stop() {\n  debugger\n}\n")
   })
 

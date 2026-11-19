@@ -111,19 +111,20 @@ pnpm run check
 pnpm run fix
 ```
 
-The first-party rules and the probe plugin must work with each Oxlint version that
-`peerDependencies` allows. CI runs the RuleTester tests, the preset fixtures of every stack, and the
-probe tests with the minimum version. To do
-that locally, install the version from `peerDependencies.oxlint` in a temporary folder, and name
-its package folder in `ADAMANTITE_TEST_OXLINT`:
+The first-party rules, the probe plugin, and `custom()` must work with each Oxlint version that
+`peerDependencies` allows. CI runs the RuleTester tests, the preset fixtures of every stack, the
+probe tests, and the `custom()` tests with the minimum version. The `test:minimum-oxlint` script
+in `package.json` lists the test files. To do that locally, install the version from
+`peerDependencies.oxlint` in a temporary folder, and name its package folder in
+`ADAMANTITE_TEST_OXLINT`:
 
 ```sh
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
-ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
-  presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts \
-  presets/__tests__/effect.test.ts src/commands/__tests__/rule.test.ts \
-  src/lib/hardening/__tests__/suppressions.test.ts
+ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm run test:minimum-oxlint
 ```
+
+Without `ADAMANTITE_TEST_OXLINT`, the script runs the same tests with the Oxlint of the
+repository.
 
 A fixture that imports a package, such as `vue`, needs the package in the fixture packages, not in
 the root `package.json`. Add it with an exact version, and commit the lockfile of the fixture

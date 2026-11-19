@@ -60,9 +60,6 @@ export function readBooleanOption(options: Readonly<Options>, key: string): bool
   return isBoolean(value) ? value : undefined
 }
 
-/**
- * Read an object from the rule's first option object.
- */
 export function readObjectOption(
   options: Readonly<Options>,
   key: string

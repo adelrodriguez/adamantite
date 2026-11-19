@@ -3,9 +3,6 @@ import type { Rule } from "@oxlint/plugins"
 import { withTypeBindings } from "../shared/type-alias-resolution.ts"
 import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
-/**
- * Ban named aliases that merely conceal TypeScript's unknown top type.
- */
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => ({

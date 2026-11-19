@@ -64,19 +64,10 @@ function isHeritage(node: ESTree.Node): node is Heritage {
   return node.type === "TSClassImplements" || node.type === "TSInterfaceHeritage"
 }
 
-/**
- * Return whether a node is the whole body of a type alias, as `Bag` in `type Other = Bag`. Such an
- * alias gives the dictionary another name, so it reports as a declaration.
- */
 function isTypeAliasBody(node: ESTree.TSType): boolean {
   return node.parent.type === "TSTypeAliasDeclaration" && node.parent.typeAnnotation === node
 }
 
-/**
- * Return whether a node is a plain use of a local alias or interface, as `Bag` in `const a: Bag` or
- * `type Logger = { info: (fields: Bag) => void }`. The declaration reports its own unsafe
- * dictionary, so its plain uses do not report again.
- */
 function isPlainNamedConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) {
     return false
@@ -146,9 +137,6 @@ function isInsideTypeTest(node: ESTree.TSType, environment: TypeEnvironment): bo
   return false
 }
 
-/**
- * Return whether to report an unsafe dictionary type, which the caller has classified.
- */
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (isInsideTypeTest(node, environment)) {
     return false
@@ -175,9 +163,6 @@ function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): bo
   return true
 }
 
-/**
- * Disallow object-dictionary contracts whose direct value type is an unsafe escape hatch.
- */
 const rule: Rule = {
   createOnce(context) {
     function report(node: ESTree.Node, value: string) {

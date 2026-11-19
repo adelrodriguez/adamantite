@@ -15,9 +15,6 @@ function getImportedName(specifier: ESTree.ImportSpecifier): string {
   return specifier.imported.value
 }
 
-/**
- * Keep dependency-bearing Effect service constructors local to their owning capability modules.
- */
 const rule: Rule = {
   create(context) {
     const isTestFile = TEST_FILE.test(context.filename.replaceAll("\\", "/"))

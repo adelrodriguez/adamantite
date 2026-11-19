@@ -2,9 +2,6 @@ import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
 
 import { staticKeyName } from "./ast.ts"
 
-/**
- * Resolve an identifier to its binding by walking lexical scopes upward.
- */
 export function resolveVariable(
   sourceCode: SourceCode,
   identifier: ESTree.Node & { readonly name: string }
@@ -24,10 +21,6 @@ export function resolveVariable(
   return null
 }
 
-/**
- * Return the pattern and the value of a `const` binding that no code reassigns, or null for any
- * other binding.
- */
 export function constBinding(
   variable: Variable
 ): { readonly id: ESTree.BindingPattern; readonly init: ESTree.Expression } | null {
@@ -50,10 +43,6 @@ export function constBinding(
   return null
 }
 
-/**
- * Reports whether an identifier with the given name reads a global, because the file does not
- * declare that name in scope.
- */
 function isGlobalIdentifier(sourceCode: SourceCode, expression: ESTree.Node, name: string) {
   if (expression.type !== "Identifier" || expression.name !== name) {
     return false
@@ -68,10 +57,6 @@ function isGlobalIdentifier(sourceCode: SourceCode, expression: ESTree.Node, nam
   return variable === null || variable.defs.length === 0
 }
 
-/**
- * Reports whether an expression reads a global object by name, such as `Reflect` or
- * `globalThis.Reflect`, and no local binding shadows it.
- */
 export function isGlobalObject(
   sourceCode: SourceCode,
   expression: ESTree.Node,
@@ -88,10 +73,6 @@ export function isGlobalObject(
   )
 }
 
-/**
- * Return the `const` binding that an identifier reads, or null for any other expression or for a
- * binding that `visited` holds. `visited` stops a cycle of bindings.
- */
 function resolveConstBinding(
   sourceCode: SourceCode,
   expression: ESTree.Node,
@@ -112,10 +93,6 @@ function resolveConstBinding(
   return constBinding(variable)
 }
 
-/**
- * Reports whether an expression matches, directly or through `const` aliases, such as `R` after
- * `const R = Reflect`.
- */
 export function matchesThroughAliases(
   sourceCode: SourceCode,
   expression: ESTree.Node,
@@ -142,11 +119,6 @@ function matchesThroughAliasesFrom(
   )
 }
 
-/**
- * Reports whether an expression reads a property of an owner object, as `owner.name`, as `name`
- * after `const { name } = owner`, or through a `const` alias of either. `isName` decides which
- * property names count, and `isOwner` decides which objects count.
- */
 export function readsProperty(
   sourceCode: SourceCode,
   expression: ESTree.Node,

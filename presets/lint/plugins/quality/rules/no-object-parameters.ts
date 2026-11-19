@@ -24,10 +24,6 @@ type ParameterOwner =
 // These built-ins return `object` for `object`, so they keep it as broad as before.
 const OBJECT_PRESERVING_WRAPPERS: ReadonlySet<string> = new Set(["NonNullable", "Readonly"])
 
-/**
- * Return the type that a built-in `Readonly` or `NonNullable` wraps, unless a local declaration
- * shadows the name.
- */
 function preservedObjectType(
   type: ESTree.TSType,
   environment: TypeAliasEnvironment
@@ -89,9 +85,6 @@ function resolvesToObject(type: ESTree.TSType, environment: TypeAliasEnvironment
   })
 }
 
-/**
- * Ban the broad object type on function inputs, including local aliases to object.
- */
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => {

@@ -232,7 +232,6 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     // A nearer type declaration hides an outer type parameter with the same name.
     'function outer<T>() { function inner() { type T = string | number; function show(value: T) { return typeof value === "string"; } return show; } return inner; }',
     'function outer<T>() { function inner() { interface T { readonly kind: string } function show(value: T) { return typeof value.kind === "string"; } return show; } return inner; }',
-    // An imported alias has no declaration in the file, so the rule cannot see its body.
     'import type { Data } from "./data"; function f(value: Data) { return typeof value === "string"; }',
     {
       code: 'function isString(value: unknown): value is string { return typeof value === "string"; }',

@@ -9,8 +9,6 @@ import {
   resolveVariable,
 } from "../../shared/scope.ts"
 
-// The methods of the test framework object that replace a module, or build a module or an object
-// of mocks in place of the real one.
 const moduleMockMethods: ReadonlySet<string> = new Set([
   "createMockFromModule",
   "doMock",
@@ -23,12 +21,8 @@ const moduleMockMethods: ReadonlySet<string> = new Set([
   "unstable_mockModule",
 ])
 
-// The methods of the test framework object that replace a global or a property with a value of the
-// test, or what a spy returns for some arguments, as `vi.when(spy).calledWith(1).thenReturn(2)`.
 const replacementMethods: ReadonlySet<string> = new Set(["replaceProperty", "stubGlobal", "when"])
 
-// The methods of a mock or a spy that replace what the function does. A spy without them only
-// observes the real function.
 const behaviorMethods: ReadonlySet<string> = new Set([
   "mockImplementation",
   "mockImplementationOnce",
@@ -41,26 +35,16 @@ const behaviorMethods: ReadonlySet<string> = new Set([
   "mockReturnValueOnce",
 ])
 
-// A mock method with a common name, which other objects also have. It counts only on a mock or a
-// spy that the test framework builds, as `vi.fn().withImplementation(...)`.
 const sharedBehaviorMethod = "withImplementation"
 
-// The methods of the test framework object that build or type a mock or a spy.
 const mockBuilders: ReadonlySet<string> = new Set(["fn", "mocked", "spyOn"])
 
-/**
- * The test framework object that each test package exports. Vitest and Jest also make the object a
- * global.
- */
+// Vitest and Jest also make these objects globals.
 const frameworkExports = new Map([
   ["@jest/globals", "jest"],
   ["vitest", "vi"],
 ])
 
-/**
- * Return the package and the export name that an identifier imports, with `*` for a namespace
- * import, or null when the identifier is not an import.
- */
 function importedBinding(sourceCode: SourceCode, expression: ESTree.Node) {
   if (expression.type !== "Identifier") {
     return null
@@ -88,11 +72,6 @@ function importedBinding(sourceCode: SourceCode, expression: ESTree.Node) {
   return name === null ? null : { name, source }
 }
 
-/**
- * Reports whether an expression reads the test framework object: the `vi` or `jest` global, such as
- * `vi` or `globalThis.vi`, an import of it, or a property of a namespace import, such as
- * `vitest.vi`.
- */
 function isTestFrameworkObject(sourceCode: SourceCode, expression: ESTree.Node) {
   if ([...frameworkExports.values()].some((name) => isGlobalObject(sourceCode, expression, name))) {
     return true
@@ -117,10 +96,6 @@ function isTestFrameworkObject(sourceCode: SourceCode, expression: ESTree.Node) 
   )
 }
 
-/**
- * Reports whether a call target reads a method of the test framework object that `isName` accepts,
- * such as `vi.mock`, `vitest.vi.mock`, or `doMock` after `const { doMock } = vi`.
- */
 function isFrameworkMethod(
   sourceCode: SourceCode,
   callee: ESTree.Node,
@@ -131,10 +106,6 @@ function isFrameworkMethod(
   )
 }
 
-/**
- * Reports whether a call passes a function its implementation, as `vi.fn(() => 1)` does. `vi.fn()`
- * and `vi.fn(undefined)` build a function that only records its calls.
- */
 function passesImplementation(sourceCode: SourceCode, node: ESTree.CallExpression) {
   const [implementation] = node.arguments
 
@@ -145,10 +116,6 @@ function passesImplementation(sourceCode: SourceCode, node: ESTree.CallExpressio
   )
 }
 
-/**
- * Reports whether an expression is a mock or a spy that the test framework builds, such as
- * `vi.fn()`, also through type wrappers and a `const` binding.
- */
 function isFrameworkMock(sourceCode: SourceCode, expression: ESTree.Node) {
   const node = unwrapExpression(expression)
   const variable = node.type === "Identifier" ? resolveVariable(sourceCode, node) : null
@@ -175,10 +142,6 @@ function isBehaviorMethod(sourceCode: SourceCode, callee: ESTree.Node) {
   return name !== null && behaviorMethods.has(name)
 }
 
-/**
- * Ban test doubles that replace what a dependency does: module mocks, mock implementations, and
- * stubbed globals. A spy that only observes the real function stays allowed.
- */
 const rule: Rule = {
   createOnce(context) {
     return {

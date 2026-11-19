@@ -3,34 +3,27 @@ import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 import { isNumberLiteral, staticKeyName, staticString, unwrapExpression } from "../../shared/ast.ts"
 import { constBinding, resolveVariable } from "../../shared/scope.ts"
 
-// The functions that register a test or a suite, by the name at the root of the call, such as `it`
-// in `it.effect("loads", ...)` or `test` in `test.each([1])("loads %i", ...)`.
 const testFunctions: ReadonlySet<string> = new Set(["describe", "it", "suite", "test"])
 
-// The members of a test function that do not register a test: they return a new test function or
-// set fixture values.
+// These members of a test function return a new test function or set fixture values, and
+// register no test.
 const builderMembers: ReadonlySet<string> = new Set(["each", "extend", "for", "override"])
 
 // The member that sets fixture values in Vitest, as `test.scoped({ ... })`, and registers a test in
 // @effect/vitest 3, as `it.scoped("loads", ...)`.
 const scopedMember = "scoped"
 
-// The Vite and Vitest configs, whose `test` options set the retries of every test.
 const configFile = /(?:^|\/)(?:vite|vitest)\.config\.[cm]?[jt]s$/u
 
 // The files that Vitest runs as benchmarks by default, such as `index.bench.ts`.
 const benchmarkFile = /\.(?:bench|benchmark)\.[cm]?[jt]sx?$/u
 
-// The option key of a test or a suite that raises its timeout.
 const testTimeouts: ReadonlySet<string> = new Set(["timeout"])
 
-// A Vitest config sets its timeouts on purpose, so only its retries count.
 const noTimeouts: ReadonlySet<string> = new Set()
 
-// The option keys of `vi.setConfig` that raise the timeout of every later test or hook.
 const configTimeouts: ReadonlySet<string> = new Set(["hookTimeout", "testTimeout"])
 
-// The calls that change the retries or the timeout of every later test, by object and method.
 const frameworkCalls: ReadonlyMap<string, ReadonlyMap<string, "retry" | "timeout">> = new Map([
   [
     "jest",
@@ -45,10 +38,6 @@ function propertyName(property: ESTree.Node): string | null {
   return property.type === "Property" ? staticKeyName(property.key, property.computed) : null
 }
 
-/**
- * Return the identifier at the root of a call target, such as `it` in `it.effect` or `test` in
- * `test.each([1])`.
- */
 function rootName(node: ESTree.Node): string | null {
   if (node.type === "MemberExpression") {
     return rootName(node.object)
@@ -65,10 +54,6 @@ function rootName(node: ESTree.Node): string | null {
   return node.type === "Identifier" ? node.name : null
 }
 
-/**
- * Return the object and the method of a call such as `vi.setConfig(...)`, or null when the target
- * is not a member of an identifier.
- */
 function methodCall(callee: ESTree.Node): { method: string; object: string } | null {
   if (callee.type !== "MemberExpression" || callee.object.type !== "Identifier") {
     return null
@@ -101,10 +86,6 @@ function isTestCall(node: ESTree.CallExpression): boolean {
   return member === null || !builderMembers.has(member)
 }
 
-/**
- * Return the value that an expression holds without its type wrappers, also through a `const`
- * binding, such as `60_000` for `LONG` after `const LONG = 60_000 as const`.
- */
 function constValue(sourceCode: SourceCode, expression: ESTree.Node): ESTree.Node {
   const node = unwrapExpression(expression)
 
@@ -118,10 +99,6 @@ function constValue(sourceCode: SourceCode, expression: ESTree.Node): ESTree.Nod
   return binding?.id.type === "Identifier" ? unwrapExpression(binding.init) : node
 }
 
-/**
- * Reports whether an expression is a function, also through a function declaration or a `const`
- * binding, such as `body` in `function body() {}`.
- */
 function isFunctionValue(sourceCode: SourceCode, node: ESTree.Node): boolean {
   if (node.type === "Identifier") {
     const variable = resolveVariable(sourceCode, node)
@@ -136,10 +113,6 @@ function isFunctionValue(sourceCode: SourceCode, node: ESTree.Node): boolean {
   return value.type === "ArrowFunctionExpression" || value.type === "FunctionExpression"
 }
 
-/**
- * Reports whether an expression computes a number from number literals, such as `2 * 60_000`, also
- * through a `const` binding.
- */
 function isNumberValue(sourceCode: SourceCode, node: ESTree.Node, depth = 0): boolean {
   const value = depth > 8 ? node : constValue(sourceCode, node)
 
@@ -159,16 +132,10 @@ function isNumberValue(sourceCode: SourceCode, node: ESTree.Node, depth = 0): bo
   )
 }
 
-/**
- * Ban test retries and raised test timeouts, which hide a flaky or slow test instead of fixing it.
- */
 const rule: Rule = {
   createOnce(context) {
-    // The local names of `flakyTest` that the file imports from @effect/vitest.
     const flakyTestNames = new Set<string>()
     let isConfig = false
-    // The options that a `const` binding holds can reach several calls, so each option gets one
-    // report.
     const reported = new Set<ESTree.Node>()
 
     function report(messageId: "retry" | "timeout", property: ESTree.Node) {
@@ -278,7 +245,6 @@ const rule: Rule = {
           reportOptions(node.value, noTimeouts)
         }
       },
-      // A benchmark is slow by design, so its timeout hides no flaky test.
       before() {
         flakyTestNames.clear()
         reported.clear()

@@ -34,7 +34,6 @@ tester.run(
       { code: "const result = { ...(name ? { name } : undefined) };", errors: [error] },
       { code: "const result = { ...(condition ? { name } : null) };", errors: [error] },
       { code: "const result = { ...(condition ? { name } : void 0) };", errors: [error] },
-      // A type operator or a nested conditional does not change what the branch spreads.
       {
         code: "const result = { ...(condition ? { name } : ({} satisfies Options)) };",
         errors: [error],
@@ -43,7 +42,6 @@ tester.run(
       { code: "const result = { ...(condition ? { name } : ok ? {} : {}) };", errors: [error] },
       { code: "const result = { ...(condition ? { name } : ok ? { id } : {}) };", errors: [error] },
       { code: "const result = { ...(condition ? (ok && { name }) : { id }) };", errors: [error] },
-      // A constant that holds `{}` is the same empty branch.
       {
         code: "const EMPTY = {}; const result = { ...(condition ? { name } : EMPTY) };",
         errors: [error],
@@ -52,7 +50,6 @@ tester.run(
         code: "const EMPTY = {}; const a = { ...(ok ? { name } : EMPTY) }; const b = { ...(ok ? (EMPTY as Options) : { id }) }; const c = { ...EMPTY };",
         errors: [error, error],
       },
-      // A JSX spread attribute omits an attribute the same way.
       { code: "const element = <div {...(ok ? { title } : {})} />;", errors: [error], ...jsx },
       { code: "const element = <div {...(title && { title })} />;", errors: [error], ...jsx },
     ],

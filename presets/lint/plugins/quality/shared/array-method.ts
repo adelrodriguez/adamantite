@@ -3,9 +3,6 @@ import { staticKeyName, unwrapExpression } from "../../shared/ast.ts"
 import { constBinding } from "../../shared/scope.ts"
 import { namedTypeReference } from "./type-alias-resolution.ts"
 
-/**
- * Resolve a local binding by scope, not by identifier spelling.
- */
 export function resolveArrayBinding(
   sourceCode: SourceCode,
   expression: ESTree.Node
@@ -31,20 +28,12 @@ export function resolveArrayBinding(
   return null
 }
 
-/**
- * Return the initial value of a `const` binding that no code reassigns, or null for any other
- * binding.
- */
 export function constInitializer(variable: Variable): ESTree.Expression | null {
   const binding = constBinding(variable)
 
   return binding?.id.type === "Identifier" ? binding.init : null
 }
 
-/**
- * Read static method names, such as `filter` in `items.filter`, ``items[`filter`]``, or
- * `items["filter"]`, without evaluating expressions.
- */
 export function arrayMethodTarget(
   callee: ESTree.Node
 ): { readonly name: string; readonly object: ESTree.Node } | null {
@@ -83,17 +72,10 @@ function isArrayAnnotation(type: ESTree.TSType): boolean {
   return reference !== null && ARRAY_TYPES.has(reference.name)
 }
 
-/**
- * Recognize local array evidence; unknown receivers and iterator pipelines are deliberately
- * excluded.
- */
 export function isKnownArrayExpression(sourceCode: SourceCode, expression: ESTree.Node): boolean {
   return isKnownArrayExpressionFrom(sourceCode, expression, new Set())
 }
 
-/**
- * Follow bindings to array evidence, and stop at a binding that `visited` already holds.
- */
 function isKnownArrayExpressionFrom(
   sourceCode: SourceCode,
   expression: ESTree.Node,

@@ -11,9 +11,6 @@ import {
 
 type ReducerCallback = ESTree.ArrowFunctionExpression | ESTree.Function
 
-/**
- * Return the call that takes a node as an argument, past syntax-only wrappers, or null.
- */
 function callWithArgument(node: ESTree.Node) {
   let owner: ESTree.Node | null = node.parent
 
@@ -27,9 +24,6 @@ function callWithArgument(node: ESTree.Node) {
     : null
 }
 
-/**
- * Return the reduce call that takes a node as its reducer, or null.
- */
 function reduceCallWithReducer(node: ESTree.Node) {
   const call = callWithArgument(node)
 
@@ -48,10 +42,6 @@ function reduceCallWithReducer(node: ESTree.Node) {
     : null
 }
 
-/**
- * Return the binding that names a function, for a function declaration or a function that
- * initializes a `const` binding that no code reassigns. Return null for any other function.
- */
 function functionBinding(sourceCode: SourceCode, callback: ReducerCallback) {
   if (callback.type === "FunctionDeclaration") {
     const variable = sourceCode
@@ -76,10 +66,6 @@ function functionBinding(sourceCode: SourceCode, callback: ReducerCallback) {
   return variable !== undefined && constInitializer(variable) === declarator.init ? variable : null
 }
 
-/**
- * Return the reduce call that uses a function as its reducer: inline, or by the name of a function
- * declaration or a `const` binding in the same file. Return null when no reduce call uses it.
- */
 function reduceCallForCallback(sourceCode: SourceCode, callback: ReducerCallback) {
   const inlineCall = reduceCallWithReducer(callback)
 
@@ -100,10 +86,6 @@ function reduceCallForCallback(sourceCode: SourceCode, callback: ReducerCallback
   return null
 }
 
-/**
- * Return the accumulator parameter and the initial value of a reducer, or null when the accumulator
- * is not a plain name.
- */
 function reducerParts(callback: ReducerCallback, call: ESTree.CallExpression) {
   const firstParameter = callback.params[0]
 
@@ -117,11 +99,6 @@ function reducerParts(callback: ReducerCallback, call: ESTree.CallExpression) {
   return { accumulator, callback, initialValue: call.arguments[1] }
 }
 
-/**
- * Find the reducer that runs a node. A callback inside the reducer, such as a `forEach` callback,
- * runs on each step, so the search continues past it. Any other function, such as a stored
- * callback, stops the search.
- */
 function enclosingReducer(sourceCode: SourceCode, node: ESTree.Node) {
   let parent = node.parent
 
@@ -172,10 +149,6 @@ function referencesAccumulator(
   )
 }
 
-/**
- * How the length of each array copy method's result compares with the accumulator's length. A
- * `window` copy has a fixed length when it passes literal bounds, such as `acc.slice(-2)`.
- */
 const ARRAY_COPY_LENGTH = new Map<string, "grow" | "keep" | "window">([
   ["concat", "grow"],
   ["toSpliced", "grow"],
@@ -194,10 +167,6 @@ function isNegativeNumberLiteral(node: ESTree.Node) {
   )
 }
 
-/**
- * Reports whether a `slice` call copies at most a fixed number of items, such as `slice(-2)` or
- * `slice(0, 3)`.
- */
 function hasFixedWindow(args: ESTree.CallExpression["arguments"]) {
   const [start, end] = args
 
@@ -212,9 +181,6 @@ function hasFixedWindow(args: ESTree.CallExpression["arguments"]) {
   return end !== undefined && isNumberLiteral(start) && isNumberLiteral(end)
 }
 
-/**
- * Follow `const` bindings to the expression that gives the reducer its initial value.
- */
 function resolveInitialValue(
   sourceCode: SourceCode,
   expression: ESTree.Node,
@@ -233,10 +199,6 @@ function resolveInitialValue(
   return initializer === null ? node : resolveInitialValue(sourceCode, initializer, visited)
 }
 
-/**
- * Reports whether an object literal has only fixed keys, so merging it cannot add keys on each
- * step.
- */
 function hasFixedKeys(node: ESTree.Node) {
   return (
     node.type === "ObjectExpression"
@@ -247,11 +209,6 @@ function hasFixedKeys(node: ESTree.Node) {
   )
 }
 
-/**
- * Return the expression that the reducer returns when it returns the copy, directly or through more
- * calls that keep its length, such as `acc.with(0, a).with(1, b)`. A copy that the step changes
- * later can grow, so it has no step result.
- */
 function stepResult(
   copy: ESTree.Node,
   callback: ESTree.ArrowFunctionExpression | ESTree.Function
@@ -281,10 +238,6 @@ function stepResult(
   return null
 }
 
-/**
- * Reports whether the step uses the accumulator only inside its result. A step that also uses the
- * accumulator elsewhere can grow it, as in `acc.push(item)`, before it makes the copy.
- */
 function isUsedOnlyIn(accumulator: Variable, result: ESTree.Node | null) {
   return (
     result !== null
@@ -295,17 +248,12 @@ function isUsedOnlyIn(accumulator: Variable, result: ESTree.Node | null) {
   )
 }
 
-/**
- * Reject non-spread copies of reducer accumulators that can grow on each step. Pair with
- * oxc/no-accumulating-spread.
- */
 const rule: Rule = {
   createOnce(context) {
     return {
       CallExpression(node) {
         const method = arrayMethodTarget(node.callee)
 
-        // Only these methods copy, so other calls skip the search for an enclosing reducer.
         if (
           method === null
           || (method.name !== "assign"
@@ -355,8 +303,6 @@ const rule: Rule = {
         ) {
           const target = node.arguments[0]
 
-          // A copy keeps a fixed size when the initial value has keys, each merged object has only
-          // fixed keys, and the step uses the accumulator only in the copy that it returns.
           const isBounded =
             initialValue?.type === "ObjectExpression"
             && initialValue.properties.length > 0
@@ -381,8 +327,6 @@ const rule: Rule = {
             reducer.initialValue !== undefined
             && isKnownArrayExpression(context.sourceCode, reducer.initialValue)
 
-          // A window copy has a fixed length. A copy that keeps the length of a non-empty tuple
-          // keeps a fixed size when the step returns it and uses the accumulator only there.
           const isBounded =
             arrayCopyLength === "window"
               ? hasFixedWindow(node.arguments)

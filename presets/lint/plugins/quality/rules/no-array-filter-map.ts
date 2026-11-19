@@ -3,9 +3,6 @@ import type { Rule } from "@oxlint/plugins"
 import { unwrapExpression } from "../../shared/ast.ts"
 import { arrayMethodTarget, isKnownArrayExpression } from "../shared/array-method.ts"
 
-/**
- * Reject eager array filter/map pipelines; lazy iterator helpers remain allowed.
- */
 const rule: Rule = {
   createOnce(context) {
     return {

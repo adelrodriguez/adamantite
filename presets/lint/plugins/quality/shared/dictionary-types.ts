@@ -27,15 +27,9 @@ const BUILT_INS = new Set([
 
 const TRANSPARENT_WRAPPERS = new Set(["Readonly", "Partial", "Required", "NonNullable"])
 
-/**
- * The built-in string types that map each key to one key, so the key set keeps its size.
- */
+// These intrinsic string types map each key to one key, so the key set keeps its size.
 const KEY_CASE_CHANGES = new Set(["Uppercase", "Lowercase", "Capitalize", "Uncapitalize"])
 
-/**
- * The type argument bound to each type parameter, with the substitutions of the place that wrote
- * it.
- */
 type TypeAliasEnvironment = ReadonlyMap<string, ResolvedType>
 
 type ResolvedType = {
@@ -81,9 +75,6 @@ function isTransparentWrapper(reference: NamedTypeReference, environment: TypeEn
   )
 }
 
-/**
- * Return the type argument bound to a type parameter. A `globalThis` use names no type parameter.
- */
 function substitutionFor(
   reference: NamedTypeReference,
   substitutions: TypeAliasEnvironment
@@ -123,11 +114,6 @@ const BROAD_KEY_TYPES: ReadonlySet<string> = new Set([
 
 const FINITE_KEY_TYPES: ReadonlySet<string> = new Set(["TSLiteralType", "TSNeverKeyword"])
 
-/**
- * How many keys a key type allows. `string`, `number`, `symbol`, and `PropertyKey` allow any key,
- * and literal types allow a finite set. An imported type or an unbound type parameter is
- * unresolved, because the rule cannot see its keys.
- */
 type KeyBreadth = "broad" | "finite" | "unresolved"
 
 function unionKeyBreadth(members: readonly KeyBreadth[]): KeyBreadth {
@@ -162,8 +148,7 @@ function keyBreadth(
     )
   }
 
-  // A template over finite parts, such as `get${"a" | "b"}`, has finite keys. The rule does not
-  // read the keys of other templates.
+  // A template over finite parts, such as `get${"a" | "b"}`, has finite keys.
   if (unwrapped.type === "TSTemplateLiteralType") {
     return unwrapped.types.every(
       (part) => keyBreadth(part, environment, substitutions, visitedAliases) === "finite"
@@ -213,10 +198,7 @@ function keyBreadth(
   return keyBreadth(alias.typeAnnotation, environment, new Map(), nextVisited)
 }
 
-/**
- * Return the breadth of a `Record` key. `Record` with no type arguments is still an error in
- * TypeScript, so treat it as open.
- */
+// `Record` without type arguments is an error in TypeScript, so its key counts as broad.
 function recordKeyBreadth(
   reference: NamedTypeReference,
   environment: TypeEnvironment,
@@ -227,11 +209,9 @@ function recordKeyBreadth(
   return key === undefined ? "broad" : keyBreadth(key, environment, substitutions)
 }
 
-/**
- * Return the breadth of the keys of a mapped type. An `as` clause, as in `[K in Kind as
- * Uppercase<K>]`, names the keys, and it sees the key parameter as its constraint. The clause can
- * map each key to any key, so only a finite clause keeps the keys finite.
- */
+// An `as` clause, as in `[K in Kind as Uppercase<K>]`, names the keys and sees the key
+// parameter as its constraint. It can map each key to any key, so only a finite clause keeps the
+// keys finite.
 function mappedKeyBreadth(
   type: ESTree.TSMappedType,
   environment: TypeEnvironment,
@@ -292,12 +272,8 @@ function isEffectivelyEmptyInterface(
   )
 }
 
-/**
- * Bind the type parameters of an alias or an interface for its body and heritage. The body sees
- * only these parameters, because the type parameters of the type that refers to it are not in scope
- * there. Each explicit argument keeps the substitutions of the place that wrote it, and a default
- * sees the parameters before it.
- */
+// A declaration body sees only its own type parameters. An explicit argument keeps the
+// substitutions of the place that wrote it, and a default sees the parameters before it.
 function typeArgumentSubstitution(
   declaration: ESTree.TSInterfaceDeclaration | ESTree.TSTypeAliasDeclaration,
   arguments_: readonly ESTree.TSType[],
@@ -522,10 +498,6 @@ function referenceValueTypes(
     : dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving)
 }
 
-/**
- * Return the value types of an interface's index signatures and of the types it extends. They see
- * the type arguments of the use, as an alias body does.
- */
 function interfaceValueTypes(
   declaration: ESTree.TSInterfaceDeclaration,
   reference: NamedTypeReference,
@@ -584,11 +556,8 @@ function enclosingGenericDeclaration(node: ESTree.Node): GenericDeclaration | nu
   return null
 }
 
-/**
- * Bind the type parameters of the enclosing declaration to their defaults. A plain use of the
- * declaration, such as `Bag` for `type Bag<T = unknown> = Record<string, T>`, gets these types, so
- * the declaration states them. A closer binder with the same name hides a parameter.
- */
+// A plain use, such as `Bag` for `type Bag<T = unknown> = Record<string, T>`, gets the
+// defaults, so the declaration states them.
 function defaultTypeArguments(node: ESTree.Node, environment: TypeEnvironment) {
   const declaration = enclosingGenericDeclaration(node)
   const defaults = new Map<string, ResolvedType>()
@@ -654,9 +623,6 @@ export function classifyUnsafeDictionary(
   )
 }
 
-/**
- * Classify the type that an interface `extends` clause or a class `implements` clause names.
- */
 export function classifyUnsafeHeritage(
   heritage: ESTree.TSClassImplements | ESTree.TSInterfaceHeritage,
   environment: TypeEnvironment
@@ -724,8 +690,6 @@ export function classifyWideningTarget(
   const declaration =
     localAlias(reference, environment) ?? localInterfaces(reference, environment)[0]
 
-  // A generic named type is a container for the caller's values, and its other broad targets
-  // depend on the type argument.
   if (declaration === undefined || !hasTypeParameters(declaration)) {
     return resolved
   }
@@ -733,10 +697,6 @@ export function classifyWideningTarget(
   return resolved?.kind === "open dictionary" ? { kind: "generic container" } : null
 }
 
-/**
- * Return whether an interface accepts any key, through an index signature of its own or through a
- * type it extends. The heritage sees the type arguments of the use, as an alias body does.
- */
 function isOpenInterface(
   declarations: readonly ESTree.TSInterfaceDeclaration[],
   reference: NamedTypeReference,

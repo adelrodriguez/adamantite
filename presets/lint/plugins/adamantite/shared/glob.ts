@@ -1,14 +1,7 @@
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs.
-
 function escapeRegExp(text: string) {
   return text.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)
 }
 
-/**
- * Convert a glob to a regular expression that matches a whole path with forward slashes. Supports
- * `**`, `*`, `?`, `[a-z]` and `[!a-z]` character classes, and `{a,b}` alternation.
- */
 export function globToRegExp(glob: string): RegExp {
   let source = ""
   let index = 0

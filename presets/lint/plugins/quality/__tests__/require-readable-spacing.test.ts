@@ -20,9 +20,6 @@ const tester = new RuleTester({
 
 const error = { messageId: "expectedBlankLine" }
 
-/**
- * An indented `const` on one line that ends at `column`.
- */
 function bindingEndingAt(name: string, column: number) {
   const start = `  const ${name} = load("`
 
@@ -170,7 +167,6 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
   ],
 })
 
-// Exercise upstream options that the opinionated public rule does not enable.
 tester.run(
   "vendored padding removal",
   createPaddingLineRule([{ blankLine: "never", next: "*", prev: "*" }]),

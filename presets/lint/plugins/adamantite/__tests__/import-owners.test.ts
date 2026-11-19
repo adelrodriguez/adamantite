@@ -13,8 +13,6 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-// Every file is in the project at `/project`, and no import resolves. The fixture tests cover the
-// real workspace lookup and the resolution of project modules.
 const rule = createImportOwnersRule({
   findRoot: () => ({ kind: "workspace", path: "/project" }),
   identify: identity,
@@ -31,7 +29,6 @@ function hint(index: number) {
 
 const HINT = hint(0)
 
-// The message data that every report carries for the first option.
 const ANCHOR = { configPath: "options[0]", root: "workspace root" }
 
 const GIGET = { import: "giget", owners: ["src/lib/sources/repository/fetch.ts"] }
@@ -83,8 +80,6 @@ tester.run("import-owners", rule, {
       filename: file("src/lib/references/add.ts"),
       options: [GIGET],
     },
-    // A source that the code spells without computing it: a template with no expression, or a
-    // string inside type assertions. The report points to the whole source expression.
     ...[
       "import(`giget`)",
       'import("giget" as string)',
@@ -103,8 +98,6 @@ tester.run("import-owners", rule, {
       filename: file("apps/mobile/src/app/index.tsx"),
       options: [ALERT],
     },
-    // A CommonJS `require` and a TypeScript import-equals declaration reach the module too, also
-    // when they import only types.
     ...[
       'const giget = require("giget")',
       "const giget = require(`giget`)",
@@ -141,14 +134,12 @@ tester.run("import-owners", rule, {
       options: [GIGET],
     },
     {
-      // A file next to the owner file is not the owner.
       code: 'import { downloadTemplate } from "giget"',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/sources/repository/fetch.test.ts"),
       options: [GIGET],
     },
     {
-      // A subpath of the module belongs to the same owner.
       code: 'import * as z from "zod/mini"',
       errors: [
         {
@@ -159,7 +150,6 @@ tester.run("import-owners", rule, {
       options: [ZOD],
     },
     {
-      // A folder whose name starts with the owner's name is not the owner.
       code: 'import * as z from "zod"',
       errors: [{ messageId: "module" }],
       filename: file("packages/utils-extra/src/index.ts"),
@@ -262,7 +252,6 @@ tester.run("import-owners", rule, {
       options: [{ ...ALERT, names: ["default"] }],
     },
     {
-      // Each option is checked on its own.
       code: 'import { downloadTemplate } from "giget"\nimport * as z from "zod"',
       errors: [
         { line: 1, messageId: "module" },
@@ -278,7 +267,6 @@ tester.run("import-owners", rule, {
       options: [ALERT],
     },
     {
-      // Each report names the option that produced it, when two options restrict one module.
       code: 'import { Alert } from "react-native"\nimport * as Native from "react-native"',
       errors: [
         {
@@ -313,14 +301,12 @@ tester.run("import-owners", rule, {
       filename: file("src/lib/sources/repository/fetch.ts"),
       options: [GIGET],
     },
-    // A source that only running the code gives does not match a restricted module.
     ...[
       'const name = "giget"\nconst giget = import(name)',
       'const giget = import("gi" + "get")',
       `const name = "get"\nconst giget = import(\`gi\${name}\`)`,
       'const zod = import("zod", { with: { type: "giget" } })',
     ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
-    // A local function named `require`, or a `require` property, loads no module.
     ...[
       'function load(require: (name: string) => unknown) {\n  return require("giget")\n}',
       'const require = (name: string) => name\nrequire("giget")',
@@ -337,13 +323,11 @@ tester.run("import-owners", rule, {
       options: [ZOD],
     },
     {
-      // An owner path can start with `./`.
       code: 'import * as z from "zod"',
       filename: file("packages/utils/src/schema/index.ts"),
       options: [{ ...ZOD, owners: ["./packages/utils/"] }],
     },
     {
-      // Another package whose name starts with the module's name.
       code: 'import { Gigeto } from "gigeto"',
       filename: file("src/index.ts"),
       options: [GIGET],
@@ -359,7 +343,6 @@ tester.run("import-owners", rule, {
       options: [ALERT],
     },
     {
-      // The owners own only `Alert`.
       code: 'import Native, { Text, View } from "react-native"\nexport { Pressable } from "react-native"',
       filename: file("apps/mobile/src/app/index.tsx"),
       options: [ALERT],

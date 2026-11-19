@@ -2,9 +2,6 @@ import type { Context, ESTree, Rule, Visitor } from "@oxlint/plugins"
 import { staticKeyName } from "../../shared/ast.ts"
 import { findImportedCalls, type ImportedCall } from "../shared/imports.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports only types from packages.
-
 const QUERY_MODULE = "@tanstack/react-query"
 const REACT_MODULE = "react"
 
@@ -29,10 +26,6 @@ function getReferences(context: Context, declarator: ESTree.VariableDeclarator, 
     .map((reference) => reference.identifier)
 }
 
-/**
- * The expressions that read the data of the query result that `call` returns: `query.data` for
- * `const query = useQuery(...)`, and each `data` read for `const { data } = useQuery(...)`.
- */
 function findDataReads(context: Context, call: ESTree.CallExpression): ESTree.Node[] {
   const declarator = call.parent
 
@@ -70,10 +63,6 @@ function findDataReads(context: Context, call: ESTree.CallExpression): ESTree.No
   })
 }
 
-/**
- * Whether `node` evaluates to query data or to a value inside it, such as `query.data`,
- * `data.user.name`, `data ?? []`, or `() => data`.
- */
 function readsData(node: ESTree.Node, dataReads: ReadonlySet<ESTree.Node>): boolean {
   if (dataReads.has(node)) {
     return true

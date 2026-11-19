@@ -134,7 +134,6 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
       code: "function assertDefined(value: unknown): asserts value is NonNullable<unknown> {} assertDefined('known');",
       errors: [error],
     },
-    // A named interface with an index signature is as open as a named alias to a dictionary.
     {
       code: "interface ScoreMap { [name: string]: number } const scores: ScoreMap = { alice: 1 };",
       errors: [error],
@@ -155,7 +154,6 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
       code: "function outer() { interface ScoreMap { [name: string]: number } const scores: ScoreMap = { alice: 1 }; }",
       errors: [error],
     },
-    // A named interface passes its type arguments to the types it extends, as an alias does.
     {
       code: "interface Dict<K extends string, V> extends Record<K, V> {} const d: Dict<string, number> = { a: 1 };",
       errors: [error],
@@ -205,7 +203,6 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
     `${prelude} type Diet = 'vegan' | 'omnivore'; type Labels = Record<Diet, string>; const labels: Labels = { vegan: 'V', omnivore: 'O' };`,
     `${prelude} type Diet = 'vegan' | 'omnivore'; const labels: Readonly<Record<Diet, string>> = { vegan: 'V', omnivore: 'O' };`,
     `${prelude} const labels: Record<'a' | 'b', number> = { a: 1, b: 2 };`,
-    // A finite key set makes a mapped type a closed contract, as it does for `Record`.
     "type Kind = 'a' | 'b'; const counts: { [K in Kind]: number } = { a: 1, b: 2 };",
     "const counts: { readonly [K in 'a' | 'b']: number } = { a: 1, b: 2 };",
     `type Kind = 'a' | 'b'; const getters: { [K in Kind as \`get\${K}\`]: number } = { geta: 1, getb: 2 };`,

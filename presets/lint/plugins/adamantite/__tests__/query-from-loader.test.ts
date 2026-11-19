@@ -12,8 +12,6 @@ const tester = new RuleTester({
   languageOptions: { parserOptions: { lang: "tsx" }, sourceType: "module" },
 })
 
-// The router import stays on the first line, and the route definition comes last, so the report
-// lines and columns match the component code.
 const ROUTER = 'import { createFileRoute } from "@tanstack/react-router"; '
 const ROUTE = '\nexport const Route = createFileRoute("/user")({ component: User })'
 const IMPORT = `${ROUTER}import { queryOptions, useQuery } from "@tanstack/react-query"\n`
@@ -147,7 +145,6 @@ tester.run("query-from-loader", plugin.rules["query-from-loader"], {
     },
   ],
   valid: [
-    // Not a route file: no route factory from @tanstack/react-router.
     'import { useQuery } from "@tanstack/react-query"\nexport function User() {\n  return useQuery({ queryFn: fetchUser, queryKey: ["user"] })\n}',
     'import type { createFileRoute } from "@tanstack/react-router"\nimport { useQuery } from "@tanstack/react-query"\nexport function User() {\n  return useQuery({ queryFn: fetchUser, queryKey: ["user"] })\n}',
     'import { Link } from "@tanstack/react-router"\nimport { useQuery } from "@tanstack/react-query"\nexport function User() {\n  useQuery({ queryFn: fetchUser, queryKey: ["user"] })\n  return <Link to="/" />\n}',

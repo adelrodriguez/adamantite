@@ -22,10 +22,6 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-// A fake of the file system: relative imports resolve from the importer, `#` imports from
-// `/project/src`, and `#dep` to a package. `#conditional` selects a lib layer only under the
-// `development` condition, and `#dual` selects a higher lib layer for `require` than for `import`.
-// `#missing/...` does not resolve. The fixture test covers the real resolver.
 const MODULES: Modules = {
   findPackage: () => "/project",
   identify: identity,
@@ -90,7 +86,6 @@ function hint(root: string, configPath = "options[0].layers") {
 const HINT = hint("src/lib")
 const APP_HINT = hint("src")
 
-// The `src` map above the lib map: the lib folder is one layer, below the terminal.
 const SRC_OPTIONS = {
   entries: ["cli.ts"],
   layers: {
@@ -199,8 +194,6 @@ tester.run("layers", createLayersRule(MODULES), {
       filename: lib("workspace/lazy.ts"),
       options: [LIB_OPTIONS],
     },
-    // A source that the code spells without computing it: a template with no expression, or a
-    // string inside type assertions. The report points to the whole source expression.
     ...[
       "import(`#lib/integrations/base.ts`)",
       'import("#lib/integrations/base.ts" as string)',
@@ -214,7 +207,6 @@ tester.run("layers", createLayersRule(MODULES), {
       filename: lib("workspace/lazy.ts"),
       options: [LIB_OPTIONS],
     })),
-    // A CommonJS `require` and a TypeScript import-equals declaration reach the module too.
     ...[
       'const base = require("#lib/integrations/base.ts")',
       "const base = require(`#lib/integrations/base.ts`)",
@@ -421,14 +413,12 @@ tester.run("layers", createLayersRule(MODULES), {
       filename: lib("workspace/conditional.ts"),
       options: [LIB_OPTIONS],
     },
-    // A source that only running the code gives is outside the map.
     ...[
       'const path = "#lib/integrations/base.ts"\nconst base = import(path)',
       'const base = import("#lib/integrations/" + "base.ts")',
       `const name = "base"\nconst base = import(\`#lib/integrations/\${name}.ts\`)`,
       'const base = import("#lib/shared/errors.ts", { with: { type: "#lib/integrations/base.ts" } })',
     ].map((code) => ({ code, filename: lib("workspace/lazy.ts"), options: [LIB_OPTIONS] })),
-    // A local function named `require`, a `require` property, and a namespace alias load no module.
     ...[
       'function load(require: (path: string) => unknown) {\n  return require("#lib/integrations/base.ts")\n}',
       'const require = (path: string) => path\nrequire("#lib/integrations/base.ts")',
@@ -666,7 +656,6 @@ describe("layer map", () => {
   })
 })
 
-// A nested map: `src` maps `lib`, and `lib` has its own layer map, as in this repository.
 const NESTED_MODULES: Modules = {
   findPackage: () => "/project",
   identify: identity,

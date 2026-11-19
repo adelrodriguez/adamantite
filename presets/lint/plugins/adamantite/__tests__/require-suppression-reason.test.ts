@@ -71,9 +71,7 @@ tester.run("require-suppression-reason", plugin.rules["require-suppression-reaso
     "console.log(1) // oxlint-disable-line no-console -- prints the report",
     "/* oxlint-disable no-console -- this script prints its progress */\nconsole.log(1)",
     "// oxlint-disable-next-line no-console --- the CLI writes its report to stdout\nconsole.log(1)",
-    // Turning rules back on needs no reason.
     "/* oxlint-disable no-console -- prints progress */\nconsole.log(1)\n/* oxlint-enable no-console */",
-    // A comment that only mentions a directive does not turn off rules.
     "// Never add oxlint-disable-next-line here.\nconst a = 1",
     "// oxlint-disabled is not a directive\nconst a = 1",
     "/** @ts-expect-error - handled by typescript/ban-ts-comment */\nconst a = 1",

@@ -45,9 +45,7 @@ tester.run("require-effect-dependencies", plugin.rules["require-effect-dependenc
   valid: [
     'import { useEffect } from "react"\nexport function useTitle(title: string) {\n  useEffect(() => {\n    document.title = title\n  }, [title])\n}',
     'import { useLayoutEffect } from "react"\nexport function useMount() {\n  useLayoutEffect(() => {}, [])\n}',
-    // The dependency array that a caller passes through a spread is not visible to the rule.
     'import { useEffect } from "react"\nexport function useForward(args: Parameters<typeof useEffect>) {\n  useEffect(...args)\n}',
-    // Only the hooks of `react` are effects. A local function of the same name is not.
     "function useEffect(run: () => void) {\n  run()\n}\nexport function useOnce() {\n  useEffect(() => {})\n}",
   ],
 })

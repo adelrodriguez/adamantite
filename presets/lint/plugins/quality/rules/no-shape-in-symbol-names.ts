@@ -27,9 +27,6 @@ function moduleExportName(name: ESTree.ModuleExportName): string {
   return name.type === "Literal" ? name.value : name.name
 }
 
-/**
- * Ban the case-insensitive substring "shape" in every name that a file declares.
- */
 const rule: Rule = {
   createOnce(context) {
     function report(node: DeclaredName) {

@@ -39,10 +39,7 @@ interface QualityPlugin extends Plugin {
   }
 }
 
-/**
- * The quality rules that the strict preset enables. They started as a copy of
- * https://github.com/dmmulroy/anti-slop. Adamantite uses the `quality` namespace. See license.md.
- */
+// Started as a copy of https://github.com/dmmulroy/anti-slop. See license.md.
 const plugin: QualityPlugin = {
   meta: { name: "quality" },
   rules: {

@@ -27,10 +27,6 @@ function unwrapExpression(node: ESTree.Expression): ESTree.Expression {
   return current
 }
 
-/**
- * Return whether code only spreads a value at this node: as the argument of a spread, or as a
- * branch of a conditional that code spreads. A spread reads the value and cannot fill it.
- */
 function isOnlySpread(node: ESTree.Node): boolean {
   const { parent } = node
 
@@ -61,11 +57,8 @@ function isNullLiteral(node: ESTree.Expression): boolean {
   return node.type === "Literal" && node.value === null && !("regex" in node)
 }
 
-/**
- * Return whether an identifier is the global `undefined` or a `const` that holds `{}`. The `const`
- * holds `{}` only when code does nothing with it but spread it, because a property write, a call
- * such as `Object.assign(fallback, values)`, or any other use can fill it.
- */
+// A property write, or a call such as `Object.assign(fallback, values)`, can fill a `const`
+// that holds `{}`.
 function isEmptyBinding(sourceCode: SourceCode, node: ESTree.IdentifierReference): boolean {
   const variable = resolveVariable(sourceCode, node)
 
@@ -90,9 +83,6 @@ function isEmptyBinding(sourceCode: SourceCode, node: ESTree.IdentifierReference
   )
 }
 
-/**
- * Return whether spreading a branch adds no property: `{}`, `undefined`, `null`, or `void 0`.
- */
 function isEmptyBranch(sourceCode: SourceCode, node: ESTree.Expression): boolean {
   const branch = unwrapExpression(node)
 
@@ -105,10 +95,7 @@ function isEmptyBranch(sourceCode: SourceCode, node: ESTree.Expression): boolean
   )
 }
 
-/**
- * Return whether a conditional spread adds nothing on one of its branches. `a && b` spreads a falsy
- * value when `a` is falsy, so it omits properties the same way as `a ? b : {}`.
- */
+// `a && b` spreads a falsy value when `a` is falsy, so it omits properties as `a ? b : {}` does.
 function addsNothingOnSomeBranch(sourceCode: SourceCode, node: ESTree.Expression): boolean {
   const spread = unwrapExpression(node)
 
@@ -122,9 +109,6 @@ function addsNothingOnSomeBranch(sourceCode: SourceCode, node: ESTree.Expression
   )
 }
 
-/**
- * Ban conditional empty-object spreads without changing their omission semantics.
- */
 const rule: Rule = {
   createOnce(context) {
     function check(node: ESTree.JSXSpreadAttribute | ESTree.SpreadElement) {

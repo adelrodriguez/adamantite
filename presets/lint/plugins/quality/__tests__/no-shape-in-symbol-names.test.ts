@@ -17,7 +17,6 @@ tester.run("no-shape-in-symbol-names", plugin.rules["no-shape-in-symbol-names"],
     { code: "function shapeOf() {}", errors: [error] },
     { code: "type PayloadShape = { id: string };", errors: [error] },
     { code: "type Payload = { shape: string };", errors: [error] },
-    // The rule reports a declaration once, not each reference to it.
     {
       code: "declare const owner: External; const shape = 'field'; const value = owner[shape];",
       errors: 1,
@@ -51,7 +50,6 @@ tester.run("no-shape-in-symbol-names", plugin.rules["no-shape-in-symbol-names"],
     "declare const outer: External; const value = outer.inner.shape;",
     "declare const schema: ExternalSchema; schema.shape.id.parse('x');",
     "const owner = { id: 1 }; const value = owner.id;",
-    // A name that another module declares is not this file's choice.
     "import type { ZodRawShape } from 'zod'; export type Fields = ZodRawShape;",
     "import type { ZodRawShape as ZodFields } from 'zod'; export type Fields = ZodFields;",
     "import { ZodRawShape } from 'zod'; export { ZodRawShape };",

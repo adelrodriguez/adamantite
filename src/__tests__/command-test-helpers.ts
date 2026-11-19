@@ -415,6 +415,7 @@ export function runCommand<
     )
 
     // The test clock stays paused, so the menu would wait forever before a handoff.
+    // `TestClock.adjust` fails on the live clock, so a test that runs a command needs `it.effect`.
     yield* TestClock.adjust(RAW_MODE_RELEASE_WAIT)
 
     return yield* Fiber.join(fiber)

@@ -1,5 +1,588 @@
 # adamantite
 
+## 0.48.0
+
+### Minor Changes
+
+- [#911](https://github.com/adelrodriguez/adamantite/pull/911) [`858e371`](https://github.com/adelrodriguez/adamantite/commit/858e37158396ebbe3b2e2ecd34e437d29c39a666) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Check `require()`, `import x = require()`, and fixed `import()` sources in `adamantite/layers` and `adamantite/import-owners`
+
+  Both rules checked an `import()` only when its source was a plain string, and did not check CommonJS or TypeScript import-equals imports. Each of these imports could cross a layer or reach a restricted module without a report. Both rules now check:
+
+  - `import()` with a template that has no expression, such as ``import(`../high/api.ts`)``.
+  - `import()` with a string inside `as`, `satisfies`, `!`, or `<T>` assertions, such as `import("../high/api.ts" as string)`.
+  - `require("../high/api.ts")`, unless the file declares its own `require`.
+  - `import api = require("../high/api.ts")`, `export import api = require(...)`, and `import type api = require(...)`.
+
+  A source that only running the code gives, such as a variable or a template with `${}`, is still not checked. `require()` and `import x = require()` resolve with the `require` condition of a package's `exports` and `imports`. In `adamantite/layers`, `import type x = require()` follows `ignoreTypes`. In `adamantite/import-owners`, `require()` and `import x = require()` reach every export of the module, as `import()` does, so they are reported when the option restricts only some names.
+
+  A project can get new reports where these imports cross a boundary. Move the import to an allowed layer or to an owner, as for a static import.
+
+- [#942](https://github.com/adelrodriguez/adamantite/pull/942) [`4d35430`](https://github.com/adelrodriguez/adamantite/commit/4d3543020ebd400de3f140b3cc6d6a618a45560c) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Fail `adamantite check` when the lockfile records another Adamantite version than the project installs
+
+  After an update of the `adamantite` package, the managed packages, the managed files, and the Adamantite skill stay at the old version until `adamantite update` runs. `adamantite check` now runs its stages as before, then fails with a line that names the version in `.adamantite/adamantite-lock.json`, the installed version, and the repair. `adamantite doctor` reports the same state as the `setup-outdated` finding, or as `setup-ahead` when a newer Adamantite wrote the lockfile.
+
+  The comparison uses the Adamantite that the project installs, so a CLI from another install, such as `npx`, judges the project as the project's own CLI does. A project without a lockfile, or one that installs no Adamantite, passes this step. `update` writes the lockfile again with the installed version, also when no managed file changes.
+
+  To migrate, run `adamantite update` after each update of the `adamantite` package, and commit the changes. When the check says that a newer Adamantite wrote the lockfile, install the dependencies instead, because `update` with the older version would bring the setup back to it.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report more conditional spreads that omit properties in `quality/no-conditional-empty-object-spread`
+
+  The rule now reports `...(name && { name })`, a branch of `undefined`, `null`, or `void 0`, an empty object under `satisfies` or `as`, an empty branch in a nested conditional, and a `const` that holds `{}`. A `const` counts as empty only when code does nothing with it but spread it, because a property write or a call such as `Object.assign(fallback, values)` can fill it. It also reports the same pattern in a JSX spread attribute, such as `<div {...(ok ? { title } : {})} />`. The message now says that one branch adds nothing, because that branch is not always an empty object.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read named interfaces, heritage clauses, and finite key sets in the dictionary rules
+
+  `quality/no-unsafe-dictionary-type` and `quality/no-known-value-widening` now treat a named interface like a named alias, and a finite key set like a closed object.
+
+  `quality/no-unsafe-dictionary-type`:
+
+  - Reports `interface A extends Record<string, unknown>`, `class A implements Record<string, unknown>`, and a type alias or interface whose default type argument makes it an unsafe dictionary, such as `type Bag<T = unknown> = Record<string, T>`.
+  - Reads `globalThis.Record<string, unknown>` as the built-in `Record`, which Effect code writes when `import { Record } from "effect"` hides the global type.
+  - Reads a named interface at a use with type arguments, as it reads an alias. `interface Bag<V> extends Record<string, V> {}` used as `Bag<unknown>` is reported, and `Bag<number>` is not. A plain use such as `const bag: Bag` is not reported again, because the interface declaration reports itself.
+  - Reports a named dictionary such as `type LogFields = Record<string, unknown>` once, at its declaration, also when another type alias uses it. Before, `type Logger = { info: (event: LogFields) => void }` got one report for each method. An alias whose whole body is the dictionary, such as `type Other = LogFields`, still reports, because it gives the dictionary another name. A logger or tracer that accepts open fields can name its field bag once and suppress the rule at that declaration with a reason, as the strict preset section of the README shows.
+  - No longer reports `Record<"a" | "b", unknown>` or a mapped type over literal keys, because `{ a: unknown; b: unknown }` passes. It still reports a key type that it cannot resolve, such as an imported type.
+  - No longer reports `Record<string, unknown>` in a conditional type test, such as `T extends Record<string, unknown> ? A : B`, or as the filter of the built-in `Extract` and `Exclude`. Those positions ask whether a type is a plain object, and `object` gives a different answer for interfaces and arrays.
+
+  `quality/no-known-value-widening`:
+
+  - Reports a known value widened to a named interface with an index signature, such as `interface ScoreMap { [name: string]: number }`, as it does for `type Scores = Record<string, number>`. A generic interface passes its type arguments to the types it extends, so `interface Dict<K extends string, V> extends Record<K, V>` is open as `Dict<string, number>` and closed as `Dict<"a" | "b", number>`. The message now asks for a named owner contract with known keys.
+  - No longer calls an inline mapped type over literal keys, such as `{ [K in "a" | "b"]: number }`, an open dictionary.
+  - Reports a type guard or assertion call only when its argument is a literal or object value, such as `isString("known")`, or a `const` that holds one. TypeScript narrows a declared binding at the call, so a guard on a parameter typed `string | number` does not widen it.
+
+  Both rules read the keys of a mapped type with an `as` clause from that clause. `{ [K in "seed" as string]: unknown }` is still an open dictionary. ``{ [K in Kind as `get${Capitalize<K>}`]: number }`` is closed when `Kind` is a finite set of literals. Any other `as` clause, such as an imported type or a template with `string`, counts as open.
+
+- [#894](https://github.com/adelrodriguez/adamantite/pull/894) [`0f9a8ed`](https://github.com/adelrodriguez/adamantite/commit/0f9a8edf35c63cda50fae521bc65eca4803478c0) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop reporting migrations from earlier Adamantite versions in Doctor
+
+  Doctor no longer reports these findings, and no longer reads the source of configs and rule files to find them. A config or rule file that still uses a retired name now fails to load, and Doctor reports the `oxlint-config-load-failure` finding with the error that Oxlint printed. Replace each retired name, and remove the leftover settings by hand:
+
+  - "The shadcn preset was renamed to tailwind" (`tailwind-preset-migration`). Replace `adamantite/lint/shadcn` and `--preset shadcn` with `adamantite/lint/tailwind` and `--preset tailwind`.
+  - "React Doctor rules now belong to react-strict" (`react-doctor-preset-migration`). Replace `adamantite/lint/react-doctor` and `--preset react-doctor` with `adamantite/lint/react-strict` and `--preset react-strict`. Keep the `react` preset and `oxlint-plugin-react-doctor`. The `react-doctor/*` rule names stay the same.
+  - "The antislop rules now belong to strict" (`strict-preset-migration`). Replace `adamantite/lint/antislop` and `--preset antislop` with `adamantite/lint/strict` and `--preset strict`.
+  - "Custom rules need migration to the current agent workflow" (`custom-rules-api-migration`) and "Custom rule `<file>` cannot load" (`custom-rule-cannot-load:<file>`). A config or rule file that imports the removed `adamantite/lint/custom` module or a name that `adamantite/rules` no longer exports fails to load, and so does a rule file with TypeScript that type stripping cannot erase, such as an `enum`. Import `custom` from `adamantite/rules`, and `definePlugin`, `defineRule`, and the authoring types from `adamantite/rules/plugin`. The Adamantite skill gives these repairs for the `oxlint-config-load-failure` finding.
+  - "Legacy oxlint-tsgolint" (`legacy-oxlint-tsgolint`). Remove `oxlint-tsgolint` from `package.json`. Adamantite runs the type-aware rules on tsrs.
+  - "Legacy Zed oxfmt settings" (`legacy-zed-oxfmt-settings`). Remove the oxfmt language server settings that an earlier Adamantite wrote to `.zed/settings.json`: `configPath: null`, `"fmt.experimental": true`, `typeAware: false`, and `unusedDisableDirectives: false`.
+
+  Doctor also no longer looks for rules in `.adamantite/rules`, the default rules folder before `.adamantite/lint`. It checks only `.adamantite/lint` and the folders that `custom()` calls load. Move the rules to `.adamantite/lint`, or load the folder with `custom({ dir: ".adamantite/rules" })`.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Detect the package manager from `package.json` or a lockfile
+
+  Adamantite now reads the package manager from the `packageManager` field of `package.json`, such as `pnpm@10.0.0`, or else from a lockfile: `bun.lock` or `bun.lockb`, `deno.lock`, `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`. It looks in the project folder and then in each folder above it. Without a `packageManager` field, a `yarn.lock` with the `__metadata` entry that Yarn 2 and later write selects modern Yarn, so a monorepo installs without the Yarn 1 `-W` flag. A `yarn.lock` with the `# yarn lockfile v1` header, or with neither, selects Yarn 1. It no longer detects a package manager from `deno.json`, `pnpm-workspace.yaml`, `.yarnrc.yml`, the `devEngines` field, or the command that started Adamantite, and it no longer detects package managers outside bun, deno, npm, pnpm, and yarn. Without a supported package manager, `adamantite init` fails with the `No package manager was found` error, and the GitHub Actions and `AGENTS.md` integrations write no package manager commands. Add a `packageManager` field or a lockfile to the project.
+
+  Installs run the package manager directly, such as `pnpm add -D` or `npm install -D`, instead of through Corepack. A failed install shows the command line and what the package manager printed.
+
+- [#819](https://github.com/adelrodriguez/adamantite/pull/819) [`224ecbe`](https://github.com/adelrodriguez/adamantite/commit/224ecbeb488518da8b64fcc7c1c977394684ff9a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Use Effect's prompts and console for the terminal, and exit 1 when `init` is cancelled
+
+  Questions now show `? message ›`, and each answer shows `✔ message … answer`. Status lines start with a symbol, such as `✔ Dependencies installed.`, and no guide line runs at the left edge. Each step prints one line when it finishes, without a spinner. The error that ends a command goes to standard error.
+
+  - The intro and outro headings print only when the command can prompt, so a run without a terminal, or `init --non-interactive`, prints none. Each outro starts with `✅`, such as `✅ Setup finished.` and `✅ No setup selected, so Adamantite made no changes.`. `adamantite update` no longer prints the `❌ Update failed` outro before an error.
+  - A cancelled prompt in `adamantite init`, such as Ctrl-C, now exits 1 with the `CommandFailed` error, as a cancel in `doctor`, `harden`, and `update` does. Before, `init` printed `■ Setup was cancelled.` and exited 0. A script that runs `init` in a terminal and treats a cancel as success needs to accept exit code 1.
+  - The scripts prompt of interactive `init` starts with the recommended `check` and `fix` scripts checked, so pressing Enter sets up Oxlint and Oxfmt. Before, Enter selected no script.
+  - The editor prompt of `init` calls the `.vscode/settings.json` choice "Universal", because VS Code, Cursor, Windsurf, and other editors read that file. The highlighted choice shows the settings file that `init` creates. The `--editor vscode` flag does not change.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `quality/no-array-filter-map` report a reassigned variable with an array type
+
+  The strict preset now reports adjacent `filter` and `map` calls on a `let` variable that has an array type annotation, such as `let values: number[] = []`, also after the code assigns a new value to it. The annotation keeps each value an array. A reassigned variable without an annotation is still allowed, because its new value can be an iterator.
+
+- [#939](https://github.com/adelrodriguez/adamantite/pull/939) [`2f511d8`](https://github.com/adelrodriguez/adamantite/commit/2f511d8fa15f0481c6c88cdad051020a4e2b2c37) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Give `adamantite harden` a decisions record, so a later session does not propose again what you rejected
+
+  After you answer a harden session, the coding agent appends lines to `.adamantite/decisions.jsonl`. The record is at the project root, which is the workspace root in a monorepo. It is a JSON Lines log, and Adamantite never writes it. Commit the record.
+
+  ```jsonl
+  {"session":"2026-03-14","head":"4f0c1d2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d"}
+  {"id":"tests-beside-module","at":"2026-03-14","standard":"Test files sit beside the module that they test","decision":"rejected","reason":"Integration tests stay in tests/","follow":41,"break":7,"fixes":["1a2b3c4"]}
+  ```
+
+  A decision line records a candidate that you did not approve, or a decision that you made. It has the required keys `id`, `at`, `standard`, and `decision`, and the optional keys `reason`, `rule`, `scope`, `follow`, `break`, and `fixes`. The `decision` is `rejected`, `deferred`, `decided`, or `approved`. A decision is its `id` together with its `scope`, so one standard can have a decision for the project and another for a folder. A later line with the same `id` and the same `scope` replaces the earlier one, and an `approved` line ends that decision. An approved candidate gets no line, because its rule or instruction is the trace.
+
+  A session line records one session that you answered. It has `session`, the date, `head`, the commit that `HEAD` named, and `scope`, the `--path` of the session. The prompt gives the agent the line to copy. A session with `--commits` records no `head`, so it does not move the start of later sessions. The README describes each key.
+
+  Adamantite decodes the record:
+
+  - The prompt has a "Decisions" section that shows the last decision of each `id` and `scope` on one line. The agent lists a candidate that matches a decision under "Also considered", unless it has evidence that is newer than the decision. To let harden propose a candidate again, delete its decision line.
+  - With `--path`, the prompt leaves out the decisions of other folders.
+  - The prompt lists each line that does not decode, with its line number, for the agent to repair. After a handoff, `harden` exits 1 when the session added such a line.
+  - The agent now reads the fix commits after the common ancestor of `HEAD` and the commit of the last session line that covers the scope of the session. A line covers a scope when it has no `scope`, or when its `scope` is that folder or a parent of it. Without such a line, or when the repository does not have the recorded commit, the agent reads the last 200 commits as before. `--commits <n>` reads the last `n` commits in each case.
+  - `harden --json` has `decisionsRecord`, with the `_tag` `Present` or `Missing`. A present record has its `decisions`, its `sessions`, and its `undecodableLines`. `harden --json` also has `head`, the commit that `HEAD` names, and `fixHistory`. It is `{ "_tag": "Last", "count": 200 }` for the default, `{ "_tag": "Requested", "count": 30 }` for `--commits 30`, or `{ "_tag": "Since", "boundary": "<hash>", "head": "<hash>", "session": "<date>" }`.
+
+  The Adamantite skill tells agents to append to the record.
+
+- [#944](https://github.com/adelrodriguez/adamantite/pull/944) [`7d31712`](https://github.com/adelrodriguez/adamantite/commit/7d31712ccb738f5740737990bc99ab7220bbc1c4) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - List links whose anchor matches no heading, and count TypeScript suppressions, in `adamantite harden`
+
+  - The "Agent reach" section of the prompt lists each Markdown link whose anchor Adamantite could not match to a heading of its file, such as `docs/architecture.md#module-seams`. The match is a simple rule: the GitHub anchor of the heading as written, and of the heading without link targets, HTML tags, and emphasis underscores. A `{#id}` at the end of a heading and an HTML `id` count as anchors too. The rule can list a link that works, such as one to a heading with an image or an HTML entity, so the prompt tells the agent to open each target, decide whether the link is broken, and treat a broken one as a discovery gap. `harden` does not fail a session on such a link.
+  - The "Suppressions" section counts the `@ts-expect-error`, `@ts-ignore`, and `@ts-nocheck` comments in the files that Oxlint lints, with their locations. It counts a comment only where TypeScript reads the directive, so a sentence that mentions `@ts-ignore` does not count. The prompt tells the agent that many `@ts-expect-error` comments with the same reason point to a type that is wrong at its source.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add `--json` to `doctor`, `harden`, `init`, `update`, `rule ast`, and `rule try`, and run `init` from the flags without a terminal
+
+  Each command prints one JSON document on standard output and writes its other lines on standard error. With `--json`, a command never asks a question and never starts an agent, and its exit codes stay the same. The Adamantite skill now tells agents to use `--json`.
+
+  - `doctor --json` prints the `selection`, the applicable integrations, the `findings` with their `id`, `integration`, `title`, `currentState`, `goal`, `notes`, and `reference`, the `warnings`, and the `packageActions`.
+  - `harden --json` prints the context of its prompt: the configs, rules folders, instructions, documentation, agent reach with its broken links and the links whose anchor matches no heading, the suppressions of each rule and of each TypeScript directive, override trials, scope, decisions record, and fix history.
+  - `init --json` and `update --json` print the file writes, the script writes, the installs, and the lockfile write of the setup, and the assessment after it. `init --json` sets up from the flags without `--non-interactive`.
+  - `rule ast --json` prints the file and its tree, and `rule try --json` prints the rule, the setting, and the reports of each case.
+
+  `adamantite init` now asks for the selection only when standard input and standard output are both terminals. Without such a terminal, as in CI or when an agent runs it, `init` sets up from the flags as with `--non-interactive`, and reports a missing `--script` or `--typescript` instead of opening prompts.
+
+- [#915](https://github.com/adelrodriguez/adamantite/pull/915) [`8f32d14`](https://github.com/adelrodriguez/adamantite/commit/8f32d1407875b513e245972e3827dba36e0d6aea) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Warn about import layers that an Oxlint config states by hand
+
+  `adamantite doctor` now warns when an Oxlint config turns on `no-restricted-imports` with `patterns` in two or more `overrides` entries, as a hand-written layer map does. Oxlint replaces the options that an earlier override set for the same files, so each override repeats the patterns of the ones before it. The `adamantite/layers` rule states the same layers in one layer map. The warning names the config, counts the overrides, and gives the steps to move them into layer maps. It tells you to keep each override that bans imports from another workspace package, because a layer map checks only the imports inside one package. Doctor checks the root config and the config of each workspace package, and counts overrides that a `.map()` callback builds. It is a warning, not a finding, so Doctor still exits 0.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read configs, disable comments, and syntax trees from the tools, instead of parsing source
+
+  Doctor, `init`, `update`, `harden`, and `rule test` now load `oxlint.config.ts`, `oxfmt.config.ts`, `knip.config.ts`, and the Oxlint config of each workspace package with Node.js, in a separate process, and read the default export. They no longer parse the source, so a config can build its settings with spreads, variables, function calls, and shared packages. A config runs its own code when it loads, as it does when the tool loads it.
+
+  - A preset counts when the loaded config applies it, also through a spread such as `{ ...analyze }` or through a shared config package. Each preset names itself under a symbol key that the tools ignore, so the project must install the Adamantite version that runs the command.
+  - A config that Node.js cannot load gets the `invalid-oxlint-config`, `invalid-oxfmt-config`, or `invalid-knip-config` finding with the error that Node.js printed.
+  - The Knip check reads the loaded `ignoreDependencies`, so an entry counts as a name or as a regular expression that matches it.
+  - Custom rule discovery reads the rules folder, the plugin name, and the calling file of each `custom()` call that a loaded config reaches. A `dir` or a `name` that a variable sets now counts, and a `custom()` call in an imported module counts without import resolution. Doctor and `rule test` warn about a config that does not load, and no longer warn about an import that they cannot resolve or a `dir` or `name` that is not a string literal.
+  - `harden --json` lists the configs that Node.js cannot load in `unloadedConfigs`, and the trials of `harden` read the overrides of the loaded config, so an override that a spread or a function adds also gets a trial.
+
+  Doctor also runs Oxlint to load the lint configs. When a config fails to load, such as one that imports a preset that the installed Adamantite does not export, Doctor reports the `oxlint-config-load-failure` finding with the error that Oxlint printed, and exits 1. Before, Doctor only warned that it could not list the Oxlint files, and `adamantite check` failed without a finding. The finding and the Adamantite skill point to the changelog for the preset that replaces a removed one.
+
+  `harden` now counts the disable comments that Oxlint parses, and `rule ast` prints the syntax tree that Oxlint gives rules. A small internal Oxlint plugin reports them, so both commands run the Oxlint of the project, and `rule ast` fails when the project has no Oxlint. `rule ast` prints the tree with `range`, `comments`, and `tokens` beside `start` and `end`, and without the link from a node to its parent. A `bigint` literal value prints as its digits. A file that Oxlint does not lint, such as a CSS file, fails with an error that says so. When Oxlint cannot read the comments, `harden` asks the agent to count them, as it does when Oxlint cannot list its files.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `testing/no-doubles` report mocks through a namespace import or a destructured method
+
+  The strict preset now reports `vitest.vi.mock(...)` after `import * as vitest from "vitest"`, the same form for `@jest/globals`, and a mock method that the code destructures from `vi` or `jest`, such as `const { doMock } = vi`. It also follows `const` aliases of `vi`, `jest`, and their mock methods, and reads `globalThis.vi`. An import of `vi` from your own module, such as `import { vi } from "./helpers"`, is still allowed.
+
+- [#929](https://github.com/adelrodriguez/adamantite/pull/929) [`0986672`](https://github.com/adelrodriguez/adamantite/commit/0986672a611deefb3da2088be071cf5158d5c5b0) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Turn on `curly`, `import/export`, and `unicorn/prefer-string-raw` in the core preset, and add `adamantite/require-effect-dependencies` to the react-strict preset
+
+  These rules report code that passed before, so `adamantite check` can fail after you update.
+
+  - `curly` reports an `if`, `else`, or loop body without braces, such as `if (done) return`. `adamantite fix` adds the braces. With the strict preset, run `adamantite fix` a second time, because the spacing rule then asks for a blank line after the new block, and Oxlint applies one pass of fixes.
+  - `import/export` reports a name that a module exports twice, including a local export that hides a name of an `export *`. TypeScript does not report that case, and it does not check JavaScript files. Rename or remove one of the exports.
+  - `unicorn/prefer-string-raw` reports a string that escapes a backslash, such as `"C:\\project"` or the regular expression source `"^\\S"`. `adamantite fix` writes it as a `String.raw` template, such as `` String.raw`C:\project` ``.
+  - `adamantite/require-effect-dependencies` reports a call to `useEffect`, `useLayoutEffect`, or `useInsertionEffect` that passes no dependency array, or passes `undefined` or `null`, because React then runs the effect after every render. Pass the values that the effect reads, or `[]` when it reads none.
+
+- [#857](https://github.com/adelrodriguez/adamantite/pull/857) [`77b2403`](https://github.com/adelrodriguez/adamantite/commit/77b24037b295dc381d5039bf866907f98e1911eb) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Move the Node.js lint rules into core
+
+  Core now enables `node/handle-callback-err`, `node/no-exports-assign`, `node/no-mixed-requires`, `node/no-new-require`, and `node/no-path-concat`. The separate `adamantite/lint/node` preset and `--preset node` choice are removed. A config that still imports `adamantite/lint/node` fails to load, and Doctor reports the load error.
+
+  Remove the Node preset import and its `extends` entry from `oxlint.config.ts`. Keep the core `adamantite/lint` preset and any `node/*` rule settings. Remove `--preset node` from init commands.
+
+  Oxlint matches the name `require` in the mixed-declaration and constructor rules even when it names a local parameter. Rename those parameters to names such as `loadModule` and `Module`. The callback rule also reports a declaration parameter named `err`, which can be renamed to `error`. These upstream limitations remain tracked in [issue #843](https://github.com/adelrodriguez/adamantite/issues/843).
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report `Readonly<object>` and `object & {}` parameters, and name the fixes that work, in `quality/no-object-parameters`
+
+  The rule now reports a parameter typed `Readonly<object>`, `NonNullable<object>`, or an intersection of `object` with `{}`, because each type accepts the same values as `object`. A local type named `Readonly` or `NonNullable` keeps its own meaning, and an intersection with a named type, such as `object & Owner`, still passes.
+
+  The message now suggests a named domain type, `WeakKey` for a `WeakMap` or `WeakSet` key, or a generic `<T extends object>` that the signature uses again, such as in the return type. A generic with one use fails the core preset's `typescript/no-unnecessary-type-parameters`.
+
+- [#842](https://github.com/adelrodriguez/adamantite/pull/842) [`f2e3d4a`](https://github.com/adelrodriguez/adamantite/commit/f2e3d4acb8e39a15bafc2c635f2663527b370594) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ship the strict and effect rules as first-party code under the `quality` and `quality-effect` namespaces
+
+  This breaks rule settings and suppression comments that use `anti-slop/*` or `anti-slop-effect/*`. Replace those prefixes with `quality/` and `quality-effect/`, except `anti-slop/no-module-mocking`, which is now `testing/no-doubles` of the new `testing` plugin. Keep the rule severity, options, and suppression reasons.
+
+  A config that still sets an `anti-slop/*` or `anti-slop-effect/*` rule fails to load, and Doctor reports the load error. `adamantite check` reports a suppression comment with an old name as an unused directive. Rename each one, run `adamantite check`, then run Doctor again.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Write each setup file whole as a managed file, and stop merging into files that you wrote
+
+  `adamantite init` and `adamantite update` now write each setup file only whole, and only when the file does not exist or still holds what Adamantite wrote, by its hash in `.adamantite/adamantite-lock.json`. A file that an earlier version wrote and nobody changed is replaced with the current version. A file that you changed is kept, and `adamantite doctor` reports each change that breaks the setup. When the setup no longer uses a file, `update` deletes it if nobody changed it. Adamantite no longer merges its settings into a file that you wrote, and no longer stops or prints a change to make by hand when the file has comments.
+
+  These are the managed files, with what Doctor checks in a file that you changed:
+
+  - `oxlint.config.ts` lists its imports in the order that Oxfmt sorts them, and wraps `extends` when it passes 100 characters, so `adamantite fix` leaves it unchanged. Doctor reports a lint preset that the lockfile selects and no Oxlint config of the project applies, with the new `missing-lint-preset` finding. A preset counts as applied in `extends`, in an `overrides` entry that spreads its `rules`, as the jest and vitest presets show, and in the Oxlint config of a workspace package. Doctor also requires the plugin package of a preset that only a workspace package config applies.
+  - `oxfmt.config.ts` lists its imports in the order that Oxfmt sorts them. Doctor reports a config that no longer uses `adamantite/format`.
+  - `knip.config.ts` gets the ignore lists of the recorded selection, so a project that selects the `effect` preset gets the `@effect/language-service` entry on the first `init`. Doctor reports a config that no longer uses `adamantite/analyze` or misses an ignore list that the setup needs. The `missing-knip-config` finding now says to run `adamantite update`.
+  - `tsconfig.json` extends the selected TypeScript preset, and adds the `@effect/language-service` entry when the setup includes the `effect` preset. Doctor reports a missing or mismatched preset, type resets in a library, and a missing language service entry. It finds the preset through each relative base config that `extends` reaches, such as a shared `tsconfig.base.json`, but not through a base config from another package, such as `@company/config`. In a monorepo, Adamantite still writes no root `tsconfig.json`, and Doctor reports the packages that need the preset. A root `tsconfig.json` that Adamantite wrote before the project became a monorepo stays managed.
+  - `.vscode/settings.json` and a new `.vscode/extensions.json`. The extensions file recommends `oxc.oxc-vscode` for the `check` and `fix` scripts, `webpro.vscode-knip` for `analyze`, and `TypeScriptTeam.native-preview` for the `effect` preset, so VS Code offers to install them. Doctor reports a missing Oxlint entry or a missing extension recommendation. `update` now also prepares the Effect editor SDK for VS Code, and the `vscode-effect-sdk` finding says to run `adamantite update`. A project without a matching Effect build gets that finding, and `init` continues instead of failing.
+  - `.zed/settings.json`. Doctor reports a missing Oxlint entry and a missing Effect language server, and the Effect editor messages now say to run `adamantite update`. Zed reads `auto_install_extensions` only from the user settings, so `init` prints the link of each Zed extension whenever it sets up Zed.
+  - `.github/workflows/adamantite.yml` gets the jobs for the scripts of the recorded setup. Doctor reports a workflow in which no job runs a CI script of the setup, or a job hard-codes a Node.js version. A workflow that `init` cannot write now fails `init` instead of leaving a warning.
+  - `AGENTS.md` is written with the Adamantite section only when the project has no `AGENTS.md`. Doctor reports an `AGENTS.md` without the section with the new `missing-agents-section` finding, and the `missing-agents-md` finding now says to run `adamantite update`.
+  - Each file of the Adamantite skill in `.agents/skills`, `.claude/skills`, and `.grok/skills`. A copy that matches what Adamantite wrote passes, also in the layout of the project's Oxfmt config. Doctor reports a copy that differs from the shipped skill and from what Adamantite wrote with the new `stale-adamantite-skill` finding, which says to delete the copy and run `adamantite update`. A copy that an earlier version wrote before the lockfile gets that finding once. When a copy misses a file of the skill, Doctor reports the new `missing-adamantite-skill` finding, and `update` writes the missing file.
+
+  `adamantite init --script <name>`, and each script that you select in interactive `init`, now sets that `package.json` script to its Adamantite command and replaces what it ran. `init` prints each script that it added or replaced, with the command that it ran before, and `update` sets the scripts of the recorded selection the same way. A script that you did not select stays as it is. To keep custom tool arguments, pass them after `--` in a script with a name of your own, such as `adamantite analyze -- --directory packages/app`.
+
+  A project with `.oxlintrc.json`, `.oxfmtrc.json`, `knip.json`, or their `.jsonc` forms gets no TypeScript config for that tool, because Oxlint fails when it finds both, Oxfmt loads neither, and Knip loads the JSON config first. Doctor reports the JSON config, also beside a TypeScript config, with the `conflicting-oxlint-config`, `conflicting-oxfmt-config`, or `conflicting-knip-config` finding and the migration. These findings replace `legacy-<tool>-config` and `shadowed-legacy-<tool>-config`, and `init` no longer warns about a JSON config.
+
+  These options and blocks are removed:
+
+  - `--overwrite-scripts`, because `--script` always sets the selected script. `init` no longer keeps a conflicting `check`, `fix`, or `analyze` script, warns about it, or asks whether to replace it.
+  - `--install-extensions` and its prompt, which ran `code --install-extension`. `.vscode/extensions.json` replaces it.
+  - The `# ADAMANTITE:START` and `# ADAMANTITE:END` block of the GitHub Actions workflow, and the `malformed-adamantite-workflow` finding. Adamantite no longer replaces the jobs between the comments of a workflow that you changed.
+  - The `<!-- ADAMANTITE:START -->` and `<!-- ADAMANTITE:END -->` section of an existing `AGENTS.md`. Adamantite no longer splices the section into it.
+
+  To migrate:
+
+  1. Remove `--overwrite-scripts` and `--install-extensions` from scripts and CI that pass them.
+  2. Run `adamantite update`.
+  3. Run `adamantite doctor`, and repair each finding for a file that you changed.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Count a line past the print width as multiline in `quality/require-readable-spacing`, so one `adamantite fix` passes `check`
+
+  Oxfmt wraps a statement whose line ends past its `printWidth`, and the wrapped statement needs blank lines around it. `adamantite fix` applies Oxlint fixes before it formats, so Oxfmt could wrap a line after the lint stage, and `check` then failed on a blank line that `fix` had not added. The rule now counts a one-line statement that ends past column 100 as multiline, so it asks for those blank lines before Oxfmt wraps the line. A line that Oxfmt cannot wrap, such as a long template literal, also gets blank lines. If your Oxfmt config sets another `printWidth`, set the rule's new `printWidth` option to the same value. Oxlint still applies one pass of fixes, so a fix that causes a new fixable report needs a second `fix`.
+
+  The rule also keeps single-line bindings grouped before an ASI-guard semicolon. Without semicolons, Oxfmt writes a statement that starts with `[` or `(` as `;[a, b].forEach(f)`. The parser made that semicolon the last token of the binding above it, so the rule counted the binding as two lines, reported it and the next statement, and its fix split the group. The rule now ends a statement at its last token before that semicolon.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report accumulator copies in named reducers, and accept copies with a fixed size, in `quality/no-reduce-accumulator-copy`
+
+  The rule now reports an accumulator copy in a function declaration or a `const` function that a `reduce` call in the same file uses as its reducer, such as `items.reduce(append, [])`. It also reports an accumulator passed to `concat` on a new array, such as `[item].concat(acc)`, `globalThis.Object.assign` and `globalThis.Array.from`, and a copy in a callback that the reducer passes to another call, such as `forEach`. A copy in a stored callback is still allowed.
+
+  The rule no longer reports a copy that cannot grow: a sliding window such as `acc.slice(-2).concat(item)`, a `with`, `toSorted`, or `toReversed` copy of a non-empty tuple that the step returns, and an `Object.assign({}, acc, { sum: acc.sum + n })` copy with fixed keys on a non-empty initial value. A step that also uses the accumulator outside the copy that it returns, as in `acc.push(item)`, is still reported, because it can grow the accumulator first.
+
+  The message used to ask for a mutated accumulator, which the core preset's `no-param-reassign` reports for `acc[key] = value`. It now names `Object.assign(acc, source)`, `acc.push(item)`, `Map#set`, and `Object.fromEntries`, which pass both presets.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report indirect access to Reflect, and accept a `Reflect.get` receiver, in `quality/no-reflect-get` and `quality/no-reflect-apply`
+
+  The strict preset now reports a `Reflect.get` or `Reflect.apply` call that the code reaches through a `const` alias such as `const R = Reflect`, through `globalThis.Reflect`, through destructuring such as `const { get } = Reflect`, through `.call` or `.apply` on the method, or through a template literal key such as ``Reflect[`get`]``.
+
+  A Proxy `get` trap forwards its receiver with `Reflect.get(target, key, receiver)`, so a getter gets the correct `this`, and property syntax cannot pass a receiver. So the strict preset no longer reports a `Reflect.get` call that passes a receiver different from the target, also through `.call` and `.apply`. A call without a receiver, or with the target as the receiver, is still reported.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Exit 1 from `init` and `update` when findings remain, and offer their repair through the resolution menu
+
+  `adamantite update` used to print the findings that remained after the setup and exit 0, and `adamantite init` did not assess the project. Both now exit 1 while findings remain. In an interactive terminal they offer the same resolution menu as `adamantite doctor`: a handoff to an installed coding agent, a copy of the repair prompt, or nothing. After a handoff they assess the project again and exit 0 only when no findings remain. Without a terminal they print the Markdown repair prompt. A CI job that runs `update` and accepts findings now fails, so run `adamantite doctor` to read them, or repair them first.
+
+  Every command that hands a prompt to an agent now uses one flow. When the agent CLI does not start, the command prints and copies the prompt instead of asking whether to copy it. `adamantite doctor` reports a project that does not declare `adamantite` with the new `adamantite-not-installed` finding instead of a message. `adamantite harden` reports a missing install, another installed version, and a `--path` outside the project once on standard error, as other failures are.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ship the custom rule authoring types inside the package, and stop exporting `eslintCompatPlugin`
+
+  `adamantite/rules/plugin` now defines `definePlugin` and `defineRule`, which return their argument, and its declarations include the authoring types of the Oxlint version that Adamantite pins. `@oxlint/plugins` is no longer a runtime dependency, and a project type-checks its custom rules without installing it.
+
+  `adamantite/rules/plugin` no longer exports `eslintCompatPlugin`, which made a `createOnce` rule run in ESLint. Adamantite runs rules only in Oxlint, which runs `createOnce` rules without it, so remove its calls.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read only the comment above the assertion's own statement, and reject blank markers, in `quality/require-safety-comment-for-type-assertion`
+
+  One `SAFETY:` comment above a test call or a function used to cover every assertion in an `if`, `for`, `while`, or `switch` header inside it. A trailing comment at the end of the previous line, such as `const a = 1 // SAFETY: ...`, also counted for the next line. The rule now stops at the nearest statement and ignores a trailing comment of earlier code. A comment above a `for` statement covers an assertion in its initializer.
+
+  The `markers` option accepted an entry with only spaces, and the rule dropped it without a warning. `{ "markers": ["  "] }` fell back to `SAFETY:`, and `{ "markers": ["WHY", " "] }` lost its second entry. Oxlint now stops with an options validation error for a blank marker, so remove the blank entry from your config.
+
+- [#889](https://github.com/adelrodriguez/adamantite/pull/889) [`8b4668f`](https://github.com/adelrodriguez/adamantite/commit/8b4668fd10a17632b11f9dd8953b20b28719aed3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Record the setup in `.adamantite/adamantite-lock.json`, and run `init` and `update` through one setup
+
+  `init` now writes `.adamantite/adamantite-lock.json` at the project root, or at the workspace root of a monorepo. The lockfile records the selection that `init` set up, the Adamantite version that wrote it, and the hash of each file that Adamantite wrote whole. A later `init` adds its options to the selection, and `update` writes the lockfile again with the installed version.
+
+  `init` and `update` now differ only in where the selection comes from. `init` takes it from the prompts or the flags, and `update` takes it from the lockfile. Both then install the packages, set the managed scripts, write the managed files, write the lockfile, and report the findings that remain. So `init` now prints the findings that `adamantite doctor` would report, such as a missing extension in a `.vscode/extensions.json` that you changed.
+
+  - Installs cover Oxlint, tsrs, Oxfmt, Knip, Sherif, the managed plugin of each selected preset, and `adamantite` itself at the version that runs the command. They include only the packages that `package.json` does not declare at the managed version. `update` prints them under "Packages installed", and no longer updates a tool that the setup does not select. A package that a pnpm catalog declares stays as it is, and Doctor reports an outdated catalog entry.
+  - Sherif is installed in every monorepo whose setup includes the `analyze` script, by `update` as well as `init`. A single-package project gets no Sherif.
+  - Each file that `init` and `update` write whole, and the lockfile, is formatted with the Oxfmt that the project installs. They use the project's Oxfmt config, or Adamantite's format preset when the project has none yet, and record the hash of the formatted file. So `adamantite check` passes on these files, and `adamantite fix` leaves them as they are. `package.json` gets the same layout when `init` or `update` changes it. A project that installs no Oxfmt gets each file as Adamantite renders it. When the project's Oxfmt config does not load, `init` and `update` fail before they write a file, with an error that names the file.
+
+  Doctor now checks each integration that the lockfile selects. A selected integration whose file is missing or wrong gets a finding, such as a `tsconfig.json` that no longer extends the selected TypeScript preset. An integration that the lockfile does not select gets no findings.
+
+  A project without a lockfile gets the `lockfile-missing` finding alone, from `adamantite doctor` and from `adamantite update`, and both exit 1. `update` no longer reads a setup from the project files, and Doctor no longer prints the "No Adamantite-managed setup found" warning. When the lockfile does not decode or has an unknown `schemaVersion`, Doctor reports the `invalid-lockfile` or `unsupported-lockfile` finding, and `init` and `update` fail before they change a file, with an error that says to run `adamantite doctor`.
+
+  `update` no longer removes the `adamantite` entry from `skills-lock.json`, because Adamantite does not edit a file that another tool owns. When the setup includes agent guidance and that lock records the skill, Doctor reports the `skills-lock-adamantite-entry` finding.
+
+  To migrate, run `adamantite init` once in each project that an earlier version set up, with the options that the project uses, and commit `.adamantite/adamantite-lock.json`. `init` keeps each existing file that differs from what it writes, and Doctor then reports the changes that break the setup.
+
+- [#950](https://github.com/adelrodriguez/adamantite/pull/950) [`b9db5f2`](https://github.com/adelrodriguez/adamantite/commit/b9db5f2046b3a78c147b97eb7ee3da5528624064) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ship two skills: `adamantite` for the toolchain, and `adamantite-hardening` for coding standards
+
+  One skill covered setup, checks, Doctor, updates, hardening, custom rules, and the guide for a fixed mistake, so an agent loaded all of it for any of those tasks. The package now ships two skills, and `adamantite init --agents` writes both to each skill folder:
+
+  - `adamantite` covers setup, `check`, `fix`, `analyze`, Doctor findings, preset rule reports, and `update`.
+  - `adamantite-hardening` covers the guide for a fixed mistake and a disable comment, `adamantite harden`, the enforcement ladder, custom rules, rule trials, and layer maps and import owners.
+
+  To migrate, run `adamantite update` and commit the result. It writes `adamantite-hardening` to each skill folder, writes the new `adamantite` skill over each copy that is unchanged, and deletes the three guides that moved, `corrections.md`, `custom-rules.md`, and `enforcement-ladder.md`, where they are unchanged. For a copy that you changed, Doctor reports the `stale-adamantite-skill` finding, which now names the folder of the skill. It also reports a moved guide that you changed, because `update` keeps that file and the skill no longer links to it.
+
+  Three things changed with the split:
+
+  - The Adamantite section of a new `AGENTS.md` names both skills. In an `AGENTS.md` that you changed, replace "the Adamantite skill" with the skill that holds the section: `adamantite-hardening` for custom rules and for a fixed mistake.
+  - Doctor reports an `adamantite-hardening` entry in `skills-lock.json` with the `skills-lock-adamantite-entry` finding, as it does for an `adamantite` entry.
+  - The harden prompt and `adamantite rule add` send agents to `skills/adamantite-hardening/SKILL.md`.
+
+- [#748](https://github.com/adelrodriguez/adamantite/pull/748) [`1dda6fa`](https://github.com/adelrodriguez/adamantite/commit/1dda6fa5c5b3493412f60cb28399767ecf35db73) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read template literal keys and `globalThis` built-in types in the Adamantite rules
+
+  The rules of the `adamantite`, `quality`, and `quality-effect` plugins now read property keys with one shared helper, so a key form that one plugin reads, the others read too. A template literal with an expression, such as ``items[`${method}`]``, still does not count as a key.
+
+  - The rules that find calls of imported functions, such as `adamantite/no-react-state-hooks`, report ``React[`useState`](0)``.
+  - `quality/no-array-filter-map` and `quality/no-reduce-accumulator-copy` read a method name from a template literal, such as ``items[`filter`](f)[`map`](g)`` or ``rows[`reduce`](...)``, as `quality/no-reflect-get` and `quality/no-reflect-apply` do.
+  - The `quality-effect` tag rules report ``value[`_tag`] === "Ready"`` and ``{ [`_tag`]: "Ready" }``, classify ``error[`reason`][`_tag`]`` as a reason tag, and accept the pattern object of ``Match[`when`](...)``.
+  - `adamantite/no-query-data-in-state` reads ``query[`data`]`` and `{ ["data"]: user }`.
+  - In `quality/no-unknown-parameters`, a parser, promise, or `cause` name written as a string or template key, such as `schema["parse"](value)`, gets the same exemption as the plain name.
+
+  The rules also read `globalThis.X` as the built-in `X`, which Effect code writes when `import { Array, Record } from "effect"` hides the global types. `quality/no-widen-then-assert` reports a binding widened to `globalThis.Record<string, unknown>` and asserted back, and no longer calls an assertion to `globalThis.Record<string, unknown>` narrower. `quality/no-array-filter-map` and `quality/no-reduce-accumulator-copy` count `globalThis.Array<T>` and `globalThis.ReadonlyArray<T>` as arrays.
+
+- [#945](https://github.com/adelrodriguez/adamantite/pull/945) [`ef0814b`](https://github.com/adelrodriguez/adamantite/commit/ef0814bdba1405dc3a60e8a0417e3a1c72d0e5ea) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report mock implementations and stubbed globals in the strict preset with `testing/no-doubles`
+
+  `testing/no-doubles` now reports each Vitest or Jest test double that replaces what a dependency does, not only a module mock:
+
+  - A mock implementation: `vi.fn(impl)`, `jest.fn(impl)`, and `mockImplementation`, `mockReturnValue`, `mockResolvedValue`, `mockRejectedValue`, their `Once` forms, `mockReturnThis`, and `withImplementation`.
+  - A stubbed global or property: `vi.stubGlobal()` and `jest.replaceProperty()`.
+  - A spy result for some arguments: `vi.when()`.
+  - A module or an object of mocks: `vi.importMock()`, `vi.mockObject()`, `jest.createMockFromModule()`, `jest.genMockFromModule()`, `jest.setMock()`, and `jest.enableAutomock()`.
+
+  A spy, such as `vi.spyOn(store, "save")`, and `vi.fn()` without an implementation only observe the real code, so they stay allowed. To fix a report, pass a test implementation through the dependency's interface, such as an Effect `Layer` or a function parameter.
+
+  The jest and vitest presets turn off `prefer-mock-promise-shorthand` and `prefer-mock-return-shorthand`. They asked for `mockResolvedValue` and `mockReturnValue` in place of a mock implementation, but the strict preset reports both forms. A project without the strict preset can turn the rules on in its own `oxlint.config.ts`. Suppressions that name these rules are unused, so you can delete them.
+
+- [#945](https://github.com/adelrodriguez/adamantite/pull/945) [`ef0814b`](https://github.com/adelrodriguez/adamantite/commit/ef0814bdba1405dc3a60e8a0417e3a1c72d0e5ea) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report a fixed sleep in a test or a hook in the strict preset with `testing/no-fixed-sleep`
+
+  The strict preset turns on `testing/no-fixed-sleep` in the test files of the jest and vitest presets. It reports a fixed sleep in the body of a test or a hook, such as `await new Promise((resolve) => setTimeout(resolve, 100))`, `await setTimeout(100)` of `node:timers/promises`, `scheduler.wait()`, `Bun.sleep()`, and `yield* Effect.sleep()` in the generator of an Effect test. A sleep guesses how long the work takes, and fails under load.
+
+  To fix a report, await the operation, or a promise that its handler resolves. To move time, use fake timers or `TestClock`. A file that calls `vi.useFakeTimers()` or `jest.useFakeTimers()`, or uses `TestClock`, gets no report. A sleep in a helper or a handler, such as simulated latency in a mock server, stays allowed.
+
+- [#945](https://github.com/adelrodriguez/adamantite/pull/945) [`ef0814b`](https://github.com/adelrodriguez/adamantite/commit/ef0814bdba1405dc3a60e8a0417e3a1c72d0e5ea) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report test retries and raised test timeouts in the strict preset with `testing/no-flake-masking`
+
+  The strict preset loads a new first-party plugin, `testing`, and turns on `testing/no-flake-masking` in the test files of the jest and vitest presets. A test that passes only on a retry is flaky, and a raised timeout hides a slow or stuck test. The rule reports a `retry` or `timeout` option of a test or suite, a timeout after the test function, such as `it("loads", fn, 60_000)`, `vi.setConfig()` with `retry`, `testTimeout`, or `hookTimeout`, `jest.retryTimes()`, `jest.setTimeout()`, and `flakyTest` of `@effect/vitest`. In a `vite.config.*` or `vitest.config.*` file, it reports `retry` in the `test` options.
+
+  A hook timeout, such as `beforeAll(setup, 60_000)`, a timeout of `expect.poll()` or `vi.waitFor()`, `testTimeout` or `hookTimeout` in the Vitest config, and a timeout in a benchmark file, such as `index.bench.ts`, stay allowed.
+
+  To fix a report, remove the retry or the timeout, and await the event that the test depends on, or control time with `TestClock` or fake timers. A test that must keep its timeout suppresses the rule with a reason, such as `// oxlint-disable-next-line testing/no-flake-masking -- the test builds the whole package`.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Allow `typeof` on a value with a declared owned type in `quality/no-runtime-typeof`
+
+  The rule now reports `typeof` only on values that may be unparsed. It allows `typeof` on a variable, a parameter, or a property path such as `options.headers` or `options!.headers`, when the root binding has a type annotation with no `unknown` or `any`, as in `retry: number | RetryPolicy`. It also allows a property destructured from such a binding, as in `const { headers } = options`.
+
+  - The rule resolves local aliases, generic aliases, and aliases of type parameters before it checks the type. A local alias that hides `unknown` or `any`, such as `type Payload = Record<string, unknown>`, does not count as owned, and a local alias of an owned union, such as `type Label = string | (() => string)`, does. An imported alias has no body in the file, so the rule treats it as owned.
+  - A type parameter counts as owned only with an owned constraint, as in `<T extends string | number>`. The rule reports `typeof` on a type parameter with no constraint, or with a constraint that has `unknown` or `any`, as in `<T extends Record<string, unknown>>`, also behind `NonNullable`, `NoInfer`, or `Awaited`, or in an intersection with `{}` or `object`. A nearer type alias or interface with the same name hides an outer type parameter, and the rule then checks that declaration.
+  - The rule allows `typeof` inside a type guard, also in an inline callback of the guard, such as `value.every((item) => typeof item === "string")`, and in an arrow function whose variable has a type guard type, such as `const isText: (value: unknown) => value is string = (value) => typeof value === "string"`.
+
+  The rule still reports a value typed `unknown` or `any`, an unannotated value, the result of `JSON.parse`, a callback with its own return type that is not a type predicate, and a helper function stored in a variable.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Find `unknown` behind aliases and wrappers, and allow it for parsers and error causes, in the strict preset
+
+  `quality/no-unknown-parameters`, `quality/no-unknown-returns`, and `quality/no-unknown-type-aliases` now share one check for `unknown`:
+
+  - All three rules resolve local type aliases, as in `type Box<T> = T` with `Box<unknown>`, and see through `Awaited<unknown>` and `NoInfer<unknown>`. A local declaration with the same name as a built-in type, such as `interface Promise<T>`, is not treated as the built-in type.
+  - `quality/no-unknown-returns` also reports `globalThis.Promise<unknown>`, `Iterable<unknown>`, `AsyncIterable<unknown>`, `AsyncIterator<unknown>`, `Generator<unknown>`, and `AsyncGenerator<unknown>`.
+  - `quality/no-known-value-widening` uses the same check for the parameter of a type guard.
+  - Each alias body sees only its own type parameters. Before, in `type Reply<Payload> = Envelope | Payload[]`, the rules read an imported `Payload` inside `Envelope` as the `unknown` argument of `Reply<unknown>`. A type argument that names a type parameter of an outer alias, such as `Index<T | Command>`, resolves against that outer alias, so `quality/no-unsafe-dictionary-type` reports it when the outer argument is `unknown`.
+
+  `quality/no-unknown-parameters` allows an `unknown` parameter in two more cases, and one fewer:
+
+  - A function that only passes the parameter to a schema parser, such as `schema.parse(value)`, `z.safeParse(schema, value)`, or `Schema.decodeUnknownSync(User)(value)`, or checks it with `instanceof`, passes. A function that reads the value without parsing it, or that also passes the raw value somewhere else, is still reported.
+  - A parameter named `cause` passes only on a constructor, as in `constructor(message: string, cause: unknown)`, and on a function, method, class, or interface whose name ends in `Error` or has the word `cause`, as in `toError`, `AppError`, or `formatCauseDetail`. Before, every `unknown` parameter named `cause` passed, so `function parse(cause: unknown)` did. A `cause` property in an object type, as in `options: { cause: unknown }`, still passes.
+
+- [#832](https://github.com/adelrodriguez/adamantite/pull/832) [`9bdb04b`](https://github.com/adelrodriguez/adamantite/commit/9bdb04b7f8bb4b7a694b94d81d1750c5a12e3a04) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report an unused `oxlint-disable` comment in `adamantite check`, and remove it in `adamantite fix`
+
+  The core preset sets `options.reportUnusedDisableDirectives` to `"error"`. `adamantite check` now fails on an `oxlint-disable` comment that suppresses nothing, and `adamantite fix` removes the comment with Oxlint 1.93 or later. With Oxlint 1.92, remove the comment yourself. When `fix` removes a comment that has no reason, the same run still reports `adamantite/require-suppression-reason` for the comment, and the next `check` passes.
+
+  Zed and VS Code now report these comments with the severity from the Oxlint config. The Zed settings that Adamantite writes no longer set `unusedDisableDirectives`. If you changed `.zed/settings.json`, remove `lsp.oxlint.initialization_options.settings.unusedDisableDirectives` so that Zed follows your Oxlint config.
+
+  To turn the report off, set `options.reportUnusedDisableDirectives` to `"off"` in the root `oxlint.config.ts`. Oxlint reads this option only from the root config.
+
+- [#779](https://github.com/adelrodriguez/adamantite/pull/779) [`6ee9d13`](https://github.com/adelrodriguez/adamantite/commit/6ee9d1319ac5829b98478f3808263acfdc7f64ab) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update Oxlint to 1.93, Oxfmt to 0.78, tsrs to 0.25, Knip to 6.45, and `@effect/tsgo` to 0.69, and trim the runtime dependencies
+
+  The managed tooling versions are now Oxlint 1.93.0, Oxfmt 0.78.0, tsrs 0.25.0-ts7.1.0-beta, Knip 6.45.1, and `@effect/tsgo` 0.69.0. The optional peer ranges move to `oxlint` 1.92.0 or later and `tsrs` 0.25.0-ts7.1.0-beta or later. npm rejected tsrs 0.25.0-ts7.1.0-beta against the old range, because a prerelease matches a range only through a version with the same major, minor, and patch.
+
+  - The type-aware rules now have builds for Windows ARM64: tsrs 0.25.0 publishes `@tsrs/win32-arm64`, and `@effect/tsgo` 0.69.0 ships a Windows ARM64 build of tsrs.
+  - Oxlint 1.92.0 and later find the `tsrs-lint` launcher in `node_modules/.bin` themselves. Outside Windows, the Oxlint entry that `adamantite check`, `adamantite fix`, and the editors run no longer names the launcher in `OXLINT_TSGOLINT_PATH`.
+  - The effect preset enables the two new `@effect/tsgo` rules. `effecttsgo/missing-concurrency-option` reports an `Effect.all` or `Effect.forEach` call without a `concurrency` option, because these calls run one effect at a time unless the option says otherwise. `effecttsgo/on-exit-failure-to-on-error` reports an `Effect.onExit` callback that acts only on failure, which `Effect.onError` replaces.
+
+  The runtime dependencies are now `effect`, `@effect/platform-node`, and `oxc-resolver`. Adamantite no longer installs `@clack/prompts`, `jsonc-parser`, `nypm`, `oxc-parser`, `@oxlint/plugins`, or `@effect/platform-node-shared`. `@effect/platform-node@4.1.2` depends on `@effect/platform-node-shared` at exactly `4.1.2`, so installs resolve the same version as before ([#511](https://github.com/adelrodriguez/adamantite/issues/511)). Adamantite reads JSON files with the parsers in Effect, so a parse error now shows one line and column, such as `Invalid JSONC at line 3, column 3`, and a `__proto__` key in a project file is read as an ordinary key.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` to install the new versions.
+  - In a project with the effect preset, expect `adamantite check` to report `Effect.all` and `Effect.forEach` calls without a `concurrency` option. Add `{ concurrency: 1 }` to keep the current order, or set the concurrency that the code needs.
+  - Expect `adamantite check` to report a rejection callback that is the second argument of `then()`. Oxlint 1.93 reports it with `promise/prefer-catch`, which the core preset turns on. Move the callback to `.catch()`.
+  - In a Vue project, expect `adamantite fix` to format `.vue` files differently. Oxfmt 0.77.0 formats them with its own formatter instead of Prettier ([oxc-project/oxc#28848](https://github.com/oxc-project/oxc/issues/28848)).
+  - In an Astro or Svelte project, expect `adamantite fix` to format `.astro` and `.svelte` files. The format preset turns on Oxfmt's `astro` and `svelte` options, and Zed and VS Code format both languages with Oxfmt. Oxfmt needs a package from the project: `@astrojs/compiler-rs`, which Astro 7 and later install, and `svelte` 5 or later. In an Astro 5 or 6 project, or a Svelte 3 or 4 project, Oxfmt fails on those files, and Doctor reports it. Run `adamantite update` to move Zed's Astro setup from Prettier to Oxfmt.
+
+- [#923](https://github.com/adelrodriguez/adamantite/pull/923) [`1a618c8`](https://github.com/adelrodriguez/adamantite/commit/1a618c8d41c04672dda7010ac3e1d3bd145caa98) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update Oxlint to 1.94 and `@effect/tsgo` to 0.70, and enable the two new Effect rules
+
+  The managed tooling versions are now Oxlint 1.94.0 and `@effect/tsgo` 0.70.0. `@effect/tsgo` 0.70.0 ships the Effect build of Oxlint 1.94.0 and keeps the build of tsrs 0.25.0-ts7.1.0-beta, so tsrs stays at that version.
+
+  The effect preset enables the two new `@effect/tsgo` rules:
+
+  - `effecttsgo/flat-map-provide-service-to-provide-service-effect` reports an `Effect.flatMap` whose callback only passes its parameter to `Effect.provideService`. `Effect.provideServiceEffect` replaces it.
+  - `effecttsgo/for-loop-push-to-for-each` reports a `for...of` loop in an Effect generator that only pushes `yield*` results into an array declared just before the loop. `Effect.forEach` replaces it.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` to install the new versions.
+  - In a project with the effect preset, expect `adamantite check` to report the code that the two new rules describe. Both rules come with a fix in the editor.
+  - Expect `adamantite fix` to apply fewer fixes. Oxlint 1.94 turns the fixes of several rules into suggested fixes, such as `no-useless-escape`, `no-regex-spaces`, `typescript/no-import-type-side-effects`, and the `prefer-to-be` and `prefer-called-with` rules of Jest and Vitest. Run `adamantite fix --suggested` to apply them, and review the changes.
+
+- [#971](https://github.com/adelrodriguez/adamantite/pull/971) [`8462846`](https://github.com/adelrodriguez/adamantite/commit/8462846160b8529c128b3468712577616567a670) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ship the changelog, and print the notes of each release since the recorded version in `adamantite update`
+
+  The package now ships `CHANGELOG.md`, so the notes that an agent reads match the installed version. Before, the Adamantite skill and Doctor linked the changelog on GitHub `main`, which can name releases that the project does not run.
+
+  - `adamantite update` reads the version that the lockfile recorded before it writes the installed version, and prints the notes of each release since then, oldest first. A terminal gets one link to the GitHub release of each version. A run without a terminal prints the notes as Markdown. `adamantite update --json` puts them in `releaseNotes`, with the path of the changelog and the recorded version in `from`. `releaseNotes` is `null` for `init`, and for `update` when it has no range to read.
+  - The `oxlint-config-load-failure` finding now names the path of the installed changelog, and tells the agent to search it for a preset that the package no longer exports. The Adamantite skill gives the same repair.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report more assertion chains, and name `@ts-expect-error` for test input, in the strict preset's assertion rules
+
+  - `quality/no-widen-then-assert` reports an assertion of a widened binding anywhere after the declaration in the declaring function, including in the functions nested in it, such as a test callback inside `describe`. The binding is a `const` with no writes, so a nested function sees the same value.
+  - `quality/no-chained-type-assertions` looks through a `satisfies` expression between two assertions, such as `(value as unknown satisfies unknown) as number`, as it looks through parentheses, because `satisfies` keeps the type of its operand.
+  - The messages of both rules now tell you to pass input of the wrong type without an assertion and put `// @ts-expect-error -- reason` above the call. A test that passes such input on purpose, such as `parsePort("abc" as unknown as number)`, had no form that both rules accept.
+
+### Patch Changes
+
+- [#781](https://github.com/adelrodriguez/adamantite/pull/781) [`e49c354`](https://github.com/adelrodriguez/adamantite/commit/e49c3549476f5d4805d21e39443e26476ca25918) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept correct code that the core preset reported
+
+  The core lint preset changes these rules, so code that has no other correct form passes:
+
+  - `no-await-in-loop` is off. The rule told the author to start the calls together, and that is a defect when each call needs the result of the call before it, such as a retry, a lock order, or a page that depends on the page before it.
+  - `oxc/no-map-spread` is off. The rule reported `{ ...item, done: true }` in a `map` callback and asked for a change in place, so no immutable copy passed core. React state updates use this copy in reducers and event handlers.
+  - `prefer-object-spread` is off. The rule reported `Object.assign({}, acc, { sum: acc.sum + item.n })` in a `reduce` callback, and its fix wrote a spread that `oxc/no-accumulating-spread` reports. The strict preset still reports an `Object.assign` copy when the accumulator can grow.
+  - `typescript/non-nullable-type-assertion-style` is off. The rule reported `value as string` and told the author to write `value!`, which `typescript/no-non-null-assertion` bans.
+  - `no-throw-literal` is off. `typescript/only-throw-error` reports every throw that it reported, such as `throw "failed"`, so one throw got two reports. A suppression now names only `typescript/only-throw-error`.
+  - `no-redeclare` is off in TypeScript files, so a type and a value can share a name, such as `const Port = Schema.Number` with `type Port = typeof Port.Type`. The type check still reports a value that is declared two times. The setting is in an override of the preset, so change it in an `overrides` entry of your config, because the preset's override takes priority over top-level `rules`.
+  - `import/unambiguous` is off in `*.d.ts`, `.astro`, `.vue`, and `.svelte` files. A declaration file without an `import` or `export` is a script on purpose, because only a script can declare a wildcard module, such as `declare module "*?raw"`, or a global. The frameworks compile a component's script as a module. The rule still reports `.js` and `.ts` files.
+  - `jsdoc/check-tag-names` uses `typed: false` in `.js`, `.jsx`, `.mjs`, and `.cjs` files, so a JavaScript file can state types with tags such as `@type`.
+  - `unicorn/no-useless-undefined` uses `checkArguments: false` and `checkArrowFunctionBody: false`, so it keeps a required argument such as `consume(undefined)` and a concise result such as `() => undefined`. The rule still reports redundant initializers, yields, and empty functions. For a block callback with an explicit `return undefined`, declare a union result type such as `: number | undefined`, because the rule still reports an unannotated return and its fix can conflict with the callback-return checks. With the effect preset, `Effect.succeed(undefined)` still gets the Effect rule that recommends `Effect.undefined`.
+
+  Suppressions, overrides, and placeholder exports that you added for these rules are now unneeded, so you can delete them.
+
+- [#925](https://github.com/adelrodriguez/adamantite/pull/925) [`a47c74d`](https://github.com/adelrodriguez/adamantite/commit/a47c74de7c6675c237de7465d3ddba964b385676) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Bundle Effect into the CLI, so commands start sooner and installs skip `effect` and `@effect/platform-node`
+
+  The CLI and the Oxlint entry now include the Effect modules that they use. Node.js loads three files at startup in place of more than two hundred Effect modules, and it keeps the compiled code of the CLI in its compile cache, so later runs of `adamantite check` and `adamantite fix` reach Oxlint and Oxfmt sooner. Adamantite no longer installs `effect` or `@effect/platform-node`. A project that imports them lists them itself, as it already had to.
+
+- [#921](https://github.com/adelrodriguez/adamantite/pull/921) [`f5b4ae9`](https://github.com/adelrodriguez/adamantite/commit/f5b4ae9da99e96fb06c413887ded342eef23e798) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Run the format and lint stages of `adamantite check` at the same time
+
+  `adamantite check` now starts Oxfmt and Oxlint together, so a check takes about as long as its lint stage. The output keeps its order: the Oxfmt section prints first, and the Oxlint section prints after Oxfmt ends. Each stage writes to a pipe, and Adamantite sets `FORCE_COLOR` for both when the terminal shows color. `check --only format` and `check --only lint` run as before.
+
+- [#961](https://github.com/adelrodriguez/adamantite/pull/961) [`83569bd`](https://github.com/adelrodriguez/adamantite/commit/83569bd703f484bdb51d29529c03015a49756944) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Print the stage headings of `adamantite check` only on a plain run
+
+  `adamantite check` and `adamantite check <files>` still print a heading above each stage, such as `🔍 Linting · adamantite (oxlint)`. With `--only` or arguments after `--`, `check` prints only the tool's output, so `adamantite check --only lint -- --format json` prints one JSON document that a script can parse. In a coding agent's shell, where Oxlint prints its agent report, `check` prints no heading either, so a passing lint no longer ends the output with a heading and no result. Adamantite reads the same environment variables as Oxlint 1.94.0 to detect an agent.
+
+- [#947](https://github.com/adelrodriguez/adamantite/pull/947) [`c31e02e`](https://github.com/adelrodriguez/adamantite/commit/c31e02e410d97f544e52d1a370eaba022ca7ac0f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Share Node.js's compile cache with the tools that Adamantite starts, so Oxlint starts sooner
+
+  `bin/adamantite` sets `NODE_COMPILE_CACHE` to its own compile cache folder for every process that the CLI starts, unless you set the variable yourself. Oxlint then loads its own compiled code from the cache instead of compiling its JavaScript on every run. `NODE_DISABLE_COMPILE_CACHE` still turns the cache off.
+
+- [#798](https://github.com/adelrodriguez/adamantite/pull/798) [`13a54d6`](https://github.com/adelrodriguez/adamantite/commit/13a54d679398012de6a88bb35c40c2818d3191c8) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report a preset that comes before core in `extends`
+
+  Oxlint applies the `extends` entries of `oxlint.config.ts` in order, and a later entry replaces the rules of an earlier one. The strict preset changes three rules of core, and the effect preset turns three off. With `extends: [strict, core]`, core replaced those changes, so the ban on type assertions was off, and no tool reported it. `adamantite doctor` now reports each Adamantite preset that comes before a core entry with the `core-preset-order` finding, which names the preset modules, such as `adamantite/lint/strict`, and tells you to move core directly before the first Adamantite preset.
+
+- [#933](https://github.com/adelrodriguez/adamantite/pull/933) [`da160de`](https://github.com/adelrodriguez/adamantite/commit/da160deb598e5c6d614d25762a4f7cece8c5a22f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Correct what the `adamantite-hardening` skill and the README say about a custom rule that throws
+
+  The custom rules guide of the skill and the README said that a custom rule that throws prints an error for each file while Oxlint still exits 0. That is false. When a rule throws in a visitor, or in `before` or `after`, Oxlint fails the lint run and reports `Error running JS plugin`, with the stack of the throw, for each file in which the rule throws. For those files, Oxlint omits the reports of every other rule that a JavaScript plugin provides, such as the other custom rules and `adamantite/layers`. Its native rules still report. A throw in the `createOnce` body, or while the rule file loads, stops Oxlint with `Failed to load JS plugin` before it lints a file.
+
+  The skill now tells agents to fix the throw first, and to run lint again before they trust the remaining reports. Oxlint 1.92.0 and 1.94.0 behave this way.
+
+- [#928](https://github.com/adelrodriguez/adamantite/pull/928) [`4861700`](https://github.com/adelrodriguez/adamantite/commit/48617001e8004c0b6b41a7f11a33073ade224b76) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report a managed script that does not run its Adamantite command in Doctor
+
+  `adamantite doctor` now compares each selected managed script in the root `package.json` with its command, such as `adamantite check` for `check`. A project could replace the `check` script with another command, and Doctor reported nothing while `pnpm run check` and the generated CI workflow passed without running Adamantite.
+
+  Doctor reports the `missing-managed-script` finding for a selected script that `package.json` does not have, and the `mismatched-managed-script` finding for one that runs another command. Both say to run `adamantite update`, which sets the script to its command. If the project still needs the earlier command, move it to a script of another name before the update, and run that script wherever the project ran the managed script, such as in CI.
+
+- [#922](https://github.com/adelrodriguez/adamantite/pull/922) [`a5fa677`](https://github.com/adelrodriguez/adamantite/commit/a5fa677c9d232fda932251056cd215bdbf15418a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop predicting which Oxlint binding and tsrs binary load in Doctor
+
+  Doctor no longer guesses which `@oxlint/binding-*` or `@tsrs/*` platform package Oxlint and tsrs load on this machine, a choice that it copied from their loaders and that could disagree with them. It still reports a missing declared package, a missing `tsrs-lint` launcher, and an `@effect/tsgo` without a build or the bridge for the installed versions.
+
+  When the platform package is missing, `adamantite check` stops with the error of the tool that needs it. Oxlint prints `Cannot find native binding` with each file that it tried, and tsrs names the missing `@tsrs/*` package. The Adamantite skill tells agents to reinstall the dependencies with optional dependencies for this platform.
+
+  Doctor runs Oxlint, so a missing Oxlint binding still gives the `oxlint-config-load-failure` finding with Oxlint's error. The finding is now titled "Oxlint stops before it lints a file", and it tells the agent to reinstall the dependencies, not to change the config, when the error says `Cannot find native binding`.
+
+- [#918](https://github.com/adelrodriguez/adamantite/pull/918) [`0294363`](https://github.com/adelrodriguez/adamantite/commit/02943636b27052f2cc96cde06a3812ad86b2a5fa) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Load the Effect build of Oxlint through `@effect/tsgo/oxlint-bridge`, and report a missing binding package in Effect projects
+
+  The Oxlint entry that `adamantite check`, `adamantite fix`, and the editors run no longer sets `NAPI_RS_NATIVE_LIBRARY_PATH`. It loads `@effect/tsgo/oxlint-bridge`, which swaps Oxlint's installed binding for the Effect build as Oxlint loads it and leaves every other napi-rs binding unchanged.
+
+  The bridge needs the installed `@oxlint/binding-<platform>` package, so Doctor now checks for that package in a project with `@effect/tsgo` too. Doctor also reports an `@effect/tsgo` that ships no bridge. Run `adamantite update` to install the managed version.
+
+- [#816](https://github.com/adelrodriguez/adamantite/pull/816) [`8c82710`](https://github.com/adelrodriguez/adamantite/commit/8c827105aecbac70e169bbb54714da81b9e58bc1) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Turn off the core rules that read Effect functions as built-in methods in the effect preset
+
+  These core rules match a method by its name only, so they reported Effect code as misused promises, strings, and arrays. The effect lint preset now turns them off:
+
+  - `promise/valid-params` reported the data-first `Effect.catch(load("a"), () => load("b"))` as `Promise.catch()` with 2 arguments.
+  - `promise/no-nesting` reported an `Effect.catch` in the handler of another `Effect.catch` as a nested promise.
+  - `array-callback-return` reported an `Effect.map` or `Option.map` callback that returns nothing, which is the form that the fix of `typescript/no-confusing-void-expression` writes.
+  - `unicorn/prefer-string-slice` rewrote `String.substring(1)` from `effect/String` to `String.slice(1)`, a different Effect function that reads a negative index from the end.
+  - `unicorn/prefer-array-find` and `unicorn/prefer-array-some` reported `Array.filter(values, predicate)[0]` and `Array.filter(values, predicate).length > 0` from `effect/Array`, which has no `find`.
+  - `unicorn/throw-new-error` reported an error class that `Schema.TaggedError` or `Schema.Error` makes as an error made without `new`, and its fix broke the class. The rule stays off until Oxlint fixes [oxc-project/oxc#27718](https://github.com/oxc-project/oxc/issues/27718).
+
+  In a project with the effect preset, these rules no longer report the same patterns on native promises, strings, and arrays. The type check still reports a promise method call with the wrong arguments, and, with `noImplicitReturns` as in `adamantite/tsconfig` and `adamantite/typescript`, a callback that returns a value on only some paths.
+
+- [#830](https://github.com/adelrodriguez/adamantite/pull/830) [`963329a`](https://github.com/adelrodriguez/adamantite/commit/963329a147131185061bf82b675398c01142800e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept correct test code in the jest and vitest presets, and allow only one of the two
+
+  - `consistent-test-it` is off for a time. Its fix renamed a `test` call in `describe` to `it`, but did not change the import, so the file failed at run time unless Vitest ran with `globals: true`. The presets will turn the rule on again when an Oxlint release keeps the import ([oxc-project/oxc#29181](https://github.com/oxc-project/oxc/issues/29181)).
+  - `prefer-lowercase-title` has `ignore: ["describe"]`, so `describe("Calculator", ...)` passes, because a describe title often names the class or function under test. The rule still reports a test title that starts with a capital letter.
+  - `require-hook` accepts a top-level `tester.run(...)` call, and `vitest/require-hook` also accepts a `layer(TestLayer)("name", (it) => ...)` suite of `@effect/vitest`. The rule matches the name of the call, not the import, so a top-level call of another function named `layer` also passes. The RuleTester test that `adamantite rule test add` writes no longer has a suppression for `require-hook`, and `adamantite fix` removes that suppression from a test that it wrote before.
+  - `vitest/prefer-import-in-mock` and `jest/no-untyped-mock-factory` are off. They told the author how to write a module mock, but the strict preset's `testing/no-doubles` bans each module mock, so the code that obeyed the first report still failed. A project without the strict preset can turn the rules on in its own `oxlint.config.ts`.
+
+  The two presets report the same test defects, so a config that extended both gave two reports for each defect. `adamantite init` now rejects `--preset jest --preset vitest`, and the interactive prompt asks which of the two presets to keep. `adamantite doctor` reports a config that extends both presets. A config that uses each preset in an override of its own is not reported.
+
+  Suppressions that name the rules that are now off are unused, so you can delete them.
+
+- [#932](https://github.com/adelrodriguez/adamantite/pull/932) [`33e1358`](https://github.com/adelrodriguez/adamantite/commit/33e13585129fcba8d51789ae1d481fee424f1b92) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Lint faster with the strict preset's quality rules
+
+  The quality rules now record type declarations while Oxlint walks a file, instead of walking each file a second time. `quality/no-widen-then-assert`, `quality/no-shape-in-symbol-names`, and `quality/no-known-value-widening` now build scope analysis only for a file that has a candidate to check. On three TypeScript projects of 400 to 950 files, the rules spent about 45% less time per lint, and a lint with only these rules took about 25% less time. The rules report the same diagnostics as before.
+
+- [#972](https://github.com/adelrodriguez/adamantite/pull/972) [`6c1e2d1`](https://github.com/adelrodriguez/adamantite/commit/6c1e2d1e4f189f80ad635e869b324c3ccb5fcdba) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Print the stage headings of `adamantite fix` and `adamantite analyze` only on a plain run, as `adamantite check` does
+
+  `adamantite fix`, `adamantite fix <files>`, and `adamantite analyze` still print a heading above each stage. With `--only` or arguments after `--`, they print only the tool's output, such as a Knip reporter that a script parses. In a coding agent's shell, where Oxlint prints its agent report, they print no heading either, so an agent reads the same kind of output from `check`, `fix`, and `analyze`.
+
+- [#970](https://github.com/adelrodriguez/adamantite/pull/970) [`cd9f0b3`](https://github.com/adelrodriguez/adamantite/commit/cd9f0b30bca882c437332dd43849defab0343cea) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Type the `printWidth` of `adamantite/format` as set
+
+  The default export of `adamantite/format` now has the type `FormatConfig & Required<Pick<FormatConfig, "printWidth">>`, so `format.printWidth` reads as a `number` instead of `number | undefined`. A config that spreads the preset or exports it unchanged still type-checks. A config that deletes `printWidth` from the preset to use the default of Oxfmt no longer type-checks: leave it out of a copy instead, as in `const { printWidth: _printWidth, ...preset } = format`.
+
+- [#934](https://github.com/adelrodriguez/adamantite/pull/934) [`070d6a1`](https://github.com/adelrodriguez/adamantite/commit/070d6a15e64915711e844e91790e4b45497b107d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - State the enforcement ladder in one file, and stop the harden prompt from favoring lint rules
+
+  The harden prompt, the glossary, and `adamantite harden --help` described what hardening produces in three ways. The Adamantite skill now defines the enforcement ladder in `references/enforcement-ladder.md`, and the harden prompt shows that file in step 7. The ladder has six steps: a type or structure, a preset rule, an import rule, a project check, a custom rule, and an instruction. A project check now includes a test, which holds a standard about behavior.
+
+  The harden prompt changes in four places:
+
+  - It scores a candidate by the mistake that the proposal prevents and the valid code that it accepts, not by its step. An instruction with a reason and an example can score 5.
+  - An instruction is an entry in `CODING_STANDARDS.md` with the standard, the reason, how to spot the mistake, and an example from the project. It was one line.
+  - When a rule covers an instruction, the agent deletes only the text that repeats the rule's report. It keeps the reason and the example of a standard that shapes a design.
+  - The agent fixes the code that a new rule reports in the same change when you approve the fixes with the candidate. Otherwise it still turns the rule off in the files that break it, and now states in a comment above the override what removes each file from it.
+
+- [#930](https://github.com/adelrodriguez/adamantite/pull/930) [`12bb3e2`](https://github.com/adelrodriguez/adamantite/commit/12bb3e233368daf344d5a8c3ad7bde678a44949d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Leave agent skills out of the documentation that `adamantite harden` lists
+
+  `adamantite harden` listed each Markdown file in a skill folder, such as `.agents/skills` or `.claude/skills`, as documentation, and as a file that no `AGENTS.md` reaches. In a project that `adamantite init --agents` had just set up, it listed the Adamantite skill and its guides that way, once for each skill folder.
+
+  A coding agent finds the skills in its skill folder on its own, so no `AGENTS.md` has to link to them. The harden prompt and `harden --json` now leave the files of each skill folder out of `documentationFiles` and `agentReach`, in the root and in each workspace package.
+
+- [#871](https://github.com/adelrodriguez/adamantite/pull/871) [`a249904`](https://github.com/adelrodriguez/adamantite/commit/a2499046f4f8430afe45fa5f388b57dfba39e398) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Name the option that produced each `adamantite/import-owners` report
+
+  A report of `adamantite/import-owners` named the owners, but not the option that restricted the import. With many options, or with two options for the same module, you could not tell which option to change. Each report now names the option, such as `options[1]`, with the same convention as `adamantite/layers`. It also says whether the owner paths are relative to the workspace root or to the package root. The report does not print the path of the root, because that path is different on each machine.
+
+- [#892](https://github.com/adelrodriguez/adamantite/pull/892) [`35d9df8`](https://github.com/adelrodriguez/adamantite/commit/35d9df853994e108ff01c53cc156daa045999866) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Name the `init` command that adds a tool when the setup does not select it
+
+  When Oxlint, Oxfmt, Knip, or Sherif is not installed and the lockfile selects no script that runs it, `adamantite check`, `adamantite fix`, and `adamantite analyze` now fail with a `ToolNotSelected` error. Setup does not install such a tool, so the error names the command that adds the script and installs the tool, such as `adamantite init --non-interactive --script check`. Before, the commands said "`oxlint` is not installed" or "The command `oxfmt` was not found on PATH", and pointed to `adamantite update`, which installs nothing for that selection. A tool that the selection leaves out but that is installed still runs. Without a lockfile, or for a selected tool that is not installed, the commands fail as before.
+
+- [#959](https://github.com/adelrodriguez/adamantite/pull/959) [`45e6254`](https://github.com/adelrodriguez/adamantite/commit/45e625475182e9a180219688729050145f9f2721) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Tell agents that a code comment does not hold a standard
+
+  The enforcement ladder in the `adamantite-hardening` skill now says that a code comment is not a step. When a comment states a standard or an invariant of the project's own code, the agent puts the standard on a step of the ladder, such as a type, a rule, or a test, and deletes the comment. The comment beside a rule that states the standard and its reason stays, such as the comment at the top of a custom rule file. The harden prompt shows the ladder, so `adamantite harden` gives the same instruction.
+
+- [#946](https://github.com/adelrodriguez/adamantite/pull/946) [`3d12515`](https://github.com/adelrodriguez/adamantite/commit/3d1251500a9b130b74d65ee40af6a2666de0c668) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Start each command without loading ICU's data
+
+  `adamantite check`, `fix`, and the other commands no longer create an `Intl` object at startup. The first `Intl` object loads ICU's data, which slowed every command. The bundled Effect now creates its grapheme segmenter when the CLI first measures text, such as for `--help`.
+
+- [#898](https://github.com/adelrodriguez/adamantite/pull/898) [`9229478`](https://github.com/adelrodriguez/adamantite/commit/92294783fdf1034230f51179f9334e9825c55d78) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop `init` from setting up Oxlint in a folder that a parent Oxlint config lints
+
+  `init` in a subfolder wrote an `oxlint.config.ts` with `options.typeAware`, `options.typeCheck`, and `options.respectEslintDisableDirectives`. Oxlint accepts those options only in the root config, so `adamantite check` failed in the parent project. Now, when the selection includes a script that runs Oxlint and any parent folder up to the filesystem root has an Oxlint config, also past a folder that holds `.git`, `init` fails with `ParentOxlintConfig` before it changes a file. Run `adamantite init` at the root of the parent project, or extend the root config in the folder, as "Custom rules in a monorepo" in the README shows. A nested `init` without a lint script, such as one that sets up only an editor, still works.
+
+- [#947](https://github.com/adelrodriguez/adamantite/pull/947) [`c31e02e`](https://github.com/adelrodriguez/adamantite/commit/c31e02e410d97f544e52d1a370eaba022ca7ac0f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Start the project's Oxfmt with `node` in `adamantite check` and `fix`, so formatting starts sooner
+
+  `check` and `fix` no longer go through the shell script in `node_modules/.bin`. They start the CLI module of the Oxfmt that the project installs. When Oxfmt is missing, the error now says that the project does not install `oxfmt`, instead of that `PATH` has no `oxfmt`. An `oxfmt` on `PATH` that the project does not install no longer runs.
+
+- [#824](https://github.com/adelrodriguez/adamantite/pull/824) [`aaa0616`](https://github.com/adelrodriguez/adamantite/commit/aaa06167fbbfab1c997712239d17090dc27ad9b6) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Describe Adamantite as agent-first, and document preset overrides and core advice in the README
+
+  - The npm description and the README tagline now read "Strict, agent-first code-quality toolchain for TypeScript codebases." The README introduction says that Adamantite helps coding agents write excellent code.
+  - A top-level `rules` setting has no effect on a rule that a preset sets in an override, for the files of that override, and Oxlint gives no warning. The README now gives the order in which Oxlint applies `rules` and `overrides`, and lists the files and rules of each override in the core, strict, tailwind, jest, and vitest presets.
+  - The README explains that, with the strict preset, the help of `typescript/no-explicit-any`, `typescript/no-wrapper-object-types`, and `unicorn/no-instanceof-builtins` recommends a form that strict reports. Follow the strict report that comes next, which names a form that both presets accept.
+  - The README no longer links to the architecture decision records, which no longer exist.
+
+- [#820](https://github.com/adelrodriguez/adamantite/pull/820) [`2e1aff8`](https://github.com/adelrodriguez/adamantite/commit/2e1aff8452eb9d46904eb9bd7d1a691f0369729d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Make the React and Next.js presets agree with core and react-strict
+
+  - The react lint preset no longer turns on `react/jsx-no-constructed-context-values`. The rule reported `<ThemeContext.Provider value={{ mode }}>` and asked for `useMemo`, but react-strict bans `useMemo` in feature code because the React Compiler memoizes. The react preset already left out the similar `react-perf` rules. A project without the React Compiler can turn the rule on in its own `oxlint.config.ts`.
+  - The nextjs lint preset now turns off `typescript/require-await`. Next.js rejects each exported function of a `"use server"` file that is not async, so the rule reported a server action that the user could not change. An Oxlint override cannot select a file by its `"use server"` directive, so the rule is off in all files.
+  - The default `allow` list of `adamantite/no-react-state-hooks` now includes `**/hooks.{ts,tsx}`, for a feature that keeps its hooks in one file, such as `features/cart/hooks.ts`. It no longer includes `**/use[A-Z]*.{ts,tsx}`, because core's `unicorn/filename-case` asks for `use-counter.ts` instead of `useCounter.ts`. Rename such a hook module, or move it under a `hooks` directory. A project that keeps camelCase file names can add `"**/use[A-Z]*.{ts,tsx}"` to the rule's `allow` option, and an `allow` option that only repeated the defaults to add the `hooks.ts` glob can go.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report only the names that a file declares in `quality/no-shape-in-symbol-names`
+
+  The rule now checks the bindings, types, and members that a file declares, and a renamed import or export. It no longer reports a name that comes from another module, such as `import type { ZodRawShape } from "zod"`, `UserSchema.shape`, a JSX attribute, or an object key passed to another library. It reports each declaration once, not once for each reference.
+
+- [#973](https://github.com/adelrodriguez/adamantite/pull/973) [`4e51b23`](https://github.com/adelrodriguez/adamantite/commit/4e51b23476120417377e75536d1a741aec40bc49) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Teach agents to adopt Adamantite in existing code
+
+  The setup guide of the `adamantite` skill now has a section for code written before the setup. The agent runs `adamantite fix`, counts the remaining reports and files for each rule from `adamantite check --only lint -- --format json`, fixes the rules with few reports, and turns each remaining rule off only in the files that break it now, in an Oxlint override. It keeps each preset rule at `error`, and does not add disable comments or turn a rule off for the whole project.
+
+- [#934](https://github.com/adelrodriguez/adamantite/pull/934) [`070d6a1`](https://github.com/adelrodriguez/adamantite/commit/070d6a15e64915711e844e91790e4b45497b107d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add a guide to the Adamantite skill for keeping a fixed mistake from recurring
+
+  The skill has a new section, "Keep a fixed mistake from recurring", with the guide `references/corrections.md`. An agent follows it after it fixes a regression, a mistake that a reviewer corrected before, or a break of a project standard that no check reported. The guide starts from that one mistake, chooses a step of the enforcement ladder, such as a test, a type, a rule, or an instruction, and proves the choice. A regression test needs no approval. A new standard waits for yours. `adamantite harden` stays the audit of every standard of the project.
+
+  The guide also covers a disable comment. Before an agent adds one, it fixes the code, or gives the suppression a reason. When a comment already suppresses the same rule for the same reason, the agent adds no further comment and treats the repeated suppression as the mistake: it proposes the exception once, in an option of the rule or in an override. Before the guide chooses a step, the agent runs `adamantite rule try <rule> --current --report <case>`, and stops when a rule of the config already reports the mistake.
+
+  The Adamantite section that `init --agents` writes to `AGENTS.md` now sends agents to that section of the skill after a fix and before a disable comment. `adamantite update` writes the new section to an `AGENTS.md` that is unchanged since Adamantite wrote it.
+
+  The skill also tells agents that `adamantite check` does not run the project's tests, so they run the tests of each changed behavior. The setup guide tells agents who move a replaced script's command to another script to make CI and Git hooks run that script, because the workflow that Adamantite writes runs only the managed scripts.
+
+- [#926](https://github.com/adelrodriguez/adamantite/pull/926) [`efe3256`](https://github.com/adelrodriguez/adamantite/commit/efe32567f2f5164e06647b39410a8d04b4938f11) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Start Oxlint's own CLI from `adamantite check`, `fix`, and `harden`, so Effect loads once per command
+
+  The CLI now resolves the project's Oxlint runtime itself and starts Oxlint's `dist/cli.js` with `node`, with the runtime's variables and preload module. No second Node.js process loads Effect to resolve the runtime again, so linting starts sooner. Editors still start `node_modules/adamantite/dist/oxlint.js`, which no longer reads `ADAMANTITE_PROJECT`. When Oxlint is missing, `adamantite check` still checks the formatting, then fails with the error that names the repair.
+
+- [#829](https://github.com/adelrodriguez/adamantite/pull/829) [`b1111d4`](https://github.com/adelrodriguez/adamantite/commit/b1111d42e34d73ad4d8af9e1e02c139a9c23dfa4) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Fit the strict preset's overrides to declaration files and to the test files of the jest and vitest presets
+
+  The strict lint preset now turns off `quality/no-unknown-parameters`, `quality/no-unknown-returns`, `quality/no-object-parameters`, and `quality/no-unsafe-dictionary-type` in `*.d.ts` files. A declaration file states the types of code that it does not hold, such as a built-in API or a package without types, so it cannot change those signatures.
+
+  The strict preset also selects its test files with the `testFiles` globs of the jest and vitest presets, so the three presets agree on which files are test files. The override that allows a type assertion with a safety comment now also applies to `.js`, `.jsx`, `.mjs`, and `.cjs` test files. In a `__tests__` folder, it applies only to files with these extensions and the TypeScript extensions, so a `.vue`, `.svelte`, or `.astro` file in that folder now gets the strict rules for ordinary files.
+
+- [#912](https://github.com/adelrodriguez/adamantite/pull/912) [`a8b16f1`](https://github.com/adelrodriguez/adamantite/commit/a8b16f1d0df2bbfc2b3fd7b9a43ac44ef767771c) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report an import that reaches a protected file through a symlink in `adamantite/layers` and `adamantite/import-owners`
+
+  Both rules now find an imported file by its real path. Before, an import through a folder link, such as `./link/api.ts` with `src/low/link` linked to `../high`, or through a source-file link, reached a higher layer or an owned module without a report. A path through `node_modules` keeps its package, so a bare import of a linked workspace package still matches its package name and stays outside every layer map. A project below a linked folder, such as `/tmp` on macOS, gets the same reports.
+
+- [#910](https://github.com/adelrodriguez/adamantite/pull/910) [`eb93dd7`](https://github.com/adelrodriguez/adamantite/commit/eb93dd728fd0119893b6105957a50d15784d99c8) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Drop the checkout token and keep expressions out of the run script in the generated GitHub Actions workflow
+
+  The workflow that `init` and `update` write now sets `persist-credentials: false` on `actions/checkout`, so the job token no longer stays in `.git/config` for the later steps. The run step reads the matrix command from a `COMMAND` environment variable instead of expanding `${{ matrix.command }}` into the shell script. zizmor 1.32.0 now reports no `artipacked` or `template-injection` finding for any package manager. `update` replaces a workflow that the project has not changed. A workflow that the project changed stays as it is.
+
 ## 0.47.0
 
 ### Minor Changes

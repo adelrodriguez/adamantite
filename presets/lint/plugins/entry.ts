@@ -1,16 +1,7 @@
-// The first-party plugins, by rule namespace. Each one is the folder with that name beside this
-// module, and its `index.ts` registers the rules under the same name. The fixture folder of a
-// plugin has that name too. In a plugin folder, `rules/` holds one module for each rule, and
-// `shared/` holds the helpers that only this plugin uses. The `shared/` folder beside this module
-// holds the helpers that more than one plugin uses, and a helper moves there only when a second
-// plugin needs it.
 export const FIRST_PARTY_PLUGINS = ["adamantite", "quality", "quality-effect", "testing"] as const
 
 export type FirstPartyPlugin = (typeof FIRST_PARTY_PLUGINS)[number]
 
-/**
- * A `jsPlugins` entry of an Oxlint config.
- */
 interface PluginEntry {
   readonly name: FirstPartyPlugin
   readonly specifier: string
@@ -21,11 +12,6 @@ interface PluginEntry {
 // source tree, where Node.js strips the types.
 const EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 
-/**
- * Return the `jsPlugins` entry of a first-party plugin. Oxlint loads the plugin by file URL from
- * this package, so target projects install nothing extra. This module imports no plugin code, so a
- * preset loads no rule module.
- */
 export function firstPartyPlugin(name: FirstPartyPlugin): PluginEntry {
   return { name, specifier: new URL(`${name}/index.${EXTENSION}`, import.meta.url).href }
 }

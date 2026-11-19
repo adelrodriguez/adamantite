@@ -1,18 +1,9 @@
 import type { Rule, Visitor } from "@oxlint/plugins"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports only types from packages.
-
-/**
- * A comment that turns off lint rules: `oxlint-disable`, `eslint-disable`, and their `-line` and
- * `-next-line` forms. An `-enable` comment turns rules back on, so it needs no reason.
- */
 const SUPPRESSION = /^\s*(?:eslint|oxlint)-disable(?:-line|-next-line)?(?=\s|$)/u
 
-/**
- * The reason follows two or more dashes with white space on both sides, as ESLint and Oxlint parse
- * a directive description.
- */
+// ESLint and Oxlint read the description of a directive after two or more dashes with white
+// space on both sides.
 const REASON = /\s-{2,}\s(.*)$/su
 
 const rule: Rule = {

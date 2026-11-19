@@ -2,9 +2,6 @@ import type { Rule } from "@oxlint/plugins"
 
 import { matchReflectMethodCall } from "../shared/reflect-method.ts"
 
-/**
- * Ban Reflect.apply, which bypasses ordinary typed function calls.
- */
 const rule: Rule = {
   createOnce(context) {
     return {

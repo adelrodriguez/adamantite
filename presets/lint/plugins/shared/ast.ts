@@ -1,26 +1,13 @@
 import type { ESTree } from "@oxlint/plugins"
 
-// AST helpers that the adamantite plugin and both quality plugins share. Rule code runs under the
-// runtime that executes Oxlint in the target project, so this module imports only types.
-
-/**
- * Return whether a node is a string literal, such as `"get"` in `Reflect["get"]`.
- */
 export function isStringLiteral(node: ESTree.Node): node is ESTree.StringLiteral {
   return node.type === "Literal" && typeof node.value === "string"
 }
 
-/**
- * Return whether a node is a number literal, such as `2` in `acc.slice(-2)`.
- */
 export function isNumberLiteral(node: ESTree.Node): node is ESTree.NumericLiteral {
   return node.type === "Literal" && typeof node.value === "number"
 }
 
-/**
- * Return the expression inside wrappers that only change its syntax or its type, such as `vi.fn()`
- * in `(vi.fn() as Mock)` or `60_000` in `60_000 as const`.
- */
 export function unwrapExpression(expression: ESTree.Node): ESTree.Node {
   let node = expression
 
@@ -38,12 +25,6 @@ export function unwrapExpression(expression: ESTree.Node): ESTree.Node {
   return node
 }
 
-/**
- * Return the string that an expression spells without computing it, such as `./api.ts` in
- * `"./api.ts"`, `` `./api.ts` ``, or `("./api.ts" as const)!`. A type assertion does not change the
- * value, so the string inside one counts. Return null when running the code gives the value, as for
- * a variable, a concatenation, or a template with an expression.
- */
 export function staticString(node: ESTree.Expression): string | null {
   switch (node.type) {
     case "Literal":
@@ -63,11 +44,6 @@ export function staticString(node: ESTree.Expression): string | null {
   }
 }
 
-/**
- * Return the name that a property key spells without computing it, such as `get` in `Reflect.get`,
- * `Reflect["get"]`, ``Reflect[`get`]``, or `const { get } = Reflect`, and `"0"` in `{ 0: value }`
- * or `{ [0]: value }`. Return null when an expression gives the name.
- */
 export function staticKeyName(key: ESTree.Node, computed: boolean): string | null {
   if (!computed && key.type === "Identifier") {
     return key.name
@@ -88,9 +64,6 @@ export function staticKeyName(key: ESTree.Node, computed: boolean): string | nul
   return null
 }
 
-/**
- * The child-node properties of each node type, as `context.sourceCode.visitorKeys` lists them.
- */
 export type VisitorKeys = Readonly<Record<string, readonly string[]>>
 
 function isNode(value: unknown): value is ESTree.Node {
@@ -99,18 +72,14 @@ function isNode(value: unknown): value is ESTree.Node {
   )
 }
 
-/**
- * Return the child nodes of a node, in the order of its visitor keys. Oxlint builds each node as a
- * plain object with own enumerable fields. If a later Oxlint version changes that, the function
- * throws, because it would otherwise find no child nodes and the rules that use it would stop
- * without an error.
- */
 export function childNodes(
   node: Pick<ESTree.Node, "type">,
   visitorKeys: VisitorKeys
 ): readonly ESTree.Node[] {
   const fields = new Map(Object.entries(node))
 
+  // Oxlint builds each node as a plain object with own enumerable fields. Without this guard, a
+  // later version that does not would leave the rules without child nodes, and without an error.
   if (!fields.has("type")) {
     throw new Error("Child node invariant: AST node fields are not own enumerable properties")
   }

@@ -12,55 +12,17 @@ import {
 } from "../shared/imports.ts"
 import { identifyPath, type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
-
-/**
- * One import and its owners: one option object of the rule.
- */
 export interface ImportOwner {
-  /**
-   * The path of the option object in the rule options, such as `options[1]`, which messages name.
-   */
   readonly configPath: string
-  /**
-   * The module as the import states it, such as `giget`. It also covers the module's subpaths, such
-   * as `zod/mini` for `zod`.
-   */
   readonly import: string
-  /**
-   * How the option names the module, which sets how the rule matches an import of it.
-   */
   readonly kind: ModuleKind
-  /**
-   * The exports that the owners own. Undefined when they own the whole module.
-   */
   readonly names: ReadonlySet<string> | undefined
-  /**
-   * The owner files and folders as the option states them, which messages name.
-   */
   readonly owners: readonly string[]
-  /**
-   * A pattern for each owner that matches the owner file, or each file below the owner folder.
-   */
   readonly patterns: readonly RegExp[]
 }
 
-/**
- * How an option names its module, by the start of `import`:
- *
- * - `package`, such as `giget`: the rule matches the import as written.
- * - `alias`, such as `#lib/db`: a module of the project. The rule matches the import as written, and
- *   also any import that resolves to the module, such as a relative path. The alias resolves from
- *   the root, so the text match keeps an alias that a workspace package declares.
- * - `path`, such as `./src/lib/db` or `/src/lib/db`: a module of the project that the rule matches
- *   only by the resolved file, because the text of a relative import depends on its file.
- */
 export type ModuleKind = "alias" | "package" | "path"
 
-/**
- * Whether an import of each kind of module matches by its text, and by its resolved file.
- */
 const MODULE_MATCHES = {
   alias: { file: true, text: true },
   package: { file: false, text: true },
@@ -75,43 +37,19 @@ function readModuleKind(specifier: string): ModuleKind {
   return /^[./]/.test(specifier) ? "path" : "package"
 }
 
-/**
- * The folder that owner paths are relative to, by what makes it the root:
- *
- * - `workspace`: the nearest folder that lists workspace packages.
- * - `package`: the nearest folder that holds a `package.json`, when no workspace holds the file.
- */
 export interface Root {
   readonly kind: "package" | "workspace"
   readonly path: string
 }
 
-/**
- * How a message names each kind of root. A message does not print the path of the root, because
- * that path is different on each machine.
- */
 const ROOT_NAMES = {
   package: "package root",
   workspace: "workspace root",
 } as const satisfies Record<Root["kind"], string>
 
-/**
- * What the rule reads from the file system. The plugin reads real files, and unit tests pass fakes.
- */
 export interface Project {
-  /**
-   * The root that owner paths are relative to for `file`.
-   */
   readonly findRoot: (file: string) => Root | undefined
-  /**
-   * The path that identifies the file or folder at `path`, so the rule compares a resolved file
-   * with an owned module and the root by the same kind of path.
-   */
   readonly identify: (path: string) => string
-  /**
-   * The file that `specifier` in `importer` resolves to in `mode`, with `/` between folders, or
-   * undefined when it does not resolve.
-   */
   readonly resolve: (
     importer: string,
     specifier: string,
@@ -133,12 +71,7 @@ function normalizeOwner(owner: string) {
     .join("/")
 }
 
-/**
- * Read one import and its owners from one option object at `configPath`. Undefined when `import` or
- * `owners` is missing.
- */
 function readImportOwner(option: Options[number], configPath: string): ImportOwner | undefined {
-  // The option readers read the first option object.
   const options = [option]
   const specifier = readStringOption(options, "import")
   const owners = readStringArrayOption(options, "owners")
@@ -161,17 +94,10 @@ function readImportOwner(option: Options[number], configPath: string): ImportOwn
   }
 }
 
-/**
- * Read the rule options: one import and its owners for each option object. An object without
- * `import` or `owners` is left out.
- */
 export function readImportOwners(options: Readonly<Options>): ImportOwner[] {
   return options.flatMap((option, index) => readImportOwner(option, `options[${index}]`) ?? [])
 }
 
-/**
- * Whether `specifier` imports `module` or one of its subpaths.
- */
 export function isImportOf(module: string, specifier: string): boolean {
   return specifier === module || specifier.startsWith(`${module}/`)
 }
@@ -196,15 +122,11 @@ function hasWorkspacesField(packageJson: string) {
 
     return manifest instanceof Object && Object.hasOwn(manifest, "workspaces")
   } catch {
-    // The package manager reports a broken `package.json`.
     return false
   }
 }
 
-/**
- * Whether `dir` lists workspace packages. A `pnpm-workspace.yaml` without a `packages` key only
- * holds settings.
- */
+// A `pnpm-workspace.yaml` without a `packages` key only holds settings.
 function listsWorkspacePackages(dir: string) {
   const pnpmWorkspace = posix.join(dir, "pnpm-workspace.yaml")
 
@@ -219,10 +141,6 @@ function listsWorkspacePackages(dir: string) {
 
 const workspaces = new Map<string, string | undefined>()
 
-/**
- * The nearest folder at or above `dir` that lists workspace packages, in `pnpm-workspace.yaml` or
- * in the `workspaces` field of `package.json`.
- */
 function findWorkspace(dir: string): string | undefined {
   if (workspaces.has(dir)) {
     return workspaces.get(dir)
@@ -266,13 +184,6 @@ function findRoot(file: string): Root | undefined {
 
 const project: Project = { findRoot, identify: identifyPath, resolve: resolveImport }
 
-/**
- * The names that an alias can give the file at `path`: the path itself, the path without its
- * extension for an alias such as `"#lib/*": "./src/lib/*.ts"`, and the folder of an index file for
- * an alias that adds `/index.ts` after the name. A declaration file such as `rows.d.ts` has two
- * names without its extension: `rows.d` for an alias that adds `.ts`, and `rows` for an alias that
- * adds `.d.ts`.
- */
 function listAliasNames(path: string) {
   const bareNames = [path.replace(/\.[^./]+$/, ""), path.replace(/\.d\.[^./]+$/, "")]
 
@@ -283,23 +194,10 @@ function listAliasNames(path: string) {
   return [...new Set([path, ...bareNames, ...folders])].filter((name) => name !== ".")
 }
 
-/**
- * The rule. It needs its options from the target project, so no preset turns it on.
- */
 export function createImportOwnersRule(project: Project): Rule {
-  // Whether a project module covers a resolved path, by module, root, path, and mode. Oxlint loads
-  // the rule one time for a lint run, so the answers carry over between files.
+  // Oxlint loads the rule one time for a lint run, so the answers carry over between files.
   const coverage = new Map<string, boolean>()
 
-  /**
-   * Whether the file at `path` is the project module `entry.import`, or a file below it when the
-   * module is a folder. The module resolves from the root, as owner paths do, and in the `mode` of
-   * the import, so an alias with a `require` condition names the file that `require()` loads. A
-   * folder resolves only through a file in it, so each tail of the file's path is tried below the
-   * module, in each name that an alias can give it. The tails come from both the path and the real
-   * path, because a link can give the file a name in the module that its real path lacks. A
-   * candidate matches when it identifies the same file.
-   */
   function covers(entry: ImportOwner, root: string, path: string, mode: ResolutionMode) {
     const key = [entry.import, root, path, mode].join("\0")
     const known = coverage.get(key)
@@ -344,7 +242,6 @@ export function createImportOwnersRule(project: Project): Rule {
         return {}
       }
 
-      // The closures below keep the narrowed root.
       const projectRoot = root.path
       const relative = posix.relative(projectRoot, importer)
       const rootName = ROOT_NAMES[root.kind]
@@ -357,9 +254,6 @@ export function createImportOwnersRule(project: Project): Rule {
         return {}
       }
 
-      /**
-       * The message data that names the option of `entry` and the root of its owner paths.
-       */
       function describeEntry(entry: ImportOwner) {
         return {
           configPath: entry.configPath,
@@ -396,8 +290,6 @@ export function createImportOwnersRule(project: Project): Rule {
       const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
 
       function findRestricted(source: ModuleSource) {
-        // A project module can match only an import that resolves to a file of the project. A link
-        // cannot hide an owned module, because `covers` identifies the file and the module.
         const resolved = matchesFile
           ? project.resolve(importer, source.specifier, source.mode)
           : undefined
@@ -414,10 +306,7 @@ export function createImportOwnersRule(project: Project): Rule {
         })
       }
 
-      /**
-       * Check an import that reaches every export of the module, such as `import()`. A plain
-       * `export * from` reaches every export except the default export.
-       */
+      // A plain `export * from` reaches every export except the default export.
       function checkWhole(source: ModuleSource, withDefault = true) {
         for (const entry of findRestricted(source)) {
           if (entry.names === undefined) {
@@ -435,10 +324,8 @@ export function createImportOwnersRule(project: Project): Rule {
         }
       }
 
-      /**
-       * Check a type import, such as `import("react-native").Alert`. With a qualifier it reaches
-       * only the export that the qualifier names first.
-       */
+      // A type import with a qualifier, such as `import("react-native").Alert.Props`, reaches only
+      // the export `Alert`.
       function checkImportType(node: ESTree.TSImportType) {
         if (node.qualifier === null) {
           checkWhole(readStaticSource(node.source))
@@ -545,7 +432,6 @@ export function createImportOwnersRule(project: Project): Rule {
         name: `Only {{owners}} may import \`{{name}}\` from \`{{import}}\`. Use what the owner exports, or move this code into the owner. ${OWNERS_HINT}`,
         namespace: `This import reaches {{names}} from \`{{import}}\`, which only {{owners}} may import. Import only the names that this file needs. ${OWNERS_HINT}`,
       },
-      // Each option object is one import and its owners.
       schema: {
         items: {
           additionalProperties: false,

@@ -15,11 +15,7 @@ interface QualityEffectPlugin extends Plugin {
   }
 }
 
-/**
- * The quality-effect rules that the effect preset enables. They started as a copy of the Effect
- * rules of https://github.com/dmmulroy/anti-slop. Adamantite uses the `quality-effect` namespace.
- * See license.md.
- */
+// Started as a copy of the Effect rules of https://github.com/dmmulroy/anti-slop. See license.md.
 const plugin: QualityEffectPlugin = {
   meta: { name: "quality-effect" },
   rules: {

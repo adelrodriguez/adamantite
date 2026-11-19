@@ -2,8 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import { globToRegExp } from "#presets/lint/plugins/adamantite/shared/glob.ts"
 
-// A path segment without glob syntax. It holds the characters that a regular expression reads as
-// syntax, so the glob must escape them.
 const segment = Schema.String.check(Schema.isPattern(/^[\w$()+.^|-]{1,6}$/))
 const segments = Schema.Array(segment).check(Schema.isMaxLength(4))
 

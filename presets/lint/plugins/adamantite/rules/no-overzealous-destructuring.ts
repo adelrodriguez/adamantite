@@ -1,36 +1,20 @@
 import type { ESTree, Rule, Visitor } from "@oxlint/plugins"
 import { readPositiveIntegerOption } from "../../shared/options.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports only types from packages.
-
-/**
- * A binding pattern, or an assignment target such as `({ a } = value)`.
- */
 type Pattern =
   | ESTree.ArrayAssignmentTarget
   | ESTree.ArrayPattern
   | ESTree.ObjectAssignmentTarget
   | ESTree.ObjectPattern
 
-/**
- * `const { data: { user } } = query` nests two patterns, which stays allowed.
- */
 const DEFAULT_MAX_DEPTH = 2
 
-/**
- * Five properties cover typical component props. A rest element does not count.
- */
 const DEFAULT_MAX_PROPERTIES = 5
 
 function isPattern(node: ESTree.Node): node is Pattern {
   return node.type === "ObjectPattern" || node.type === "ArrayPattern"
 }
 
-/**
- * The pattern that directly contains `pattern`, through a property, a default value, or a rest
- * element. A root pattern, such as a declaration target or a parameter, has none.
- */
 function getParentPattern(pattern: Pattern) {
   let node: ESTree.Node = pattern.parent
 
@@ -65,10 +49,10 @@ const rule: Rule = {
       readPositiveIntegerOption(context.options, "maxProperties") ?? DEFAULT_MAX_PROPERTIES
 
     function checkDepth(node: Pattern) {
-      // Report only the first pattern past the limit, so one nested branch gives one report.
       const depth = getDepth(node)
+      const isFirstPastLimit = depth === maxDepth + 1
 
-      if (depth === maxDepth + 1) {
+      if (isFirstPastLimit) {
         context.report({
           data: { depth: String(depth), maxDepth: String(maxDepth) },
           messageId: "tooDeep",

@@ -11,12 +11,7 @@ interface TestingPlugin extends Plugin {
   }
 }
 
-/**
- * The testing rules that the strict preset enables. They started as a copy of
- * https://github.com/interfere-inc/landmines. Adamantite uses the `testing` namespace, and drops
- * the per-file allowlists of landmines: a file that needs an exception suppresses the rule with a
- * reason, as `adamantite/require-suppression-reason` asks. See license.md.
- */
+// Started as a copy of https://github.com/interfere-inc/landmines. See license.md.
 const plugin: TestingPlugin = {
   meta: { name: "testing" },
   rules: {

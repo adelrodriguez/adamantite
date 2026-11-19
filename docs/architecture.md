@@ -709,6 +709,100 @@ the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `presets/lint/plugi
 loads a first-party plugin by a file URL inside this package, and names a managed plugin, such as
 `@shadcn/lint`, by its package, which resolves in the target project.
 
+Oxlint loads a plugin by file URL from the Adamantite package, so a target project installs
+nothing more. `entry.ts` imports no plugin code, so a preset loads no rule module. Each plugin
+folder holds an `index.ts` that registers the rules, a `rules` folder with one module for each
+rule, and, when the plugin needs one, a `shared` folder with the helpers that only that plugin
+uses.
+`presets/lint/plugins/shared` holds the helpers that more than one plugin uses.
+
+`quality` started as a copy of [anti-slop](https://github.com/dmmulroy/anti-slop),
+`quality-effect` as a copy of its Effect rules, and `testing` as a copy of
+[landmines](https://github.com/interfere-inc/landmines). The `license.md` of each folder keeps the
+license of its source. `testing` drops the per-file allowlists of landmines: a file that needs an
+exception suppresses the rule with a reason, as `adamantite/require-suppression-reason` asks.
+
+`Replacement` in `presets/lint/plugins/shared/replacement.d.ts` is the type of `meta.docs.replaces`.
+Doctor counts the `overrides` entries that turn on one of `rules` and set the property that `option`
+names to a non-empty array. It warns when the count reaches `minimum`, and the warning says what the
+entries state, from `states`, and gives the `steps` that move them into the rule. Doctor names the
+replaced rule by the first name in `rules`. The type is in a declaration file, so the build ships no
+module for a type that only the rules and Doctor read.
+
+### Import resolution
+
+`adamantite/layers` and `adamantite/import-owners` resolve imports with `resolveImport` in
+`presets/lint/plugins/adamantite/shared/resolver.ts`, so both rules share its extensions,
+`tsconfig.json` paths, and default conditions. A layer map can add conditions of its own, so
+`layers` can reach another file than `import-owners` for the same import. `identifyPath` keeps a
+path through `node_modules` as it is, so a linked workspace package keeps its package. It gives
+every other path its real path, so a symlink cannot give a protected file a second path. A rule
+identifies both paths of a comparison, so a project below a linked folder, such as `/tmp` on macOS,
+compares a real path with a real path. `layers` does not check an import that does not resolve,
+because TypeScript reports it. `import-owners` matches such an import only by its text.
+
+### Layer maps
+
+`createLayersRule` in `presets/lint/plugins/adamantite/rules/layers.ts` activates each map whose
+root glob matches a folder above the linted file. `splitAtRoot` takes the shortest match, so `**`
+matches zero or more folders above the root. A nested map activates from the concrete folder that
+its parent matched, before any `ignore` of the parent. Each active map checks an import with its
+own entries, ignores, isolation, type-import setting, and conditions. Two maps with the same
+concrete root report `duplicateMap` and check nothing.
+
+A dependency, or a file outside the package, is outside every map, even below a `.` root. No layer
+imports an entry. A file of a map that is in no layer is reported, and so is each import that
+reaches it from a file in a layer of that map. In an isolated layer, a file and the folder of the
+same name, such as `routes/settings.tsx` and `routes/settings/`, are one unit.
+
+The message of a violation names the repairs. `findLowerRepairs` gives the highest layers that both
+sides import, where the code that both need can move. `findUpperRepairs` gives the lowest layers
+that import both sides, where the importing file can move. For two units of one layer, the layer
+itself does not count.
+
+### Import owners
+
+`createImportOwnersRule` in `presets/lint/plugins/adamantite/rules/import-owners.ts` reads owner
+paths from the workspace root: the nearest folder with a `pnpm-workspace.yaml` that has a `packages`
+key, or with a `package.json` that has a `workspaces` field. Outside a workspace, it reads them from
+the nearest folder with a `package.json`. A `package.json` that does not parse lists no workspace,
+because the package manager reports it. A message names the kind of root, not its path, because the
+path is different on each machine.
+
+The start of the `import` option sets how the rule matches an import:
+
+| Kind      | Example        | The rule matches                                                                                                                                                       |
+| --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package` | `giget`        | The import as written, and its subpaths.                                                                                                                               |
+| `alias`   | `#lib/db`      | The import as written, and each import that resolves to the module. The alias resolves from the root, so the text match also catches the alias of a workspace package. |
+| `path`    | `./src/lib/db` | Each import that resolves to the module, because the text of a relative import depends on the file that has it.                                                        |
+
+The module of an option resolves from the root, as owner paths do, in the resolution mode of the
+import. A folder module resolves only through a file in it, so `covers` tries each tail of the
+file's path below the module, in each name that an alias can give the file: the path, the path
+without its extension, and the folder of an index file. The tails come from the path and from the
+real path, because a link can give the file a name in the module that its real path lacks.
+
+### Scope analysis
+
+A rule that needs the scope analysis to resolve a name, such as `quality/no-widen-then-assert` and
+`quality/no-known-value-widening`, first collects the names that a report needs, so most files never
+build it. `withTypeBindings` in `presets/lint/plugins/quality/shared/type-alias-resolution.ts`
+records the type bindings of a file during Oxlint's own traversal. The first rule that uses it
+records them once for each program, and the other rules read the same bindings. It runs each
+deferred check at the end of the file, when a type declared after its use is known too.
+
+### Readable spacing
+
+`quality/require-readable-spacing` configures the vendored rule in
+`presets/lint/plugins/quality/stylistic`, which its `UPSTREAM.md` describes. `adamantite fix` runs
+lint before Oxfmt, so the rule predicts the lines that Oxfmt writes. A statement on one line that
+ends past `printWidth` counts as multiline, because Oxfmt usually wraps it. The rule cannot know
+what Oxfmt will do. If Oxfmt keeps that line, as for a long template literal, the statement only
+gets blank lines that the policy allows. The rule measures the line as written, so it can miss a
+wrap when Oxfmt makes the line longer, for example when it changes `{a:1}` to `{ a: 1 }`, indents
+the line deeper, or expands tabs.
+
 | Invariant                                                                                                                                                                                                             | Held by                                                                                                                                |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | The folder name of a plugin is its rule namespace and its `meta.name`.                                                                                                                                                | `presets/lint/plugins/__tests__/entry.test.ts`                                                                                         |
@@ -721,6 +815,11 @@ loads a first-party plugin by a file URL inside this package, and names a manage
 | A rule declares the hand-written config that it replaces in `meta.docs.replaces`, so `src/lib/integrations/oxlint/replacements.ts` names no rule.                                                                     | `src/lib/integrations/oxlint/__tests__/replacements.test.ts`                                                                           |
 | Each license notice below `presets`, outside the `__tests__` folders, ships at the same path in `dist/presets`, because some plugin rules started as copies of MIT-licensed code.                                     | `scripts/test-build.ts`                                                                                                                |
 | Each plugin file that a built lint preset loads by a file URL exists after the build.                                                                                                                                 | `scripts/test-build.ts`                                                                                                                |
+| `presets/lint/plugins/entry.ts` imports no plugin code.                                                                                                                                                               | Nothing                                                                                                                                |
+| A helper moves to `presets/lint/plugins/shared` only when a second plugin needs it.                                                                                                                                   | Nothing                                                                                                                                |
+| Each kind of layer map error has the data of its message.                                                                                                                                                             | The type checker, because the `switch` of `getMapErrorData` has no default                                                             |
+| The default `printWidth` of `quality/require-readable-spacing` is the `printWidth` of `adamantite/format`.                                                                                                            | `presets/lint/plugins/quality/__tests__/require-readable-spacing.test.ts`                                                              |
+| A safety marker of `quality/require-safety-comment-for-type-assertion` is not blank.                                                                                                                                  | The option schema of the rule                                                                                                          |
 
 ## Custom rules
 

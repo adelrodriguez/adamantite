@@ -1,9 +1,6 @@
 import type { ESTree, Rule, Visitor } from "@oxlint/plugins"
 import { findImportedCalls } from "../shared/imports.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports only types from packages.
-
 const EFFECT_HOOKS: ReadonlySet<string> = new Set([
   "useEffect",
   "useInsertionEffect",
@@ -12,11 +9,6 @@ const EFFECT_HOOKS: ReadonlySet<string> = new Set([
 
 const REACT_MODULE = "react"
 
-/**
- * Whether React runs the effect after every render: the call passes no dependency array, or passes
- * `undefined` or `null` in its place. A spread argument can hold the array, so a call with one
- * passes.
- */
 function runsAfterEveryRender(call: ESTree.CallExpression) {
   if (call.arguments.some((argument) => argument.type === "SpreadElement")) {
     return false

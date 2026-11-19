@@ -1,15 +1,8 @@
 import { realpathSync } from "node:fs"
 import { type NapiResolveOptions, ResolverFactory } from "oxc-resolver"
 
-// The import resolution that the first-party rules share, so `adamantite/layers` and
-// `adamantite/import-owners` agree on the file that an import reaches. This module runs under
-// whatever runtime executes oxlint in the target project; oxc-resolver ships Node-API bindings for
-// Node.js and Bun.
-
-/**
- * How an import loads its module, as TypeScript's `resolution-mode` names it. It selects the
- * `import` or the `require` condition of a package's `exports` and `imports`.
- */
+// TypeScript's `resolution-mode` names these modes. Each selects the `import` or the `require`
+// condition of a package's `exports` and `imports`.
 export type ResolutionMode = "import" | "require"
 
 const DEFAULT_CONDITIONS = {
@@ -18,10 +11,9 @@ const DEFAULT_CONDITIONS = {
 } as const satisfies Record<ResolutionMode, readonly string[]>
 
 // TypeScript substitutes the source and declaration extensions for a runtime extension, such as
-// `./view.tsx` for `./view.jsx`, and `tsconfig.json` `paths` resolve from the nearest config.
-// oxc-resolver does not read `customConditions`, so they come from the `conditions` argument. The
-// resolver keeps symlinked paths as they are, so a path through `node_modules` keeps its package, and
-// `identifyPath` gives the rules the real path of every other file.
+// `./view.tsx` for `./view.jsx`, and resolves `tsconfig.json` `paths` from the nearest config.
+// oxc-resolver does not read `customConditions`. `symlinks: false` keeps a path through
+// `node_modules` in its package.
 const resolverOptions = {
   extensionAlias: {
     ".cjs": [".cts", ".d.cts", ".cjs"],
@@ -36,14 +28,8 @@ const resolverOptions = {
 
 const identities = new Map<string, string>()
 
-/**
- * The path that identifies the file or folder at `path` when a rule compares two paths, with `/`
- * between folders. A path through a `node_modules` folder stays as it is, so a linked workspace
- * package keeps its package. Every other path becomes its real path, so a symlink cannot give a
- * protected file a second path. A rule identifies both paths of a comparison, so a project below a
- * linked folder, such as `/tmp` on macOS, compares a real path with a real path. Oxlint caches the
- * loaded plugin, so an editor language server needs a restart after a link changes.
- */
+// Oxlint caches the loaded plugin, so an editor language server needs a restart after a link
+// changes.
 export function identifyPath(path: string): string {
   if (path.split("/").includes("node_modules")) {
     return path
@@ -64,7 +50,7 @@ const baseResolver = new ResolverFactory({
   conditionNames: [...DEFAULT_CONDITIONS.import],
 })
 
-// One resolver for each mode and set of conditions. Clones share the cache of the base resolver.
+// Clones share the cache of the base resolver.
 const resolvers = new Map<string, ResolverFactory>()
 
 function getResolver(mode: ResolutionMode, conditions: readonly string[]) {
@@ -86,11 +72,8 @@ function getResolver(mode: ResolutionMode, conditions: readonly string[]) {
   return resolver
 }
 
-/**
- * The file that `specifier` in `importer` resolves to in `mode`, with `/` between folders, or
- * undefined when it does not resolve. Oxlint caches the loaded plugin, so an editor language server
- * needs a restart after a `package.json` or `tsconfig.json` changes.
- */
+// Oxlint caches the loaded plugin, so an editor language server needs a restart after a
+// `package.json` or a `tsconfig.json` changes.
 export function resolveImport(
   importer: string,
   specifier: string,

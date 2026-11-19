@@ -3,8 +3,6 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 import { staticKeyName } from "../../shared/ast.ts"
 import { resolveVariable } from "../../shared/scope.ts"
 
-// The functions whose callback is a test or a hook, by the name at the root of the call, such as
-// `it` in `it.effect("loads", ...)` or `test` in `test.each([1])("loads %i", ...)`.
 const testCallees: ReadonlySet<string> = new Set([
   "afterAll",
   "afterEach",
@@ -14,10 +12,10 @@ const testCallees: ReadonlySet<string> = new Set([
   "test",
 ])
 
-// The modules whose `setTimeout` returns a promise that resolves after the delay.
+// The `setTimeout` of these modules returns a promise that resolves after the delay.
 const timerModules: ReadonlySet<string> = new Set(["node:timers/promises", "timers/promises"])
 
-// The objects whose `useFakeTimers` method replaces the real timers.
+// The `useFakeTimers` method of these objects replaces the real timers.
 const fakeTimerObjects: ReadonlySet<string> = new Set(["jest", "vi"])
 
 type FunctionNode = ESTree.ArrowFunctionExpression | ESTree.Function
@@ -39,10 +37,6 @@ function isMember(node: ESTree.Node, object: string, property: string): boolean 
   )
 }
 
-/**
- * Return the identifier at the root of a call target, such as `it` in `it.effect` or `test` in
- * `test.each([1])`.
- */
 function rootName(node: ESTree.Node): string | null {
   if (node.type === "MemberExpression") {
     return rootName(node.object)
@@ -83,10 +77,6 @@ function isTestCallback(fn: FunctionNode): boolean {
   )
 }
 
-/**
- * Return the outermost `.pipe(...)` call that starts from an effect, such as the whole of
- * `Effect.gen(...).pipe(Effect.provide(layer))`, or the effect itself when no pipe follows it.
- */
 function pipedEffect(effect: ESTree.CallExpression): ESTree.CallExpression {
   let current = effect
 
@@ -107,11 +97,6 @@ function pipedEffect(effect: ESTree.CallExpression): ESTree.CallExpression {
   }
 }
 
-/**
- * Reports whether a generator is the body of an Effect test, as in `it.effect("loads", () =>
- * Effect.gen(function* () { ... }))`: the test callback returns the `Effect.gen` call of the
- * generator, also through `.pipe(...)`.
- */
 function isEffectTestBody(fn: FunctionNode): boolean {
   const gen = fn.parent
 
@@ -127,20 +112,12 @@ function isEffectTestBody(fn: FunctionNode): boolean {
   return owner !== null && isFunctionNode(owner) && isTestCallback(owner)
 }
 
-/**
- * Reports whether a node runs in the body of a test or a hook, not in a helper or a handler that
- * the body passes on.
- */
 function inTestBody(node: ESTree.Node): boolean {
   const fn = enclosingFunction(node)
 
   return fn !== null && (isTestCallback(fn) || isEffectTestBody(fn))
 }
 
-/**
- * Return the single expression that a function body runs, such as `setTimeout(resolve, 10)` in
- * `(resolve) => { setTimeout(resolve, 10) }`, or null when the body runs more than one statement.
- */
 function onlyExpression(body: ESTree.Node | null): ESTree.Node | null {
   if (body?.type !== "BlockStatement") {
     return body
@@ -161,10 +138,6 @@ function isSetTimeout(node: ESTree.Node): boolean {
   )
 }
 
-/**
- * Reports whether a promise only resolves after a delay, as in `new Promise((resolve) =>
- * setTimeout(resolve, 10))`.
- */
 function resolvesAfterTimeout(node: ESTree.NewExpression): boolean {
   const [executor] = node.arguments
 
@@ -198,19 +171,10 @@ function resolvesAfterTimeout(node: ESTree.NewExpression): boolean {
   )
 }
 
-/**
- * Ban a fixed real-time sleep in the body of a test or a hook, which guesses how long the work
- * takes.
- */
 const rule: Rule = {
   createOnce(context) {
-    // The local names of `setTimeout` that the file imports from a timer module.
     const timers = new Set<string>()
-    // The local names of a timer module that the file imports whole, such as `timers` in
-    // `import timers from "node:timers/promises"`.
     const timerModuleNames = new Set<string>()
-    // The local names of Effect's `TestClock` that the file imports, such as `Clock` in
-    // `import { TestClock as Clock } from "effect"`.
     const testClockNames = new Set<string>()
     const sleeps: ESTree.Node[] = []
     let fakeTime = false

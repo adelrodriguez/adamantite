@@ -38,9 +38,6 @@ function unwrapTypeParentheses(type: ESTree.TSType): ESTree.TSType {
   return current
 }
 
-/**
- * Return the name of a type reference, as `Record` in `Record<K, V>` or `globalThis.Record<K, V>`.
- */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
   return namedTypeReference(type)?.name ?? null
 }
@@ -220,17 +217,11 @@ function functionBoundary(node: ESTree.Node): ESTree.Node | null {
   return null
 }
 
-/**
- * Reports whether a node is inside a function boundary, or anywhere in the file when the boundary
- * is the module. A nested function sees the same value of a const binding that has no writes.
- */
+// A nested function sees the same value of a `const` binding that has no writes.
 function isInsideBoundary(node: ESTree.Node, boundary: ESTree.Node | null): boolean {
   return boundary === null || (node.start >= boundary.start && node.end <= boundary.end)
 }
 
-/**
- * Resolve an identifier reference to the variable that it reads.
- */
 type Resolve = (identifier: ESTree.IdentifierReference) => Variable | null
 
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
@@ -388,14 +379,8 @@ function assertionIsNarrower(
   return isDefinitelyNarrowerRecordType(assertedType)
 }
 
-/**
- * Detect immutable local bindings that erase a known type and are later asserted back to a narrower
- * type.
- */
 const rule: Rule = {
   createOnce(context) {
-    // The rule checks an assertion only when its identifier names a `const` binding that widens
-    // its value, so most files never build the scope analysis that resolves references.
     const candidates: Array<{
       readonly expression: ESTree.IdentifierReference
       readonly node: Assertion

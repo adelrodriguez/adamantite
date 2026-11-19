@@ -18,9 +18,6 @@ type Substitution = {
 type Substitutions = ReadonlyMap<string, Substitution>
 
 export type TypeAliasEnvironment = {
-  /**
-   * The type bindings of each name, by the scope that declares them, in source order.
-   */
   readonly bindingsByName: ReadonlyMap<string, ReadonlyMap<TypeScope, readonly TypeBinding[]>>
   readonly visitorKeys: VisitorKeys
 }
@@ -30,10 +27,6 @@ export type ResolvedTypeMatcher = (
   matches: (child: ESTree.TSType) => boolean
 ) => boolean
 
-/**
- * Run a check at the end of the file, when the environment holds every type binding of the file,
- * including the declarations after the check's node.
- */
 export type DeferCheck = (check: (environment: TypeAliasEnvironment) => void) => void
 
 type TypeBindingNode =
@@ -96,12 +89,6 @@ function recordBinding(node: TypeBindingNode, bindingsByName: BindingIndex): voi
   bindingsByName.set(name, scopes)
 }
 
-/**
- * Build a rule's visitors on the type bindings of each file. Oxlint's own traversal records the
- * bindings, so no rule walks the file again. The first rule that visits a file records them for
- * every rule that uses this function. A rule passes each check that reads the bindings to `defer`,
- * which runs it at the end of the file, when a type declared after its use is known too.
- */
 export function withTypeBindings(
   context: Context,
   createVisitors: (defer: DeferCheck) => Visitor
@@ -184,19 +171,11 @@ export function withTypeBindings(
   }
 }
 
-/**
- * The binding that a type name reads at a use: the declarations in the nearest scope that declares
- * the name, a type parameter, or nothing in the file.
- */
 type NearestTypeBinding =
   | { readonly kind: "declared"; readonly bindings: readonly TypeBinding[] }
   | { readonly kind: "none" }
   | { readonly kind: "type-parameter"; readonly parameter: LexicalTypeParameter }
 
-/**
- * The declarations of a name in the nearest scope that declares it, and the steps from the use up
- * to that scope.
- */
 type DeclaredBindings = {
   readonly bindings: readonly TypeBinding[]
   readonly distance: number
@@ -232,10 +211,7 @@ function nearestDeclaredBindings(
   return NO_DECLARED_BINDINGS
 }
 
-/**
- * Resolve a type name at a use to its nearest binding. A type parameter and a declaration hide each
- * other by scope, so the nearer one wins.
- */
+// A type parameter and a declaration hide each other by scope, so the nearer one wins.
 function nearestTypeBinding(
   name: string,
   use: ESTree.Node,
@@ -253,9 +229,6 @@ function nearestTypeBinding(
     : { kind: "none" }
 }
 
-/**
- * Resolve the nearest visible alias with this name, respecting lexical shadowing.
- */
 export function visibleTypeAlias(
   name: string,
   use: ESTree.Node,
@@ -268,10 +241,6 @@ export function visibleTypeAlias(
     : null
 }
 
-/**
- * Resolve the nearest visible interface with this name, with every declaration that merges into it.
- * Return no declarations when another kind of binding, such as an import, has the name.
- */
 export function visibleInterfaces(
   name: string,
   use: ESTree.Node,
@@ -290,10 +259,6 @@ export function visibleInterfaces(
   return interfaces.length === nearest.bindings.length ? interfaces : []
 }
 
-/**
- * Resolve the type parameter that a type name reads at a use, as `T` in `<T>(value: T)`. Return
- * null when a nearer declaration hides the parameter, or when the name reads another binder.
- */
 export function visibleTypeParameter(
   name: string,
   use: ESTree.Node,
@@ -307,9 +272,6 @@ export function visibleTypeParameter(
     : null
 }
 
-/**
- * Return whether a local declaration shadows a built-in type at this use.
- */
 export function hasVisibleTypeBinding(
   name: string,
   use: ESTree.Node,
@@ -318,13 +280,7 @@ export function hasVisibleTypeBinding(
   return nearestTypeBinding(name, use, environment).kind !== "none"
 }
 
-/**
- * A written use of a named type, in a type annotation or in a heritage clause.
- */
 export type NamedTypeReference = {
-  /**
-   * The use names the global type through `globalThis`, so no local declaration shadows it.
-   */
   readonly global: boolean
   readonly name: string
   readonly node: ESTree.Node
@@ -353,10 +309,6 @@ function globalTypeName(target: ESTree.Expression | ESTree.TSTypeName): string |
     : null
 }
 
-/**
- * Read the name and type arguments of a type use, such as `Record<K, V>`, `globalThis.Record<K,
- * V>`, or the `Record<K, V>` of `interface A extends Record<K, V>`.
- */
 export function namedTypeReference(node: TypeReferenceNode): NamedTypeReference | null {
   const target = node.type === "TSTypeReference" ? node.typeName : node.expression
   const typeArguments = node.typeArguments?.params ?? []
@@ -370,11 +322,8 @@ export function namedTypeReference(node: TypeReferenceNode): NamedTypeReference 
   return name === null ? null : { global: true, name, node, typeArguments }
 }
 
-/**
- * Bind an alias's type parameters for its body. The body sees only these parameters, because the
- * type parameters of the alias that refers to it are not in scope there. Each explicit argument
- * keeps the substitutions of the place that wrote it, and a default sees the parameters before it.
- */
+// An alias body sees only its own type parameters. An explicit argument keeps the
+// substitutions of the place that wrote it, and a default sees the parameters before it.
 function aliasSubstitutions(
   alias: ESTree.TSTypeAliasDeclaration,
   reference: ESTree.TSTypeReference,
@@ -402,9 +351,6 @@ function aliasSubstitutions(
   return next
 }
 
-/**
- * Match a type after resolving visible aliases and substituting their type parameters.
- */
 export function resolvedTypeMatches(
   type: ESTree.TSType,
   environment: TypeAliasEnvironment,

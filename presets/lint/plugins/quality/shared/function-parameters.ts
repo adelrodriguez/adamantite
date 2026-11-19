@@ -2,9 +2,6 @@ import type { ESTree, SourceCode } from "@oxlint/plugins"
 
 export type FunctionParameter = ESTree.ParamPattern
 
-/**
- * Return the TypeScript annotation attached to a function parameter or its wrapped binding.
- */
 export function functionParameterTypeAnnotation(
   parameter: FunctionParameter
 ): ESTree.TSTypeAnnotation | null | undefined {
@@ -23,9 +20,6 @@ export function functionParameterTypeAnnotation(
   return parameter.typeAnnotation
 }
 
-/**
- * Return only a function parameter's local binding, excluding its annotation and default value.
- */
 export function functionParameterBindingName(
   parameter: FunctionParameter,
   sourceCode: SourceCode

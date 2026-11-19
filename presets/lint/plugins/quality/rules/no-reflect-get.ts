@@ -2,11 +2,8 @@ import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
 import { matchReflectMethodCall } from "../shared/reflect-method.ts"
 
-/**
- * Reports whether a call passes a receiver that differs from the target. Property syntax cannot
- * pass a receiver, so a Proxy `get` trap needs `Reflect.get(target, key, receiver)` to give a
- * getter the correct `this`.
- */
+// Property syntax cannot pass a receiver, so a Proxy `get` trap needs
+// `Reflect.get(target, key, receiver)` to give a getter the correct `this`.
 function hasDistinctReceiver(
   sourceCode: SourceCode,
   args: ReadonlyArray<ESTree.Expression | ESTree.SpreadElement | null>
@@ -24,9 +21,6 @@ function hasDistinctReceiver(
   return sourceCode.getText(receiver) !== sourceCode.getText(target)
 }
 
-/**
- * Ban Reflect.get, which bypasses ordinary property access and useful type evidence.
- */
 const rule: Rule = {
   createOnce(context) {
     return {

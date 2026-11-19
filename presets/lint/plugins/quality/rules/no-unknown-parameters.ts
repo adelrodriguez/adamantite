@@ -31,9 +31,6 @@ function isRuntimeFunction(node: ESTree.Node): node is RuntimeFunction {
   )
 }
 
-/**
- * Return the identifier that a plain or defaulted parameter binds, or null for a pattern.
- */
 function parameterIdentifier(parameter: FunctionParameter): ESTree.BindingIdentifier | null {
   const binding = parameter.type === "AssignmentPattern" ? parameter.left : parameter
 
@@ -50,10 +47,6 @@ function isTypePredicateSubject(owner: ParameterOwner, parameterName: string): b
   )
 }
 
-/**
- * Names of functions, methods, classes, and interfaces that build or describe an error cause, such
- * as `toError`, `AppError`, and `formatCauseDetail`.
- */
 const ERROR_CAUSE_NAMES: readonly RegExp[] = [/(?:^e|E)rror$/, /(?:^c|C)ause(?![a-z])/]
 
 function isConstructor(owner: ParameterOwner): boolean {
@@ -69,9 +62,6 @@ function isConstructor(owner: ParameterOwner): boolean {
   )
 }
 
-/**
- * Return the name of the class or interface whose body holds a member.
- */
 function declaringTypeName(member: ESTree.Node): string | null {
   const body = member.parent
 
@@ -89,10 +79,6 @@ function declaringTypeName(member: ESTree.Node): string | null {
   return body.parent.id?.name ?? null
 }
 
-/**
- * Return the names that say what a function is for: its own name, the name of the variable or
- * member that holds it, and the name of the class or interface that declares that member.
- */
 function ownerNames(owner: ParameterOwner): string[] {
   const names: string[] = []
 
@@ -129,10 +115,6 @@ function ownerNames(owner: ParameterOwner): string[] {
   return names
 }
 
-/**
- * Return whether a function enriches an error with its cause: a constructor, or a function whose
- * name or class name says that it builds an error or describes a cause.
- */
 function isErrorCauseOwner(owner: ParameterOwner): boolean {
   return (
     isConstructor(owner)
@@ -140,18 +122,13 @@ function isErrorCauseOwner(owner: ParameterOwner): boolean {
   )
 }
 
-/**
- * The argument position of the rejection callback for each promise method that takes one.
- */
 const REJECTION_CALLBACK_INDEX = new Map([
   ["catch", 0],
   ["then", 1],
 ])
 
-/**
- * Return whether a function is the rejection callback of `.catch()` or `.then()`. The promise fixes
- * the type of the rejection reason, so the callback cannot accept a parsed domain type.
- */
+// The promise fixes the type of the rejection reason, so the callback cannot take a parsed
+// domain type.
 function isRejectionCallback(owner: ParameterOwner): boolean {
   const call = owner.parent
 
@@ -171,11 +148,6 @@ function isRejectionCallback(owner: ParameterOwner): boolean {
   return index !== undefined && call.arguments[index] === owner
 }
 
-/**
- * Parser names and how a call reaches them. A `method` parses its arguments, as in
- * `schema.parse(value)`. A `factory` returns a parser, as in
- * `Schema.decodeUnknownSync(User)(value)`.
- */
 const PARSERS = new Map<string, "factory" | "method">([
   ["parse", "method"],
   ["safeParse", "method"],
@@ -208,10 +180,6 @@ function isParserFactoryCall(node: ESTree.Node | null): boolean {
   return node?.type === "CallExpression" && memberParser(node.callee) === "factory"
 }
 
-/**
- * Return whether an identifier names a `const` binding that holds a parser from a factory, as in
- * `const decode = Schema.decodeUnknownSync(User)`.
- */
 function isParserConstant(callee: ESTree.IdentifierReference, sourceCode: SourceCode): boolean {
   const definition = resolveVariable(sourceCode, callee)?.defs[0]
   const declarator = definition?.node
@@ -255,10 +223,6 @@ function isStringConversion(reference: ESTree.Node): boolean {
   )
 }
 
-/**
- * Return whether a reference sits in a branch of `value instanceof Type ? narrowed : fallback`. The
- * first branch sees the narrowed type. The second branch may only convert the value with `String`.
- */
 function isInstanceofBranch(reference: ReferenceIdentifier): boolean {
   let child: ESTree.Node = reference
   let current: ESTree.Node | null = reference.parent
@@ -281,9 +245,6 @@ function isInstanceofBranch(reference: ReferenceIdentifier): boolean {
   return false
 }
 
-/**
- * Return whether a reference passes the parameter to a parser or checks it with `instanceof`.
- */
 function isParsedReference(reference: Reference, sourceCode: SourceCode): boolean {
   const identifier = reference.identifier
 
@@ -302,11 +263,6 @@ function isParsedReference(reference: Reference, sourceCode: SourceCode): boolea
   )
 }
 
-/**
- * Return whether a function is itself the parser for a parameter: every use of the parameter passes
- * it to a parser call or checks it with `instanceof`. A destructured parameter is never a parser
- * input, because destructuring reads the unknown value first.
- */
 function isParserInput(
   owner: ParameterOwner,
   parameter: FunctionParameter,
@@ -334,9 +290,6 @@ function isParserInput(
   )
 }
 
-/**
- * Disallow unknown inputs except explicitly named error-cause enrichment.
- */
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => {

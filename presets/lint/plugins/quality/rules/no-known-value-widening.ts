@@ -233,10 +233,6 @@ function hasParentAssertion(node: ESTree.Node): boolean {
   return node.parent?.type === "TSAsExpression" || node.parent?.type === "TSTypeAssertion"
 }
 
-/**
- * Return the expression that holds a function as a value, past the wrappers that `unwrapExpression`
- * removes, as `(isUser as Guard)` around `isUser`.
- */
 function outermostWrapper(expression: ESTree.Node): ESTree.Node {
   let current = expression
   let parent = current.parent
@@ -256,14 +252,8 @@ function outermostWrapper(expression: ESTree.Node): ESTree.Node {
   return current
 }
 
-/**
- * Detect sound syntactic cases where a known value is explicitly widened and loses evidence.
- */
 const rule: Rule = {
   createOnce(context) {
-    // The names that a call or an assignment must use to have a type predicate or an annotated
-    // binding as its target. Other calls and assignments never resolve their names, so most files
-    // never build the scope analysis.
     const predicateNames = new Set<string>()
     const annotatedNames = new Set<string>()
 

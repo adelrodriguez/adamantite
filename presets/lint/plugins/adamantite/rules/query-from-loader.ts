@@ -1,9 +1,6 @@
 import type { Context, ESTree, Rule, Scope, Variable, Visitor } from "@oxlint/plugins"
 import { findImportedCalls, type ImportedCall } from "../shared/imports.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports only types from packages.
-
 type MessageId = "plainObject" | "localOptions"
 
 const QUERY_MODULE = "@tanstack/react-query"
@@ -23,10 +20,6 @@ const INFINITE_QUERY_HOOKS: ReadonlySet<string> = new Set([
 
 const OPTIONS_FACTORIES: ReadonlySet<string> = new Set(["infiniteQueryOptions", "queryOptions"])
 
-/**
- * A file that calls one of these defines a route, in file-based or code-based routing. Only route
- * files have a loader that can preload a query, so the rule checks only them.
- */
 const ROUTE_FACTORIES: ReadonlySet<string> = new Set([
   "createFileRoute",
   "createLazyFileRoute",
@@ -46,10 +39,6 @@ function findVariable(context: Context, identifier: ESTree.Node & { readonly nam
   return scope?.set.get(identifier.name)
 }
 
-/**
- * The initializer of a `const` that declares `variable` with a plain identifier, such as `const
- * options = { ... }`. Destructured, `let`, and imported bindings have none.
- */
 function getConstInit(variable: Variable) {
   const [definition] = variable.defs
 
@@ -81,12 +70,7 @@ const rule: Rule = {
     const factoryCalls = new Set<ESTree.CallExpression>()
     let isRouteFile = false
 
-    /**
-     * Why `options` does not come from a shared definition, or `undefined` when it does or when the
-     * rule cannot tell. `inModule` is true when the expression sits at module scope.
-     */
     function classify(options: ESTree.Node, inModule: boolean): MessageId | undefined {
-      // `as const`, `satisfies`, and other type-only wrappers do not change where options come from.
       if (
         options.type === "TSAsExpression"
         || options.type === "TSNonNullExpression"
@@ -97,7 +81,6 @@ const rule: Rule = {
       }
 
       if (options.type === "ObjectExpression") {
-        // `{ ...userQuery(id), select }` extends shared options.
         return options.properties.some((property) => property.type === "SpreadElement")
           ? undefined
           : "plainObject"

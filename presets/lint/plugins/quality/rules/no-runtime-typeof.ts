@@ -19,10 +19,6 @@ function isRuntimeFunction(node: ESTree.Node): node is RuntimeFunction {
   )
 }
 
-/**
- * Return a function's declared return type. It comes from the function's own annotation, or from
- * the function type that annotates the variable it initializes.
- */
 function declaredReturnType(fn: RuntimeFunction): ESTree.TSType | undefined {
   if (fn.returnType) {
     return fn.returnType.typeAnnotation
@@ -39,19 +35,12 @@ function declaredReturnType(fn: RuntimeFunction): ESTree.TSType | undefined {
   return annotation?.type === "TSFunctionType" ? annotation.returnType.typeAnnotation : undefined
 }
 
-/**
- * Return whether a function is passed inline to a call, as in `values.every((item) => ...)`.
- */
 function isInlineCallback(fn: RuntimeFunction): boolean {
   const call = fn.parent
 
   return call.type === "CallExpression" && call.arguments.some((argument) => argument === fn)
 }
 
-/**
- * Return whether a node runs inside a type guard. An inline callback without its own return type
- * belongs to the function that passes it, so the search continues to that function.
- */
 function isInsideTypeGuard(node: ESTree.Node): boolean {
   let current: ESTree.Node | null = node.parent
 
@@ -74,9 +63,6 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
   return false
 }
 
-/**
- * Return whether typeof safely probes for the existence of a possibly absent binding.
- */
 function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
   const parent = node.parent
 
@@ -95,11 +81,9 @@ function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
 
 type BindingName = Definition["name"]
 
-/**
- * Return the identifier at the root of a `typeof` operand, as `options` in `options.headers` or
- * `options!.headers`. A non-null assertion keeps the owned type of the root. An `as` or `satisfies`
- * expression can change the type, so the search stops there.
- */
+// A non-null assertion only removes `null` and `undefined` from the type of its operand, so an
+// owned type stays owned. An `as` expression can replace the type, and `satisfies` gives its
+// operand a contextual type, so the walk stops at both.
 function operandRoot(argument: ESTree.Expression): ESTree.IdentifierReference | null {
   let current = argument
 
@@ -122,17 +106,11 @@ function bindingName(
   return resolveVariable(sourceCode, identifier)?.defs[0]?.name ?? null
 }
 
-/**
- * Return the annotation written on a binding. A parameter with a default value keeps its annotation
- * on the binding.
- */
+// A parameter with a default value keeps its annotation on the binding.
 function ownAnnotation(name: BindingName): ESTree.TSType | null {
   return name.typeAnnotation?.typeAnnotation ?? null
 }
 
-/**
- * Return the object pattern that destructures a binding, as in `const { headers } = options`.
- */
 function destructuringPattern(
   name: BindingName
 ): ESTree.ObjectAssignmentTarget | ESTree.ObjectPattern | null {
@@ -148,11 +126,6 @@ function destructuringPattern(
   return property.parent.type === "ObjectPattern" ? property.parent : null
 }
 
-/**
- * Return the annotation that declares a binding. A binding destructured from an object takes the
- * annotation of its pattern, or of the binding at the root of the value that the pattern reads, one
- * step away, as `options` in `const { headers } = options!` or `options.transport`.
- */
 function declaredType(
   identifier: ESTree.IdentifierReference,
   sourceCode: SourceCode
@@ -185,11 +158,6 @@ function declaredType(
   return source === null ? null : ownAnnotation(source)
 }
 
-/**
- * Return the type parameter that a type reference names, as `T` in `<T>(value: T)`, or null when
- * the reference names another type. A nearer type declaration with the same name hides the
- * parameter.
- */
 function referencedTypeParameter(
   type: ESTree.TSTypeReference,
   environment: TypeAliasEnvironment
@@ -199,22 +167,10 @@ function referencedTypeParameter(
     : visibleTypeParameter(type.typeName.name, type, environment)
 }
 
-/**
- * Return whether a declared type may hold any value, because it is a type parameter with no
- * constraint, or with a constraint that has `unknown` or `any`, as in `<T>(value: T)`. A union
- * matches when one of its members matches. The check resolves local aliases, as in `type Same<X> =
- * X` with `value: Same<T>`.
- */
-/**
- * Built-in types that hold every value of their type argument, apart from `null` and `undefined`,
- * so `NonNullable<T>` holds any value of an unconstrained `T`.
- */
+// These built-ins hold every value of their type argument, apart from `null` and `undefined`,
+// so `NonNullable<T>` holds any value of an unconstrained `T`.
 const PASS_THROUGH_TYPES: ReadonlySet<string> = new Set(["Awaited", "NoInfer", "NonNullable"])
 
-/**
- * Return whether an intersection member leaves the other members as they are, as `{}` and `object`
- * do for an unconstrained `T`. Local aliases resolve to their bodies.
- */
 function addsNothing(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
   return resolvedTypeMatches(type, environment, (resolved, matches) => {
     if (resolved.type === "TSParenthesizedType") {
@@ -277,12 +233,6 @@ function isUncheckedTypeParameter(
   })
 }
 
-/**
- * Return whether a `typeof` operand reads a binding with a declared type that has no `unknown` or
- * `any`, and that is not a type parameter that may hold any value. Such a value is already parsed,
- * so `typeof` only picks a member of an owned union. Local aliases resolve to their bodies. An
- * imported alias has no body in the file, so it counts as owned.
- */
 function hasOwnedType(
   argument: ESTree.Expression,
   sourceCode: SourceCode,
@@ -298,9 +248,6 @@ function hasOwnedType(
   )
 }
 
-/**
- * Disallow runtime typeof checks that narrow unparsed values instead of decoding them.
- */
 const rule: Rule = {
   createOnce(context) {
     return withTypeBindings(context, (defer) => ({

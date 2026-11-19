@@ -3,9 +3,6 @@ import { readStringArrayOption } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
 import { findImportedCalls } from "../shared/imports.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports only types from packages.
-
 type MessageId = "banned" | "effect" | "externalStore" | "localState" | "memoization"
 
 const HOOK_MESSAGES: ReadonlyMap<string, MessageId> = new Map([
@@ -20,11 +17,6 @@ const HOOK_MESSAGES: ReadonlyMap<string, MessageId> = new Map([
 
 const DEFAULT_HOOKS: readonly string[] = [...HOOK_MESSAGES.keys()]
 
-/**
- * Modules where hooks are permitted: hook modules such as `use-cart.ts` or `hooks.ts`, and
- * everything under a `hooks` directory. Everything else is feature code. Each file name is
- * kebab-case, which core's `unicorn/filename-case` accepts. So `useCart.ts` is feature code.
- */
 const DEFAULT_ALLOW: readonly string[] = ["**/use-*.{ts,tsx}", "**/hooks.{ts,tsx}", "**/hooks/**"]
 
 const REACT_MODULE = "react"
@@ -33,10 +25,6 @@ function toPosixPath(path: string) {
   return path.replaceAll("\\", "/")
 }
 
-/**
- * The path that `allow` globs match: relative to the working directory when the file is inside it,
- * and absolute otherwise.
- */
 function getMatchPath(context: Context) {
   const filename = toPosixPath(context.filename)
   const cwd = toPosixPath(context.cwd).replace(/\/$/, "")

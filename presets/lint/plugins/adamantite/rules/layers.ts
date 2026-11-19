@@ -18,69 +18,24 @@ import {
 } from "../shared/imports.ts"
 import { identifyPath, type ResolutionMode, resolveImport } from "../shared/resolver.ts"
 
-// This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver, which ships
-// Node-API bindings for both.
-
-/**
- * Each layer by folder name, with the layers directly below it. Imports are transitive: a layer
- * imports the layers it lists and every layer that those import.
- */
 export type LayerMap = Readonly<Record<string, readonly string[]>>
 
-/**
- * One layer map and its settings: one option object of the rule.
- */
 export interface LayersOptions {
   readonly children: ReadonlyMap<string, LayersOptions>
   readonly configPath: string
-  /**
-   * Import conditions to match before the default ones, such as the `customConditions` of the
-   * target project's `tsconfig.json`.
-   */
   readonly conditions: readonly string[]
-  /**
-   * Composition files, by glob below the root. An entry imports any layer, and no layer imports an
-   * entry.
-   */
   readonly entries: readonly RegExp[]
-  /**
-   * Importers that the rule does not check, by glob below the root.
-   */
   readonly ignore: readonly RegExp[]
   readonly ignoreTypes: boolean
-  /**
-   * Layers whose units do not import each other.
-   */
   readonly isolate: ReadonlySet<string>
   readonly layers: LayerMap
-  /**
-   * The root glob, relative to the package folder.
-   */
   readonly root: RegExp
-  /**
-   * The declared root glob, before matching a concrete folder.
-   */
   readonly rootGlob: string
 }
 
-/**
- * What the rule reads from the file system. The plugin reads real files, and unit tests pass fakes.
- */
 export interface Modules {
-  /**
-   * The nearest folder above `file` that holds a `package.json`.
-   */
   readonly findPackage: (file: string) => string | undefined
-  /**
-   * The path that identifies the file or folder at `path`, so the rule compares a resolved file
-   * with a layer root by the same kind of path.
-   */
   readonly identify: (path: string) => string
-  /**
-   * The file that `specifier` in `importer` resolves to in `mode`, or undefined when it does not
-   * resolve.
-   */
   readonly resolve: (
     importer: string,
     specifier: string,
@@ -89,9 +44,6 @@ export interface Modules {
   ) => string | undefined
 }
 
-/**
- * Where a file sits below the root.
- */
 export type Location =
   | { readonly kind: "entry"; readonly path: string }
   | { readonly kind: "layer"; readonly layer: string; readonly unit: string | undefined }
@@ -102,9 +54,6 @@ type LayerLocation = Extract<Location, { kind: "layer" }>
 
 type UnmappedLocation = Extract<Location, { kind: "unmappedFile" | "unmappedFolder" }>
 
-/**
- * The rule that an import from one layer to another breaks.
- */
 type Violation = "isolated" | "sibling" | "upward"
 
 export type MapError =
@@ -119,9 +68,6 @@ function toPosixPath(path: string) {
   return path.replaceAll("\\", "/")
 }
 
-/**
- * Read one layer map from one option object. Undefined when `root` or `layers` is missing.
- */
 function readLayerMap(
   option: Options[number],
   root: string | undefined,
@@ -173,10 +119,6 @@ function readLayerMap(
   }
 }
 
-/**
- * Read the rule options: one layer map for each option object. A map without `root` or `layers` is
- * left out.
- */
 export function readLayersOptions(options: Readonly<Options>): LayersOptions[] {
   return options.flatMap(
     (option, index) =>
@@ -184,9 +126,6 @@ export function readLayersOptions(options: Readonly<Options>): LayersOptions[] {
   )
 }
 
-/**
- * Find the layers that `name` imports, including itself.
- */
 export function listImportable(layers: LayerMap, name: string): ReadonlySet<string> {
   const importable = new Set<string>()
   const pending = [name]
@@ -239,9 +178,6 @@ function findCycle(layers: LayerMap): readonly string[] | undefined {
   return undefined
 }
 
-/**
- * Find the mistakes in a layer map: a name that is not a layer, and a cycle.
- */
 export function findMapErrors(layers: LayerMap, isolate: ReadonlySet<string>): MapError[] {
   const errors: MapError[] = []
 
@@ -268,17 +204,12 @@ export function findMapErrors(layers: LayerMap, isolate: ReadonlySet<string>): M
   return errors
 }
 
-/**
- * Split a path relative to the package folder at the root. Undefined when the path is not below the
- * root.
- */
 export function splitAtRoot(
   root: RegExp,
   relative: string
 ): { readonly below: readonly string[]; readonly root: string } | undefined {
   const segments = relative.split("/")
 
-  // The shortest match, so `**` matches zero or more folders above the root.
   for (let length = 0; length < segments.length; length += 1) {
     const folder = segments.slice(0, length).join("/")
 
@@ -293,7 +224,6 @@ export function splitAtRoot(
 function getUnit(inside: readonly string[]) {
   const [first = ""] = inside
 
-  // `routes/settings.tsx` and `routes/settings/` are the same unit.
   return inside.length === 1 ? first.replace(/\.[^.]+$/, "") : first
 }
 
@@ -317,9 +247,6 @@ export function locate(options: LayersOptions, root: string, below: readonly str
   return { kind: "layer", layer: top, unit: options.isolate.has(top) ? getUnit(inside) : undefined }
 }
 
-/**
- * Find the rule that an import from one layer to another breaks.
- */
 export function findViolation(
   layers: LayerMap,
   from: LayerLocation,
@@ -336,28 +263,18 @@ export function findViolation(
   return listImportable(layers, to.layer).has(from.layer) ? "upward" : "sibling"
 }
 
-/**
- * Keep the names that no other name imports: the highest layers.
- */
 function keepHighest(layers: LayerMap, names: readonly string[]) {
   return names.filter(
     (name) => !names.some((other) => other !== name && listImportable(layers, other).has(name))
   )
 }
 
-/**
- * Keep the names that import no other name: the lowest layers.
- */
 function keepLowest(layers: LayerMap, names: readonly string[]) {
   return names.filter(
     (name) => !names.some((other) => other !== name && listImportable(layers, name).has(other))
   )
 }
 
-/**
- * The highest layers that both `from` and `to` import, where code that both need can move. For two
- * units of one layer, the layer itself does not count.
- */
 export function findLowerRepairs(layers: LayerMap, from: string, to: string): string[] {
   const fromImportable = listImportable(layers, from)
   const toImportable = listImportable(layers, to)
@@ -369,10 +286,6 @@ export function findLowerRepairs(layers: LayerMap, from: string, to: string): st
   return keepHighest(layers, common)
 }
 
-/**
- * The lowest layers that import both `from` and `to`, where the importing file can move, in layer
- * map order. For two units of one layer, the layer itself does not count.
- */
 export function findUpperRepairs(layers: LayerMap, from: string, to: string): string[] {
   const candidates = Object.keys(layers).filter((name) => {
     const importable = listImportable(layers, name)
@@ -393,19 +306,12 @@ function formatList(names: readonly string[]) {
   return `${quoted.slice(0, -1).join(", ")}, or ${quoted.at(-1) ?? ""}`
 }
 
-/**
- * The words of each repair, by the rule that the import breaks.
- */
 const REPAIR_WORDS = {
   isolated: { lower: "both need", upper: "compose them in" },
   sibling: { lower: "both need", upper: "move this file up to" },
   upward: { lower: "this file needs", upper: "move this file up to" },
 } as const satisfies Record<Violation, { readonly lower: string; readonly upper: string }>
 
-/**
- * The repair sentence for a layer violation, with a leading space, or an empty string when the map
- * allows no repair.
- */
 export function describeRepairs(
   violation: Violation,
   lower: readonly string[],
@@ -481,9 +387,6 @@ function isTypeOnlyExport(node: ESTree.ExportNamedDeclaration) {
   )
 }
 
-/**
- * A linted file in a layer of one map, with what the rule needs to check its imports.
- */
 interface LintedFile {
   readonly from: LayerLocation
   readonly importer: string
@@ -493,9 +396,6 @@ interface LintedFile {
   readonly root: string
 }
 
-/**
- * A linted file that one map reports as a whole: the map has errors, or the file is in no layer.
- */
 interface ReportedFile {
   readonly errors: readonly MapError[]
   readonly from: Location
@@ -529,10 +429,6 @@ function reportUnmapped(
   }
 }
 
-/**
- * The message data of a layer map error. The switch has no default, so a new kind of error fails
- * the type check until it has its data.
- */
 function getMapErrorData(error: MapError) {
   switch (error.kind) {
     case "cycle":
@@ -562,6 +458,12 @@ function reportFile(context: Context, node: ESTree.Program, file: ReportedFile) 
   }
 }
 
+function isOutsidePackage(relative: string) {
+  return (
+    relative === ".." || relative.startsWith("../") || relative.split("/").includes("node_modules")
+  )
+}
+
 function checkImport(context: Context, file: LintedFile, source: ModuleSource, typeOnly: boolean) {
   const { from, options } = file
   const root = file.root || "."
@@ -570,7 +472,6 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
     return
   }
 
-  // An import that does not resolve is outside the map. TypeScript reports it.
   const target = file.modules.resolve(
     file.importer,
     source.specifier,
@@ -578,7 +479,6 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
     options.conditions
   )
 
-  // A link cannot move a file into another layer, because both paths are identified.
   const relative =
     target === undefined
       ? undefined
@@ -587,19 +487,12 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
           file.modules.identify(target)
         )
 
-  // A dependency, or a file outside the package, is outside the map, even below a `.` root.
-  if (
-    relative === undefined
-    || relative === ".."
-    || relative.startsWith("../")
-    || relative.split("/").includes("node_modules")
-  ) {
+  if (relative === undefined || isOutsidePackage(relative)) {
     return
   }
 
   const to = locate(options, file.root, relative.split("/"))
 
-  // No layer imports an entry, and a file in no layer is reported where it is imported.
   if (to.kind === "entry") {
     context.report({
       data: { configPath: options.configPath, from: describeLayer(from), root, to: to.path },
@@ -640,15 +533,6 @@ function checkImport(context: Context, file: LintedFile, source: ModuleSource, t
   })
 }
 
-/**
- * The rule. It needs a layer map from the target project, so no preset turns it on. It resolves
- * each import, including `#` imports and `tsconfig.json` `paths`.
- *
- * A nested map activates from the concrete folder that its parent matches, before any exemption of
- * the parent. Each active map checks an import with its own entries, ignores, isolation,
- * type-import policy, and resolver conditions. Two maps with the same concrete root fail lint. A
- * diagnostic names the concrete root and the declaration path.
- */
 export function createLayersRule(modules: Modules): Rule {
   return {
     create(context): Visitor {
@@ -697,7 +581,6 @@ export function createLayersRule(modules: Modules): Rule {
       const duplicates = [...declarations].filter(([, paths]) => paths.length > 1)
       const duplicateRoots = new Set(duplicates.map(([root]) => root))
 
-      // Physical scope discovery is independent from each map's exemptions and graph errors.
       for (const { below, options, root } of active) {
         if (
           duplicateRoots.has(root)
@@ -816,7 +699,6 @@ export function createLayersRule(modules: Modules): Rule {
         unmappedFolder: `\`{{path}}\` is in no layer. Add \`{{folder}}\` to the layer map, with the layers that it imports. ${LAYER_MAP_HINT}`,
         upward: `\`{{from}}\` cannot import \`{{to}}\`: it is a higher layer.{{repair}} ${LAYER_MAP_HINT}`,
       },
-      // Each option object is one layer map.
       schema: {
         definitions: {
           layer: {

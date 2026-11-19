@@ -8,16 +8,9 @@ import {
   type TypeAliasEnvironment,
 } from "./type-alias-resolution.ts"
 
-/**
- * Built-in types that are `unknown` when their type argument is `unknown`, as in
- * `NoInfer<unknown>`. `Readonly<unknown>` is `{}`, so `Readonly` is not here.
- */
+// `Awaited<unknown>` and `NoInfer<unknown>` are `unknown`. `Readonly<unknown>` is `{}`.
 const TRANSPARENT_TYPES: ReadonlySet<string> = new Set(["Awaited", "NoInfer"])
 
-/**
- * Built-in types that give their first type argument to the code that reads them, as in
- * `Promise<unknown>` or `AsyncIterable<unknown>`.
- */
 const CONTAINER_TYPES: ReadonlySet<string> = new Set([
   "AsyncGenerator",
   "AsyncIterable",
@@ -30,10 +23,6 @@ const CONTAINER_TYPES: ReadonlySet<string> = new Set([
 
 const NO_CONTAINER_TYPES: ReadonlySet<string> = new Set()
 
-/**
- * Return the built-in name of a type reference, as `Promise` in `Promise<T>` or
- * `globalThis.Promise<T>`, or null when a local declaration shadows the name.
- */
 export function builtInTypeName(
   type: ESTree.TSTypeReference,
   environment: TypeAliasEnvironment
@@ -83,28 +72,16 @@ function matchesUnknown(
   })
 }
 
-/**
- * Return whether a type is TypeScript's `unknown` top type, or a union that absorbs it. The check
- * resolves local aliases and sees through `Awaited` and `NoInfer`.
- */
 export function resolvesToUnknown(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
   return matchesUnknown(type, environment, NO_CONTAINER_TYPES)
 }
 
-/**
- * Return whether a type gives `unknown` to the code that reads it: the type resolves to `unknown`,
- * or it is a built-in container of `unknown`, as in `Promise<unknown>`.
- */
 export function exposesUnknown(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
   return matchesUnknown(type, environment, CONTAINER_TYPES)
 }
 
 const UNCHECKED_TYPES: ReadonlySet<string> = new Set(["TSAnyKeyword", "TSUnknownKeyword"])
 
-/**
- * Return whether `unknown` or `any` appears in a node or below it. Each type reference below the
- * node goes to `matches`, which resolves it.
- */
 function containsUncheckedType(
   node: ESTree.Node,
   visitorKeys: VisitorKeys,
@@ -120,10 +97,6 @@ function containsUncheckedType(
   )
 }
 
-/**
- * Return whether `unknown` or `any` appears anywhere in a type, as in `Record<string, unknown>`.
- * The check resolves local aliases, as in `type Data = unknown`.
- */
 export function mentionsUncheckedType(
   type: ESTree.TSType,
   environment: TypeAliasEnvironment

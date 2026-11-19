@@ -21,10 +21,6 @@ interface AdamantitePlugin extends Plugin {
   }
 }
 
-/**
- * Adamantite's first-party Oxlint plugin. Presets load it by file URL, so target projects install
- * nothing extra.
- */
 const plugin: AdamantitePlugin = {
   meta: { name: "adamantite" },
   rules: {

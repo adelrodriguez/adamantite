@@ -1,10 +1,6 @@
 import type { ESTree } from "@oxlint/plugins"
 import { childNodes, type VisitorKeys } from "../../shared/ast.ts"
 
-/**
- * A type binder in scope at a node. `distance` counts the steps from the node up to the node that
- * declares the binder, so a smaller distance is a nearer scope.
- */
 export type LexicalTypeParameter = {
   readonly declaration: ESTree.TSMappedType | ESTree.TSTypeParameter
   readonly distance: number
@@ -25,22 +21,17 @@ function collectInferTypeParameters(
   }
 }
 
-/**
- * Collect type binders that are in scope at a node and can shadow module aliases, nearest first.
- * With `outer`, collect only the binders below that ancestor, which shadow its own type
- * parameters.
- */
 export function lexicalTypeParameters(
   node: ESTree.Node,
   visitorKeys: VisitorKeys,
-  outer?: ESTree.Node
+  stopAt?: ESTree.Node
 ): readonly LexicalTypeParameter[] {
   const binders: LexicalTypeParameter[] = []
   let descendant: ESTree.Node = node
   let current: ESTree.Node = node
   let distance = 0
 
-  while (current.type !== "Program" && current !== outer) {
+  while (current.type !== "Program" && current !== stopAt) {
     if ("typeParameters" in current) {
       for (const parameter of current.typeParameters?.params ?? []) {
         binders.push({ declaration: parameter, distance, name: parameter.name.name })
@@ -71,15 +62,12 @@ export function lexicalTypeParameters(
   return binders
 }
 
-/**
- * Collect the names of the type binders that are in scope at a node. See `lexicalTypeParameters`.
- */
 export function lexicalTypeParameterNames(
   node: ESTree.Node,
   visitorKeys: VisitorKeys,
-  outer?: ESTree.Node
+  stopAt?: ESTree.Node
 ): ReadonlySet<string> {
-  return new Set(lexicalTypeParameters(node, visitorKeys, outer).map(({ name }) => name))
+  return new Set(lexicalTypeParameters(node, visitorKeys, stopAt).map(({ name }) => name))
 }
 
 function findInferTypeParameter(
@@ -102,10 +90,6 @@ function findInferTypeParameter(
   return undefined
 }
 
-/**
- * Return the nearest type binder with this name that is in scope at a node, the first match of
- * `lexicalTypeParameters`. The walk stops at that binder, and looks for no other name.
- */
 export function nearestTypeParameter(
   name: string,
   node: ESTree.Node,

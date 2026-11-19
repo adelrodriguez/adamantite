@@ -13,9 +13,6 @@ const statementLikeKinds = new Set(["AccessorProperty", "PropertyDefinition", "T
 // covers it.
 const loopHeadKinds = new Set(["ForInStatement", "ForOfStatement", "ForStatement"])
 
-/**
- * Reports whether a node is the statement that owns the comments above an assertion.
- */
 function isCommentOwner(node: ESTree.Node): boolean {
   if (node.type === "VariableDeclaration" && loopHeadKinds.has(node.parent.type)) {
     return false
@@ -32,7 +29,6 @@ function isConstAssertion(node: TypeAssertion): boolean {
   )
 }
 
-// The option schema rejects a blank marker, so every configured marker keeps text after the trim.
 function configuredSafetyMarkers(
   configured: readonly string[] = DEFAULT_SAFETY_MARKERS
 ): readonly string[] {
@@ -47,10 +43,6 @@ function markerPattern(markers: readonly string[]): RegExp {
   return new RegExp(String.raw`(?:^|[^\p{L}\p{N}_])(?:${alternation})\s*:\s*\S`, "u")
 }
 
-/**
- * Reports whether a comment before the statement ends a line of earlier code, such as `const a = 1
- * // SAFETY: ...`. That comment describes the earlier code.
- */
 function isTrailingComment(
   sourceCode: SourceCode,
   comment: ESTree.Comment,
@@ -96,9 +88,6 @@ function hasSafetyComment(sourceCode: SourceCode, node: TypeAssertion, pattern: 
   )
 }
 
-/**
- * Require every non-const type assertion to state the invariant TypeScript cannot express.
- */
 const rule: Rule = {
   createOnce(context) {
     const patterns = new Map<string, RegExp>()

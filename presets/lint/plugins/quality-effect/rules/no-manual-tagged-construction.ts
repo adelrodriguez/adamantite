@@ -3,10 +3,7 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 import { isStringLiteral, staticKeyName } from "../../shared/ast.ts"
 import { isMatchPatternObject, propertyName } from "../shared/tagged-values.ts"
 
-/**
- * Effect constructors whose input carries `_tag` as data, such as the error code of a
- * `SystemError`. An object passed to one of them already goes through its Effect constructor.
- */
+// These Effect constructors take `_tag` as data, such as the error code of a `SystemError`.
 const TAG_INPUT_CONSTRUCTORS = new Set([
   "CookiesErrorReason",
   "HeaderParseErrorReason",

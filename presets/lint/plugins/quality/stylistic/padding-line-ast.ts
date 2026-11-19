@@ -3,42 +3,24 @@ import type { ESTree, SourceCode, Token as SyntaxToken, Comment, Location } from
 
 type Token = SyntaxToken | Comment
 
-/**
- * Line terminators recognized by the upstream padding matcher.
- */
 export const LINEBREAKS: ReadonlySet<string> = new Set(["\r\n", "\r", "\n", "\u2028", "\u2029"])
 
-/**
- * Test a closing brace without treating comment text as punctuation.
- */
 export function isClosingBraceToken(token: Token): boolean {
   return token.type === "Punctuator" && token.value === "}"
 }
 
-/**
- * Test a semicolon without treating comment text as punctuation.
- */
 export function isSemicolonToken(token: Token): boolean {
   return token.type === "Punctuator" && token.value === ";"
 }
 
-/**
- * Filter the optional final semicolon when identifying block-like statements.
- */
 export function isNotSemicolonToken(token: Token): boolean {
   return !isSemicolonToken(token)
 }
 
-/**
- * Compare token/node boundaries, including attached comments.
- */
 export function isTokenOnSameLine(left: { loc: Location }, right: { loc: Location }): boolean {
   return left.loc.end.line === right.loc.start.line
 }
 
-/**
- * Recognize declarations and expressions used by the upstream IIFE matcher.
- */
 export function isFunction(node: ESTree.Node): boolean {
   return (
     node.type === "FunctionDeclaration"
@@ -81,19 +63,10 @@ export function getActualLastToken(node: ESTree.Node, sourceCode: SourceCode): T
   return isSemicolonLessStyle ? prevToken : semiToken
 }
 
-/**
- * Test whether a statement fits on one line. The statement ends at its actual last token, so the
- * semicolon-less style's semicolon on the line of the next statement does not count.
- */
 export function isSingleLine(node: ESTree.Node, sourceCode: SourceCode): boolean {
   return node.loc.start.line === getActualLastToken(node, sourceCode).loc.end.line
 }
 
-/**
- * Test whether a statement stays on one line after formatting. It must be on one line, as
- * `isSingleLine` measures it, and end at or before `printWidth`, because Oxfmt wraps a longer
- * line.
- */
 export function fitsOnOneLine(
   node: ESTree.Node,
   sourceCode: SourceCode,
@@ -104,16 +77,11 @@ export function fitsOnOneLine(
   return node.loc.start.line === end.line && end.column <= printWidth
 }
 
-/**
- * Unwrap optional chaining before checking IIFE syntax.
- */
 export function skipChainExpression(node: ESTree.Node): ESTree.Node {
   return node.type === "ChainExpression" ? node.expression : node
 }
 
-/**
- * Only a program or function-body expression can begin a directive prologue.
- */
+// Only a program or function-body expression can begin a directive prologue.
 export function isTopLevelExpressionStatement(
   node: ESTree.Node
 ): node is ESTree.ExpressionStatement {
@@ -124,9 +92,7 @@ export function isTopLevelExpressionStatement(
   )
 }
 
-/**
- * A single wrapping pair suffices to exclude a string from directive syntax.
- */
+// A single wrapping pair suffices to exclude a string from directive syntax.
 export function isParenthesized(node: ESTree.Node, sourceCode: SourceCode): boolean {
   const before = sourceCode.getTokenBefore(node)
   const after = sourceCode.getTokenAfter(node)

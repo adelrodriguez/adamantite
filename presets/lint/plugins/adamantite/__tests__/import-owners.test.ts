@@ -13,8 +13,6 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-// Every file is in the project at `/project`, and no import resolves. The fixture tests cover the
-// real workspace lookup and the resolution of project modules.
 const rule = createImportOwnersRule({
   findRoot: () => ({ kind: "workspace", path: "/project" }),
   identify: identity,
@@ -31,7 +29,6 @@ function hint(index: number) {
 
 const HINT = hint(0)
 
-// The message data that every report carries for the first option.
 const ANCHOR = { configPath: "options[0]", root: "workspace root" }
 
 const GIGET = { import: "giget", owners: ["src/lib/sources/repository/fetch.ts"] }
@@ -57,68 +54,87 @@ tester.run("import-owners", rule, {
       code: 'import { downloadTemplate } from "giget"',
       errors: [{ column: 33, line: 1, message: MODULE_MESSAGE }],
       filename: file("src/lib/references/add.ts"),
+      name: "report a static import outside the owner",
       options: [GIGET],
     },
     {
       code: 'import type { DownloadTemplateResult } from "giget"',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/references/add.ts"),
+      name: "report a type-only import outside the owner",
       options: [GIGET],
     },
     {
       code: 'export { downloadTemplate } from "giget"',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/references/index.ts"),
+      name: "report a named re-export outside the owner",
       options: [GIGET],
     },
     {
       code: 'export * from "giget"',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/references/index.ts"),
+      name: "report export star outside the owner",
       options: [GIGET],
     },
     {
       code: 'const giget = await import("giget")',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/references/add.ts"),
+      name: "report a dynamic import outside the owner",
       options: [GIGET],
     },
-    // A source that the code spells without computing it: a template with no expression, or a
-    // string inside type assertions. The report points to the whole source expression.
     ...[
-      "import(`giget`)",
-      'import("giget" as string)',
-      'import("giget" satisfies string)',
-      'import("giget"!)',
-      'import(("giget" as const)!)',
-    ].map((code) => ({
+      { code: "import(`giget`)", name: "report a template literal dynamic import" },
+      { code: 'import("giget" as string)', name: "report a dynamic import of a source under as" },
+      {
+        code: 'import("giget" satisfies string)',
+        name: "report a dynamic import of a source under satisfies",
+      },
+      { code: 'import("giget"!)', name: "report a dynamic import of a non-null source" },
+      {
+        code: 'import(("giget" as const)!)',
+        name: "report a dynamic import of a source under a const assertion and a non-null assertion",
+      },
+    ].map(({ code, name }) => ({
       code,
       errors: [{ column: 7, line: 1, message: MODULE_MESSAGE }],
       filename: file("src/lib/references/add.ts"),
+      name,
       options: [GIGET],
     })),
     {
       code: "const Native = await import(`react-native`)",
       errors: [{ messageId: "namespace" }],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a dynamic import that reaches a restricted name",
       options: [ALERT],
     },
-    // A CommonJS `require` and a TypeScript import-equals declaration reach the module too, also
-    // when they import only types.
     ...[
-      'const giget = require("giget")',
-      "const giget = require(`giget`)",
-      'import giget = require("giget")',
-      'export import giget = require("giget")',
-      'import type giget = require("giget")',
+      { code: 'const giget = require("giget")', name: "report require" },
+      { code: "const giget = require(`giget`)", name: "report require of a template literal" },
+      { code: 'import giget = require("giget")', name: "report import-equals" },
+      { code: 'export import giget = require("giget")', name: "report an exported import-equals" },
+      { code: 'import type giget = require("giget")', name: "report a type-only import-equals" },
       // A type named `require` leaves the runtime `require` in place.
-      'type require = string\nconst giget = require("giget")',
-      'interface require {}\nconst giget = require("giget")',
-      'type require = string\nfunction load() {\n  return require("giget")\n}',
-    ].map((code) => ({
+      {
+        code: 'type require = string\nconst giget = require("giget")',
+        name: "report require beside a type named require",
+      },
+      {
+        code: 'interface require {}\nconst giget = require("giget")',
+        name: "report require beside an interface named require",
+      },
+      {
+        code: 'type require = string\nfunction load() {\n  return require("giget")\n}',
+        name: "report require inside a function beside a type named require",
+      },
+    ].map(({ code, name }) => ({
       code,
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/references/add.ts"),
+      name,
       options: [GIGET],
     })),
     {
@@ -126,29 +142,31 @@ tester.run("import-owners", rule, {
       code: 'const { View } = require("react-native")',
       errors: [{ column: 25, line: 1, messageId: "namespace" }],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a destructured require that reaches a restricted name",
       options: [ALERT],
     },
     {
       code: 'import Native = require("react-native")',
       errors: [{ messageId: "namespace" }],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report an import-equals that reaches a restricted name",
       options: [ALERT],
     },
     {
       code: 'type Result = import("giget").DownloadTemplateResult',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/references/add.ts"),
+      name: "report a type import outside the owner",
       options: [GIGET],
     },
     {
-      // A file next to the owner file is not the owner.
       code: 'import { downloadTemplate } from "giget"',
       errors: [{ message: MODULE_MESSAGE }],
       filename: file("src/lib/sources/repository/fetch.test.ts"),
+      name: "report an import in a file next to the owner file",
       options: [GIGET],
     },
     {
-      // A subpath of the module belongs to the same owner.
       code: 'import * as z from "zod/mini"',
       errors: [
         {
@@ -156,13 +174,14 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/web/src/form.ts"),
+      name: "report a subpath of the module",
       options: [ZOD],
     },
     {
-      // A folder whose name starts with the owner's name is not the owner.
       code: 'import * as z from "zod"',
       errors: [{ messageId: "module" }],
       filename: file("packages/utils-extra/src/index.ts"),
+      name: "report a folder whose name starts with the owner name",
       options: [ZOD],
     },
     {
@@ -175,6 +194,7 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a restricted name beside an unrestricted name",
       options: [ALERT],
     },
     {
@@ -186,6 +206,7 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a renamed restricted name",
       options: [ALERT],
     },
     {
@@ -197,6 +218,7 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a re-export of a restricted name",
       options: [ALERT],
     },
     {
@@ -207,12 +229,14 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a namespace import that reaches a restricted name",
       options: [ALERT],
     },
     {
       code: 'export * from "react-native"',
       errors: [{ messageId: "namespace" }],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report export star that reaches a restricted name",
       options: [ALERT],
     },
     {
@@ -224,6 +248,7 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a qualified type of a restricted name",
       options: [ALERT],
     },
     {
@@ -235,12 +260,14 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a qualified type under a restricted name",
       options: [ALERT],
     },
     {
       code: 'type Native = typeof import("react-native")',
       errors: [{ messageId: "namespace" }],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a typeof import type",
       options: [ALERT],
     },
     {
@@ -248,6 +275,7 @@ tester.run("import-owners", rule, {
       code: 'export * as Native from "react-native"',
       errors: [{ messageId: "namespace" }],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a named export star that holds the default export",
       options: [{ ...ALERT, names: ["default"] }],
     },
     {
@@ -259,26 +287,27 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a default import when the owners own the default export",
       options: [{ ...ALERT, names: ["default"] }],
     },
     {
-      // Each option is checked on its own.
       code: 'import { downloadTemplate } from "giget"\nimport * as z from "zod"',
       errors: [
         { line: 1, messageId: "module" },
         { line: 2, messageId: "module" },
       ],
       filename: file("src/index.ts"),
+      name: "report each option on its own",
       options: [GIGET, ZOD],
     },
     {
       code: 'import { Alert } from "react-native"',
       errors: [{ messageId: "name" }],
       filename: file("apps/mobile/src/features/goals/components/row.tsx"),
+      name: "report each option that restricts one module with its own anchor",
       options: [ALERT],
     },
     {
-      // Each report names the option that produced it, when two options restrict one module.
       code: 'import { Alert } from "react-native"\nimport * as Native from "react-native"',
       errors: [
         {
@@ -299,6 +328,7 @@ tester.run("import-owners", rule, {
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "report a restricted name in a file that the owner glob does not match",
       options: [ALERT, { import: "react-native", owners: ["apps/mobile/src/native"] }],
     },
   ],
@@ -306,78 +336,113 @@ tester.run("import-owners", rule, {
     {
       code: 'import { downloadTemplate } from "giget"',
       filename: file("src/lib/sources/repository/fetch.ts"),
+      name: "accept an import in the owner file",
       options: [GIGET],
     },
     {
       code: "const giget = await import(`giget`)",
       filename: file("src/lib/sources/repository/fetch.ts"),
+      name: "accept a template literal dynamic import in the owner file",
       options: [GIGET],
     },
-    // A source that only running the code gives does not match a restricted module.
     ...[
-      'const name = "giget"\nconst giget = import(name)',
-      'const giget = import("gi" + "get")',
-      `const name = "get"\nconst giget = import(\`gi\${name}\`)`,
-      'const zod = import("zod", { with: { type: "giget" } })',
-    ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
-    // A local function named `require`, or a `require` property, loads no module.
+      {
+        code: 'const name = "giget"\nconst giget = import(name)',
+        name: "accept a dynamic import of a constant",
+      },
+      {
+        code: 'const giget = import("gi" + "get")',
+        name: "accept a dynamic import of a concatenation",
+      },
+      {
+        code: `const name = "get"\nconst giget = import(\`gi\${name}\`)`,
+        name: "accept a dynamic import of a template literal with an expression",
+      },
+      {
+        code: 'const zod = import("zod", { with: { type: "giget" } })',
+        name: "accept an import attribute that names the module",
+      },
+    ].map(({ code, name }) => ({
+      code,
+      filename: file("src/lib/references/add.ts"),
+      name,
+      options: [GIGET],
+    })),
     ...[
-      'function load(require: (name: string) => unknown) {\n  return require("giget")\n}',
-      'const require = (name: string) => name\nrequire("giget")',
-      'const path = require.resolve("giget")',
-    ].map((code) => ({ code, filename: file("src/lib/references/add.ts"), options: [GIGET] })),
+      {
+        code: 'function load(require: (name: string) => unknown) {\n  return require("giget")\n}',
+        name: "accept a parameter named require",
+      },
+      {
+        code: 'const require = (name: string) => name\nrequire("giget")',
+        name: "accept a local function named require",
+      },
+      { code: 'const path = require.resolve("giget")', name: "accept require.resolve" },
+    ].map(({ code, name }) => ({
+      code,
+      filename: file("src/lib/references/add.ts"),
+      name,
+      options: [GIGET],
+    })),
     {
       code: 'const giget = require("giget")\nimport fetch = require("giget")',
       filename: file("src/lib/sources/repository/fetch.ts"),
+      name: "accept require and import-equals in the owner file",
       options: [GIGET],
     },
     {
       code: 'import * as z from "zod/mini"',
       filename: file("packages/utils/src/schema/mini.ts"),
+      name: "accept a subpath import in the owner folder",
       options: [ZOD],
     },
     {
-      // An owner path can start with `./`.
       code: 'import * as z from "zod"',
       filename: file("packages/utils/src/schema/index.ts"),
+      name: "accept an owner path that starts with ./",
       options: [{ ...ZOD, owners: ["./packages/utils/"] }],
     },
     {
-      // Another package whose name starts with the module's name.
       code: 'import { Gigeto } from "gigeto"',
       filename: file("src/index.ts"),
+      name: "accept another package whose name starts with the module name",
       options: [GIGET],
     },
     {
       code: 'import { Alert } from "react-native"',
       filename: file("apps/mobile/src/shared/alerts.ts"),
+      name: "accept a restricted name in an owner file",
       options: [ALERT],
     },
     {
       code: 'import { Alert } from "react-native"',
       filename: file("apps/mobile/src/features/goals/hooks.ts"),
+      name: "accept a restricted name in an owner that a glob matches",
       options: [ALERT],
     },
     {
-      // The owners own only `Alert`.
       code: 'import Native, { Text, View } from "react-native"\nexport { Pressable } from "react-native"',
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "accept names that the owners do not own",
       options: [ALERT],
     },
     {
       code: 'import { downloadTemplate } from "giget"',
       filename: file("src/index.ts"),
+      name: "accept an import without options",
     },
     {
       // A qualified type reaches only the export that it names.
       code: 'type TextType = import("react-native").Text',
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "accept a qualified type of a name that the owners do not own",
       options: [ALERT],
     },
     {
       // `export *` does not re-export the default export.
       code: 'export * from "react-native"',
       filename: file("apps/mobile/src/app/index.tsx"),
+      name: "accept export star when the owners own the default export",
       options: [{ ...ALERT, names: ["default"] }],
     },
   ],

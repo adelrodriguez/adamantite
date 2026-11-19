@@ -13,55 +13,72 @@ const error = { messageId: "reflectApply" }
 
 tester.run("no-reflect-apply", plugin.rules["no-reflect-apply"], {
   invalid: [
-    { code: "const value = Reflect.apply(operation, owner, args);", errors: [error] },
-    { code: "const value = Reflect['apply'](operation, owner, args);", errors: [error] },
+    {
+      code: "const value = Reflect.apply(operation, owner, args);",
+      errors: [error],
+      name: "report Reflect.apply",
+    },
+    {
+      code: "const value = Reflect['apply'](operation, owner, args);",
+      errors: [error],
+      name: "report Reflect.apply through a string key",
+    },
     {
       code: "const { apply } = Reflect; const value = apply(operation, owner, args);",
       errors: [error],
-      name: "method destructured from Reflect",
+      name: "report a method destructured from Reflect",
     },
     {
       code: "const R = Reflect; const value = R.apply(operation, owner, args);",
       errors: [error],
-      name: "constant alias of Reflect",
+      name: "report a constant alias of Reflect",
     },
     {
       code: "const value = globalThis.Reflect.apply(operation, owner, args);",
       errors: [error],
-      name: "Reflect read from globalThis",
+      name: "report Reflect read from globalThis",
     },
     {
       code: "const value = Reflect.apply.call(null, operation, owner, args);",
       errors: [error],
-      name: "method called with call",
+      name: "report the method called with call",
     },
     {
       code: "const value = Reflect.apply.apply(null, [operation, owner, args]);",
       errors: [error],
-      name: "method called with apply",
+      name: "report the method called with apply",
     },
     {
       code: "const value = Reflect[`apply`](operation, owner, args);",
       errors: [error],
-      name: "template literal key",
+      name: "report Reflect.apply through a template literal key",
     },
   ],
   valid: [
-    "const value = operation.apply(owner, args);",
-    "Reflect.get(owner, key);",
+    {
+      code: "const value = operation.apply(owner, args);",
+      name: "accept Function.prototype.apply",
+    },
+    { code: "Reflect.get(owner, key);", name: "accept another Reflect method" },
     {
       code: "const value = Reflect.get.apply(null, [owner, key]);",
-      name: "apply on another Reflect method",
+      name: "accept apply on another Reflect method",
     },
     {
       code: "const { apply } = other; const value = apply(operation, owner, args);",
-      name: "method destructured from another object",
+      name: "accept a method destructured from another object",
     },
     {
       code: "function invoke(globalThis) { return globalThis.Reflect.apply(operation, owner, args); }",
-      name: "parameter that shadows globalThis",
+      name: "accept a parameter that shadows globalThis",
     },
-    "const Reflect = { apply() { return 1; } }; Reflect.apply();",
-    "function invoke(Reflect: { apply(): number }) { return Reflect.apply(); }",
+    {
+      code: "const Reflect = { apply() { return 1; } }; Reflect.apply();",
+      name: "accept a local Reflect binding",
+    },
+    {
+      code: "function invoke(Reflect: { apply(): number }) { return Reflect.apply(); }",
+      name: "accept a parameter named Reflect",
+    },
   ],
 })

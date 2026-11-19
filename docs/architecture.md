@@ -225,9 +225,10 @@ reports it.
 Without a lockfile, `update` has no selection to apply, so it offers the one finding, which names
 `adamantite init`.
 
-`harden` runs only with the Adamantite version that the project installs, because the prompt offers
-the presets and rules of that version. The Adamantite repository runs its own build, so harden
-takes the version from its root `package.json` there. After an agent session, `verify` in
+In a target project, `harden` runs only when the Adamantite version in `node_modules` is the
+running version, because the prompt offers the presets and rules of that version. The Adamantite
+repository does not install itself, so there `harden` compares the running version with the
+`version` of the root `package.json`, and does not check `node_modules`. After an agent session, `verify` in
 `src/commands/harden.ts` runs `check`, reads the project again, and assesses it. A failed command
 already printed its report, so only another failure, such as a missing tool, adds its message. A
 link that was broken before the session, or a line of the decisions record that did not decode

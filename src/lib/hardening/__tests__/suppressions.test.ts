@@ -1,7 +1,6 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import process from "node:process"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -12,17 +11,11 @@ import { toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions } from "#lib/hardening/suppressions.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
-
-const REPO_ROOT = join(import.meta.dirname, "../../../..")
+import { readTestOxlint } from "#presets/__tests__/rule-fixtures.ts"
 
 // The Oxlint package folder of the project. CI sets `ADAMANTITE_TEST_OXLINT` to run the probe with
 // the minimum Oxlint version that `peerDependencies` allows.
-const OXLINT_OVERRIDE = process.env["ADAMANTITE_TEST_OXLINT"]
-
-const TEST_OXLINT =
-  OXLINT_OVERRIDE === undefined || OXLINT_OVERRIDE === ""
-    ? join(REPO_ROOT, "node_modules/oxlint")
-    : OXLINT_OVERRIDE
+const TEST_OXLINT = readTestOxlint()
 
 // The build writes the probe beside the CLI, so a run from source loads its source.
 const TEST_LAYER = Layer.mergeAll(

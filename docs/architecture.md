@@ -114,9 +114,10 @@ failure that `assess` reports as a finding does not fail the setup. `doctor --js
 `Finding` and `PackageAction` as its schema encodes it, and `update` installs the package actions.
 
 `assessPackage` in `src/lib/integrations/tooling/base.ts` compares the version that the project
-declares for a managed package with the managed version. A version from a pnpm catalog gets a
-finding that asks for a change to the catalog, because `pnpm add` replaces the `catalog:`
-specifier, so `update` does not install it.
+declares for a managed package with the managed version. A pnpm catalog entry at another version
+gets a finding that asks for a change to the catalog, because `pnpm add` replaces the `catalog:`
+specifier, so `update` does not install it. A catalog entry that is missing or unreadable gets a
+warning.
 
 The modules that end in `.macro.ts` run at build time and inline a file into the bundle, so a
 command reads no template from disk: the workflow template of `github`, the `AGENTS.md` section and
@@ -187,12 +188,14 @@ other configs can extend it.
 
 Doctor follows the `extends` chain of the root config and of each workspace package config through
 its relative and absolute entries. A package entry that is not an Adamantite preset makes the base
-unknown, and Doctor reports neither a missing nor a mismatched preset for that config. A chain that
-names both presets uses `adamantite/typescript`. The project's own TypeScript tells whether a
-config loads the type resets, through `tsc --showConfig`, and Doctor runs it only for a config with
-`extends`. A package that is not private and declares `exports` or `types` is a library. A library
-uses `adamantite/tsconfig` whatever the selection, and gets a finding only when it loads the
-resets.
+unknown, and Doctor reports neither a missing nor a mismatched preset for that config. Doctor
+classifies a chain that names both presets, and no unknown package entry, as
+`adamantite/typescript`. The project's own TypeScript tells whether a config loads the type resets,
+through `tsc --showConfig`, and Doctor runs it only for a config with `extends`. When TypeScript is
+not installed or the command fails, Doctor treats the config as one without the resets and goes by
+its classification of the chain, which does not show the files that TypeScript loads. A package that
+is not private and declares `exports` or `types` is a library. A library uses `adamantite/tsconfig`
+whatever the selection, and gets a finding only when it loads the resets.
 
 ### Editors
 
@@ -230,21 +233,22 @@ run a script of the selection, or that hard-codes a Node.js version.
 file does not exist, and never adds the section to a file that the project wrote. Doctor reports a
 missing root `AGENTS.md` and one without the section, and checks only the root in a monorepo.
 
-`getShippedSkillFiles` in `src/lib/integrations/agents/skill.macro.ts` inlines each file of
-`skills/` at build time, so the skills that `init` and `update` write match the running build. The
-first folder of a path is the name of its skill, so a new skill is a new folder of `skills/`, and
-a folder that starts with `_` is not a skill. `detectSkillFolders` in
+`getShippedSkillFiles` in `src/lib/integrations/agents/skill.macro.ts` inlines each file inside a
+skill folder of `skills/` at build time, so the skills that `init` and `update` write match the
+running build. The first folder of a path is the name of its skill, so a new skill is a new folder
+of `skills/`, and a folder that starts with `_` is not a skill. `detectSkillFolders` in
 `src/lib/integrations/agents/skill.ts` gives the shared `.agents/skills` and each other skill folder
 whose agent folder exists, such as `.claude/skills`, and each skill goes to each of them.
 
-Doctor reports a copy that misses a shipped file, and a copy with a changed file or with a file
-that the skill does not ship. A file whose hash equals the hash in the lockfile is what Adamantite
-wrote, because Adamantite writes each file in the layout of the project's Oxfmt. `update` deletes a
-file of an earlier version that is unchanged since Adamantite wrote it, and keeps a file that the
-project added or changed, so Doctor reports that file. A `skills-lock.json` that records a shipped
-skill gets a finding, because `npx skills update` would then write the folders that Adamantite
-owns. The lock belongs to the `skills` CLI, so Adamantite does not edit it, and a lock that does
-not decode gets no finding.
+Doctor reports a copy that misses a shipped file, and a copy with a changed file or with a file that
+the skill does not ship. A file whose hash equals the hash in the lockfile is what Adamantite wrote,
+because the lockfile records the hash of the content that Setup wrote, after it formats the content
+with the project's Oxfmt when the project installs Oxfmt. `update` deletes a file of an earlier
+version that is unchanged since Adamantite wrote it, and keeps a file that the project added or
+changed, so Doctor reports that file. A `skills-lock.json` that records a shipped skill gets a
+finding, because `npx skills update` would then write the folders that Adamantite owns. The lock
+belongs to the `skills` CLI, so Adamantite does not edit it, and a lock that does not decode gets no
+finding.
 
 | Invariant                                                                                                                                                                                                                                                          | Held by                                                   |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
@@ -252,7 +256,7 @@ not decode gets no finding.
 | A command builder is not a member of `Integration`. The `command.ts` of a tool returns `CommandRunOptions` and starts no process, and the bridge and Setup import it.                                                                                              | Nothing                                                   |
 | Each plugin language is an optional peer of the installed Oxfmt, and the format preset turns on each one.                                                                                                                                                          | `src/lib/integrations/oxfmt/__tests__/languages.test.ts`  |
 | The Oxlint config that `init` writes passes the inspection of Doctor.                                                                                                                                                                                              | `src/lib/integrations/oxlint/__tests__/config.test.ts`    |
-| A chain that names both TypeScript presets uses `adamantite/typescript`.                                                                                                                                                                                           | `src/lib/integrations/typescript/__tests__/index.test.ts` |
+| Doctor classifies a chain that names both TypeScript presets, and no unknown package entry, as `adamantite/typescript`.                                                                                                                                            | `src/lib/integrations/typescript/__tests__/index.test.ts` |
 
 ## Setup and the write rule
 
@@ -465,7 +469,7 @@ plugin.
 | A config that extends `jest` or `vitest` gets their rules only in the test files, and a project override that spreads its `plugins` and `rules` gets each rule.                                                                        | `presets/__tests__/jest.test.ts` and `presets/__tests__/vitest.test.ts`                                               |
 | Each lint preset besides core is in a stack of `presets/__tests__/stacks.ts`.                                                                                                                                                          | `presets/__tests__/stacks.test.ts`                                                                                    |
 | Each `effecttsgo` rule of the `effect` preset is in a category preset of `@effect/tsgo`, and the preset decides on each rule of those presets.                                                                                         | `presets/__tests__/effect.test.ts`                                                                                    |
-| Two presets that report the same defects exclude each other, and each lists the other in `excludes`.                                                                                                                                   | `src/lib/integrations/oxlint/__tests__/presets.test.ts`                                                               |
+| A preset that lists another in `excludes` is listed in the `excludes` of that preset too.                                                                                                                                              | `src/lib/integrations/oxlint/__tests__/presets.test.ts`                                                               |
 
 ## Managed plugins
 
@@ -477,9 +481,10 @@ plugin replaces.
 `src/lib/integrations/oxlint/presets.ts` names the plugin of each preset. `oxlintPlugins` in
 `src/lib/integrations/oxlint/plugins/index.ts` collects them for the runtime, and `managedPlugins`
 in `src/lib/integrations/oxlint/plugins/managed.ts` adds the managed versions. Setup installs the
-package of a selected preset. `defineManagedPlugin` in `src/lib/integrations/oxlint/plugins/define.ts`
-builds each plugin on `definePackageTooling`, as tsrs is built, so Doctor and `update` require the
-package only while a managed script runs Oxlint and a config of the project applies the preset.
+package of a selected preset for both `init` and `update`, whether or not a config applies the
+preset. `defineManagedPlugin` in `src/lib/integrations/oxlint/plugins/define.ts` builds each plugin
+on `definePackageTooling`, as tsrs is built, so Doctor requires the package only while a managed
+script runs Oxlint and a config of the project applies the preset.
 
 A plugin has a `JavaScriptRuntime` when Oxlint loads it through the `jsPlugins` entry of its
 preset, which resolves from the target project. It has a `NativeRuntime` when its rules exist only

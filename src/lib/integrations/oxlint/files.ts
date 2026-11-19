@@ -104,6 +104,7 @@ export const listLintedFiles = Effect.fn("listLintedFiles")(function* (
   cwd: string,
   files: readonly string[] = []
 ) {
+  // Oxlint leaves out of `--debug=files` the files that an ignore pattern or `.gitignore` matches.
   const { exitCode, output, stdout } = yield* runOxlint(cwd, ["--debug=files", ...files])
 
   if (exitCode !== 0) {

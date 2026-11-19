@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
@@ -51,11 +52,18 @@ function parseChangelog(content: string) {
  * ends at the installed version, so it never names a release that the project does not run.
  */
 export const findChangelog = Effect.fn("findChangelog")(function* (root: string) {
+  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
+  const installed = yield* findInstalledPackage(root)
 
-  return Option.map(yield* findInstalledPackage(root), ({ directory }) =>
-    path.relative(root, path.join(directory, "CHANGELOG.md"))
-  )
+  if (Option.isNone(installed)) {
+    return Option.none<string>()
+  }
+
+  // The resolver returns real paths, so a project path through a symlink compares as a real path.
+  const real = yield* fs.realPath(root).pipe(Effect.orElseSucceed(() => root))
+
+  return Option.some(path.relative(real, path.join(installed.value.directory, "CHANGELOG.md")))
 })
 
 /**

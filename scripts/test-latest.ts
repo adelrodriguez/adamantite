@@ -307,13 +307,15 @@ const TestRunRead = Data.taggedEnum<TestRunRead>()
 const isRead = TestRunRead.$is("Read")
 
 function readTestRun(path: string): TestRunRead {
-  if (!existsSync(path)) {
-    return TestRunRead.Missing({ path })
-  }
+  return existsSync(path)
+    ? parseTestRun(basename(path), readFileSync(path, "utf8"))
+    : TestRunRead.Missing({ path })
+}
 
-  return Result.match(decodeLatestResults(readFileSync(path, "utf8")), {
+export function parseTestRun(file: string, text: string): TestRunRead {
+  return Result.match(decodeLatestResults(text), {
     onFailure: (error) =>
-      TestRunRead.Unreadable({ failure: toFailure(basename(path), "unreadable", [error.message]) }),
+      TestRunRead.Unreadable({ failure: toFailure(file, "unreadable", [error.message]) }),
     onSuccess: (results) =>
       TestRunRead.Read({
         run: {
@@ -400,11 +402,13 @@ function isSkipped(test: ReportedTest | undefined): boolean {
   return test?.state === "skipped" || test?.state === "pending"
 }
 
-function listSkipped(runs: readonly TestRun[]): string[] {
-  const [first, ...rest] = runs
+export function listSkipped(baseline: TestRunRead, candidate: TestRunRead): string[] {
+  if (!isRead(baseline) || !isRead(candidate)) {
+    return []
+  }
 
-  const skipped = [...(first?.tests.values() ?? [])].flatMap((test) =>
-    isSkipped(test) && rest.every((run) => isSkipped(run.tests.get(test.id))) ? [test.id] : []
+  const skipped = [...baseline.run.tests.values()].flatMap((test) =>
+    isSkipped(test) && isSkipped(candidate.run.tests.get(test.id)) ? [test.id] : []
   )
 
   return EffectArray.sort(skipped, Order.String)
@@ -444,7 +448,7 @@ interface RunResults {
   readonly updated: boolean
 }
 
-function classify(results: RunResults): Classification {
+export function classify(results: RunResults): Classification {
   const { baseline, candidate } = results
 
   if (!results.baselinePassed) {
@@ -673,7 +677,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
         os: `${type()} ${release()} ${arch()}`,
         pnpm: read("pnpm", ["--version"]).trim(),
       },
-      skipped: listSkipped([baseline, candidate].flatMap((run) => (isRead(run) ? [run.run] : []))),
+      skipped: listSkipped(baseline, candidate),
       steps,
     }
 
@@ -763,33 +767,35 @@ function publishLatest(out: string, repo: string, dryRun: boolean): void {
   console.info(dryRun ? `Dry run: gh ${args.join(" ")}` : read("gh", args).trim())
 }
 
-const { positionals, values } = parseArgs({
-  allowPositionals: true,
-  options: {
-    "dry-run": { default: false, type: "boolean" },
-    out: { type: "string" },
-    override: { default: [], multiple: true, type: "string" },
-    repo: { type: "string" },
-  },
-})
+if (import.meta.main) {
+  const { positionals, values } = parseArgs({
+    allowPositionals: true,
+    options: {
+      "dry-run": { default: false, type: "boolean" },
+      out: { type: "string" },
+      override: { default: [], multiple: true, type: "string" },
+      repo: { type: "string" },
+    },
+  })
 
-const [command] = positionals
+  const [command] = positionals
 
-if (values.out === undefined) {
-  throw new Error("Expected --out <folder>.")
-}
-
-// Absolute, because Vitest writes the results from the temporary worktree.
-const out = resolve(values.out)
-
-if (command === "run") {
-  process.exitCode = runLatest(out, values.override) === "pass" ? 0 : 1
-} else if (command === "publish") {
-  if (values.repo === undefined) {
-    throw new Error("Expected --repo <owner/name>.")
+  if (values.out === undefined) {
+    throw new Error("Expected --out <folder>.")
   }
 
-  publishLatest(out, values.repo, values["dry-run"])
-} else {
-  throw new Error(`Expected the command run or publish, not ${command ?? "nothing"}.`)
+  // Absolute, because Vitest writes the results from the temporary worktree.
+  const out = resolve(values.out)
+
+  if (command === "run") {
+    process.exitCode = runLatest(out, values.override) === "pass" ? 0 : 1
+  } else if (command === "publish") {
+    if (values.repo === undefined) {
+      throw new Error("Expected --repo <owner/name>.")
+    }
+
+    publishLatest(out, values.repo, values["dry-run"])
+  } else {
+    throw new Error(`Expected the command run or publish, not ${command ?? "nothing"}.`)
+  }
 }

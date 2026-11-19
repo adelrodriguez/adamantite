@@ -2,16 +2,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import { fillTemplate } from "#lib/shared/template.ts"
 
-// Two common names, so that slots repeat and a value can name another slot.
 const slotName = Schema.Union([
   Schema.Literals(["a", "name"]),
   Schema.String.check(Schema.isPattern(/^\w{1,8}$/)),
 ])
 
-// Text that a template holds between slots, which cannot open a slot.
 const text = Schema.String.check(Schema.isPattern(/^[^{}]*$/))
 
-// Any value, and the values that a regular expression replacement or a second pass would change.
 const value = Schema.Union([
   Schema.String,
   Schema.Literals(["$&", "$1", "$$", "{{a}}", "{{name}}"]),

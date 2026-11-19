@@ -14,24 +14,12 @@ export const CONFIG_FILES = [
   "oxlint.config.mjs",
 ]
 
-/**
- * A `custom()` call that a loaded config reaches.
- */
 interface ResolvedCall {
-  /**
-   * Absolute rules folder.
-   */
   readonly dir: string
   readonly name: string
-  /**
-   * The file that called `custom()`, or the config when the stack of the call names no file.
-   */
   readonly source: string
 }
 
-/**
- * The first config file that exists in `directory`.
- */
 const findConfigFile = Effect.fn("findConfigFile")(function* (directory: string) {
   const path = yield* Path.Path
 
@@ -44,15 +32,6 @@ const findConfigFile = Effect.fn("findConfigFile")(function* (directory: string)
   return Array.head(found)
 })
 
-/**
- * The Oxlint configs that lint the `lintedDirectories`, and the `custom()` calls that the configs
- * reach. Each config loads as Oxlint loads it, so a call in a module that the config imports, such
- * as the entry module of a shared tooling package, counts, and a call in a module that no config
- * imports does not. As in Oxlint, a directory uses the config of the innermost package that
- * contains it and has one. A config that loads is in `loadedConfigs`, and a config that does not
- * load is in `unloadedConfigs`, with the reason. Every config loads in `cwd`, the project root that
- * `adamantite check` starts Oxlint in.
- */
 export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   cwd: string,
   packageDirectories: readonly string[],
@@ -66,6 +45,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     })
   )
 
+  // As in Oxlint, a folder uses the config of the innermost package that contains it and has one.
   const nearestConfigs = new Set(
     lintedDirectories.flatMap((directory) =>
       Array.sort(
@@ -104,9 +84,6 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     loadedConfigs: loaded.flatMap(({ read }) =>
       read !== undefined && Result.isSuccess(read) ? [read.success] : []
     ),
-    /**
-     * The read of each config, by file.
-     */
     reads: new Map(
       loaded.flatMap(({ config, read }) => (read === undefined ? [] : [[config, read] as const]))
     ),

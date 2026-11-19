@@ -24,18 +24,10 @@ const testStubTemplate = getTestStubTemplate()
 
 const RULE_NAME_PATTERN = /^[a-z][\da-z]*(?:-[\da-z]+)*$/
 
-/**
- * The stub that `adamantite rule add` writes: a working rule that the author replaces.
- */
 export function toCustomRuleStub(name: string): string {
   return stubTemplate.replaceAll("{{name}}", name)
 }
 
-/**
- * Write only a rule stub. Agents verify it with temporary RuleTester cases, which run
- * `adamantite/rules/testing` from stdin or a temporary file and do not stay in the target project.
- * A relative dir resolves from cwd. An existing rule stays unchanged.
- */
 export const addCustomRule = Effect.fn("addCustomRule")(function* (
   cwd: string,
   name: string,
@@ -49,7 +41,6 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
   const directory = path.resolve(cwd, dir)
   const rulePath = path.join(directory, `${name}.ts`)
 
-  // A rule file with any rule extension, such as `no-foo.js`, already defines the rule.
   const existing = (yield* listCustomRules(cwd, dir)).filter(
     (file) => file.slice(0, -path.extname(file).length) === name
   )
@@ -66,9 +57,6 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
   return rulePath
 })
 
-/**
- * List the rules that can receive an optional test, in file-name order.
- */
 export const listCustomRules = Effect.fn("listCustomRules")(function* (
   cwd: string,
   dir: string = DEFAULT_DIRECTORY
@@ -92,10 +80,6 @@ export const listCustomRules = Effect.fn("listCustomRules")(function* (
   return Array.sort(files, Order.String)
 })
 
-/**
- * Write an optional test for an existing rule. The test defaults to a sibling `.test.ts` file; an
- * explicit target resolves from cwd. Existing tests stay unchanged.
- */
 export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
   cwd: string,
   name: string,
@@ -127,8 +111,8 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
     return yield* new CustomRuleExists({ paths: [testPath] })
   }
 
-  // Node resolves the import from the real path of the test, so the import joins the real paths. A
-  // path through a directory symlink, such as `/var` for `/private/var` on macOS, then resolves.
+  // Node.js resolves an import from the real path of the importing file, and a folder link, such as
+  // `/var` for `/private/var` on macOS, changes the path.
   yield* ensureDirectory(path.dirname(testPath))
 
   const readRealPath = (file: string) =>
@@ -150,14 +134,6 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
   return testPath
 })
 
-/**
- * The command that runs the optional rule tests of each rules folder that a `custom()` call loads,
- * with paths relative to the project root, or none when no test exists, and the configs that did
- * not load. A test is a `.test.*` file beside the rules, so a `_` file is a helper. `RuleTester`
- * runs only on Node.js, so the tests run under Node.js, also in a Bun project. A saved test is the
- * user's choice, and only `adamantite rule test` runs it: `init`, the CI workflow, and `harden` do
- * not.
- */
 export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* ({
   customRules,
 }: Project.Snapshot) {
@@ -185,6 +161,7 @@ export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(
         ? Option.none()
         : Option.some({
             args: ["--test", ...tests.map((test) => path.relative(cwd, test))],
+            // `RuleTester` runs only on Node.js.
             command: "node",
           }),
     unloadedConfigs: customRules.unloadedConfigs,

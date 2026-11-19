@@ -13,20 +13,10 @@ import * as Str from "effect/String"
 import { FailedToParseFile, type FailedToReadFile } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
-/**
- * A file that declares the Node.js version. It renders as `node-version-file`, so the workflow
- * keeps tracking the target project's declaration.
- */
 export class NodeVersionFile extends Data.TaggedClass("File")<{ readonly path: string }> {}
 
-/**
- * A Node.js version that renders as a literal `node-version` value.
- */
 export class NodeVersion extends Data.TaggedClass("Version")<{ readonly value: string }> {}
 
-/**
- * A workflow-ready Node.js version input for `actions/setup-node`.
- */
 export type NodeVersionSource = NodeVersionFile | NodeVersion
 
 const VERSION_FILES = [".node-version", ".nvmrc"] as const
@@ -52,9 +42,8 @@ function hasToolVersionsNodeEntry(content: string): boolean {
 }
 
 /**
- * Recognizes the `package.json` Node.js declarations `actions/setup-node` supports: `volta.node`, a
- * `devEngines.runtime` entry named `node`, and `engines.node`. `actions/setup-node` remains
- * responsible for interpreting the selected field.
+ * `actions/setup-node` reads these `package.json` declarations: `volta.node`, a
+ * `devEngines.runtime` entry named `node`, and `engines.node`.
  */
 function hasNodeDeclaration(packageJson: JsonValue): boolean {
   if (Schema.is(VoltaDeclaration)(packageJson)) {

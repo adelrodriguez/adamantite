@@ -19,57 +19,27 @@ export interface CommandRunOptions {
   readonly args: string[]
   readonly command: string
   readonly cwd?: string
-  /**
-   * Variables to set for the child, on top of this process's environment. A variable without a
-   * value leaves the child's environment.
-   */
+  // A variable without a value leaves the environment of the child.
   readonly env?: Readonly<Record<string, string | undefined>>
-  /**
-   * The tool that the heading names, when `command` only starts it, such as `node` for Oxlint.
-   */
   readonly name?: string
   readonly stderr?: "ignore" | "inherit"
-  /**
-   * A child with `"inherit"` reads the terminal, so it stays in this process group, where terminal
-   * signals such as SIGINT and SIGWINCH reach it. Any other child starts in a new session on POSIX,
-   * the default of the platform spawner.
-   */
   readonly stdin?: "ignore" | "inherit"
   readonly stdout?: "ignore" | "inherit"
-  /**
-   * What the command is doing, such as `"✨ Checking formatting"`. When set, `run` prints it as a
-   * heading above the command's inherited output.
-   */
   readonly title?: string
 }
 
 export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
 
-/**
- * A step of `runAll`, `runConcurrently`, or `runUntilFailure`: the effect that finds the command to
- * run, such as the Oxlint command, which resolves the Oxlint runtime of the project. A step that
- * fails prints no section, and its failure counts as the failure of its command.
- */
 type Step<E, R> = Effect.Effect<CommandRunOptions, E, R>
 
-/**
- * Bytes that a child wrote to its standard output or its standard error.
- */
 export interface OutputChunk {
   readonly bytes: Uint8Array
   readonly stream: "stderr" | "stdout"
 }
 
-/**
- * Receives the output of a child in place of the terminal.
- */
 export type OutputSink = (chunk: OutputChunk) => Effect.Effect<void>
 
 interface CommandRunnerService {
-  /**
-   * Runs the command and returns its exit code. With `output`, the streams that the options do not
-   * ignore go to `output` instead of the terminal.
-   */
   readonly exitCode: (
     options: CommandRunOptions,
     output?: OutputSink
@@ -77,25 +47,12 @@ interface CommandRunnerService {
   readonly run: (
     options: CommandRunOptions
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
-  /**
-   * Runs every step in order, even after one fails, then fails with the first failure.
-   */
   readonly runAll: <E, R>(
     steps: ReadonlyArray<Step<E, R>>
   ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R>
-  /**
-   * Starts every step at once, then fails with the first step that found no command, or else with
-   * the first failure in step order. A step that finds no command prints no section, so its failure
-   * comes first, and the CLI prints it. The output keeps the order of `runAll`: each step's heading
-   * and output print after the steps before it end, and the output of the first running step prints
-   * as it comes. Every step finds its command before any command starts.
-   */
   readonly runConcurrently: <E, R>(
     steps: ReadonlyArray<Step<E, R>>
   ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R | Stdio.Stdio>
-  /**
-   * Runs the steps in order and stops at the first failure.
-   */
   readonly runUntilFailure: <E, R>(
     steps: ReadonlyArray<Step<E, R>>
   ) => Effect.Effect<void, E | CommandFailed | CommandFailedLike, R>
@@ -148,8 +105,8 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
         const stdio = yield* Stdio.Stdio
         const { canColor } = yield* TerminalCapabilities.TerminalCapabilities
 
-        // A child writes to a pipe here, so it prints color only when told to. Oxlint and Oxfmt
-        // read `FORCE_COLOR`.
+        // A child that writes to a pipe prints color only when told to, and Oxlint and Oxfmt read
+        // `FORCE_COLOR`.
         function toColored(step: CommandRunOptions) {
           return canColor ? { ...step, env: { ...step.env, FORCE_COLOR: "1" } } : step
         }
@@ -157,8 +114,6 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
         const write = (chunk: OutputChunk) =>
           Stream.run(Stream.succeed(chunk.bytes), stdio[chunk.stream]())
 
-        // Every step finds its command before any command starts, so the commands still start
-        // together. A step that fails starts nothing and prints no section.
         const sections = yield* Effect.forEach(
           steps,
           (step) =>
@@ -184,8 +139,6 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
           { concurrency: "unbounded" }
         )
 
-        // Each section waits for the sections before it, so the output of a later step stays in
-        // its queue until its turn.
         const print = Effect.forEach(
           sections.flatMap(({ found, queue }) =>
             Result.isSuccess(found) ? [{ queue, step: found.success }] : []
@@ -222,10 +175,9 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
 
-      // Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
-      // `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
-      // Any string decodes, and the default covers a missing variable, so only a provider that
-      // cannot read its source fails. That failure is a defect.
+      // Oxlint and Oxfmt load TypeScript configs through Node.js, which warns about each typeless
+      // `package.json` that it reparses as ESM. With a default, `Config.String` fails only when the
+      // provider cannot read its source.
       const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
         Config.withDefault(""),
         Config.map((options) =>
@@ -248,6 +200,9 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
               const handle = yield* spawner.spawn(
                 ChildProcess.make(command, options.args, {
                   cwd: options.cwd,
+                  // A child that reads the terminal stays in this process group, where terminal
+                  // signals such as SIGINT and SIGWINCH reach it. On POSIX, the platform spawner
+                  // starts any other child in a new session.
                   detached: options.stdin === "inherit" ? false : undefined,
                   env: { ...options.env, NODE_OPTIONS: nodeOptions },
                   extendEnv: true,

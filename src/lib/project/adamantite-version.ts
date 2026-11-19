@@ -5,11 +5,6 @@ import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
-/**
- * The version of the Adamantite package that the project at `root` installs, or none when it
- * installs none. It resolves `adamantite/lint` as Oxlint loads the preset, so an install in a
- * parent `node_modules`, such as at the root of a monorepo, counts.
- */
 export const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (root: string) {
   const path = yield* Path.Path
   const resolver = yield* ModuleResolver

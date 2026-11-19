@@ -54,9 +54,6 @@ export class AdamantiteNotInstalled extends Data.TaggedError("AdamantiteNotInsta
   }
 }
 
-/**
- * The project declares Adamantite, but the package manager did not install it.
- */
 export class AdamantiteNotInNodeModules extends Data.TaggedError("AdamantiteNotInNodeModules")<{
   command: string
 }> {
@@ -65,9 +62,6 @@ export class AdamantiteNotInNodeModules extends Data.TaggedError("AdamantiteNotI
   }
 }
 
-/**
- * The project installs another Adamantite than the one that runs the command.
- */
 export class AdamantiteVersionMismatch extends Data.TaggedError("AdamantiteVersionMismatch")<{
   command: string
   installed: string
@@ -89,9 +83,6 @@ export class ScopeOutsideProject extends Data.TaggedError("ScopeOutsideProject")
 
 export class CliNotFound extends Data.TaggedError("CliNotFound")<{
   command: string
-  /**
-   * How to install the command. Replaces the generic install advice.
-   */
   hint?: string
 }> {
   override get message() {
@@ -102,9 +93,6 @@ export class CliNotFound extends Data.TaggedError("CliNotFound")<{
 export class CommandFailed extends Data.TaggedError("CommandFailed")<{
   command: string
   exitCode: ChildProcessSpawner.ExitCode
-  /**
-   * What the command printed, when the caller captured it instead of showing it.
-   */
   output?: string
 }> {
   override get message() {
@@ -115,9 +103,6 @@ export class CommandFailed extends Data.TaggedError("CommandFailed")<{
 }
 
 export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
-  /**
-   * The existing rule or test file.
-   */
   paths: readonly string[]
 }> {
   override get message() {
@@ -138,9 +123,6 @@ export class CustomRuleNotFound extends Data.TaggedError("CustomRuleNotFound")<{
   }
 }
 
-/**
- * The installed `@effect/tsgo` has no Effect build of the installed Oxlint or tsrs.
- */
 export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
   effectVersion: string
   supported: readonly string[]
@@ -157,10 +139,6 @@ export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
   }
 }
 
-/**
- * The installed `@effect/tsgo` has no `oxlint-bridge` module, which swaps Oxlint's binding for the
- * Effect build.
- */
 export class EffectOxlintBridgeMissing extends Data.TaggedError("EffectOxlintBridgeMissing")<{
   effectVersion: string
 }> {
@@ -169,9 +147,6 @@ export class EffectOxlintBridgeMissing extends Data.TaggedError("EffectOxlintBri
   }
 }
 
-/**
- * `@effect/tsgo` publishes no Effect build of Oxlint for this platform, such as Linux with musl.
- */
 export class EffectPlatformUnsupported extends Data.TaggedError("EffectPlatformUnsupported")<{
   platform: string
 }> {
@@ -199,9 +174,6 @@ export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDir
   }
 }
 
-/**
- * The project's Oxfmt failed to format a file that `init` or `update` was about to write.
- */
 export class FailedToFormatFile extends Data.TaggedError("FailedToFormatFile")<{
   output: string
   path: string
@@ -284,9 +256,6 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
   }
 }
 
-/**
- * The trial of `rule try` or `harden` could not copy the project to its temporary folder.
- */
 export class ProjectCopyFailed extends Data.TaggedError("ProjectCopyFailed")<{
   cause?: unknown
 }> {
@@ -304,10 +273,6 @@ export class InvalidPackageJson extends Data.TaggedError("InvalidPackageJson")<{
   }
 }
 
-/**
- * The lockfile does not decode, such as after a merge conflict. Doctor reports it as a finding, and
- * the commands that write the lockfile fail, so they do not overwrite it.
- */
 export class InvalidLockfile extends Data.TaggedError("InvalidLockfile")<{
   issue: string
   path: string
@@ -317,11 +282,6 @@ export class InvalidLockfile extends Data.TaggedError("InvalidLockfile")<{
   }
 }
 
-/**
- * An older Adamantite wrote the lockfile than the one that the project installs, so the managed
- * packages, the managed files, and the Adamantite skill are those of the older version. `update`
- * repairs it.
- */
 export class SetupOutdated extends Data.TaggedError("SetupOutdated")<{
   installed: string
   path: string
@@ -332,11 +292,6 @@ export class SetupOutdated extends Data.TaggedError("SetupOutdated")<{
   }
 }
 
-/**
- * A newer Adamantite wrote the lockfile than the one that the project installs, such as after a
- * pull that updated the dependency before an install. `update` would bring the setup back to the
- * installed version, so the repair is an install instead.
- */
 export class SetupAhead extends Data.TaggedError("SetupAhead")<{
   installed: string
   path: string
@@ -347,12 +302,6 @@ export class SetupAhead extends Data.TaggedError("SetupAhead")<{
   }
 }
 
-/**
- * The lockfile has a schema version that this Adamantite version cannot read, because a newer
- * Adamantite wrote it. `version` is the Adamantite version that the file names, when it names one.
- * Doctor reports it as a finding, and the commands that write the lockfile fail, so they do not
- * overwrite it.
- */
 export class UnsupportedLockfile extends Data.TaggedError("UnsupportedLockfile")<{
   path: string
   schemaVersion: unknown
@@ -368,11 +317,6 @@ export class UnsupportedLockfile extends Data.TaggedError("UnsupportedLockfile")
   }
 }
 
-/**
- * A parent folder of the project has an Oxlint config, so Oxlint would load the config that `init`
- * writes as a nested config, and reject its `options`. `path` is the parent config, relative to the
- * project.
- */
 export class ParentOxlintConfig extends Data.TaggedError("ParentOxlintConfig")<{
   path: string
 }> {
@@ -461,9 +405,6 @@ export class MissingPackageVersion extends Data.TaggedError("MissingPackageVersi
   }
 }
 
-/**
- * A package that Oxlint needs does not resolve from the project.
- */
 export class PackageNotInstalled extends Data.TaggedError("PackageNotInstalled")<{
   packageName: string
   project: string
@@ -473,11 +414,6 @@ export class PackageNotInstalled extends Data.TaggedError("PackageNotInstalled")
   }
 }
 
-/**
- * A tool is not installed, and no script of the lockfile selection runs it, so Setup did not
- * install it and `adamantite update` would not either. `script` is a managed script that runs the
- * tool.
- */
 export class ToolNotSelected extends Data.TaggedError("ToolNotSelected")<{
   script: string
   tool: string
@@ -495,9 +431,6 @@ export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSup
   }
 }
 
-/**
- * A case of a trial that the config that lints it ignores, so Oxlint does not lint it.
- */
 export class TrialCaseIgnored extends Data.TaggedError("TrialCaseIgnored")<{
   path: string
 }> {
@@ -526,13 +459,6 @@ export class TrialConfigNotFound extends Data.TaggedError("TrialConfigNotFound")
   }
 }
 
-/**
- * Oxlint did not lint the cases, for example because the config does not load.
- */
-/**
- * Node.js could not load a config of the target project, as the tool that reads the config would
- * not either.
- */
 export class ConfigLoadFailed extends Data.TaggedError("ConfigLoadFailed")<{
   file: string
   reason: string
@@ -542,9 +468,6 @@ export class ConfigLoadFailed extends Data.TaggedError("ConfigLoadFailed")<{
   }
 }
 
-/**
- * Oxlint could not run the probe plugin that reads the comments or the syntax tree of the files.
- */
 export class OxlintProbeFailed extends Data.TaggedError("OxlintProbeFailed")<{
   output: string
 }> {
@@ -561,9 +484,6 @@ export class TrialLintFailed extends Data.TaggedError("TrialLintFailed")<{
   }
 }
 
-/**
- * The trial copies the files that git lists, so a project that git cannot list has no trial.
- */
 export class TrialProjectUnlisted extends Data.TaggedError("TrialProjectUnlisted")<{
   cwd: string
 }> {

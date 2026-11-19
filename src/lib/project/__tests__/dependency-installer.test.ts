@@ -15,8 +15,6 @@ describe("addRootDevDependencies", () => {
       const events: string[] = []
       const files = createFileSystemTestContext({ files: { "package.json": "{}" }, root: ROOT })
 
-      // A resolution before the install cached the packages as missing. The install changes
-      // node_modules, so a later resolution must not reuse that cache.
       yield* addRootDevDependencies(["oxlint@1.0.0"]).pipe(
         Effect.provideService(Project.Directory, ROOT),
         Effect.provide([

@@ -13,7 +13,6 @@ import { ConfigLoadFailed } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
 
-// The presets load from their source, as `trial.test.ts` loads them.
 function importPreset(name: string, file: string) {
   return `import ${name} from ${JSON.stringify(join(REPO_ROOT, "presets", file))}`
 }

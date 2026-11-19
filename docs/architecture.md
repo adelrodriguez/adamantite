@@ -368,6 +368,10 @@ first with a stage that found no command, because the stages that ran already pr
 failed.
 
 - `check` runs the format stage and the lint stage at the same time, because both only read files.
+  It prints a heading above each stage only on a plain run. With `--only`, forwarded arguments, or
+  the agent report of Oxlint, the output is the tool's own, such as JSON that a script parses, and a
+  passing lint with the agent report prints nothing, so a heading would end the output with no
+  result.
 - `fix` runs the lint stage before the format stage, so `quality/require-readable-spacing` counts a
   line past the print width as multiline before Oxfmt wraps it.
 - `analyze` runs Sherif only in a monorepo. A project without a usable `package.json` has no

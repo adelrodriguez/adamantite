@@ -89,9 +89,6 @@ describe("NodeVersionResolver", () => {
     Schema.Literals(["", "  ", " # pinned"]),
   ])
 
-  // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
-  // `node` entries without a version. The `node # pinned` shapes stay inert only when comments
-  // are stripped before matching, so they keep the comment handling load-bearing.
   const inertLine = Schema.Literals([
     "",
     "# pinned tools",

@@ -110,8 +110,10 @@ export const RuleSuppressions = Schema.Struct({
 })
 
 // Prefer: the schema holds the format of a location.
+const Location = Schema.TemplateLiteral([Schema.String, ":", Schema.Int])
+
 export const RuleSuppressions = Schema.Struct({
-  locations: Schema.Array(Schema.TemplateLiteral([Schema.String, ":", Schema.Number])),
+  locations: Schema.Array(Location),
   rule: Schema.OptionFromNullOr(Schema.String),
 })
 ```

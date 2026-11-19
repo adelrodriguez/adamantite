@@ -1,13 +1,12 @@
 /// <reference path="helpers.d.ts" />
 
-// NoInfer<S> prevents contextual typing from flowing backward through S when
-// .filter(Boolean) is used inline as a function argument, which would silently
-// skip structural checks on array elements. See total-typescript/ts-reset#233.
+// `NoInfer<S>` stops contextual typing from flowing back through `S` when `.filter(Boolean)` is an
+// argument, which would skip the structural checks of the elements. See
+// https://github.com/total-typescript/ts-reset/issues/233.
 //
-// The <S extends T> generic is not needed for inference (NoInfer kills that) —
-// it exists solely to keep TypeScript's overload resolution correct so that
-// non-Boolean predicates on union arrays (e.g. string[] | number[]) fall
-// through to the built-in filter signature instead of matching this overload.
+// `S extends T` keeps TypeScript's overload resolution correct, so a predicate that is not
+// `Boolean` on a union of arrays, such as `string[] | number[]`, falls through to the built-in
+// signature.
 
 interface Array<T> {
   filter<S extends T>(

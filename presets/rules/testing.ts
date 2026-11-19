@@ -3,8 +3,8 @@ import { RuleTester } from "oxlint/plugins-dev"
 
 export { RuleTester } from "oxlint/plugins-dev"
 
-// Agents use RuleTester from stdin or a temporary file. Connect it to node:test so each case
-// reports its result and a failure sets the exit code. Keep the test runner out of rule imports.
+// Without a global `describe` and `it`, RuleTester runs each case directly and throws at the first
+// failure.
 RuleTester.describe = (text, method) => {
   void describe(text, method)
 }

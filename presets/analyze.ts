@@ -28,15 +28,14 @@ export const ignoreDependencies: SuggestedIgnoreDependencies = {
   monorepo: ["sherif"],
 }
 
-// `custom()` from `adamantite/rules` loads the rule files at lint time, so no module imports
-// them. The Oxlint plugin's `entry` adds them as entry files and keeps Knip's default entry files,
-// which a top-level `entry` replaces. Knip applies it in each workspace package. Files that start
-// with `_` are helpers, so Knip still reports one that no file imports. A rules folder at another
-// path (`custom({ dir })`) needs its own patterns.
 const config: KnipConfiguration = {
-  // The `PRESET` key of `identity.ts`, which `presets/tsconfig.json` cannot import here.
   [Symbol.for("adamantite.preset")]: { module: "adamantite/analyze" } satisfies PresetIdentity,
   ignoreExportsUsedInFile: true,
+  // `custom()` loads the rule files at lint time, so no module imports them. The `entry` of Knip's
+  // Oxlint plugin adds them and keeps Knip's default entry files, which a top-level `entry`
+  // replaces. Knip applies it in each workspace package. A file that starts with `_` is a helper, so
+  // Knip still reports one that no file imports. A rules folder at another path, from
+  // `custom({ dir })`, needs its own pattern.
   oxlint: {
     entry: [".adamantite/lint/[!_]*.{js,mjs,mts,ts}"],
   },

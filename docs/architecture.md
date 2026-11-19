@@ -270,6 +270,19 @@ presets/
     resets/         first-party type resets
 ```
 
+Adamantite reads the configs of a target project by loading them, as Oxlint, Oxfmt, and Knip do, so
+it sees plain objects and not the imports that built them. Each preset object therefore names its
+public module under `PRESET`, the `Symbol.for("adamantite.preset")` key of `presets/identity.ts`.
+`Symbol.for` gives one key to every installed copy of Adamantite, and a spread copies the key, so a
+config such as `{ ...analyze, ignoreDependencies }` keeps it. The tools ignore the key: Oxlint and
+Oxfmt send the config to Rust as JSON, and Knip reads only string keys. `presets/analyze.ts` and
+`presets/format.ts` write the key with `Symbol.for`, because `presets/tsconfig.json` sets the
+options of their folder and does not allow a value import with a `.ts` extension.
+
+| Invariant                                                                                                | Held by                              |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `adamantite/analyze`, `adamantite/format`, and each lint preset name their public module under `PRESET`. | `presets/__tests__/identity.test.ts` |
+
 ## Dependency version invariant
 
 An integration records the version of each package that Adamantite installs in target projects,
@@ -283,13 +296,33 @@ for a package that `package.json` does not declare.
 
 `LINT_PRESETS` in `src/lib/project/selection.ts` is the one list of the presets that a target
 project can select besides core, and `src/lib/integrations/oxlint/presets.ts` gives each one a
-definition.
+definition. The [README](../README.md#presets) describes what each preset checks.
+
+`jest` and `vitest` put their rules in one override for their `testFiles`, and keep `plugins` and
+`rules` as properties that `Object.defineProperties` does not make enumerable. Oxlint reads a config
+through `JSON.stringify`, which skips them, so a config that extends the preset gets only the
+override, and a project can spread `plugins` and `rules` into an override of its own. The rules
+name the preset under `PRESET` too, so Doctor counts such an override as the preset. The two presets
+load no first-party plugin, because a project override that copies their `plugins` and `rules`
+would not load it. `strict` turns on its assertion and testing rules for the `testFiles` of both
+presets, so the presets agree on what a test is.
+
+The `effect` preset turns on the native `effecttsgo` rules of `@effect/tsgo`, which only the Effect
+builds of the Oxlint binding and of tsrs have. It enables the rules that report Effect code, and none
+that bans a platform API in code that is not Effect code. `EXCLUDED_RULES` in
+`presets/__tests__/effect.test.ts` lists each rule of the four category presets of `@effect/tsgo`
+that the preset leaves out, with the reason, and the test fails when a category preset adds a rule
+that is in neither list. The preset also enables every rule of the first-party `quality-effect`
+plugin.
 
 | Invariant                                                                                                                                                                                                                              | Held by                                                                                                               |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Each preset of the list has a definition and a file in `presets/lint`.                                                                                                                                                                 | The type of `definitions`, and `src/lib/integrations/oxlint/__tests__/presets.test.ts`                                |
 | `package.json` exports core as `adamantite/lint` and each preset as `adamantite/lint/<name>`, without a wildcard, so the other modules below `presets/lint` stay private. The export map, the list, and the README import table agree. | `src/lib/integrations/oxlint/__tests__/presets.test.ts`, `src/__tests__/exports.test.ts`, and `scripts/test-smoke.ts` |
 | CLI code gets a public import from `publicImport()` in `src/lib/shared/package-exports.ts`, which accepts only a key of the export map.                                                                                                | The type checker. Nothing rejects a literal import.                                                                   |
+| A config that extends `jest` or `vitest` gets their rules only in the test files, and a project override that spreads its `plugins` and `rules` gets each rule.                                                                        | `presets/__tests__/jest.test.ts` and `presets/__tests__/vitest.test.ts`                                               |
+| Each lint preset besides core is in a stack of `presets/__tests__/stacks.ts`.                                                                                                                                                          | `presets/__tests__/stacks.test.ts`                                                                                    |
+| Each `effecttsgo` rule of the `effect` preset is in a category preset of `@effect/tsgo`, and the preset decides on each rule of those presets.                                                                                         | `presets/__tests__/effect.test.ts`                                                                                    |
 
 ## Managed plugins
 
@@ -309,8 +342,8 @@ plugin replaces.
 ## Type resets
 
 `adamantite/typescript` loads the type resets in `presets/typescript/resets`, through
-`presets/typescript/resets/index.d.ts`. Doctor reports a library that loads them, from
-`src/lib/integrations/typescript/index.ts`.
+`presets/typescript/resets/index.d.ts`. The resets change the types of built-in APIs. Doctor
+reports a library that loads them, from `src/lib/integrations/typescript/index.ts`.
 
 | Invariant                                                                                                                                                                                                    | Held by                                |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
@@ -347,9 +380,35 @@ API, and the test API. `src/lib/project/custom-rules` is the CLI side: the disco
 section of `skills/adamantite-hardening/SKILL.md` links to, tells an agent how to write and verify
 a rule.
 
+`custom()` in `presets/rules/custom.ts` runs while Oxlint loads the config. It finds the file that
+called it in the stack, resolves `dir` from that file, and turns on each rule file that
+`listRuleFiles` in `presets/rules/folder.ts` lists: a regular file directly in the folder, not a
+symlink, whose extension is `.js`, `.mjs`, `.mts`, or `.ts`, that is not a declaration or a test
+file, and whose name does not start with `_`. Helpers live in `_` files and in subfolders. Oxlint
+then loads an entry module that calls `loadRules` from `presets/rules/load.ts` for the folder.
+`presets/rules/folder.ts` holds what `custom()`, `loadRules`, and the CLI share, and the export map
+does not list it.
+
+`writeEntryModule` writes the entry module to `node_modules/.cache/adamantite` above the rules
+folder, or to a folder in the OS temporary directory that only the current user can write. The
+file name hashes the folder, the plugin name, and the URL of `loadRules`, so each rules folder and
+each installed copy of Adamantite gets its own file. Oxlint's `--debug=files` run, which the file
+discovery of Adamantite uses, writes the entry module to the temporary folder, so discovery changes
+nothing in the project. The result names the folder, the plugin, and the caller under `PRESET` also
+when the folder holds no rule, so Adamantite finds each rules folder that a loaded config reaches.
+
+`adamantite/rules/testing` connects RuleTester to `node:test`, so a rule test reports each case and
+sets the exit code. It is a separate export from `adamantite/rules/plugin`, so importing
+`adamantite/rules/plugin` does not load `node:test`.
+
 | Invariant                                                                                                                                                         | Held by                                                                                                              |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `custom()` and the loader use only the Node.js APIs that Bun also provides.                                                                                       | `presets/__tests__/custom.test.ts`, in real Oxlint runs under Node.js, and the `test` workflow, with the minimum Bun |
 | A project type-checks its rules without `@oxlint/plugins`, because the build inlines the authoring types.                                                         | `scripts/test-smoke.ts`                                                                                              |
 | `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json` extend the root config, so type-aware lint sees the Node.js types and the `.ts` import extensions. | `pnpm run check`                                                                                                     |
 | Only `adamantite rule test` runs a saved test, and no temporary verification case stays in the target project.                                                    | Nothing. The hardening skill asks it of the agent.                                                                   |
+| Two files for one rule name, such as `no-foo.js` and `no-foo.ts`, fail the lint run.                                                                              | `presets/__tests__/custom.test.ts`                                                                                   |
+| A rule that throws in a visitor fails the lint run with a plugin error, as the custom rules reference of the hardening skill tells agents.                        | `presets/__tests__/custom.test.ts`                                                                                   |
+| Two installed copies of Adamantite that load one rules folder write two entry modules.                                                                            | `presets/__tests__/custom.test.ts`                                                                                   |
+| The fallback folder of the entry modules is one that only the current user can write.                                                                             | `presets/__tests__/custom.test.ts`, except on Windows, which gives each user a temporary directory                   |
+| A `--debug=files` run writes no entry module in the project.                                                                                                      | Nothing                                                                                                              |

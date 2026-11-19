@@ -2,12 +2,6 @@ import type { OxlintConfig } from "oxlint"
 import { PRESET, type PresetIdentity } from "../identity.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 
-// Opinions for React feature code: state comes from loaders, URL params, and queries; side effects
-// live in loaders, actions, and event handlers; and the React Compiler memoizes. Use it together
-// with the react preset. The strict preset holds the opinions that do not depend on React.
-// React Doctor also checks state and effect misuse in hook modules. Its managed package stays
-// in the target project. Init installs the pinned version, and Doctor and update maintain it.
-
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/react-strict" } satisfies PresetIdentity,
   jsPlugins: ["oxlint-plugin-react-doctor", firstPartyPlugin("adamantite")],

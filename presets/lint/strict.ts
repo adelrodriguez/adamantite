@@ -4,21 +4,6 @@ import { testFiles as jestTestFiles } from "./jest.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 import { testFiles as vitestTestFiles } from "./vitest.ts"
 
-// Framework-neutral opinions: values keep their source object visible, types come from
-// validation or narrowing instead of assertions, each suppression gives its reason, no debug
-// console call stays, and no task comment marks a workaround. Use it with any other preset.
-//
-// The quality plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
-// access, and readable spacing. Its rules started as a copy of
-// https://github.com/dmmulroy/anti-slop and now live in plugins/quality/ as first-party code. They
-// use the `quality` namespace.
-//
-// The testing plugin holds the rules that keep tests honest: no module mocks, fixed sleeps,
-// retries, or raised timeouts. Its rules started as a copy of https://github.com/interfere-inc/landmines and now live
-// in plugins/testing/ as first-party code. They use the `testing` namespace. The jest and vitest
-// presets load no first-party plugin, because a project can copy their `plugins` and `rules` into
-// an override of its own, and that override would not load the plugin.
-
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/strict" } satisfies PresetIdentity,
   jsPlugins: [

@@ -4,8 +4,6 @@ import { pathToFileURL } from "node:url"
 import { DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } from "./folder.ts"
 import { definePlugin } from "./plugin.ts"
 
-// Import the custom rule files for the entry module that custom() writes.
-
 async function importRule(path: string) {
   let module: { readonly default?: Rule }
 
@@ -28,10 +26,6 @@ async function importRule(path: string) {
   return module.default
 }
 
-/**
- * Import every rule file in a rules folder and return them as one Oxlint plugin. The entry module
- * that `custom()` writes calls this function.
- */
 export async function loadRules(dir: string, name: string = DEFAULT_PLUGIN_NAME): Promise<Plugin> {
   const rules = await Promise.all(
     listRuleFiles(dir).map(

@@ -2,9 +2,6 @@ import type { OxlintConfig } from "oxlint"
 import { PRESET, type PresetIdentity } from "../identity.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 
-// Opinions for TanStack Query with route loaders: each query is defined once with `queryOptions()`
-// so a loader can preload it, and query data stays in the query cache.
-
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/tanstack" } satisfies PresetIdentity,
   jsPlugins: [firstPartyPlugin("adamantite")],

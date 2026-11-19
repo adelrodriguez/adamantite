@@ -1,23 +1,9 @@
 import type { OxlintConfig } from "oxlint"
 import { PRESET, type PresetIdentity } from "../identity.ts"
 
-// The Tailwind preset (https://github.com/shadcn-ui/lint) checks a Tailwind v4
-// design system: components keep their own appearance, colors and sizes come
-// from the theme, and every class is one Tailwind can generate. shadcn/ui is
-// not required.
-//
-// @shadcn/lint is a managed plugin: it stays an npm package that the target
-// project installs. `adamantite init` installs the pinned version when this
-// preset is selected, and doctor and update keep it on that version. The bare
-// specifier makes Oxlint resolve the package from the target project, so the
-// preset needs no runtime API and works under every package manager.
-//
-// The plugin finds components and the theme through components.json. Without
-// that file it looks in components/ui or src/components/ui and discovers the
-// stylesheet that imports Tailwind. A project with components elsewhere sets
-// settings.shadcn.ui in its own config.
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/tailwind" } satisfies PresetIdentity,
+  // Oxlint resolves a bare specifier from the target project, under every package manager.
   jsPlugins: ["@shadcn/lint"],
   overrides: [
     {

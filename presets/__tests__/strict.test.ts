@@ -31,9 +31,6 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 
 const presetRules = getFirstPartyRules(strict.rules)
 
-// The preset enables some quality rules for every file, and the assertion and testing rules only in
-// tests. An override that turns a rule off, such as the override for declaration files, enables
-// nothing.
 function getEnabledRules(namespace: string) {
   const enabled = [strict.rules, ...(strict.overrides ?? []).map((override) => override.rules)]
     .flatMap((rules) => Object.entries(rules ?? {}))
@@ -46,11 +43,8 @@ function getEnabledRules(namespace: string) {
 
 const qualityRules = getEnabledRules("quality")
 
-// `testing/no-flake-masking` also runs in Vitest configs, so it counts once.
 const testingRules = EffectArray.dedupe(getEnabledRules("testing"))
 
-// These rules need options from the target project, such as a layer map, so the project turns them
-// on.
 const PROJECT_RULES = ["import-owners", "layers"]
 
 describe("strict preset", () => {
@@ -109,9 +103,8 @@ describe("first-party plugin", () => {
   })
 })
 
-// The help of three core rules recommends `object`, `unknown`, or `typeof`, which strict reports.
-// The help belongs to the upstream rules, so each strict report must name a form that core and
-// strict both accept. Then the advice ends after two reports. See #773.
+// The help of three upstream core rules recommends `object`, `unknown`, or `typeof`, which strict
+// reports. See #773.
 describe("core advice with the strict preset", () => {
   const files = {
     // `typescript/no-explicit-any` recommends `unknown`.

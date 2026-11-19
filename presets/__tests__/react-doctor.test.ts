@@ -29,16 +29,12 @@ const OxlintJsonOutput = Schema.Struct({
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
-/**
- * Lint the existing fixtures with react and react-strict in one real Oxlint run. The plugin
- * resolves from the repository's `node_modules`, as it does from a target project's. The fixtures
- * are copied to `src/hooks/` to allow hooks and avoid paths React Doctor skips.
- */
 function lintFixtures() {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-react-doctor-"))
 
   try {
     symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
+    // A hook module allows hooks, and React Doctor skips some other paths.
     cpSync(FIXTURES_DIR, join(tempDir, "src/hooks"), { recursive: true })
     writeFileSync(
       join(tempDir, "package.json"),

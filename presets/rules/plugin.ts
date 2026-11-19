@@ -1,7 +1,5 @@
 import type { Plugin, Rule } from "@oxlint/plugins"
 
-// The build inlines the authoring types of Adamantite's pinned Oxlint version into the published
-// declarations, so a project type-checks its rules without installing `@oxlint/plugins`.
 export type * from "@oxlint/plugins"
 
 /**

@@ -2,34 +2,16 @@ import type { OxlintConfig } from "oxlint"
 import { PRESET, type PresetIdentity } from "../identity.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 
-// The Effect Language Service for TypeScript-Go (https://github.com/Effect-TS/tsgo) reports
-// misuse of Effect: effects that never run, unhandled errors and requirements, nested effects, and
-// combinators that have a direct replacement.
-//
-// @effect/tsgo is a managed plugin, but it is not a `jsPlugins` package. The rules are native
-// type-aware rules that exist only in the Effect builds of the Oxlint binding and tsrs,
-// which @effect/tsgo ships. Adamantite runs Oxlint through its entry `dist/oxlint.js`, which loads
-// those builds when the project installs @effect/tsgo. Plain `oxlint` stops with
-// "Unknown plugin: 'effecttsgo'".
-//
-// The rules read their options, such as `allowedUnstableApis`, from the `@effect/language-service`
-// plugin entry in `tsconfig.json`.
-//
-// The preset enables only the @effect/tsgo rules that report Effect code. It does not ban platform
-// APIs in code that is not Effect code.
-//
-// The preset also loads the quality-effect plugin, which reports tagged values that code handles
-// by hand instead of with Effect's tagged constructors, `Match`, and `catchTag`. Its rules started
-// as a copy of the Effect rules of https://github.com/dmmulroy/anti-slop and now live in
-// plugins/quality-effect/ as first-party code under the `quality-effect` namespace. The preset
-// targets Effect codebases, so it enables every rule of the plugin.
-
 const config: OxlintConfig = {
   [PRESET]: { module: "adamantite/lint/effect" } satisfies PresetIdentity,
   jsPlugins: [firstPartyPlugin("quality-effect")],
   options: {
     typeAware: true,
   },
+  // Only the Effect builds of the Oxlint binding and tsrs, which @effect/tsgo ships, have the
+  // `effecttsgo` rules, so plain `oxlint` stops with "Unknown plugin: 'effecttsgo'". The rules read
+  // their options from the `@effect/language-service` plugin entry in `tsconfig.json`. See
+  // https://github.com/Effect-TS/tsgo
   // @ts-expect-error - Oxlint's `LintPluginOptionsSchema` lists only its built-in plugins. Remove
   // this line when Oxlint's config types accept `effecttsgo`.
   plugins: ["effecttsgo"],

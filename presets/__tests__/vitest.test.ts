@@ -16,10 +16,6 @@ const OxlintJsonOutput = Schema.Struct({
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
-/**
- * Lint the files in one real Oxlint run with the config, and return the diagnostic codes of each
- * file, such as `vitest(require-hook)`.
- */
 function lint(config: string, files: Record<string, string>) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-vitest-preset-"))
 
@@ -65,7 +61,6 @@ const testImport = 'import { expect, it } from "vitest"'
 
 const moduleMock = ['import { vi } from "vitest"', "", 'vi.mock("./load.ts")', ""]
 
-// The shorthand rules ask for `mockResolvedValue(1)`, which strict also reports.
 const mockImplementation = [
   'import { beforeEach, describe, vi } from "vitest"',
   "",
@@ -137,7 +132,6 @@ describe("vitest preset", () => {
     expect(codes["src/math.test.ts"]).toContain(`${name}(prefer-to-be)`)
   })
 
-  // A describe title often names the class or function under test, such as `Calculator`.
   it("accept a capital letter at the start of a describe title, and report one in a test title", () => {
     const codes = lint(
       [`import preset from ${presetPath}`, "", "export default { extends: [preset] }", ""].join(
@@ -160,8 +154,6 @@ describe("vitest preset", () => {
     expect(codes["src/math.test.ts"]).toStrictEqual([`${name}(prefer-lowercase-title)`])
   })
 
-  // Strict bans each module mock and mock implementation, so the preset must not tell the author how
-  // to write one.
   it.each([
     { file: moduleMock, kind: "module mock" },
     { file: mockImplementation, kind: "mock implementation" },

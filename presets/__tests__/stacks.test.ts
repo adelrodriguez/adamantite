@@ -16,45 +16,18 @@ import {
 import { type LintPreset, listStackPresets, listStacks, STACK_OPTIONS, STACKS } from "./stacks.ts"
 
 interface KnownReport {
-  /**
-   * Fixture path relative to the fixtures directory of the preset.
-   */
   readonly file: string
-  /**
-   * Why the report stays: the issue of the conflict, or the scope that the fixture proves.
-   */
   readonly reason: string
-  /**
-   * The rule that reports the fixture, which is not the rule of the fixture.
-   */
   readonly rule: string
-  /**
-   * The first Oxlint version that makes the report. An older Oxlint, such as the minimum version
-   * that `peerDependencies` allows in CI, does not make it.
-   */
-  readonly since?: string
+  readonly sinceOxlint?: string
 }
 
 interface FixtureTree {
-  /**
-   * The unstable Effect modules that the fixtures use, which a target project must allow. See
-   * "Effect" in the README.
-   */
   readonly allowedUnstableApis?: readonly string[]
-  /**
-   * Each report of another rule on a valid fixture. The test fails when a report is not in the
-   * list, and when a report in the list does not occur, so the correction of a conflict removes its
-   * entry.
-   */
   readonly knownReports: readonly KnownReport[]
-  /**
-   * The preset that has the rules of the tree. Its fixtures are in `fixtures/<preset>`.
-   */
   readonly preset: LintPreset
 }
 
-// Strict bans each type assertion outside tests. These fixtures prove that the rules that strict
-// turns on only for tests add no report to code outside tests.
 const OUTSIDE_TESTS = "Strict reports each type assertion outside tests."
 
 const TREES: readonly FixtureTree[] = [
@@ -85,7 +58,7 @@ const TREES: readonly FixtureTree[] = [
         reason:
           "Since Oxlint 1.93, core's promise/prefer-catch reports the rejection callback of then(), as eslint-plugin-promise does. The fixture proves that the strict rule accepts it where a project allows then(). catch-callback.ts proves the catch() form.",
         rule: "promise/prefer-catch",
-        since: "1.93.0",
+        sinceOxlint: "1.93.0",
       },
     ],
     preset: "strict",
@@ -113,13 +86,10 @@ const TREES: readonly FixtureTree[] = [
 
 const OXLINT_VERSION = SemVer.parseUnsafe(readFixtureOxlintVersion())
 
-/**
- * Each known report that the Oxlint of the run makes, as the file and the rule.
- */
 function listExpectedReports(knownReports: readonly KnownReport[]): string[] {
   return knownReports.flatMap((known) =>
-    known.since === undefined
-    || SemVer.isGreaterThanOrEqualTo(OXLINT_VERSION, SemVer.parseUnsafe(known.since))
+    known.sinceOxlint === undefined
+    || SemVer.isGreaterThanOrEqualTo(OXLINT_VERSION, SemVer.parseUnsafe(known.sinceOxlint))
       ? [`${known.file} ${known.rule}`]
       : []
   )
@@ -130,7 +100,6 @@ function sortUnique(values: readonly string[]): string[] {
 }
 
 describe("stacks", () => {
-  // Each lint preset module besides core is published as `adamantite/lint/<name>`.
   it("have each lint preset in a stack", () => {
     const presets = readdirSync(join(import.meta.dirname, "../lint"))
       .filter((file) => file.endsWith(".ts"))
@@ -141,10 +110,6 @@ describe("stacks", () => {
   })
 })
 
-/**
- * Each rule of the tree that has no fixture of a kind, as the rule and the kind. A rule needs both,
- * so the tree shows what the rule reports and what it accepts.
- */
 function listMissingKinds(fixturesDir: string, fixtures: readonly RuleFixture[]): string[] {
   return listFixtureRules(fixturesDir).flatMap((rule) =>
     RULE_FIXTURE_KINDS.flatMap((kind) =>
@@ -155,9 +120,6 @@ function listMissingKinds(fixturesDir: string, fixtures: readonly RuleFixture[])
   )
 }
 
-/**
- * The invalid fixtures that do not have a report of their own rule.
- */
 function listMissedFixtures(
   fixtures: readonly RuleFixture[],
   reports: readonly FixtureReport[]
@@ -170,9 +132,6 @@ function listMissedFixtures(
   )
 }
 
-/**
- * Each report on a valid fixture, as the file and the rule.
- */
 function listValidReports(
   fixtures: readonly RuleFixture[],
   reports: readonly FixtureReport[]

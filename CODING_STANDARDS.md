@@ -94,7 +94,7 @@ Spot it: A doc comment repeats the name or the type that it documents, a comment
 statement, or a comment says what our own code must, never, or only does.
 
 ```ts
-// Avoid: the schema in suppressions.ts, whose doc comments repeat its name and hold its format.
+// Avoid: the schema in suppressions.ts before #960, whose doc comments repeat its name and its format.
 /**
  * The comments that turn off one rule, or all rules.
  */

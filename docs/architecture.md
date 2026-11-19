@@ -4,9 +4,8 @@ Adamantite is an agent-first preset package and CLI that applies and maintains c
 tooling in a target project. Product behavior is documented in the [README](../README.md), and
 domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 
-This file is a map. Each section says what an area is for, names the module that owns it, and lists
-its invariants with the rule or the test that holds each one. The TSDoc of the owning module
-describes how the area works.
+Each section says what an area is for, names the module that owns it, describes how the area
+works, and lists its invariants with the rule or the test that holds each one.
 
 ## Runtime
 

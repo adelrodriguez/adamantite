@@ -13,21 +13,9 @@ const RANGE_PREFIX_REGEX = /^[\^~]/
 const VERSION_REGEX = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/
 const CATALOG_PROTOCOL = "catalog:"
 
-/**
- * What a dependency specifier in `package.json` says about the version of the package.
- */
 type DeclaredVersion =
-  /**
-   * A pnpm catalog entry, such as `catalog:` for the default catalog or `catalog:tools`.
-   */
   | { readonly _tag: "Catalog"; readonly catalog: string }
-  /**
-   * A specifier whose version Adamantite cannot read, such as `npm:`, `link:`, or `>=1.0.0`.
-   */
   | { readonly _tag: "Unreadable" }
-  /**
-   * A version, with an optional `workspace:` protocol and one `^` or `~` prefix.
-   */
   | { readonly _tag: "Version"; readonly version: string }
 
 const {
@@ -53,9 +41,6 @@ export function parseDependencySpecifier(specifier: string): DeclaredVersion {
 
 const StringRecord = Schema.Record(Schema.String, Schema.String)
 
-/**
- * The `package.json` fields that Adamantite reads, with the types that the code relies on.
- */
 const PackageManifest = Schema.Struct({
   dependencies: Schema.optionalKey(StringRecord),
   devDependencies: Schema.optionalKey(StringRecord),
@@ -94,17 +79,10 @@ export const readPackageJson = (cwd: string) =>
     return parsed as PackageJson
   })
 
-/**
- * The code-quality tools that the managed scripts run, by their package and command name.
- */
 export const MANAGED_TOOLS = ["knip", "oxfmt", "oxlint", "sherif"] as const
 
 type ManagedTool = (typeof MANAGED_TOOLS)[number]
 
-/**
- * The package scripts that Adamantite manages: the command of each, the tools that it runs, and
- * whether CI runs it. Each other fact about a script derives from this table.
- */
 const MANAGED_SCRIPTS = {
   analyze: { ci: true, command: "adamantite analyze", tools: ["knip", "sherif"] },
   check: { ci: true, command: "adamantite check", tools: ["oxfmt", "oxlint"] },
@@ -118,35 +96,20 @@ export type Script = keyof typeof MANAGED_SCRIPTS
 
 export const MANAGED_SCRIPT_COMMANDS = Record.map(MANAGED_SCRIPTS, (script) => script.command)
 
-/**
- * Every managed script, in the order that prompts, guidance, and CI list them.
- */
 export const SCRIPT_ORDER = ["check", "fix", "analyze"] as const satisfies readonly Script[]
 
-/**
- * The managed scripts that CI runs, in `SCRIPT_ORDER`.
- */
 export const CI_SCRIPTS: readonly Script[] = SCRIPT_ORDER.filter(
   (script) => MANAGED_SCRIPTS[script].ci
 )
 
-/**
- * Whether one of `scripts` runs in CI.
- */
 export function hasCICompatibleScripts(scripts: readonly Script[]): boolean {
   return CI_SCRIPTS.some((script) => scripts.includes(script))
 }
 
-/**
- * The managed scripts that run `tool`, in `SCRIPT_ORDER`.
- */
 export function getScriptsThatRun(tool: ManagedTool): Script[] {
   return SCRIPT_ORDER.filter((script) => checkRunsTool([script], tool))
 }
 
-/**
- * Whether one of `scripts` runs `tool`.
- */
 export function checkRunsTool(scripts: readonly Script[], tool: ManagedTool): boolean {
   return scripts.some((script) => {
     const tools: readonly ManagedTool[] = MANAGED_SCRIPTS[script].tools

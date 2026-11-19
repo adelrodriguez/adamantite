@@ -27,7 +27,6 @@ function provideFiles(files: FileSystemTestContext) {
 
 describe("managed scripts", () => {
   it("order every managed script, and run the CI scripts in that order", () => {
-    // A new managed script must get a place in the order.
     expectTypeOf<(typeof SCRIPT_ORDER)[number]>().toEqualTypeOf<Script>()
     expect(SCRIPT_ORDER).toStrictEqual(["check", "fix", "analyze"])
     expect(CI_SCRIPTS).toStrictEqual(["check", "analyze"])
@@ -120,9 +119,6 @@ function describeSpecifier(specifier: string) {
 }
 
 describe("parseDependencySpecifier", () => {
-  // The input domain is real dependency specifiers: optional whitespace padding, an optional
-  // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
-  // valid specifiers and are out of scope.
   const versionNumber = Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))
 
   const version = Schema.TemplateLiteral([

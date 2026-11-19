@@ -32,31 +32,11 @@ import formatPreset from "#presets/format.ts"
 
 const version = getPackageVersion()
 
-/**
- * What `apply` did with one managed file. `init --json` and `update --json` print it as this schema
- * encodes it.
- */
 export const FileWrite = Schema.TaggedUnion({
-  /**
-   * The file did not exist, so Adamantite wrote it.
-   */
   Created: { path: Schema.String },
-  /**
-   * The selection no longer renders the file, and its hash still equaled the recorded hash.
-   */
   Deleted: { path: Schema.String },
-  /**
-   * The user changed the file, so Adamantite kept it. Its integration's `assess` judges it.
-   */
   Kept: { path: Schema.String },
-  /**
-   * The file's hash equaled the hash that the lockfile recorded, so Adamantite wrote the current
-   * version over it.
-   */
   Replaced: { path: Schema.String },
-  /**
-   * The file already held the current version.
-   */
   Unchanged: { path: Schema.String },
 })
 
@@ -66,22 +46,9 @@ const { Created, Deleted, Kept, Replaced, Unchanged } = Data.taggedEnum<FileWrit
 
 const ScriptName = Schema.Literals(SCRIPT_ORDER)
 
-/**
- * What `apply` did with one managed script in `package.json`. A managed script is the one exception
- * to whole files: `apply` sets the key to its command and overwrites what it held.
- */
 export const ScriptWrite = Schema.TaggedUnion({
-  /**
-   * `package.json` had no such script, so Adamantite added it.
-   */
   Added: { script: ScriptName },
-  /**
-   * The script ran `command`, so Adamantite replaced it with the managed command.
-   */
   Replaced: { command: Schema.String, script: ScriptName },
-  /**
-   * The script already ran the managed command.
-   */
   Unchanged: { script: ScriptName },
 })
 
@@ -89,13 +56,6 @@ export type ScriptWrite = typeof ScriptWrite.Type
 
 const ScriptWrites = Data.taggedEnum<ScriptWrite>()
 
-/**
- * Applies the write rule to one managed file: write it when it does not exist, or when its hash
- * equals the hash that the lockfile recorded. It writes the file whole, and never merges or edits
- * it. `hash` is what `written` records, and none for a file that the user changed. Without a
- * recorded hash, such as in a project without a lockfile, a file that exists gets a hash only when
- * it already holds the current version.
- */
 const writeManagedFile = Effect.fn("writeManagedFile")(function* (
   cwd: string,
   file: ManagedFile,
@@ -130,10 +90,6 @@ const writeManagedFile = Effect.fn("writeManagedFile")(function* (
   return { hash: Option.none<string>(), write: Kept({ path: file.path }) }
 })
 
-/**
- * Deletes a file that Adamantite wrote and the selection no longer renders, when its hash still
- * equals the recorded hash. A file that the user changed stays, and leaves the lockfile.
- */
 const deleteDroppedFile = Effect.fn("deleteDroppedFile")(function* (
   cwd: string,
   file: string,
@@ -153,21 +109,10 @@ const deleteDroppedFile = Effect.fn("deleteDroppedFile")(function* (
   return Option.some(Deleted({ path: file }))
 })
 
-/**
- * The config files that Oxfmt reads from the project root.
- */
 const OXFMT_CONFIGS = ["oxfmt.config.ts", "oxfmt.config.mts", ".oxfmtrc.json", ".oxfmtrc.jsonc"]
 
-/**
- * Formats `content` as the project's Oxfmt formats the file at `file`, from the project root.
- */
 type Format = (file: string, content: string) => Effect.Effect<string, FailedToFormatFile>
 
-/**
- * The config that the project's Oxfmt formats with: the project's own config, or a copy of
- * Adamantite's format preset in a temporary folder when the project has none, such as before `init`
- * writes `oxfmt.config.ts`.
- */
 const findConfig = Effect.fn("findConfig")(function* (cwd: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -185,12 +130,6 @@ const findConfig = Effect.fn("findConfig")(function* (cwd: string) {
   return config
 })
 
-/**
- * The formatter of the managed files in the project at `cwd`: the project's Oxfmt, which
- * `adamantite fix` runs too, so `fix` leaves a managed file unchanged and its hash still matches
- * the lockfile. A project that installs no Oxfmt, because the selection runs none, gets each file
- * as rendered. The temporary config lives as long as the scope.
- */
 const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const cli = yield* findOxfmtCli(cwd)
@@ -240,12 +179,6 @@ const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
   }) satisfies Format
 })
 
-/**
- * Sets each managed script of the selection to its command in the root `package.json`, and
- * overwrites what the key held. `apply` writes `package.json` in the layout that `format` gives it,
- * so `adamantite fix` leaves it unchanged. It writes only when a script changed or the install
- * changed the file, so a second run leaves `package.json` byte-identical.
- */
 const writeScripts = Effect.fn("writeScripts")(function* (
   cwd: string,
   scripts: readonly Script[],
@@ -289,10 +222,6 @@ const writeScripts = Effect.fn("writeScripts")(function* (
   return writes
 })
 
-/**
- * The install of `adamantite` itself, at the version that runs, when the project does not depend on
- * it. A project that depends on it keeps the version or source that it chose.
- */
 function getAdamantiteInstall({ packageJson }: Project.Snapshot): readonly PackageAction[] {
   const declared = packageJson.devDependencies?.adamantite ?? packageJson.dependencies?.adamantite
 
@@ -308,9 +237,6 @@ function getAdamantiteInstall({ packageJson }: Project.Snapshot): readonly Packa
     : []
 }
 
-/**
- * What `apply` did. `init --json` and `update --json` print it as this schema encodes it.
- */
 export const Result = Schema.Struct({
   files: Schema.Array(FileWrite),
   installs: Schema.Array(PackageAction),
@@ -320,15 +246,6 @@ export const Result = Schema.Struct({
 
 export type Result = typeof Result.Type
 
-/**
- * Sets up `selection` in `project`, the backend of `init` and `update`, and the only code that
- * writes target-project files. In this order, it installs `adamantite` and the packages of every
- * selected integration in one install, prepares what the integrations need in `node_modules`,
- * formats their managed files with the project's Oxfmt, sets the managed scripts, writes the files
- * under the write rule, deletes the managed files that the selection dropped, and writes the
- * lockfile last, formatted the same way. Each hash in `written` is the hash of the bytes on disk.
- * Running it twice leaves the project unchanged.
- */
 export const apply = Effect.fn("Setup.apply")(function* (
   project: Project.Snapshot,
   selection: Selection
@@ -337,9 +254,6 @@ export const apply = Effect.fn("Setup.apply")(function* (
   const cwd = yield* Project.Directory
   const selected = integrations.filter((integration) => integration.selected(selection))
 
-  // Only the packages that the project does not declare at the managed version. A version from a
-  // pnpm catalog stays, because `pnpm add` would replace the `catalog:` specifier, and the
-  // integration's `assess` reports an outdated catalog entry.
   const installs = [
     ...getAdamantiteInstall(project),
     ...selected.flatMap((integration) =>
@@ -367,7 +281,6 @@ export const apply = Effect.fn("Setup.apply")(function* (
     onSome: (lockfile) => lockfile.written,
   })
 
-  // After the install, so a project that this setup gives Oxfmt formats with it.
   const format = yield* makeFormatter(cwd)
 
   const rendered = yield* Effect.forEach(
@@ -380,7 +293,6 @@ export const apply = Effect.fn("Setup.apply")(function* (
     { concurrency: "unbounded" }
   )
 
-  // After every managed file formats, so a config that Oxfmt cannot load fails before a write.
   const scripts = yield* writeScripts(cwd, selection.scripts, installs.length > 0, format)
 
   const writes = yield* Effect.forEach(
@@ -401,7 +313,6 @@ export const apply = Effect.fn("Setup.apply")(function* (
     Option.match(hash, { onNone: () => [], onSome: (value) => [[write.path, value] as const] })
   )
 
-  // Last, so the lockfile records what the steps above wrote, and only when its content changes.
   const lockfilePath = path.join(cwd, LOCKFILE_PATH)
 
   const lockfileContent = yield* format(

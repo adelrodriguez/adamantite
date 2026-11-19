@@ -10,22 +10,10 @@ import * as Stream from "effect/Stream"
 import { ConfigLoadFailed } from "#lib/shared/errors.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 
-/**
- * The JSON key under which `encodeConfig` writes the identity that an Adamantite preset or a
- * `custom()` result holds under `PRESET` of `presets/identity.ts`.
- */
 export const IDENTITY_KEY = "$adamantite"
 
-/**
- * The identity of an Adamantite preset in a loaded config: its public module, such as
- * `adamantite/lint/strict`.
- */
 export const PresetIdentity = Schema.Struct({ module: Schema.String })
 
-/**
- * The identity of a `custom()` result in a loaded config: the rules folder, the plugin name, and
- * the file that called `custom()`, when its stack names one.
- */
 export const RulesFolderIdentity = Schema.Struct({
   caller: Schema.optional(Schema.String),
   dir: Schema.String,
@@ -35,13 +23,6 @@ export const RulesFolderIdentity = Schema.Struct({
 
 export type RulesFolderIdentity = typeof RulesFolderIdentity.Type
 
-/**
- * The source of `encode(module)`, which returns the JSON of the default export of a loaded config
- * module. An object that holds an Adamantite identity under the `adamantite.preset` symbol gets it
- * under `IDENTITY_KEY`, because JSON drops symbol keys. A regular expression, which Knip accepts in
- * place of a name, becomes `{ $regexp, flags }`. The child process runs it, and so does the
- * in-memory loader of the unit tests.
- */
 export const ENCODE_SOURCE = [
   "function encode(module) {",
   '  const identity = Symbol.for("adamantite.preset")',
@@ -57,11 +38,10 @@ export const ENCODE_SOURCE = [
   "}",
 ].join("\n")
 
-// The line that comes before the result, so that output from the config itself stays apart.
 const RESULT_MARKER = "\u0000adamantite-config\u0000"
 
-// The module that the child process evaluates. Node.js imports the config as Oxlint does, with type
-// stripping for a TypeScript config, and prints the default export.
+// Node.js imports a TypeScript config with type stripping, as Oxlint does, so a config can use only
+// erasable syntax: https://nodejs.org/api/typescript.html#type-stripping
 const LOAD_SCRIPT = [
   ENCODE_SOURCE,
   'const { pathToFileURL } = await import("node:url")',
@@ -84,26 +64,12 @@ const LoadResult = Schema.fromJsonString(
 
 const decodeLoadResult = Schema.decodeUnknownOption(LoadResult)
 
-/**
- * Loads the configs of a target project as the tools do: Node.js imports the module, and the
- * default export is the config. Adamantite does not parse the source of a config. Each reader
- * decodes the loaded value with a Schema, such as `LintConfig` for Oxlint.
- */
 export class ConfigLoader extends Context.Service<
   ConfigLoader,
   {
-    /**
-     * The default export of the module at `file`, as `ENCODE_SOURCE` writes it, decoded from JSON.
-     * The module runs in `cwd`, the folder that `adamantite check` starts Oxlint in, so a config
-     * that reads a file through `process.cwd()` reads the file that the tool reads. Fails when the
-     * module does not load or has no default export.
-     */
     readonly load: (cwd: string, file: string) => Effect.Effect<unknown, ConfigLoadFailed>
   }
 >()("ConfigLoader") {
-  // A config runs project code, as it does when Oxlint imports it. Each load runs in its own Node.js
-  // process, so output of the config cannot reach the output of a command, and a later load reads
-  // the files again, after a coding agent changes a module that the config imports.
   static readonly layer = Layer.effect(
     this,
     Effect.gen(function* () {
@@ -113,9 +79,6 @@ export class ConfigLoader extends Context.Service<
         load: Effect.fn("ConfigLoader.load")(
           function* (cwd: string, file: string) {
             const handle = yield* spawner.spawn(
-              // `custom()` writes the entry module of a rules folder outside the project when the
-              // arguments include `--debug=files`, as in Oxlint's read-only file listing, so a load
-              // changes no file of the project.
               ChildProcess.make(
                 "node",
                 ["--input-type=module", "--eval", LOAD_SCRIPT, file, "--debug=files"],
@@ -176,11 +139,6 @@ export class ConfigLoader extends Context.Service<
   )
 }
 
-/**
- * The config at `file`, loaded in `cwd` and decoded with `schema`, or none when the file does not
- * exist. A config that does not load, or does not fit `schema`, is a failed `Result`, because a
- * finding reports it.
- */
 export const readConfig = Effect.fn("readConfig")(function* <A>(
   cwd: string,
   file: string,

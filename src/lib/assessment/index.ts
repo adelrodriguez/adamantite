@@ -29,18 +29,8 @@ import { fillTemplate } from "#lib/shared/template.ts"
 const repairPromptTemplate = getRepairPromptTemplate()
 const warningReportTemplate = getWarningReportTemplate()
 
-/**
- * The integrations that only assess, assessed against a project before the ones in
- * `integrations/index.ts`. Each one decides from the project whether it applies, and the Oxlint
- * integration installs their packages. The order fixes how findings are numbered in the rendered
- * output.
- */
 const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs] as const
 
-/**
- * The assessment of a project without a lockfile. The other assessments need the selection that
- * `init` records, so this finding is the only one.
- */
 const lockfileMissing: ProjectAssessment = {
   applicableIntegrations: [],
   findings: [
@@ -63,11 +53,6 @@ const lockfileMissing: ProjectAssessment = {
   warnings: [],
 }
 
-/**
- * The assessment of a project whose lockfile does not read. The other assessments need the
- * selection, so the lockfile finding is the only one. Doctor reports it, and the commands that
- * write the lockfile fail instead, so they do not overwrite it.
- */
 function assessUnreadableLockfile(error: InvalidLockfile | UnsupportedLockfile): ProjectAssessment {
   const finding = Match.valueTags(error, {
     InvalidLockfile: ({ issue, path }): Finding => ({
@@ -113,10 +98,6 @@ function assessUnreadableLockfile(error: InvalidLockfile | UnsupportedLockfile):
   }
 }
 
-/**
- * The finding for a lockfile that another Adamantite version than the installed one wrote. `check`
- * fails with the same error, so Doctor does not call a project healthy that `check` fails.
- */
 function assessSetupVersion(error: SetupAhead | SetupOutdated): Finding {
   return Match.valueTags(error, {
     SetupAhead: ({ installed, path, recorded }): Finding => ({
@@ -148,10 +129,6 @@ function assessSetupVersion(error: SetupAhead | SetupOutdated): Finding {
   })
 }
 
-/**
- * The assessment of a project that does not declare `adamantite`. The other assessments need the
- * installed version, so this finding is the only one.
- */
 const notInstalled: ProjectAssessment = {
   applicableIntegrations: [],
   findings: [
@@ -173,12 +150,6 @@ const notInstalled: ProjectAssessment = {
   warnings: [],
 }
 
-/**
- * The findings for the managed scripts of the selection, in `SCRIPT_ORDER`: a script that the root
- * `package.json` does not have, and a script that runs another command. `Setup.apply` sets each
- * selected script to its command, so Doctor reports what `update` would change. No integration owns
- * the managed scripts, so each finding names `scripts` as its integration.
- */
 function assessScripts({ packageJson }: Project.Snapshot, { scripts }: Selection): Finding[] {
   return SCRIPT_ORDER.filter((script) => scripts.includes(script)).flatMap((script): Finding[] => {
     const command = packageJson.scripts?.[script]
@@ -217,35 +188,16 @@ function assessScripts({ packageJson }: Project.Snapshot, { scripts }: Selection
   })
 }
 
-/**
- * What an assessment found in a project. `doctor --json` prints it as this schema encodes it.
- */
 export const ProjectAssessment = Schema.Struct({
-  /**
-   * Names of the integrations that apply to this project. Empty means nothing is managed.
-   */
   applicableIntegrations: Schema.Array(Schema.String),
-  /**
-   * Empty means the project has reached the latest supported state.
-   */
   findings: Schema.Array(Finding),
   packageActions: Schema.Array(PackageAction),
-  /**
-   * The selection that the assessment checked, from the lockfile. Null when the project has no
-   * lockfile, or when it does not read.
-   */
   selection: Schema.NullOr(Selection),
   warnings: Schema.Array(Schema.String),
 })
 
 export type ProjectAssessment = typeof ProjectAssessment.Type
 
-/**
- * Assess every managed integration against one read of the project. It runs each integration that
- * the lockfile's selection includes, so a selected integration whose file is missing gets a
- * finding. A reassessment after an agent session or a dependency update reads the project again, so
- * it sees the changes.
- */
 export const assessProject = Effect.fn("assessProject")(function* (project: Project.Snapshot) {
   if (Option.isNone(project.lockfile)) {
     return lockfileMissing
@@ -271,7 +223,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 
         return assessment.applicable ? [{ assessment, name: integration.name }] : []
       }),
-    // Assessments are read-only and independent, and `forEach` keeps results in input order.
+    // `Effect.forEach` keeps the results in input order.
     { concurrency: "unbounded" }
   )
 
@@ -299,14 +251,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
   } satisfies ProjectAssessment
 })
 
-/**
- * The assessment that Doctor reports for the target project, from a new read of it. A project that
- * does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so a
- * coding agent can repair it. Any other read or parse failure still fails Doctor.
- */
 export const readAssessment = Effect.fn("readAssessment")(function* () {
-  // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets
-  // the install finding even when its workspace packages do not read.
   const packageJson = yield* readPackageJson(yield* Project.Directory)
 
   if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
@@ -321,10 +266,6 @@ export const readAssessment = Effect.fn("readAssessment")(function* () {
   )
 })
 
-/**
- * The Markdown a coding agent consumes. Findings produce the combined repair prompt with warnings
- * folded in; a warning-only assessment produces the warning report.
- */
 export function renderAssessmentMarkdown(
   assessment: Pick<ProjectAssessment, "findings" | "warnings">,
   adamantiteVersion: string
@@ -334,10 +275,6 @@ export function renderAssessmentMarkdown(
     : renderRepairPrompt(assessment.findings, assessment.warnings, adamantiteVersion)
 }
 
-/**
- * A warning as a Markdown list item. The later lines of a warning, such as its steps, stay inside
- * the item.
- */
 function toWarningItem(warning: string): string {
   return `- ${warning.replaceAll("\n", "\n  ")}`
 }

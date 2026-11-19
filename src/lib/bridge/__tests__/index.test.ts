@@ -22,15 +22,8 @@ import {
 } from "#presets/__tests__/rule-fixtures.ts"
 import { listStackPresets, type Stack, STACK_OPTIONS, STACKS } from "#presets/__tests__/stacks.ts"
 
-// Several fixes that the idioms show are suggestions, such as `eslint/no-useless-constructor` and
-// `effecttsgo/map-const-to-as`, so the test fixes as `adamantite fix --suggested` does.
 const FIX_LEVEL = "suggested"
 
-/**
- * A file with a type error, which each run of the idioms must report. A run without the type check,
- * such as a run without the type-aware backend, reports nothing on a clean idiom, so only this
- * report shows that the run checked the types.
- */
 const CANARY = {
   file: "canary.ts",
   report: { file: "canary.ts", line: 1, rule: "typescript/TS2322" },
@@ -43,9 +36,6 @@ function readFiles(folder: string, files: readonly string[]): Record<string, str
   return Object.fromEntries(files.map((file) => [file, readFileSync(join(folder, file), "utf8")]))
 }
 
-/**
- * The folders of the idioms, in sorted order. Each one is the folder of one tree.
- */
 function listTreeFolders(): string[] {
   const folders = readdirSync(IDIOMS_DIR, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? [entry.name] : []
@@ -54,9 +44,6 @@ function listTreeFolders(): string[] {
   return EffectArray.sort(folders, Order.String)
 }
 
-/**
- * The number of files in the folder of each tree that runs with the stack.
- */
 function countStackFiles(stack: Stack, folder: "clean" | "fixable"): number {
   return IDIOM_TREES.filter((tree) => listTreeStacks(tree.preset).includes(stack)).flatMap((tree) =>
     listFiles(join(IDIOMS_DIR, tree.preset, folder))
@@ -115,8 +102,8 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
         presets: listStackPresets(stack),
       })
 
-      // The type check of fix and check reports each file of the project, also outside the
-      // files of the run, so the canary stays only for this run.
+      // The type check reports each file of the TypeScript program, also outside the files of the
+      // run.
       const canary = join(project, FIXTURES_DIRECTORY, CANARY.file)
 
       writeFileSync(canary, CANARY.source)
@@ -168,8 +155,6 @@ describe.each(IDIOM_TREES)("$preset idioms", ({ allowedUnstableApis, preset, sec
             return readFiles(join(project, FIXTURES_DIRECTORY, "fixable"), fixable)
           }
 
-          // Fix fails while a report stays, as after the first pass of a known second pass, so
-          // the test reads the files to see the result.
           yield* Effect.ignore(
             Bridge.fix({
               files: [`${FIXTURES_DIRECTORY}/fixable`],

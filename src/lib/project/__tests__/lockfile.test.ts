@@ -34,8 +34,6 @@ function makeLockfile(version: string) {
   })
 }
 
-// The project at `root` resolves `adamantite/lint` to the package in `installedAt`, which holds
-// the manifest of Adamantite `installed`.
 function verify(
   lockfile: Option.Option<Lockfile>,
   options: { installed?: string; installedAt?: string; root?: string } = {}
@@ -136,7 +134,6 @@ describe("lockfile", () => {
       })
     )
 
-    // `update` with the older install would bring the managed files back to it.
     it.effect.each([
       { installed: "0.47.0", recorded: "0.48.0" },
       { installed: "0.47.0", recorded: "1.0.0" },
@@ -153,7 +150,6 @@ describe("lockfile", () => {
         })
     )
 
-    // `update` with the installed version is the repair that ends the drift.
     it.effect.each([
       { installed: "0.48.0", recorded: "0.48.0-next.1" },
       { installed: "0.48.0-next.2", recorded: "0.48.0-next.1" },
@@ -168,7 +164,6 @@ describe("lockfile", () => {
         })
     )
 
-    // A monorepo installs Adamantite at the workspace root, which also holds the lockfile.
     it.effect("compare with an Adamantite that a parent folder installs", () =>
       Effect.gen(function* () {
         expect(

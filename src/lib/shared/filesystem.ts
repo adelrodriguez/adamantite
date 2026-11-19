@@ -15,11 +15,6 @@ export const readFile = (path: string) =>
     Effect.mapError((cause) => new FailedToReadFile({ cause, path }))
   )
 
-/**
- * Reads a file that may not exist. A missing file is `Option.none`; every other failure is a
- * `FailedToReadFile`. Reading directly instead of checking `exists` first keeps the operation
- * atomic.
- */
 export const readFileIfExists = (path: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readFileString(path)),
@@ -32,11 +27,6 @@ export const readFileIfExists = (path: string) =>
     )
   )
 
-/**
- * Reads a path that may be missing or may be a folder. A missing path, or a path that is not a
- * file, is `Option.none`; every other failure, such as a permission error, is a
- * `FailedToReadFile`.
- */
 export const readFileIfFile = (path: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readFileString(path)),
@@ -44,6 +34,7 @@ export const readFileIfFile = (path: string) =>
     Effect.catchReasons(
       "PlatformError",
       {
+        // The Node.js backend of Effect reports `EISDIR` as `BadResource`.
         BadResource: () => Effect.succeedNone,
         NotFound: () => Effect.succeedNone,
       },
@@ -51,21 +42,12 @@ export const readFileIfFile = (path: string) =>
     )
   )
 
-/**
- * Whether a path exists. A failure to check, such as a permission error, is a `FailedToReadFile`,
- * because the path can exist.
- */
 export const checkExists = (path: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.exists(path)),
     Effect.mapError((cause) => new FailedToReadFile({ cause, path }))
   )
 
-/**
- * Lists the entry names of a directory that may not exist. With `recursive`, the names are paths
- * relative to the directory and include nested directories. A missing path, or a path that is not a
- * directory, is `Option.none`; every other failure is a `FailedToReadFile`.
- */
 export const readDirectoryIfExists = (path: string, options?: { readonly recursive?: boolean }) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readDirectory(path, options)),
@@ -73,6 +55,7 @@ export const readDirectoryIfExists = (path: string, options?: { readonly recursi
     Effect.catchReasons(
       "PlatformError",
       {
+        // The Node.js backend of Effect reports `ENOTDIR` as `BadResource`.
         BadResource: () => Effect.succeed(Option.none<string[]>()),
         NotFound: () => Effect.succeed(Option.none<string[]>()),
       },

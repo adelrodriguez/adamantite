@@ -55,15 +55,11 @@ function makeSpawnerLayer(
 const FORMAT = Effect.succeed<CommandRunOptions>({ args: [], command: "oxfmt", title: "Format" })
 const LINT = Effect.succeed<CommandRunOptions>({ args: [], command: "oxlint", title: "Lint" })
 
-// The steps of `check` when it prints no heading, such as in an agent's shell.
 const UNTITLED = [
   Effect.succeed<CommandRunOptions>({ args: [], command: "oxfmt" }),
   Effect.succeed<CommandRunOptions>({ args: [], command: "oxlint" }),
 ]
 
-/**
- * A step that finds no command, as the Oxlint step does in a project without Oxlint.
- */
 const MISSING = new PackageNotInstalled({ packageName: "oxlint", project: "/project" })
 
 describe("CommandRunner", () => {
@@ -141,9 +137,6 @@ describe("CommandRunner", () => {
     const encoder = new TextEncoder()
     const decoder = new TextDecoder()
 
-    /**
-     * A test `Stdio` and `Console` that record every line in one list, in the order of the writes.
-     */
     function makeTerminal() {
       const lines: string[] = []
 
@@ -172,8 +165,6 @@ describe("CommandRunner", () => {
         const terminal = makeTerminal()
         const lintPrinted = yield* Latch.make()
 
-        // Oxfmt ends only after Oxlint printed, so the steps overlap, and Oxlint's output comes
-        // first.
         const runner = CommandRunner.make((options, output) =>
           Effect.gen(function* () {
             if (output === undefined) {
@@ -196,7 +187,6 @@ describe("CommandRunner", () => {
 
         const logs = yield* TestConsole.logLines.pipe(Effect.provide(terminal.layer))
 
-        // A sequential run would wait for Oxfmt forever, so the test would time out.
         expect({ logs, output: terminal.lines }).toStrictEqual({
           logs: ["Format · adamantite (oxfmt)", "", "Lint · adamantite (oxlint)"],
           output: ["stderr: format report", "stdout: lint report"],

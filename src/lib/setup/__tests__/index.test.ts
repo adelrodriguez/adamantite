@@ -41,12 +41,8 @@ import * as Setup from "#lib/setup/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
 
-// The test folder does not install `adamantite/format`, so the check loads the preset from the
-// repository.
 const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 
-// The files that `Setup.apply` writes: the lockfile, `package.json` with the managed scripts, and
-// the managed files of every integration.
 const FORMATTED_FILES = [
   LOCKFILE_PATH,
   "package.json",
@@ -62,8 +58,6 @@ const FORMATTED_FILES = [
   ...Object.keys(getShippedSkillFiles()).map((file) => `.agents/skills/${file}`),
 ]
 
-// Every part of the selection that makes Setup write a file, with the longest renders: the VS Code
-// settings hide the Effect rules, and every extension is recommended.
 const FULL_SELECTION = {
   agents: true,
   ci: "github",
@@ -84,14 +78,12 @@ const FULL_SELECTION = {
   typescript: "typescript",
 } as const satisfies Selection
 
-// The project's Oxfmt, its packages, and the services of Setup on the host filesystem.
 const layer = Layer.mergeAll(
   NodeServices.layer,
   NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
   ModuleResolver.layer,
   ConfigLoader.layer.pipe(Layer.provide(NodeServices.layer)),
   Digest.layerWebCrypto,
-  // The project has its packages, so the install changes nothing.
   Layer.succeed(DependencyInstaller)({
     addDevDependencies: () => Effect.void,
     detectPackageManager: () => Effect.succeedSome({ name: "bun" }),
@@ -126,8 +118,6 @@ function readScripts(files: FileSystemTestContext) {
   return decodeScripts(files.read("package.json")).scripts
 }
 
-// A managed script is the one exception to whole files: Setup sets the selected key and overwrites
-// what it held.
 describe("managed scripts", () => {
   it.effect("overwrite a selected script that ran another command, and keep the others", () =>
     Effect.gen(function* () {
@@ -192,8 +182,6 @@ describe("managed scripts", () => {
   )
 })
 
-// A selection as init records it: each list in the order of its source list, and `core` first
-// when the project lints.
 const recordedSelection = Arbitrary.schema(Selection).pipe(
   Arbitrary.map((selection) => {
     const recorded = addSelection(makeSelection({}), selection)
@@ -204,8 +192,6 @@ const recordedSelection = Arbitrary.schema(Selection).pipe(
   })
 )
 
-// The write rule holds for every integration, so these properties run update with any selection
-// that init can record. The tests of each integration check what it writes.
 describe("the write rule", () => {
   it.effect.prop(
     "record the hash of each file that update writes",
@@ -217,11 +203,8 @@ describe("the write rule", () => {
 
         const { exit } = yield* runLifecycle("update", files)
 
-        // Each file that update created in the fresh project is a managed file, so the lockfile
-        // records exactly those files, each with the hash of its content.
         const created = files.list().filter((file) => !before.includes(file))
 
-        // The test installer installs nothing, so a selection that sets up a tool leaves findings.
         expect([undefined, findingsLeft("update")]).toContainEqual(getFailure(exit))
         expect(readLockfile(files).written).toStrictEqual(
           Object.fromEntries(created.map((file) => [file, hashContent(files.read(file))]))
@@ -285,8 +268,6 @@ describe("the files that Setup writes", () => {
 
     symlinkSync(join(REPO_ROOT, "node_modules/oxfmt"), join(project, "node_modules/oxfmt"))
 
-    // The written `oxfmt.config.ts` imports `adamantite/format`, so a second setup formats with the
-    // preset of the repository.
     mkdirSync(join(project, "node_modules/adamantite"))
     writeFileSync(
       join(project, "node_modules/adamantite/package.json"),
@@ -315,7 +296,6 @@ describe("the files that Setup writes", () => {
     })
   }
 
-  // `adamantite fix` must leave each file as Setup wrote it, so its hash still matches the lockfile.
   it.effect("keep their content when Oxfmt formats them with the format preset", () =>
     Effect.gen(function* () {
       const setup = yield* apply(project)
@@ -368,7 +348,6 @@ describe("the files that Setup writes", () => {
     })
   )
 
-  // Doctor must accept the skill that Setup formatted, and still report a copy that the user changed.
   it.effect("pass the skill assessment with the layout that the project's Oxfmt gives it", () =>
     Effect.gen(function* () {
       writeFileSync(join(project, ".oxfmtrc.json"), '{ "printWidth": 40, "proseWrap": "always" }\n')

@@ -9,18 +9,7 @@ import { ResolverFactory } from "oxc-resolver"
 export class ModuleResolver extends Context.Service<
   ModuleResolver,
   {
-    /**
-     * Forget the files and package manifests that earlier resolutions read. Custom rule discovery
-     * calls it before each traversal, because a coding agent can change the project between two
-     * assessments in one command, and `addRootDevDependencies` calls it after each install.
-     */
     readonly clearCache: Effect.Effect<void>
-    /**
-     * The file that Node.js loads for `specifier` when a file in `directory` imports it, as Oxlint
-     * imports a config. None when the specifier does not resolve, such as a workspace package
-     * before an install. The resolver resolves from `directory` itself, so a caller that has the
-     * importing file passes its folder.
-     */
     readonly resolve: (directory: string, specifier: string) => Effect.Effect<Option.Option<string>>
   }
 >()("ModuleResolver") {
@@ -48,10 +37,6 @@ export class ModuleResolver extends Context.Service<
   })
 }
 
-/**
- * The folder of the package `name` that Node.js finds from the package at `from`, or none when it
- * is not installed.
- */
 export const resolvePackageDirectory = Effect.fn("resolvePackageDirectory")(function* (
   from: string,
   name: string

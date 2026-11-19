@@ -10,20 +10,10 @@ import { CommandRunner } from "#lib/shared/command-runner.ts"
 export interface CodingAgent {
   readonly command: string
   readonly name: string
-  /**
-   * Arguments for the installation probe. Defaults to `--version`; Grok Build only documents a
-   * `version` subcommand.
-   */
+  // Grok Build documents only a `version` subcommand.
   readonly probeArguments?: readonly string[]
-  /**
-   * Arguments that start the CLI's interactive session seeded with the prompt. OpenCode only
-   * pre-fills its input box, so that handoff needs one Enter press. Adamantite passes no
-   * permission, sandbox, or trust flag of the provider.
-   */
+  // OpenCode only fills its input box with the prompt, so its handoff needs one Enter press.
   readonly seedArguments: (prompt: string) => string[]
-  /**
-   * The project folder that the agent loads skills from.
-   */
   readonly skillsFolder: string
 }
 
@@ -78,9 +68,7 @@ export const codingAgents = [
 interface HandoffOptions {
   readonly agent: CodingAgent
   readonly cwd: string
-  /**
-   * Travels in the agent's argv, so other local processes can read it for the session.
-   */
+  // The prompt travels in the arguments of the agent, so other local processes can read it.
   readonly prompt: string
 }
 
@@ -93,10 +81,8 @@ function ignoreSigint() {
   // Adamantite stays alive; the agent in the foreground process group handles the signal.
 }
 
-// The session inherits stdin, so the runner keeps the agent in Adamantite's foreground process
-// group, where it gets terminal SIGINT and SIGWINCH. On POSIX, the platform spawner otherwise starts it
-// in a new session. The same SIGINT also reaches Adamantite's runtime, whose spawner finalizer
-// would kill the agent mid-edit. This shield ignores SIGINT until the enclosing scope closes.
+// The agent stays in the foreground process group, so a terminal SIGINT also reaches this process,
+// and the finalizer of the Effect spawner would kill the agent mid-edit.
 const sigintShield = Effect.acquireRelease(
   Effect.sync(() => {
     const previous = process.listeners("SIGINT")
@@ -119,16 +105,7 @@ const sigintShield = Effect.acquireRelease(
 export class CodingAgents extends Context.Service<
   CodingAgents,
   {
-    /**
-     * The supported agents whose CLI starts on this machine, in menu order.
-     */
     readonly detectInstalled: (cwd: string) => Effect.Effect<CodingAgent[]>
-    /**
-     * Hands the terminal to the agent with inherited stdio, seeded with the prompt. Resolves when
-     * the session ends; the agent's exit code is deliberately discarded because only the command
-     * can judge the result, such as Doctor's reassessment. Adamantite ignores SIGINT for the
-     * duration of the session so a Ctrl-C reaches only the agent.
-     */
     readonly handoff: (options: HandoffOptions) => Effect.Effect<void, HandoffFailed>
   }
 >()("CodingAgents") {
@@ -137,8 +114,6 @@ export class CodingAgents extends Context.Service<
     Effect.gen(function* () {
       const runner = yield* CommandRunner
 
-      // A CLI that starts and exits is installed, whatever its output or exit code. A CLI that does
-      // not start, or that runs past the timeout, is not installed.
       const isInstalled = (agent: CodingAgent, cwd: string) =>
         runner
           .exitCode({
@@ -152,8 +127,7 @@ export class CodingAgents extends Context.Service<
 
       return CodingAgents.of({
         detectInstalled: Effect.fn("CodingAgents.detectInstalled")((cwd) =>
-          // `Effect.filter` keeps the registry order that the menu depends on, also when the
-          // probes finish out of order.
+          // `Effect.filter` keeps the input order, also when the probes finish out of order.
           Effect.filter(codingAgents, (agent) => isInstalled(agent, cwd), {
             concurrency: "unbounded",
           })

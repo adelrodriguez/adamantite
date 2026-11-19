@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { addSelection, INIT_EDITORS, LINT_PRESETS, Selection } from "#lib/project/selection.ts"
 
-// Each list of a selection holds each item once, in the order of its source list.
 function isInOrder(list: readonly string[], order: readonly string[]) {
   return list.every(
     (item, index) => index === 0 || order.indexOf(list[index - 1] ?? "") < order.indexOf(item)
@@ -28,7 +27,6 @@ describe("addSelection", () => {
     ({ next, previous }) => {
       const sum = addSelection(previous, next)
 
-      // The TypeScript preset and CI take the value of `next`, so init can change them.
       expect({
         agents: sum.agents,
         ci: sum.ci,

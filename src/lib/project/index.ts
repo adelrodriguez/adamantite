@@ -25,18 +25,9 @@ import {
 } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
 
-/**
- * The folder of the target project, where a command runs. Code that always acts on the target
- * project reads it with `yield* Project.Directory`. Code that callers also run on other folders,
- * such as a trial copy or a workspace package, takes the folder as a parameter.
- */
 export class Directory extends Context.Service<Directory, string>()(
   "adamantite/Project/Directory"
 ) {
-  /**
-   * The working directory of the process, the one reader of it. A test provides the folder instead
-   * of changing the process.
-   */
   static readonly layer = Layer.sync(this, cwd)
 }
 
@@ -63,10 +54,6 @@ const PnpmCatalogs = Schema.Struct({
   catalogs: Schema.optionalKey(Schema.Record(Schema.String, Catalog)),
 })
 
-/**
- * The pnpm catalogs of the project by name, each a map from a package name to its specifier. The
- * `catalog` field of `pnpm-workspace.yaml` is the catalog named `default`.
- */
 export type Catalogs = Readonly<Record<string, Readonly<Record<string, string>>>>
 
 const parseYaml = (content: string) =>
@@ -75,10 +62,6 @@ const parseYaml = (content: string) =>
     try: () => Yaml.parse(content),
   })
 
-/**
- * The package patterns in a `pnpm-workspace.yaml`. A file that does not parse, or that has no
- * `packages` list, declares none.
- */
 const readPnpmWorkspacePatterns = (content: string) =>
   parseYaml(content).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmWorkspace)(parsed)),
@@ -86,24 +69,16 @@ const readPnpmWorkspacePatterns = (content: string) =>
     Effect.orElseSucceed(() => [])
   )
 
-/**
- * The catalogs in a `pnpm-workspace.yaml`. A file that does not parse, or whose catalogs do not
- * decode, declares none.
- */
 const readPnpmCatalogs = (content: string) =>
   parseYaml(content).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmCatalogs)(parsed)),
+    // pnpm names the `catalog` field the `default` catalog.
     Effect.map(({ catalog, catalogs = {} }) =>
       catalog === undefined ? catalogs : { ...catalogs, default: catalog }
     ),
     Effect.orElseSucceed(() => ({}))
   )
 
-/**
- * The workspace declarations of the project. The patterns are the `packages` of
- * `pnpm-workspace.yaml`, or the `workspaces` of `package.json` when `pnpm-workspace.yaml` declares
- * none. A `pnpm-workspace.yaml` can hold only settings, such as `allowBuilds`.
- */
 const readWorkspaceDeclarations = (cwd: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
@@ -128,10 +103,6 @@ const readWorkspaceDeclarations = (cwd: string) =>
     }
   })
 
-/**
- * Whether the target project declares workspace patterns. It reads only the declarations, so it
- * does not search for the workspace packages.
- */
 export const checkIsMonorepo = Effect.fn("Project.checkIsMonorepo")(function* () {
   const { patterns } = yield* readWorkspaceDeclarations(yield* Directory)
 
@@ -142,17 +113,13 @@ function escapeRegExp(text: string) {
   return text.replaceAll(/[$()+.[\\\]^{|}]/gu, String.raw`\$&`)
 }
 
-/**
- * Convert a workspace pattern to a regular expression that matches a relative directory path. `*`
- * and `?` match inside one path segment, and a `**` segment matches zero or more segments.
- */
 function workspacePatternToRegExp(pattern: string): RegExp {
   const segments = pattern.replace(/^\.\//u, "").replace(/\/+$/u, "").split("/")
   let source = ""
 
   for (const [index, segment] of segments.entries()) {
-    // A segment after `**` takes its separator from the `**` part.
-    const separator = index === 0 || segments[index - 1] === "**" ? "" : "/"
+    const followsGlobstar = segments[index - 1] === "**"
+    const separator = index === 0 || followsGlobstar ? "" : "/"
 
     if (segment !== "**") {
       source += `${separator}${escapeRegExp(segment).replaceAll("*", "[^/]*").replaceAll("?", "[^/]")}`
@@ -166,10 +133,6 @@ function workspacePatternToRegExp(pattern: string): RegExp {
   return new RegExp(`^${source}$`, "u")
 }
 
-/**
- * The fixed directory before the first wildcard segment of a pattern, such as `packages` for
- * `packages/*`, and the number of segments after it. The depth is unbounded with `**`.
- */
 function getPatternBase(pattern: string) {
   const segments = pattern.replace(/^\.\//u, "").replace(/\/+$/u, "").split("/")
   const wildcardIndex = segments.findIndex((segment) => /[*?]/u.test(segment))
@@ -186,10 +149,6 @@ function getPatternBase(pattern: string) {
 
 const SKIPPED_DIRECTORIES: ReadonlySet<string> = new Set(["node_modules"])
 
-/**
- * The directory and every subdirectory up to `depth` levels below it, relative to `cwd`. Skips
- * `node_modules` and directories whose names start with a dot.
- */
 const listDirectories = (
   cwd: string,
   relative: string,
@@ -216,11 +175,6 @@ const listDirectories = (
     return [relative, ...children.flat()]
   })
 
-/**
- * The absolute directories of the workspace packages that the patterns select, without the root. A
- * package is a directory with a `package.json` that matches an include pattern and no `!` exclusion
- * pattern.
- */
 const findPackageDirectories = (cwd: string, patterns: readonly string[]) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
@@ -259,27 +213,12 @@ const findPackageDirectories = (cwd: string, patterns: readonly string[]) =>
     return packages.flat()
   })
 
-/**
- * The workspace shape of the project. A project that declares workspace patterns is a monorepo,
- * also before any package exists.
- */
 export interface Workspace {
-  /**
-   * The pnpm catalogs that `catalog:` dependency specifiers refer to.
-   */
   readonly catalogs: Catalogs
   readonly isMonorepo: boolean
-  /**
-   * The absolute directories of the workspace packages, without the root.
-   */
   readonly packageDirectories: readonly string[]
 }
 
-/**
- * Reads the workspace patterns one time, and finds the workspace packages that they select. A
- * command that reads the workspace outside a snapshot, such as `harden` or `rule try`, reads it one
- * time for each phase and passes the `Workspace` down.
- */
 export const readWorkspace = Effect.fn("Project.readWorkspace")(function* () {
   const directory = yield* Directory
   const { catalogs, patterns } = yield* readWorkspaceDeclarations(directory)
@@ -293,33 +232,14 @@ export const readWorkspace = Effect.fn("Project.readWorkspace")(function* () {
 
 const LINT_CONFIG_FILE = "oxlint.config.ts"
 
-/**
- * The facts about the target project that several assessments share. It is a snapshot: a coding
- * agent or an install can change the project, so each reassessment reads a new one. It holds facts,
- * and not the folder, which `Directory` gives.
- */
 export interface Snapshot {
-  /**
-   * The `custom()` calls that the Oxlint configs of the root and the workspace packages reach.
-   */
   readonly customRules: CustomRuleDiscovery
-  /**
-   * The root `oxlint.config.ts`, loaded as Oxlint loads it, or none when it does not exist.
-   */
   readonly lintConfig: Option.Option<Result.Result<LintConfig, ConfigLoadFailed>>
-  /**
-   * The lockfile that `init` or `update` wrote, or none when the project has no lockfile. `read`
-   * decodes the lockfile one time, and the rest of the code trusts this value.
-   */
   readonly lockfile: Option.Option<Lockfile>
   readonly packageJson: PackageJson
   readonly workspace: Workspace
 }
 
-/**
- * Reads a snapshot of the target project. Each part comes from this read, so a manifest from before
- * an install or a handoff cannot enter the snapshot.
- */
 export const read = Effect.fn("Project.read")(function* () {
   const directory = yield* Directory
   const path = yield* Path.Path
@@ -334,9 +254,6 @@ export const read = Effect.fn("Project.read")(function* () {
     ...workspace.packageDirectories,
   ])
 
-  // Discovery loads the config that lints the root. `oxlint.config.ts` comes first in its config
-  // files, so that load is the root `oxlint.config.ts` when the file exists. Each load starts a
-  // Node.js process, so the snapshot takes the read from discovery.
   const lintConfig = Option.fromUndefinedOr(
     customRules.reads.get(path.join(directory, LINT_CONFIG_FILE))
   )

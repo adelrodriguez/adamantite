@@ -26,7 +26,6 @@ function readPnpmWorkspace(pnpmWorkspace: string) {
 }
 
 describe("Project.readWorkspace", () => {
-  // `*` and `?` match inside one folder name, and a `**` segment matches zero or more folders.
   it.effect.each([
     { directory: "packages/web", expected: ["/project/packages/web"], pattern: "packages/*" },
     { directory: "packages/group/web", expected: [], pattern: "packages/*" },
@@ -66,7 +65,6 @@ describe("Project.readWorkspace", () => {
       })
   )
 
-  // An exclusion matches the whole path, so `*` in it stays inside one folder name.
   it.effect("leave out only the packages that an exclusion with * names", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -333,7 +331,6 @@ describe("Project.checkIsMonorepo", () => {
     },
   ])("return $expected when $name", ({ content, expected, file }) =>
     Effect.gen(function* () {
-      // A case for `package.json` replaces the default one.
       const defaults = { "package.json": yield* stringifyJson({ name: "test-package" }) }
       const files = makeFiles({ ...defaults, [file]: content })
 

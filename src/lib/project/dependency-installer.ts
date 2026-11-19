@@ -19,11 +19,6 @@ import { CommandFailed, FailedToInstallDependency, NoPackageManager } from "#lib
 export class DependencyInstaller extends Context.Service<
   DependencyInstaller,
   {
-    /**
-     * Add `packages` as development dependencies of the project at `cwd` with its package manager,
-     * at the workspace root when `workspace` is set. The package manager's output shows only in the
-     * error of a failed install.
-     */
     readonly addDevDependencies: (
       packages: readonly string[],
       cwd: string,
@@ -90,11 +85,6 @@ export class DependencyInstaller extends Context.Service<
   )
 }
 
-/**
- * Install `packages` at the workspace root of the target project. An install changes
- * `node_modules`, so the module resolver forgets what earlier resolutions read, also when the
- * install fails part way.
- */
 export const addRootDevDependencies = (packages: readonly string[]) =>
   Effect.gen(function* () {
     const dependencyInstaller = yield* DependencyInstaller

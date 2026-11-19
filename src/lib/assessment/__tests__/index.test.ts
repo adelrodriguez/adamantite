@@ -31,12 +31,10 @@ const EMPTY_SELECTION = {
   typescript: null,
 } as const satisfies Selection
 
-// The lockfile that `init` writes for `selection`, before it writes any managed file.
 function makeLockfile(selection: Selection) {
   return stringifyJson({ schemaVersion: 1, selection, version: "0.0.0", written: {} })
 }
 
-// These assessments resolve no TypeScript package, so the tsconfig integration starts no process.
 const noProcessLayer = makeOxlintFilesLayer()
 
 type RenderedAssessment = Pick<ProjectAssessment, "findings" | "warnings">
@@ -155,7 +153,6 @@ describe("renderAssessmentMarkdown", () => {
     )
   })
 
-  // A warning with steps puts each step on its own line, as the terminal shows it.
   it.each([
     { findings: [], report: "warning report" },
     {
@@ -319,7 +316,6 @@ describe("assessProject", () => {
         )
       )
 
-      // The findings follow the script order, and the `analyze` script gets none.
       expect(
         assessment.findings.filter((finding) => finding.integration === "scripts")
       ).toStrictEqual([
@@ -440,8 +436,6 @@ describe("assessProject", () => {
         "github",
       ])
       expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
-      // Custom rule discovery loads the root config as the config of the root package, and the
-      // project takes its read from there.
       expect(reads.filter((path) => path === `${ROOT}/oxlint.config.ts`)).toHaveLength(1)
     })
   )

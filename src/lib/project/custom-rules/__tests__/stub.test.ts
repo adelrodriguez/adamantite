@@ -26,9 +26,6 @@ const OxlintJsonOutput = Schema.Struct({
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
-/**
- * The stub that rule add writes, with its import pointed at this checkout.
- */
 function makeStub() {
   return toCustomRuleStub("no-debugger-here").replace(
     '"adamantite/rules/plugin"',
@@ -36,10 +33,6 @@ function makeStub() {
   )
 }
 
-/**
- * A config that loads the rules folder with custom(), and turns off the core rule that reports the
- * same `debugger` statement.
- */
 const CUSTOM_CONFIG = [
   'import { defineConfig } from "oxlint"',
   `import custom from ${JSON.stringify(CUSTOM_PRESET)}`,
@@ -48,8 +41,6 @@ const CUSTOM_CONFIG = [
   "",
 ].join("\n")
 
-// The stub and the optional test that rule add writes must load with custom() and the test presets
-// in a real Oxlint run.
 describe("rule add stub", () => {
   const rulePath = ".adamantite/lint/no-debugger-here.ts"
   let project: string
@@ -97,7 +88,6 @@ describe("rule add stub", () => {
 
   beforeEach(() => {
     project = mkdtempSync(join(tmpdir(), "adamantite-custom-rules-"))
-    // A real node_modules folder keeps the entry modules that custom() writes inside the project.
     mkdirSync(join(project, "node_modules"))
     symlinkSync(join(REPO_ROOT, "node_modules/oxlint"), join(project, "node_modules/oxlint"))
     write("src/index.ts", "export function stop() {\n  debugger\n}\n")

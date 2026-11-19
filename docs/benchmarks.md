@@ -27,6 +27,9 @@ The bench writes one temporary target project for each stack in `presets/__tests
   `node_modules/adamantite` links the files that `package.json` publishes, so the commands run the
   built CLI and the built presets. A project without the `effect` preset has no `@effect/tsgo`.
 
+The bench formats `package.json` and `tsconfig.json` with Oxfmt, as `init` renders formatted
+configs, so a fix changes only the fixable idioms.
+
 The report names the number of project files outside `node_modules`, the number of files in the
 TypeScript program from `tsc --listFilesOnly`, and the versions of Oxlint, Oxfmt, tsrs, TypeScript,
 and `@effect/tsgo`.

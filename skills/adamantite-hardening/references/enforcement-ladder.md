@@ -10,3 +10,5 @@ The enforcement ladder orders the places that can hold a coding standard, from s
 6. **Instruction:** an entry in `CODING_STANDARDS.md`, for a standard that needs judgment or that no step above can check. The entry states the standard, the reason for it, how to spot the mistake, and one example from the project of the code to avoid and the code to prefer.
 
 Choose a step by the mistake that it prevents and the similar valid code that it accepts. A step that reports valid code cannot hold the standard, so use a lower step. When a step can hold only part of a standard, put the other part on a lower step.
+
+A code comment is not a step. When a comment states a standard or an invariant of the project's own code, put the standard on a step and delete the comment. The comment beside a rule that holds a standard, which states the standard and its reason, stays.

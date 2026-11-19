@@ -67,6 +67,63 @@ export const readFile = (path: string) =>
 [Filesystem helpers](src/lib/shared/filesystem.ts) show the Effect chains. This moves the existing
 rule retained by [PR #344](https://github.com/adelrodriguez/adamantite/pull/344).
 
+## Comments
+
+### Write a comment only for what the code cannot say
+
+Write no comment by default. A comment that repeats the code goes stale, and the reader trusts it
+over the code. Describe how an area works in its section of the
+[architecture](docs/architecture.md), not in the TSDoc of its module. Write a comment only for one
+of these:
+
+- A doc comment on a declaration that a package export publishes, such as a type of
+  `adamantite/rules/plugin`.
+- Behavior that an outside tool, platform, or protocol forces, with a link to the upstream issue or
+  docs when one exists.
+- The reason beside a rule that a config turns off or configures.
+- The reason after a disable comment or a `@ts-expect-error`, and the `SAFETY` comment of a type
+  assertion.
+- A license or provenance header, and the vendored code that an `UPSTREAM.md` lists.
+
+When our own code surprises the reader, rename, extract, or type it until it no longer does. When a
+comment states an invariant of our own code, hold the invariant with a step of the
+[enforcement ladder](skills/adamantite-hardening/references/enforcement-ladder.md), then delete the
+comment.
+
+Spot it: A doc comment repeats the name or the type that it documents, a comment narrates the next
+statement, or a comment says what our own code must, never, or only does.
+
+```ts
+// Avoid: the schema in suppressions.ts before #960, whose doc comments repeat its name and its format.
+/**
+ * The comments that turn off one rule, or all rules.
+ */
+export const RuleSuppressions = Schema.Struct({
+  /**
+   * Each comment as `<file>:<line>`, with the file relative to the project root.
+   */
+  locations: Schema.Array(Schema.String),
+  /**
+   * The rule, or none for a comment that names no rule and so turns off all rules.
+   */
+  rule: Schema.OptionFromNullOr(Schema.String),
+})
+
+// Prefer: after #960, the schema holds the `<file>:<line>` format, and the Hardening section of
+// the architecture says what a location and a missing rule mean.
+const Location = Schema.TemplateLiteral([Schema.String, ":", Schema.Int])
+
+export const RuleSuppressions = Schema.Struct({
+  locations: Schema.Array(Location),
+  rule: Schema.OptionFromNullOr(Schema.String),
+})
+```
+
+In November 2026, comments made up 18% of the non-blank lines in `src`, `presets`, and `scripts`.
+367 doc comments sat on top-level declarations that their module does not export. The list of
+allowed comments follows the Comment Sicko agent of
+[pstack](https://github.com/cursor/plugins/tree/main/pstack).
+
 ## Integrations
 
 ### Keep tool behavior with its owner

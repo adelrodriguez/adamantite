@@ -71,9 +71,6 @@ try {
   rmSync(fixture, { force: true, recursive: true })
 }
 
-// A preset loads a first-party plugin by a file URL next to itself, so the
-// build must copy each file that a built preset names. A package name, such as `@shadcn/lint`,
-// resolves in the target project instead.
 const PresetModule = Schema.Struct({
   default: Schema.Struct({
     jsPlugins: Schema.optional(
@@ -107,8 +104,6 @@ for (const { file, module } of presets) {
 
 console.info("Verified the plugin files of the built lint presets")
 
-// The TypeScript preset lists the type resets in `files`, by a path next to itself, and each reset
-// file references the others by path. The build must copy every file that the preset loads.
 const TypeScriptPreset = Schema.Struct({ files: Schema.Array(Schema.String) })
 const typescriptPresetPath = join(import.meta.dirname, "..", "dist", "presets", "typescript.json")
 
@@ -116,9 +111,8 @@ const typescriptPreset = Schema.decodeUnknownSync(TypeScriptPreset)(
   Result.getOrThrow(Jsonc.parse(readFileSync(typescriptPresetPath, "utf8")))
 )
 
-/**
- * Returns the given declaration files and every file that they reference by path.
- */
+// TypeScript resolves each entry of `files`, and each `/// <reference path>`, relative to the file
+// that declares it.
 function collectLoadedFiles(
   pending: readonly string[],
   loaded: ReadonlySet<string>
@@ -151,9 +145,6 @@ const loadedFiles = collectLoadedFiles(
 
 console.info(`Verified the ${loadedFiles.size} type reset files of the built TypeScript preset`)
 
-// Copied code keeps the license notice of its source, so every license file under `presets/` must
-// ship at the same path under `dist/presets/`. The tests do not ship, and their folders hold the
-// licenses of the installed fixture packages.
 const sourcePresetDirectory = join(import.meta.dirname, "..", "presets")
 const builtPresetDirectory = join(import.meta.dirname, "..", "dist", "presets")
 

@@ -1,9 +1,4 @@
-/**
- * The Vitest reporter of `scripts/test-latest.ts`. The JSON reporter of Vitest keeps the message
- * and the stack of a failure, but not its diff, which names the fixture file and the rule of each
- * report. This reporter writes the state and the complete errors of each test and test module to
- * the file that `ADAMANTITE_LATEST_RESULTS` names.
- */
+// The JSON reporter of Vitest keeps the message and the stack of a failure, but not its diff.
 import { writeFileSync } from "node:fs"
 import process from "node:process"
 import type { Reporter, TestModule } from "vitest/node"
@@ -26,9 +21,6 @@ interface ReportedError {
   readonly stack?: string
 }
 
-/**
- * The message, the diff, and the stack frames outside `node_modules` of an error.
- */
 function toText(error: ReportedError): string {
   const frames = (error.stack ?? "")
     .split("\n")
@@ -39,11 +31,8 @@ function toText(error: ReportedError): string {
     .join("\n\n")
 }
 
-/**
- * The errors of a test module, and the errors of its suites. A `beforeAll` or `afterAll` hook of a
- * suite that fails reports its error on the suite, not on the module, and skips the tests of the
- * suite without an error of their own.
- */
+// A failed `beforeAll` or `afterAll` hook of a suite reports its error on the suite, not on the
+// module, and skips the tests of the suite without an error of their own.
 function toModuleResult(testModule: TestModule) {
   const suiteErrors = Array.from(testModule.children.allSuites(), (suite) =>
     suite.errors().map((error) => `In the suite "${suite.fullName}":\n\n${toText(error)}`)

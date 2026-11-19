@@ -1,20 +1,3 @@
-/**
- * Test the presets with the newest versions of Oxlint, the managed plugins, the type-aware backend,
- * and the libraries that the fixtures import. The `latest` job of the weekly workflow
- * `.github/workflows/weekly.yml` runs it.
- *
- * `run` makes a temporary git worktree of `HEAD`, so it changes no file of the checkout and makes
- * no commit. It runs `pnpm run test:presets` with the locked versions, updates the packages, runs
- * the same command on the same fixture files again, and writes `report.json` and `report.md`.
- *
- * `publish` reads the report. On a failure it comments on the open issue with the same fingerprint,
- * or opens one issue when there is none. On a pass it does nothing.
- *
- * ```sh
- * node scripts/test-latest.ts run --out <folder> [--override <package>@<version>]...
- * node scripts/test-latest.ts publish --out <folder> --repo <owner/name> [--dry-run]
- * ```
- */
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import {
@@ -38,15 +21,9 @@ import * as Schema from "effect/Schema"
 const repoRoot = join(import.meta.dirname, "..")
 const FIXTURE_PACKAGES = "presets/__tests__/fixture-packages"
 
-// The reporter of the checkout that runs this script, not the reporter of the tested commit.
-const REPORTER = join(import.meta.dirname, "latest-reporter.ts")
+const CHECKOUT_REPORTER = join(import.meta.dirname, "latest-reporter.ts")
 const LOCKFILES = ["pnpm-lock.yaml", `${FIXTURE_PACKAGES}/pnpm-lock.yaml`]
 
-/**
- * The root packages that a new release can break the presets with: Oxlint, the managed plugins, the
- * type-aware backend, and the packages that the fixtures import from the root, with the packages
- * that must keep the same version as one of them. The run also updates every fixture package.
- */
 const ROOT_PACKAGES = [
   "oxlint",
   "@oxlint/plugins",
@@ -63,21 +40,12 @@ const ROOT_PACKAGES = [
   "@vitest/ui",
 ]
 
-/**
- * The marker that `publish` writes into an issue body, and looks for in the open issues.
- */
 const FINGERPRINT_MARKER = "adamantite-latest-fingerprint"
 
 const ISSUE_LABELS = ["automated", "dependencies", "needs-triage"]
 
-// The time that `run` may take in all. The steps share it, so a step that hangs ends before the job
-// limit in `.github/workflows/weekly.yml`, and the run still writes a report for `publish`.
 const RUN_BUDGET = 45 * 60 * 1000
 
-/**
- * The steps of `run`. Each step writes `<name>.log` into the output folder. An override step is
- * `override-<n>`, with one step for each `--override`.
- */
 type StepName =
   | "baseline-install"
   | "baseline-install-fixtures"
@@ -97,11 +65,6 @@ const STEP_NAMES = [
 
 type TestRunName = "baseline" | "candidate"
 
-/**
- * The files that `run` and `publish` write into the output folder, other than the override logs.
- * `run` deletes them before it starts, so a reused folder never holds results or a report from an
- * earlier run, and it deletes no other file.
- */
 const RUN_FILES = new Set([
   "report.json",
   "report.md",
@@ -117,8 +80,6 @@ const OVERRIDE_LOG = /^override-\d+\.log$/
 // GitHub rejects an issue body or a comment longer than 65,536 characters.
 const MAX_BODY = 60_000
 const MAX_DIAGNOSTIC = 6000
-
-// --- Report ---
 
 const Outcome = Schema.Literals([
   "pass",
@@ -141,27 +102,10 @@ const Step = Schema.Struct({
 type Step = typeof Step.Type
 
 const Failure = Schema.Struct({
-  /**
-   * The full failure message of Vitest, with the diff of the reports.
-   */
   diagnostic: Schema.String,
-  /**
-   * The fixture files that the message names.
-   */
   fixtures: Schema.Array(Schema.String),
-  /**
-   * The test file and the full test name, such as `presets/__tests__/stacks.test.ts > strict stack
-   * lint each valid fixture clean`.
-   */
   id: Schema.String,
-  /**
-   * The rule IDs that the message names, such as `promise/valid-params`.
-   */
   rules: Schema.Array(Schema.String),
-  /**
-   * The status in the candidate run. `missing` is a test that the baseline run passed and the
-   * candidate run did not run.
-   */
   status: Schema.String,
 })
 
@@ -171,9 +115,6 @@ const Report = Schema.Struct({
   baselineVersions: Schema.Record(Schema.String, Schema.String),
   candidateVersions: Schema.Record(Schema.String, Schema.String),
   commit: Schema.String,
-  /**
-   * The end of the output of the step that failed, when no test result explains the failure.
-   */
   failedOutput: Schema.NullOr(Schema.String),
   failures: Schema.Array(Failure),
   fingerprint: Schema.String,
@@ -190,9 +131,6 @@ type Report = typeof Report.Type
 
 const decodeReport = Schema.decodeSync(Schema.fromJsonString(Report))
 
-/**
- * A test or a test module in the results file of `scripts/latest-reporter.ts`.
- */
 const ReportedResult = Schema.Struct({
   errors: Schema.Array(Schema.String),
   id: Schema.String,
@@ -236,11 +174,6 @@ const SUMMARIES: Record<Outcome, string> = {
     "Tests that pass with the locked versions fail, skip, or do not run with the newest versions.",
 }
 
-// --- Commands ---
-
-/**
- * Run a command, write its output to `<out>/<name>.log`, and return the step.
- */
 function runStep(
   name: StepName,
   command: string,
@@ -253,7 +186,7 @@ function runStep(
   }
 ): Step {
   const start = performance.now()
-  // Color codes would fill the logs and the issue. Vitest prints color whenever FORCE_COLOR is set.
+  // Vitest prints color whenever FORCE_COLOR is set, which would fill the logs and the issue.
   const { FORCE_COLOR: _forceColor, ...env } = process.env
 
   const result = spawnSync(command, args, {
@@ -299,9 +232,6 @@ function readPackageJson(path: string) {
   return decodePackageJson(readFileSync(path, "utf8"))
 }
 
-/**
- * The installed version of each tested package: the root packages and every fixture package.
- */
 function readVersions(worktree: string): Record<string, string> {
   const fixtures = readPackageJson(join(worktree, FIXTURE_PACKAGES, "package.json"))
 
@@ -320,10 +250,6 @@ function readVersions(worktree: string): Record<string, string> {
   ])
 }
 
-/**
- * The `pnpm add` arguments that replace the newest version of a package with a chosen one, in the
- * manifest and the dependency group that list the package.
- */
 function toOverrideArgs(worktree: string, spec: string): string[] {
   const at = spec.lastIndexOf("@")
   const name = at > 0 ? spec.slice(0, at) : ""
@@ -350,14 +276,9 @@ function toOverrideArgs(worktree: string, spec: string): string[] {
   throw new Error(`--override ${spec} names a package that no manifest lists.`)
 }
 
-// --- Test results ---
-
 type ReportedTest = (typeof LatestResults.Type)["tests"][number]
 
 interface TestRun {
-  /**
-   * The errors of each test module that failed to load or failed in a hook, keyed by module ID.
-   */
   readonly failedModules: ReadonlyMap<string, readonly string[]>
   readonly tests: ReadonlyMap<string, ReportedTest>
 }
@@ -381,8 +302,6 @@ function readTestRun(path: string): TestRun | undefined {
 
 const ANSI = new RegExp(`${String.fromCodePoint(27)}\\[[0-9;]*m`, "g")
 
-// The fixture tests print a report as an object, `{ "file": "a.ts", "rule": "plugin/rule" }`, or
-// as a string, `"a.ts plugin/rule"`.
 const FIXTURE = String.raw`[\w./@-]+\.(?:[cm]?[jt]sx?|vue)`
 const RULE = String.raw`[\w@-]+/[\w-]+`
 const RULE_FIELD = new RegExp(String.raw`"rule": "(?<rule>${RULE})"`, "g")
@@ -412,10 +331,6 @@ function toFailure(id: string, status: string, messages: readonly string[]): Fai
 // Vitest finishes the test modules in a different order in each run, so the failures sort by ID.
 const byId = Order.mapInput(Order.String, (failure: Failure) => failure.id)
 
-/**
- * The test modules that failed and the tests that failed in a run. A skipped test is not a failure,
- * because the environment can skip a test, such as a Bun test on a machine without Bun.
- */
 function listFailures(run: TestRun): Failure[] {
   return EffectArray.sort(
     [
@@ -428,12 +343,6 @@ function listFailures(run: TestRun): Failure[] {
   )
 }
 
-/**
- * The failures of the candidate run, and the tests that pass in the baseline run and skip or do not
- * run in the candidate run. The baseline passed, so a test that only the candidate skips, such as a
- * fixture without its type check, is a failure too. The tests of a module that failed to load or
- * failed in a hook are in the failure of the module.
- */
 function listRegressions(baseline: TestRun, candidate: TestRun): Failure[] {
   const lost = [...baseline.tests.values()].flatMap((test) => {
     const state = candidate.tests.get(test.id)?.state ?? "missing"
@@ -453,9 +362,6 @@ function isSkipped(test: ReportedTest | undefined): boolean {
   return test?.state === "skipped" || test?.state === "pending"
 }
 
-/**
- * The tests that each run skipped. The environment skips them, so they are not failures.
- */
 function listSkipped(runs: ReadonlyArray<TestRun | undefined>): string[] {
   const [first, ...rest] = runs.filter((run) => run !== undefined)
 
@@ -466,10 +372,6 @@ function listSkipped(runs: ReadonlyArray<TestRun | undefined>): string[] {
   return EffectArray.sort(skipped, Order.String)
 }
 
-/**
- * The identity of a failure. It holds the outcome and what failed, and no version, so a failure
- * that repeats with a newer patch release keeps one issue, and a different failure gets its own.
- */
 function toFingerprint(outcome: Outcome, failures: readonly Failure[], logs: string): string {
   const errorCodes = EffectArray.sort(
     new Set(Array.from(logs.matchAll(/\b(?:ERR_PNPM_[A-Z_]+|[A-Z][A-Za-z]*Error)\b/g), String)),
@@ -501,16 +403,9 @@ interface RunResults {
   readonly baselinePassed: boolean
   readonly candidate: TestRun | undefined
   readonly candidatePassed: boolean
-  /**
-   * The update and every override installed.
-   */
   readonly updated: boolean
 }
 
-/**
- * Separate a preset regression from a failure of `main`, of the install, or of the test process.
- * The run attributes a failure to the newest versions only after the baseline passes.
- */
 function classify(results: RunResults): Classification {
   const { baseline, candidate } = results
 
@@ -525,15 +420,12 @@ function classify(results: RunResults): Classification {
     return { failures: [], outcome: "install-failure" }
   }
 
-  // Vitest wrote no result, so it did not finish.
   if (baseline === undefined || candidate === undefined) {
     return { failures: [], outcome: "process-failure" }
   }
 
   const failures = listRegressions(baseline, candidate)
 
-  // No test ran, so the test process broke, not a preset. A test module that cannot load its
-  // imports, such as after a major release of a library that the tests import, does this.
   if (![...candidate.tests.values()].some((test) => test.state === "passed")) {
     return { failures, outcome: "process-failure" }
   }
@@ -542,11 +434,8 @@ function classify(results: RunResults): Classification {
     return { failures, outcome: "regression" }
   }
 
-  // Every test passed, but Vitest failed, such as for an unhandled error.
   return { failures, outcome: results.candidatePassed ? "pass" : "process-failure" }
 }
-
-// --- Markdown ---
 
 function fence(text: string, language = ""): string {
   const ticks = "`".repeat(Math.max(3, ...Array.from(text.matchAll(/`+/g), (m) => m[0].length + 1)))
@@ -637,8 +526,6 @@ function toMarkdown(report: Report): string {
     .replaceAll(/\n{3,}/g, "\n\n")
 }
 
-// --- run ---
-
 function runLatest(out: string, overrides: readonly string[]): Outcome {
   mkdirSync(out, { recursive: true })
 
@@ -651,8 +538,8 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
   const deadline = performance.now() + RUN_BUDGET
 
   const commit = read("git", ["rev-parse", "HEAD"]).trim()
-  // The real path, so that each path that a test prints starts with the worktree, also where the
-  // temporary folder is a symbolic link, as on macOS.
+  // On macOS, the temporary folder is a symbolic link, and the paths that a test prints start with
+  // the real path.
   const worktree = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-latest-")))
   const steps: Step[] = []
 
@@ -674,7 +561,7 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     return step(
       name,
       "pnpm",
-      ["run", "test:presets", "--reporter=default", `--reporter=${REPORTER}`],
+      ["run", "test:presets", "--reporter=default", `--reporter=${CHECKOUT_REPORTER}`],
       { ADAMANTITE_LATEST_RESULTS: join(out, `${name}.results.json`) }
     )
   }
@@ -682,8 +569,6 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
   read("git", ["worktree", "add", "--detach", worktree, commit])
 
   try {
-    // The fixture packages install here, not in the `globalSetup` of the tests, so the report has
-    // their versions, and a failed install is not a test failure.
     const baselineInstalled =
       step("baseline-install", "pnpm", ["install", "--frozen-lockfile"])
       && step("baseline-install-fixtures", "pnpm", [
@@ -729,7 +614,6 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
       baselineVersions,
       candidateVersions,
       commit,
-      // The log explains a failure that no test result explains.
       failedOutput:
         failedLogs.length > 0 && failures.every((failure) => failure.diagnostic === "")
           ? (failedLogs.at(-1) ?? "").slice(-MAX_DIAGNOSTIC)
@@ -761,8 +645,6 @@ function runLatest(out: string, overrides: readonly string[]): Outcome {
     read("git", ["worktree", "remove", "--force", worktree])
   }
 }
-
-// --- publish ---
 
 function publishLatest(out: string, repo: string, dryRun: boolean): void {
   const report = decodeReport(readFileSync(join(out, "report.json"), "utf8"))
@@ -839,8 +721,6 @@ function publishLatest(out: string, repo: string, dryRun: boolean): void {
   writeFileSync(bodyFile, [`The same failure repeated.`, "", markdown].join("\n"))
   console.info(dryRun ? `Dry run: gh ${args.join(" ")}` : read("gh", args).trim())
 }
-
-// --- CLI ---
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,

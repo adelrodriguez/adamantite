@@ -1,10 +1,5 @@
 import type { OxlintOverride } from "oxlint"
 
-// The test files with tests that start real processes: Oxlint and Oxfmt runs that lint and format
-// files, rule trials in a copy of a project, Node.js runs that load configs, and Vitest runs that
-// check the module cache. They touch the host filesystem, so they stay out of the unit tests. The
-// unit tests in the same file run with them. `vitest.config.ts` makes the `presets` project from
-// this list, and `inMemoryTests` below lets only these files reach the host filesystem.
 export const PROCESS_RUN_TESTS = [
   "presets/__tests__/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",

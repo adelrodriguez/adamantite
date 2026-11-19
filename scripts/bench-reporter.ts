@@ -1,12 +1,3 @@
-/**
- * The Vitest reporter of `pnpm run bench`. It writes `bench-results/report.json`, with the raw
- * duration of each run, and `bench-results/report.md`.
- *
- * A benchmark counts only when its test passed, recorded its metadata, and timed each command the
- * planned number of times. The bench throws on an unexpected exit code, so a run that fails, skips
- * its files, or misses its type check fails its test. The report lists each other test as invalid,
- * with the reason, and gives it no timing.
- */
 import { Buffer } from "node:buffer"
 import { spawnSync } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
@@ -20,70 +11,28 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 
 const BenchmarkCommand = Schema.Struct({
-  /**
-   * The command line that the bench runs in the project folder.
-   */
   command: Schema.String,
-  /**
-   * The duration of the first run of the command, which the bench validated before it timed the
-   * runs. Earlier operations of the stack can warm the caches of this run.
-   */
   firstRunMs: Schema.Finite,
   name: Schema.String,
 })
 
 const ExcludedFile = Schema.Struct({ file: Schema.String, reason: Schema.String })
 
-/**
- * The type of the annotation that holds the metadata of a bench test, as JSON in its attachment.
- */
 export const BENCH_ANNOTATION = "adamantite:bench"
 
-/**
- * The metadata that each bench test records in the annotation.
- */
 export const BenchmarkMeta = Schema.Struct({
-  /**
-   * The commands of the operation. Commands in one operation select the same files with the same
-   * binary, native binding, type-aware backend, rules, folder, variables, and output settings.
-   */
   commands: Schema.NonEmptyArray(BenchmarkCommand),
-  /**
-   * The files that the operation leaves out, with the reason, such as an idiom that needs a second
-   * fix.
-   */
   excluded: Schema.Array(ExcludedFile),
-  /**
-   * Why the operation has no direct command to compare with the Adamantite command.
-   */
   mismatch: Schema.NullOr(Schema.String),
   operation: Schema.String,
   project: Schema.Struct({
-    /**
-     * The files that the project holds outside `node_modules`.
-     */
     files: Schema.Int,
-    /**
-     * The files of the TypeScript program, with the declaration files of the dependencies.
-     */
     programFiles: Schema.Int,
   }),
-  /**
-   * The timed runs of each command, after its first run.
-   */
   runs: Schema.Int,
   selection: Schema.Struct({
-    /**
-     * The file arguments of the Adamantite command. None selects the whole project.
-     */
     arguments: Schema.Array(Schema.String),
-    /**
-     * The files that Oxfmt checked in the first run, or null when the operation does not format.
-     */
     formattedFiles: Schema.NullOr(Schema.Int),
-    /**
-     * The files that Oxlint linted in the first run, or null when the operation does not lint.
-     */
     lintedFiles: Schema.NullOr(Schema.Int),
   }),
   stack: Schema.String,
@@ -95,20 +44,11 @@ export type BenchmarkMeta = typeof BenchmarkMeta.Type
 
 const decodeBenchmarkMeta = Schema.decodeUnknownResult(Schema.fromJsonString(BenchmarkMeta))
 
-/**
- * A test of the bench as the reporter reads it.
- */
 export interface ReportedTest {
   readonly errors: readonly string[]
   readonly id: string
-  /**
-   * The JSON of the metadata annotation, when the test recorded one.
-   */
   readonly meta: string | undefined
   readonly state: string
-  /**
-   * Each timed task of the test, with the duration of each run in milliseconds.
-   */
   readonly tasks: ReadonlyArray<{ readonly name: string; readonly samples: readonly number[] }>
 }
 
@@ -144,10 +84,6 @@ function toMedian(sorted: readonly number[]): number {
     : ((sorted[middle - 1] ?? Number.NaN) + (sorted[middle] ?? Number.NaN)) / 2
 }
 
-/**
- * Classify one test. A test is a valid benchmark only when it passed, recorded its metadata, and
- * timed each command of the metadata exactly `runs` times.
- */
 export function toBenchmarkResult(test: ReportedTest): BenchmarkResult {
   function invalid(reason: string) {
     return { id: test.id, kind: "invalid", reason } as const
@@ -312,8 +248,6 @@ export function toMarkdown(report: BenchmarkReport): string {
   ].join("\n")
 }
 
-// --- Vitest ---
-
 interface ReportedError {
   readonly message: string
   readonly stack?: string
@@ -323,10 +257,8 @@ function toText(error: ReportedError): string {
   return error.stack ?? error.message
 }
 
-/**
- * The errors of the module and its suites. A failed `beforeAll` hook reports its error on the
- * suite, and skips the tests of the suite without an error of their own.
- */
+// A failed `beforeAll` hook reports its error on the suite, and skips the tests of the suite
+// without an error of their own.
 function listModuleErrors(testModule: TestModule): string[] {
   return [
     ...testModule.errors().map(toText),
@@ -336,9 +268,7 @@ function listModuleErrors(testModule: TestModule): string[] {
   ]
 }
 
-/**
- * The JSON of the metadata annotation. Vitest sends the bytes of an attachment as base64.
- */
+// Vitest sends the bytes of an attachment as base64.
 function findMeta(testCase: TestCase): string | undefined {
   const body = testCase.annotations().find((annotation) => annotation.type === BENCH_ANNOTATION)
     ?.attachment?.body

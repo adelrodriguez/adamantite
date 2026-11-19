@@ -11,11 +11,21 @@ none does.
 ## Runtime
 
 `bin/adamantite` loads `dist/index.js`, which Tsdown bundles from `src/index.ts`, beside the
-presets. The CLI bundle and the Oxlint entry include Effect and `@effect/platform-node`, so the
-package installs neither. `src/index.ts` starts the Effect runtime, `src/cli.ts` defines the
-command tree and the services, and each module of `src/commands` defines one command. The Oxlint
-entry, `src/oxlint/index.ts`, and the probe plugin, `src/oxlint/probe.ts`, run in Oxlint's process,
-and build as `dist/oxlint.js` and `dist/probe.js`.
+presets. The CLI bundle and the Oxlint entry include Effect and `@effect/platform-node`, so Node.js
+loads three files at startup in place of more than two hundred Effect modules, and the package
+installs neither. Each runtime dependency of `package.json`, such as `oxc-resolver`, stays outside
+the bundles, and `tsdown.config.ts` fails the build when a bundle imports another package.
+`src/index.ts` starts the Effect runtime, `src/cli.ts` defines the command tree and the services,
+and each module of `src/commands` defines one command. The Oxlint entry, `src/oxlint/index.ts`, and
+the probe plugin, `src/oxlint/probe.ts`, run in Oxlint's process, and build as `dist/oxlint.js` and
+`dist/probe.js`.
+
+`bin/adamantite` turns on the compile cache of Node.js when the runtime has one, so a later start
+skips compiling the bundle. When the cache has a folder, `bin/adamantite` hands it to the tools that
+the CLI starts, such as Oxlint and Oxfmt, through `NODE_COMPILE_CACHE`, unless the user set that
+variable. The second build of `tsdown.config.ts` writes the presets to `dist/presets` with their
+declarations, and copies the TypeScript presets, the type resets, and the license notices of the
+plugins. The tests below `presets` stay out of the package.
 
 `makeAppLayer` takes the `CommandRunner` layer as a parameter, so `src/__tests__/cli.test.ts` runs
 the same wiring with a runner that starts no process. It provides the local time zone, so the date
@@ -26,6 +36,7 @@ that harden gives the agent is the date of the user.
 | A command runs in the target project, the folder that `yield* Project.Directory` gives, and no other code reads or changes the working directory of the process. | `eslint/no-restricted-properties` in `oxlint.config.ts`                                                                                             |
 | External behavior is behind the Effect services that `makeAppLayer` in `src/cli.ts` provides, so a test runs a command without changing a real project.          | `project/file-writers` and `adamantite/import-owners`, for the writes and the prompts, and `inMemoryTests` in `config/tests.ts`, for the unit tests |
 | The build writes the Oxlint entry and the probe plugin beside the CLI bundle.                                                                                    | `scripts/test-build.ts`                                                                                                                             |
+| When the CLI has a compile cache folder, the tools that the CLI starts get it, unless the user set one.                                                          | `scripts/test-smoke.ts`                                                                                                                             |
 | The package runs under Node.js and Bun.                                                                                                                          | The tests, under Node.js, and the `test` workflow, with the minimum Bun                                                                             |
 
 ## Layers
@@ -504,7 +515,9 @@ Adamantite has four Oxlint plugins of its own in `presets/lint/plugins`: `adaman
 and `testing` for the `strict` preset, and `quality-effect` for the `effect` preset. A preset gets
 the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `presets/lint/plugins/entry.ts`. The
 `architecture` preset loads the `adamantite` plugin without enabling rules, because
-`adamantite/layers` and `adamantite/import-owners` need options from the target project.
+`adamantite/layers` and `adamantite/import-owners` need options from the target project. A preset
+loads a first-party plugin by a file URL inside this package, and names a managed plugin, such as
+`@shadcn/lint`, by its package, which resolves in the target project.
 
 | Invariant                                                                                                                                                                                                             | Held by                                                                                                                                |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -516,7 +529,8 @@ the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `presets/lint/plugi
 | No two presets set one rule, unless one of them is core. Each core rule that a preset changes has a fixture that gets a different result from core alone.                                                             | `presets/__tests__/overlap.test.ts`                                                                                                    |
 | The fixture packages in `presets/__tests__/fixture-packages` are a separate pnpm workspace, and no package is in both manifests.                                                                                      | `presets/__tests__/fixture-packages.test.ts`, for the manifests. Nothing checks the workspace file.                                    |
 | A rule declares the hand-written config that it replaces in `meta.docs.replaces`, so `src/lib/integrations/oxlint/replacements.ts` names no rule.                                                                     | `src/lib/integrations/oxlint/__tests__/replacements.test.ts`                                                                           |
-| Each `license.md` below `presets` ships at the same path in `dist/presets`.                                                                                                                                           | `scripts/test-build.ts`                                                                                                                |
+| Each license notice below `presets`, outside the `__tests__` folders, ships at the same path in `dist/presets`, because some plugin rules started as copies of MIT-licensed code.                                     | `scripts/test-build.ts`                                                                                                                |
+| Each plugin file that a built lint preset loads by a file URL exists after the build.                                                                                                                                 | `scripts/test-build.ts`                                                                                                                |
 
 ## Custom rules
 

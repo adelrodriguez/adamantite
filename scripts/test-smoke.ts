@@ -19,8 +19,6 @@ import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
 
-// The commands decode their own documents in the unit tests. This checks that the packed CLI
-// prints only the document on standard output.
 const JsonDocument = Schema.fromJsonString(Schema.Struct({ schemaVersion: Schema.Literal(1) }))
 const cliPath = join(repoRoot, "bin", "adamantite")
 
@@ -36,8 +34,7 @@ function spawn(command: string, args: string[], options: RunOptions) {
     encoding: "utf8",
     env: options.env ?? process.env,
     input: options.input,
-    // A dependency install can exceed Node's 1 MiB default and would surface as a
-    // misleading generic failure; a stuck install should fail here, not eat the CI job.
+    // A dependency install can print more than the 1 MiB default of Node.js.
     maxBuffer: 64 * 1024 * 1024,
     stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     timeout: 5 * 60 * 1000,
@@ -45,8 +42,8 @@ function spawn(command: string, args: string[], options: RunOptions) {
 
   const output = `--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`
 
-  // A failed launch sets `error` with no output; a timeout or a `maxBuffer` overrun sets it
-  // after the command already produced some.
+  // A failed launch sets `error` with no output. A timeout or a `maxBuffer` overrun sets it after
+  // the command printed some output.
   if (result.error) {
     throw new Error(`Command did not finish: ${command} ${args.join(" ")}\n${output}`, {
       cause: result.error,
@@ -81,9 +78,7 @@ function runExpectingFailure(command: string, args: string[], options: RunOption
   return { output: result.output, status: result.status }
 }
 
-/**
- * Sherif refuses to fix inside a CI environment, which it detects from these variables.
- */
+// Sherif refuses to fix inside a CI environment, which it detects from these variables.
 function withoutCiVariables(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(env).filter(
@@ -135,10 +130,6 @@ function assertFileContains(path: string, expected: string) {
   }
 }
 
-/**
- * Verify the scaffolded rule from stdin, then break it and confirm that verification fails. The
- * target project keeps only the rule, with no verification cases or fixtures.
- */
 function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
   const rulePath = join(cwd, ".adamantite", "lint", "no-smoke.ts")
 
@@ -172,7 +163,6 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
     throw new Error(`Expected only the custom rule to remain, received: ${files.join(", ")}`)
   }
 
-  // Add a saved test only on request. It must stay out of the runtime plugin.
   assertIncludes(
     runExpectingFailure(process.execPath, [cliPath, "rule", "test", "add", "missing"], { cwd, env })
       .output,
@@ -183,7 +173,6 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
 
   try {
     assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
-    // Load the plugin without linting the monorepo's unrelated dependency-version fixtures.
     run(process.execPath, [cliPath, "check", "oxlint.config.ts", "--only", "lint"], { cwd, env })
   } finally {
     rmSync(testPath)
@@ -214,11 +203,6 @@ const InstalledManifest = Schema.Struct({
 
 const decodeInstalledManifest = Schema.decodeUnknownSync(Schema.fromJsonString(InstalledManifest))
 
-/**
- * Load each public import of the installed package from the project, and check its declaration
- * file. Every other built module, such as a lint plugin helper or the custom-rule loader, must stay
- * private, so a new file in the build never becomes a public import by accident.
- */
 async function verifyPackageExports(cwd: string) {
   const packageRoot = join(cwd, "node_modules", "adamantite")
 
@@ -275,8 +259,6 @@ async function verifyPackageExports(cwd: string) {
   return privateImports
 }
 
-// The fixture uses npm and the monorepo fixture uses pnpm, so the smoke test covers both
-// package managers.
 const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
 const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
@@ -292,7 +274,6 @@ try {
         name: "adamantite-smoke-fixture",
         packageManager: `npm@${npmVersion}`,
         private: true,
-        // Init replaces a selected script that runs another command, and keeps the others.
         scripts: { check: "tsc --noEmit", test: "node --test" },
         version: "0.0.0",
       },
@@ -306,8 +287,6 @@ try {
     "export function add(left: number, right: number): number {\n  return left + right\n}\n"
   )
 
-  // Install this checkout as the fixture's `adamantite` before init. Init keeps a dependency that
-  // the project already has, so the run never installs `adamantite` from the registry.
   run("pnpm", ["pack", "--pack-destination", packDirectory], { cwd: repoRoot })
   const [tarball, ...extraTarballs] = readdirSync(packDirectory)
 
@@ -445,13 +424,10 @@ try {
     join(effectWorkspacePackage, "package.json"),
     JSON.stringify({ name: "effect-workspace-package", private: true, type: "module" })
   )
-  // Install this checkout here too, so init keeps it and never installs `adamantite` from the
-  // registry, whose peer ranges can reject the pinned tools.
   run("npm", ["install", "--ignore-scripts", "--save-dev", join(packDirectory, tarball)], {
     cwd: effectWorkspacePackage,
     env: effectEnv,
   })
-  // Init sets up no Oxlint here, because the fixture's Oxlint config lints this folder.
   run(
     process.execPath,
     [cliPath, "init", "--non-interactive", "--typescript", "typescript", "--editor", "zed"],
@@ -515,8 +491,6 @@ try {
   console.info("Running `adamantite init` against the fixture project...")
   run(process.execPath, initArgs, { cwd: fixture })
 
-  // Prove init kept the tarball: a registry install would validate the published presets
-  // instead of this checkout's.
   assertFileContains(join(fixture, "package.json"), '"adamantite": "file:')
 
   assertFileContains(join(fixture, "oxlint.config.ts"), "adamantite/lint")
@@ -544,7 +518,6 @@ try {
     }
   }
 
-  // `--json` prints one document on standard output, so an agent can parse the whole stream.
   console.info("Running `adamantite init --json` and `adamantite doctor --json`...")
 
   for (const args of [
@@ -568,7 +541,7 @@ try {
     }
   }
 
-  // The commands resolve tool binaries through PATH, matching how package scripts run them.
+  // Package scripts run with `node_modules/.bin` on `PATH`.
   const fixtureEnv = {
     ...process.env,
     PATH: `${join(fixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
@@ -577,9 +550,6 @@ try {
   console.info("Running `adamantite rule add` and temporary RuleTester verification...")
   addRuleAndVerify(fixture, fixtureEnv)
 
-  // The rule authoring types ship inside the package, so a custom rule type-checks in a project
-  // that does not install `@oxlint/plugins`. The expected error proves that the types did not
-  // resolve to `any`.
   console.info("Type-checking a custom rule without `@oxlint/plugins` installed...")
 
   if (existsSync(join(fixture, "node_modules", "@oxlint", "plugins"))) {
@@ -627,20 +597,17 @@ try {
     rmSync(ruleTypesProbe)
   }
 
-  // Check the generated config and custom rule, and keep the rule as a Knip entry file.
   for (const command of ["fix", "check", "analyze"]) {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
 
-  // `bin/adamantite` hands its compile cache folder to the tools that it starts, so Oxlint loads its
-  // compiled code from the cache. A folder that the user sets wins, and `NODE_DISABLE_COMPILE_CACHE`
-  // leaves Oxlint without a cache. Node.js logs each module that it reads or writes for the cache.
+  // With `NODE_DEBUG_NATIVE=COMPILE_CACHE`, Node.js logs each module that it reads or writes for the
+  // compile cache, and `NODE_DISABLE_COMPILE_CACHE` turns the cache off.
   console.info("Checking that Oxlint gets the compile cache of the CLI...")
   const userCache = mkdtempSync(join(tmpdir(), "adamantite-smoke-compile-cache-"))
 
-  // Each case sets the cache variables itself, so the values of the caller do not change it.
-  // Windows reads variable names in any case, so the filter compares them in uppercase.
+  // Windows reads variable names in any case.
   const cacheFreeEnv = Object.fromEntries(
     Object.entries(fixtureEnv).filter(
       ([name]) => !["NODE_COMPILE_CACHE", "NODE_DISABLE_COMPILE_CACHE"].includes(name.toUpperCase())
@@ -687,17 +654,13 @@ try {
     rmSync(userCache, { force: true, recursive: true })
   }
 
-  // `adamantite/typescript` loads the type resets by a path inside the installed
-  // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
-  // Outside Windows, the Oxlint launch sets no backend variable, so the lint error also proves that
-  // Oxlint finds the `tsrs-lint` launcher of the real tsrs by itself.
+  // Outside Windows, the Oxlint launch sets no backend variable, so Oxlint finds the `tsrs-lint`
+  // launcher of tsrs by itself.
   console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
 
-  // The lint inherits a path to a missing backend, as a shell with an old tsgolint setup passes it.
-  // The CLI removes it from Oxlint's environment outside Windows, so Oxlint still finds the real
-  // `tsrs-lint`.
+  // A shell with an old tsgolint setup passes `OXLINT_TSGOLINT_PATH`.
   const staleBackendEnv = { ...fixtureEnv, OXLINT_TSGOLINT_PATH: join(fixture, "missing-tsgolint") }
 
   for (const [command, args, env] of [
@@ -712,8 +675,6 @@ try {
 
   rmSync(resetProbe)
 
-  // Doctor asks the installed TypeScript whether the config loads the type resets, so a public
-  // package that publishes its types gets the library finding. The fixture is private otherwise.
   console.info("Checking that Doctor reports the type resets in a library...")
   const fixtureManifest = readFileSync(join(fixture, "package.json"), "utf8")
 
@@ -731,8 +692,6 @@ try {
   )
   writeFileSync(join(fixture, "package.json"), fixtureManifest)
 
-  // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
-  // fixture as one.
   const pnpmVersion = run("pnpm", ["--version"], { cwd: repoRoot }).trim()
 
   writeFileSync(
@@ -762,7 +721,6 @@ try {
     [cliPath, "init", "--non-interactive", "--script", "check", "--script", "analyze"],
     { cwd: monorepoFixture }
   )
-  // Init installs Sherif with the `analyze` script in a monorepo.
   assertFileContains(join(monorepoFixture, "package.json"), '"sherif"')
   assertFileContains(join(monorepoFixture, "package.json"), '"adamantite": "file:')
 
@@ -771,9 +729,7 @@ try {
     PATH: `${join(monorepoFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
-  // Exit 0 proves Knip, under the preset defaults, reports neither `sherif` nor `tsrs` as an unused
-  // devDependency, although no script or import references them. `tsrs` is an optional peer of
-  // Adamantite, which Knip counts as a use.
+  // Knip counts `tsrs`, an optional peer of Adamantite, as a use.
   console.info("Running `adamantite analyze --only unused` in the monorepo fixture...")
 
   const unusedOutput = run(process.execPath, [cliPath, "analyze", "--only", "unused"], {
@@ -829,11 +785,7 @@ try {
   )
   addRuleAndVerify(monorepoFixture, monorepoEnv)
 
-  // Doctor resolves config imports with the real resolver. The root config loads a shared tooling
-  // package through an `exports` subpath, so Doctor reaches its rules folder only by following the
-  // installed workspace link, and reports the rule file that cannot load. The package's config
-  // imports `./rules.js`, which exists beside `rules.ts`. Node.js loads the `.js` file, so Doctor
-  // must follow it to `rules` and not to `source-rules`.
+  // Node.js loads `./rules.js`, not the `rules.ts` beside it.
   const lintPackage = join(monorepoFixture, "packages", "lint")
 
   mkdirSync(join(lintPackage, "rules"), { recursive: true })
@@ -887,8 +839,8 @@ try {
 
   // Oxfmt formats Astro and Svelte files through plugins that import a package from the project:
   // @astrojs/compiler-rs, which Astro 7 installs, and the compiler of Svelte 5. pnpm keeps
-  // @astrojs/compiler-rs out of the project's own node_modules, so this proves that Oxfmt still
-  // finds it. pnpm rejects packages younger than one day, so the versions are pinned.
+  // @astrojs/compiler-rs out of the project's own node_modules. pnpm rejects packages younger than
+  // one day, so the versions are pinned.
   console.info("Running `adamantite fix` on Astro and Svelte files in a pnpm project...")
   writeFileSync(
     join(pluginFixture, "package.json"),

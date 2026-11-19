@@ -24,7 +24,6 @@ const READER = file("src/lib/bridge/reader.ts")
 const IMPORTS =
   'import * as Effect from "effect/Effect"\nimport * as FileSystem from "effect/FileSystem"\n'
 
-// Code that writes in each form that the rule reports.
 const WRITES = `${IMPORTS}import { ensureDirectory } from "#lib/shared/filesystem.ts"
 export const write = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem
@@ -106,7 +105,6 @@ tester.run("file-writers", rule, {
       errors: [write("copy")],
       filename: READER,
     },
-    // A relative path and a namespace reach the same helpers.
     {
       code: 'import { writeFile } from "../shared/filesystem.ts"\nexport const write = writeFile("a", "b")',
       errors: [{ data: { name: "writeFile" }, messageId: "helper" }],
@@ -117,13 +115,11 @@ tester.run("file-writers", rule, {
       errors: [{ data: { name: "writeFile" }, messageId: "helper" }],
       filename: READER,
     },
-    // A step before the write keeps the service.
     {
       code: `${IMPORTS}export const remove = FileSystem.FileSystem.pipe(\n  Effect.withSpan("remove"),\n  Effect.tap((fs) => fs.makeDirectory("a")),\n  Effect.flatMap((fs) => fs.remove("a"))\n)`,
       errors: [write("makeDirectory"), write("remove")],
       filename: READER,
     },
-    // A pipe step counts by the Effect export that it reads, however the import spells it.
     {
       code: `${IMPORTS}import { withSpan } from "effect/Effect"
 export const remove = FileSystem.FileSystem.pipe(
@@ -158,7 +154,6 @@ export const remove = FileSystem.FileSystem.pipe(
       errors: [write("remove")],
       filename: READER,
     },
-    // A writer goes through `FileSystem` too.
     {
       code: 'import { rmSync } from "node:fs"\nexport { rmSync }',
       errors: [nodeFs("node:fs")],
@@ -170,7 +165,6 @@ export const remove = FileSystem.FileSystem.pipe(
       code: `${IMPORTS}export const read = Effect.gen(function* () {\n  const fs = yield* FileSystem.FileSystem\n  return yield* fs.readFileString("a")\n})\nexport const exists = FileSystem.FileSystem.pipe(Effect.flatMap((fs) => fs.exists("a")))`,
       filename: READER,
     },
-    // Only the `FileSystem` service writes. Another `fs` or `remove` is not the service.
     {
       code: `${IMPORTS}import * as Ref from "effect/Ref"
 export const read = Effect.gen(function* () {
@@ -184,7 +178,6 @@ export const update = Effect.flatMap(Ref.make(0), (fs) => Ref.set(fs, 1))
 `,
       filename: READER,
     },
-    // A step that does not come from Effect ends the service, whatever its name.
     {
       code: `${IMPORTS}const withSpan = (name: string) => <A>(self: A) => self
 export const remove = FileSystem.FileSystem.pipe(
@@ -199,8 +192,6 @@ const Steps = { flatMap: (f: (value: unknown) => unknown) => f }
 export const remove = FileSystem.FileSystem.pipe(Steps.flatMap((fs) => fs.remove("a")))`,
       filename: READER,
     },
-    // A pipe step that may change the value ends the service: `map` returns another object, and
-    // `Effect.as` is a step that the rule does not know.
     {
       code: `${IMPORTS}export const clear = FileSystem.FileSystem.pipe(
   Effect.map(() => ({ remove: () => Effect.succeed("memory only") })),
@@ -234,13 +225,11 @@ export const remove = FileSystem.FileSystem.pipe(Steps.flatMap((fs) => fs.remove
       "src/lib/integrations/oxlint/probe.ts",
       "src/lib/shared/filesystem.ts",
     ].map((writer) => ({ code: WRITES, filename: file(writer) })),
-    // Tests write their fixtures, and the macros read templates at build time.
     { code: WRITES, filename: file("src/lib/bridge/__tests__/index.test.ts") },
     {
       code: 'import { readFileSync } from "node:fs"\nexport const template = () => readFileSync("a", "utf8")',
       filename: file("src/lib/bridge/template.macro.ts"),
     },
-    // The rule covers only `src`.
     {
       code: 'import { writeFileSync } from "node:fs"\nexport { writeFileSync }',
       filename: file("scripts/release.ts"),

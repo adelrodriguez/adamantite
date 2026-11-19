@@ -11,7 +11,6 @@ import { defineRule, type ESTree } from "#presets/rules/plugin.ts"
 // plain value, such as an object or a comparison. A rule gets no types, so the rule accepts an arrow
 // that returns anything else, such as a call. `CODING_STANDARDS.md` keeps that part of the standard.
 
-// The expressions whose value is never an Effect.
 const PLAIN_VALUES = new Set([
   "ArrayExpression",
   "BinaryExpression",
@@ -21,8 +20,7 @@ const PLAIN_VALUES = new Set([
   "UnaryExpression",
 ])
 
-// The expression that a TypeScript expression wraps, such as `value` in `value as const`. The
-// wrapper keeps the value, so the rule reads through it.
+// TypeScript erases `as`, `!`, and `satisfies`, so the wrapped expression is the runtime value.
 function unwrap(node: ESTree.Node): ESTree.Node {
   return node.type === "TSAsExpression"
     || node.type === "TSNonNullExpression"
@@ -31,7 +29,6 @@ function unwrap(node: ESTree.Node): ESTree.Node {
     : node
 }
 
-// Whether `node` is a function that cannot directly return an Effect chain.
 function isPlainFunction(wrapped: ESTree.Node): boolean {
   const node = unwrap(wrapped)
 
@@ -43,11 +40,9 @@ function isPlainFunction(wrapped: ESTree.Node): boolean {
     return false
   }
 
-  // An async arrow returns a promise, and a block body returns nothing directly.
   return node.async || node.body.type === "BlockStatement" || canBePlain(node.body)
 }
 
-// Whether `node` can give a value that is not an Effect.
 function canBePlain(wrapped: ESTree.Node): boolean {
   const node = unwrap(wrapped)
 
@@ -68,8 +63,6 @@ function canBePlain(wrapped: ESTree.Node): boolean {
     return node.operator === "&&" || canBePlain(node.left) || canBePlain(node.right)
   }
 
-  // An arrow that returns a function, such as `(status) => (message) => Effect.log(message)`,
-  // returns what that function returns.
   return isPlainFunction(node)
 }
 

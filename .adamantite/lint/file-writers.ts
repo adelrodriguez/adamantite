@@ -19,7 +19,7 @@ const WRITERS = [
   "src/lib/shared/filesystem.ts",
 ]
 
-// The methods of Effect's `FileSystem` that change the disk. `open` can open a file for writing.
+// `open` can open a file for writing.
 const WRITE_METHODS = new Set([
   "chmod",
   "chown",
@@ -48,8 +48,6 @@ const HELPERS_MODULE = "src/lib/shared/filesystem.ts"
 
 const NODE_FS = new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])
 
-// The Effect exports whose callback receives the service, as in
-// `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`.
 const CALLBACK_COMBINATORS = new Set(["andThen", "flatMap", "map", "tap"])
 
 // The pipe steps of Effect 4.1.2 that keep the success value, so the steps after them still receive
@@ -85,7 +83,6 @@ function importedName(specifier: ESTree.ImportSpecifier) {
   return specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name
 }
 
-// The references of the variables that `node` declares, or only of the one called `name`.
 function referencesOf(context: Context, node: ESTree.Node, name?: string) {
   return context.sourceCode
     .getDeclaredVariables(node)
@@ -94,16 +91,12 @@ function referencesOf(context: Context, node: ESTree.Node, name?: string) {
     .map((reference) => reference.identifier)
 }
 
-// The member reads of a namespace import, such as `Files.writeFile`.
 function findMembers(context: Context, specifier: ESTree.ImportNamespaceSpecifier) {
   return referencesOf(context, specifier).flatMap(({ parent }) =>
     parent.type === "MemberExpression" ? [parent] : []
   )
 }
 
-// The reads of the `FileSystem` export of the module that `node` imports: `FileSystem` through a
-// named import, also an aliased one, and `FileSystem.FileSystem` or `Fx.FileSystem` through a
-// namespace import.
 function findFileSystemExports(context: Context, node: ESTree.ImportDeclaration) {
   return node.specifiers.flatMap<ESTree.Node>((specifier) => {
     if (specifier.type === "ImportNamespaceSpecifier") {
@@ -116,8 +109,8 @@ function findFileSystemExports(context: Context, node: ESTree.ImportDeclaration)
   })
 }
 
-// The expressions that give the `FileSystem` tag. The `FileSystem` export of `effect/FileSystem` is
-// the tag, and the `FileSystem` export of `effect` is the `effect/FileSystem` module.
+// The `FileSystem` export of `effect/FileSystem` is the tag, and the `FileSystem` export of `effect`
+// is the `effect/FileSystem` module.
 function findTags(context: Context, node: ESTree.ImportDeclaration) {
   const exports = findFileSystemExports(context, node)
 
@@ -132,8 +125,6 @@ function findTags(context: Context, node: ESTree.ImportDeclaration) {
     : []
 }
 
-// The import specifier that declares the variable that `node` reads, or null when `node` is not an
-// identifier or reads a variable that no import declares.
 function findImportSpecifier(context: Context, node: ESTree.Node) {
   if (node.type !== "Identifier") {
     return null
@@ -154,8 +145,6 @@ function importSource(specifier: ESTree.Node) {
   return specifier.parent?.type === "ImportDeclaration" ? specifier.parent.source.value : null
 }
 
-// Whether `node` reads the `effect/Effect` module: a namespace or default import of `effect/Effect`,
-// an `Effect` import from `effect`, or `Fx.Effect` on a namespace import of `effect`.
 function isEffectModule(context: Context, node: ESTree.Node): boolean {
   if (node.type === "MemberExpression") {
     const specifier = findImportSpecifier(context, node.object)
@@ -176,9 +165,6 @@ function isEffectModule(context: Context, node: ESTree.Node): boolean {
   return specifier !== null && importSource(specifier) === "effect/Effect"
 }
 
-// The `effect/Effect` export that a call reads, such as `flatMap` for `Effect.flatMap(…)`,
-// `Fx.Effect.flatMap(…)`, `flatMap(…)`, or `chain(…)` through `flatMap as chain`. Undefined for a
-// call of anything else, such as a local function.
 function findEffectExport(context: Context, node: ESTree.Node | undefined) {
   const callee = node?.type === "CallExpression" ? node.callee : undefined
 
@@ -193,8 +179,6 @@ function findEffectExport(context: Context, node: ESTree.Node | undefined) {
     : undefined
 }
 
-// The first parameter of the callback at `index` of an Effect combinator call, such as `fs` in
-// `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`.
 function callbackParameter(context: Context, node: ESTree.Node | undefined, index: number) {
   const callback =
     node?.type === "CallExpression"
@@ -207,16 +191,13 @@ function callbackParameter(context: Context, node: ESTree.Node | undefined, inde
     : undefined
 }
 
-// The bindings that receive the service from `tag` in a callback.
 function findServiceParameters(context: Context, tag: ESTree.Node) {
   const { parent } = tag
 
-  // `Effect.flatMap(FileSystem.FileSystem, (fs) => …)`
   if (parent?.type === "CallExpression" && parent.arguments[0] === tag) {
     return [callbackParameter(context, parent, 1)]
   }
 
-  // `FileSystem.FileSystem.pipe(Effect.withSpan("read"), Effect.flatMap((fs) => …))`
   const call =
     parent?.type === "MemberExpression" && memberName(parent) === "pipe" ? parent.parent : undefined
 
@@ -224,7 +205,6 @@ function findServiceParameters(context: Context, tag: ESTree.Node) {
     return []
   }
 
-  // The steps up to and including the first one that may change the value.
   const steps = call.arguments
 
   const end = steps.findIndex((step) => !KEEPS_VALUE.has(findEffectExport(context, step) ?? ""))
@@ -244,7 +224,6 @@ export default defineRule({
       }
     }
 
-    // A binding of the service: `fs`, or `{ remove }` that takes its methods.
     function reportBinding(pattern: ESTree.Node) {
       if (pattern.type === "Identifier") {
         for (const identifier of referencesOf(context, pattern.parent, pattern.name)) {
@@ -263,7 +242,6 @@ export default defineRule({
       }
     }
 
-    // A node whose value is the service, such as `fs` or `yield* FileSystem.FileSystem`.
     function reportService(node: ESTree.Node) {
       const { parent } = node
 
@@ -279,7 +257,6 @@ export default defineRule({
     function reportTag(tag: ESTree.Node) {
       const { parent } = tag
 
-      // `yield* FileSystem.FileSystem`
       if (parent?.type === "YieldExpression" && parent.delegate) {
         reportService(parent)
       }
@@ -297,8 +274,6 @@ export default defineRule({
       }
     }
 
-    // The file that a relative or `#` import resolves to, such as `src/lib/shared/filesystem.ts` for
-    // `../shared/filesystem.ts`, or null for a package or a path that does not resolve.
     function resolveImport(source: string) {
       if (!source.startsWith(".") && !source.startsWith("#")) {
         return null
@@ -311,7 +286,6 @@ export default defineRule({
       }
     }
 
-    // The build-time macros read their templates with `node:fs`.
     function reportNodeFs(node: ESTree.Node, source: ESTree.Node) {
       const name = stringValue(source)
 
@@ -351,7 +325,6 @@ export default defineRule({
       ImportExpression(node) {
         reportNodeFs(node, node.source)
       },
-      // Only the non-test files of `src`.
       before() {
         file = relative(ROOT, context.filename).split(sep).join("/")
 

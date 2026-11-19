@@ -42,9 +42,6 @@ const OxlintJsonOutput = Schema.Struct({
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
-/**
- * A rule that reports every `debugger` statement with the given message.
- */
 function makeRule(message: string) {
   return [
     `import { defineRule } from ${JSON.stringify(RULES_MODULE)}`,
@@ -66,9 +63,6 @@ function makeRule(message: string) {
   ].join("\n")
 }
 
-/**
- * A rule that throws in its visitor for every `debugger` statement.
- */
 const THROWING_RULE = [
   `import { defineRule } from ${JSON.stringify(RULES_MODULE)}`,
   "",
@@ -104,9 +98,6 @@ describe("custom preset", () => {
     writeFileSync(join(project, path), content)
   }
 
-  /**
-   * Runs Oxlint in the project, and returns its exit code with the diagnostics that it prints.
-   */
   function run(...args: string[]) {
     const result = spawnSync(
       process.execPath,
@@ -132,7 +123,6 @@ describe("custom preset", () => {
 
   beforeEach(() => {
     project = mkdtempSync(join(tmpdir(), "adamantite-custom-rules-"))
-    // A real node_modules folder keeps the entry modules that custom() writes inside the project.
     mkdirSync(join(project, "node_modules"))
     symlinkSync(TEST_OXLINT, join(project, "node_modules/oxlint"))
     write("src/index.ts", "export function stop() {\n  debugger\n}\n")
@@ -144,9 +134,7 @@ describe("custom preset", () => {
 
   it("enable each rule file in .adamantite/lint and skip helper files", () => {
     write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
-    // A helper without a default export fails the run if it loads as a rule.
     write(".adamantite/lint/_helpers.ts", "export const helper = 1\n")
-    // Optional tests must not run or become rules when the plugin loads.
     write(".adamantite/lint/no-debugger-here.test.ts", 'throw new Error("Test was loaded")\n')
     write(".adamantite/lint/AGENTS.md", "# Custom rules\n")
     write("oxlint.config.ts", makeConfig("custom()"))
@@ -171,8 +159,6 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):warning"])
   })
 
-  // The `adamantite-hardening` skill tells agents that a rule that throws in a visitor fails the
-  // lint run, and names the error that they must look for.
   it("fail the run with a plugin error for the file where a rule throws in a visitor", () => {
     write(".adamantite/lint/throw-on-debugger.ts", THROWING_RULE)
     write("oxlint.config.ts", makeConfig("custom()"))
@@ -193,8 +179,6 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual([])
   })
 
-  // Adamantite loads the config and reads this identity to find each rules folder that the config
-  // reaches, as `presets/identity.ts` describes.
   it("name the rules folder, the plugin, and the caller of each call, also without a folder", () => {
     write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
     write(
@@ -242,8 +226,6 @@ describe("custom preset", () => {
   })
 
   it("load a rules folder from a shared tooling package under its own name", () => {
-    // A monorepo keeps its lint config and rules in a tooling package. The relative `dir` resolves
-    // from the tooling config, so every package that extends it loads the same rules.
     write("tooling/lint/rules/no-debugger-here.ts", makeRule("No debugger here."))
     write(
       "tooling/lint/index.ts",
@@ -286,8 +268,6 @@ describe("custom preset", () => {
   it("give each Adamantite copy its own entry module for one rules folder", () => {
     write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
 
-    // Two installed copies, such as two versions in a monorepo, load the same rules folder. Each
-    // entry module imports `loadRules` from its own copy, so the copies must not share the file.
     const results = ["a", "b"].map((copy) => {
       for (const file of ["custom.ts", "folder.ts"]) {
         write(
@@ -329,15 +309,10 @@ describe("custom preset", () => {
   })
 })
 
-/**
- * The fallback folder of `custom()` for the current user. The tests that use it skip Windows.
- */
 function getPrivateFolderName() {
   return `adamantite-${process.geteuid?.() ?? 0}`
 }
 
-// The shared temporary directory can hold files of other users, so the fallback entry module must
-// go to a folder that only this user can write. A child process gets its own TMPDIR.
 describe.skipIf(process.platform === "win32")("custom preset without node_modules", () => {
   let temporary: string
   let rules: string
@@ -370,7 +345,6 @@ describe.skipIf(process.platform === "win32")("custom preset without node_module
   }
 
   it("write the entry module to a folder that only this user can write", () => {
-    // Another user could create the shared folder first and replace the module after the write.
     const shared = join(temporary, "adamantite")
     mkdirSync(shared)
     chmodSync(shared, 0o777)

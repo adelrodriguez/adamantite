@@ -71,8 +71,6 @@ describe("layers option validation in Oxlint", () => {
   })
 })
 
-// Each model is a small project with its own `package.json` files and a `layers.json` config
-// fragment that turns on `adamantite/layers`.
 describe("layers rule fixtures", () => {
   describeModelFixtures({
     configFile: "layers.json",
@@ -87,8 +85,6 @@ const PNPM_DEPENDENCY = {
     '{"name":"dep","type":"module","exports":"./index.js"}\n',
 }
 
-// `src/high` imports `src/low`. Links give the higher layer other paths: a folder link in the lower
-// layer, a source-file link, and a link in the project root. pnpm links `dep` into `node_modules`.
 const LINKED_LAYERS = {
   config: {
     rules: {
@@ -121,8 +117,6 @@ const LINKED_LAYERS = {
   targets: ["src"],
 }
 
-// A workspace root with source, whose layer map at `.` holds the workspace package `packages/ui`.
-// The package manager links the package into `node_modules/@acme/ui`.
 const LINKED_WORKSPACE_PACKAGE = {
   config: {
     rules: {
@@ -155,8 +149,6 @@ function messagesOf(reports: readonly ModelReport[], file: string) {
   return reports.flatMap((report) => (report.filename === file ? [report.message] : []))
 }
 
-// Each boundary is measured on real paths, except for a path through `node_modules`, so Oxlint must
-// report the same files whether it reaches the project folder directly or through a linked folder.
 describe.each([
   { throughLink: false, title: "layers through symlinks, from the project folder" },
   { throughLink: true, title: "layers through symlinks, from a linked project folder" },

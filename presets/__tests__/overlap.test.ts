@@ -46,23 +46,17 @@ const PRESET_NAMES = EffectArray.sort(
   Order.String
 )
 
-/**
- * Each rule that the preset sets, in its rules and in its overrides, as a report names it. A rule
- * of ESLint has no plugin in a config, such as `no-console`.
- */
 function listRules(config: OxlintConfig): string[] {
   return EffectArray.dedupe(
     [config.rules, ...(config.overrides ?? []).map((override) => override.rules)]
       .flatMap((rules) => Object.keys(rules ?? {}))
+      // A config names a rule of ESLint without its plugin, such as `no-console`.
       .map((name) => (name.includes("/") ? name : `eslint/${name}`))
   )
 }
 
 const coreRules = new Set(listRules(core))
 
-/**
- * The rules of core that the preset changes.
- */
 function listCoreChanges(preset: LintPreset): string[] {
   return EffectArray.sort(
     listRules(PRESETS[preset]).filter((rule) => coreRules.has(rule)),
@@ -72,8 +66,6 @@ function listCoreChanges(preset: LintPreset): string[] {
 
 const changingPresets = PRESET_NAMES.filter((preset) => listCoreChanges(preset).length > 0)
 
-// A preset cannot see the other presets of a config, so two presets that set one rule give a
-// result that depends on the order of `extends`. Only core has a known position: it is first.
 describe("preset rules", () => {
   it("have no rule that two presets set, except a rule of core", () => {
     const shared = PRESET_NAMES.flatMap((first) =>
@@ -94,18 +86,12 @@ describe("preset rules", () => {
   })
 })
 
-// A change of a core rule needs a reason that a fixture proves: code that gets a different result
-// from core alone. When Oxlint corrects the rule, the fixture gets the same result, and the test
-// fails until the preset stops changing the rule.
 describe.each(changingPresets)("%s changes of core rules", (preset) => {
   const fixturesDir = join(FIXTURES_DIR, preset)
   const fixtures = listRuleFixtures(fixturesDir)
   let coreReports: FixtureReport[]
   let presetReports: FixtureReport[]
 
-  /**
-   * The fixtures of the rule that have a report of the rule.
-   */
   function listReported(reports: readonly FixtureReport[], rule: string): string[] {
     return fixtures.flatMap((fixture) =>
       fixture.rule === rule

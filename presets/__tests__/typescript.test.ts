@@ -15,9 +15,6 @@ const RESETS = join(REPO_ROOT, "presets/typescript/resets")
 
 const FIXTURES = join(REPO_ROOT, "src/__tests__/presets/fixtures/typescript")
 
-/**
- * Type check the fixture project with the given config, and return the TypeScript output.
- */
 function checkFixtures(config: "tsconfig.json" | "tsconfig.without-resets.json") {
   const result = spawnSync(join(REPO_ROOT, "node_modules/.bin/tsc"), ["-p", config], {
     cwd: FIXTURES,
@@ -31,9 +28,6 @@ function checkFixtures(config: "tsconfig.json" | "tsconfig.without-resets.json")
   return { output: result.stdout, status: result.status }
 }
 
-/**
- * The settings that a test adds to the `tsconfig.json` of the project.
- */
 interface ProjectConfig {
   readonly compilerOptions?: { readonly lib: readonly string[] }
   readonly files?: readonly string[]
@@ -42,10 +36,6 @@ interface ProjectConfig {
 
 const INCLUDE_INDEX: ProjectConfig = { include: ["index.ts"] }
 
-/**
- * Type check one file in a project that extends a TypeScript preset, and return the TypeScript
- * output. A `base` config goes into `base.json`, which the project extends before the preset.
- */
 function check(
   preset: keyof typeof PRESETS,
   source: string,

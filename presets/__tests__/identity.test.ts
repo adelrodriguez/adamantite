@@ -5,7 +5,6 @@ import { PRESET, type PresetIdentity } from "#presets/identity.ts"
 import packageJson from "../../package.json" with { type: "json" }
 
 describe("preset identity", () => {
-  // Doctor reads a loaded config, so it finds a preset by the module that the preset names.
   it.effect.each(
     Object.entries(packageJson.exports).flatMap(([subpath, target]) => {
       const built = Predicate.isString(target) ? target : target.default

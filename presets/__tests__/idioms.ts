@@ -5,41 +5,18 @@ import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
 import { type LintPreset, listStacks, type Stack, STACKS } from "./stacks.ts"
 
-/**
- * The idiom fixtures: ordinary code of each stack, adapted from permissively licensed projects.
- * `SOURCES.md` in the folder names the source and the license of each file.
- */
 export const IDIOMS_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/idioms")
 
 const ONE_FIX_PASS = "https://github.com/oxc-project/oxc/issues/16118"
 
 interface SecondPass {
-  /**
-   * Path of the idiom relative to `fixable/`.
-   */
   readonly file: string
-  /**
-   * The upstream issue that makes the second fix necessary.
-   */
   readonly issue: string
 }
 
 export interface IdiomTree {
-  /**
-   * The unstable Effect modules that the idioms use, which a target project must allow. See
-   * "Effect" in the README.
-   */
   readonly allowedUnstableApis?: readonly string[]
-  /**
-   * The preset that the idioms need. Their files are in `fixtures/idioms/<preset>`. Core idioms run
-   * with every stack.
-   */
   readonly preset: "core" | LintPreset
-  /**
-   * Each fixable idiom that one fix does not end, because a fix causes a new report. The idiom test
-   * runs a second fix for these idioms only. It fails when one fix ends a listed idiom, so the
-   * correction upstream removes its entry.
-   */
   readonly secondPasses: readonly SecondPass[]
 }
 
@@ -105,10 +82,6 @@ export const IDIOM_TREES: readonly IdiomTree[] = [
   },
 ]
 
-/**
- * The files below the folder, relative to it, with forward slashes, in sorted order. A tree without
- * the folder has no files in it.
- */
 export function listFiles(folder: string): string[] {
   if (!existsSync(folder)) {
     return []
@@ -123,9 +96,6 @@ export function listFiles(folder: string): string[] {
   return EffectArray.sort(files, Order.String)
 }
 
-/**
- * The stacks that lint the idioms of the preset. Core idioms run with every stack.
- */
 export function listTreeStacks(preset: IdiomTree["preset"]): Stack[] {
   return preset === "core" ? EffectRecord.keys(STACKS) : listStacks(preset)
 }

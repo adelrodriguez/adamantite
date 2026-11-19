@@ -18,7 +18,6 @@ const QUALITY_NAMESPACE = "quality-effect"
 const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/effect")
 const CATEGORY_PRESETS = ["correctness", "antipattern", "effect-native", "style"] as const
 
-// Every upstream rule that the preset does not enable. ADR 0007 gives the criteria.
 const EXCLUDED_RULES = new Set([
   // It depends on the entry points of the project.
   "strict-effect-provide",
@@ -94,12 +93,6 @@ const OxlintJsonOutput = Schema.Struct({
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
-/**
- * Lint the files with the effect preset in one real Oxlint run, through the Oxlint entry. Oxlint,
- * `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing patches.
- * `jsPlugins` adds plugins next to the preset. `presets` are the preset names of `extends`, in
- * order.
- */
 function lint(
   files: Record<string, string>,
   {

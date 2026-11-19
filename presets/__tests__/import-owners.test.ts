@@ -11,8 +11,6 @@ import {
   type ModelReport,
 } from "./model-fixtures.ts"
 
-// Each model is a small project with its own `package.json` files and an `import-owners.json`
-// config fragment that turns on `adamantite/import-owners`.
 const OPTIONS = {
   configFile: "import-owners.json",
   fixturesDir: join(import.meta.dirname, "../../src/__tests__/presets/fixtures/import-owners"),
@@ -72,10 +70,6 @@ describe("import-owners reports", () => {
   })
 })
 
-// `src/owner.ts` owns the project folder `src/high`, the linked workspace package `@acme/ui`, the
-// pnpm dependency `dep`, and the alias folder `#lib/db`. Links give `src/high` other paths: a folder
-// link, a source-file link, and a link in the project root. A file link in `src/lib/db` gives
-// `src/other/actual.ts` a name in the alias folder.
 const LINKED_OWNERS = {
   config: {
     rules: {
@@ -133,9 +127,6 @@ function ownerReport(module: string, index: number) {
   return `Only \`src/owner.ts\` may import \`${module}\`. Use what the owner exports, or move this code into the owner. Owners: the \`adamantite/import-owners\` options in the Oxlint config at \`options[${index}]\`. Owner paths are relative to the workspace root.`
 }
 
-// Each owned module is identified by its real path, except for a path through `node_modules`, so
-// Oxlint must report the same files whether it reaches the project folder directly or through a
-// linked folder.
 describe.each([
   { throughLink: false, title: "import-owners through symlinks, from the project folder" },
   { throughLink: true, title: "import-owners through symlinks, from a linked project folder" },

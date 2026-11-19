@@ -22,16 +22,6 @@ import {
   listRuleFiles,
 } from "./folder.ts"
 
-// Custom rules are Oxlint rules that the target project writes in its own rules folder. `custom()`
-// runs while Oxlint loads the config. It lists the rule files, enables each one, and points Oxlint
-// at a small entry module that loads the folder through the internal `loadRules` module.
-//
-// Oxlint caches a plugin module by its path and drops query strings, so each rules folder gets its
-// own entry module file. The entry module imports `loadRules` by file URL, so it works from the
-// temporary directory too. The source tree holds `rules/load.ts` and the dist tree holds
-// `rules/load.js`, so the extension follows the extension of this module. This module runs under
-// whatever runtime executes oxlint in the target project, so it uses only APIs that Node.js and Bun
-// both provide.
 const MODULE_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 const RULES_MODULE_URL = new URL(`load.${MODULE_EXTENSION}`, import.meta.url).href
 
@@ -54,10 +44,7 @@ export interface CustomRulesOptions {
   readonly rules?: Readonly<Record<string, DummyRule>>
 }
 
-/**
- * Normalize a file from a stack frame: drop the query string and hash, which Oxlint adds to bypass
- * the module cache, and convert a file URL to a path.
- */
+// Oxlint adds a query string and a hash to a config URL to bypass the module cache.
 function toFramePath(location: string) {
   if (location.startsWith("file://")) {
     const url = new URL(location)
@@ -77,10 +64,6 @@ const OWN_FILE = toFramePath(import.meta.url)
 // prints `at /path/config.ts:2:19` and `at name (/path:1:2)`. Windows paths start with a drive.
 const FRAME_LOCATION = /(?:\(|at )((?:file:\/\/|\/|[A-Za-z]:[\\/]).+?):\d+:\d+\)?\s*$/
 
-/**
- * The first file in a stack trace that is not `ownFile`: the module that called into `ownFile`.
- * Undefined when the stack names no such file.
- */
 export function findCallerFile(stack: string, ownFile: string): string | undefined {
   for (const line of stack.split("\n").slice(1)) {
     const location = FRAME_LOCATION.exec(line)?.[1]
@@ -99,18 +82,8 @@ export function findCallerFile(stack: string, ownFile: string): string | undefin
   return undefined
 }
 
-/**
- * What a `custom()` result holds under `PRESET`, so that Adamantite finds each rules folder that a
- * loaded config reaches, also when the folder does not exist or holds no rule.
- */
 export interface RulesFolderIdentity extends PresetIdentity {
-  /**
-   * The file that called `custom()`, or undefined when the stack names none.
-   */
   readonly caller: string | undefined
-  /**
-   * The absolute rules folder.
-   */
   readonly dir: string
   readonly name: string
 }
@@ -145,12 +118,6 @@ function hasContent(path: string, content: string) {
   return existsSync(path) && readFileSync(path, "utf8") === content
 }
 
-/**
- * Write `content` to `path` unless the file already holds it. Several Oxlint processes can load the
- * config at once, as in a monorepo task runner, and one can import the module while another writes
- * it. A write in place truncates the file first, so the module goes to a temporary file that a
- * rename moves over `path` in one step.
- */
 function writeIfChanged(path: string, content: string) {
   if (hasContent(path, content)) {
     return
@@ -158,6 +125,8 @@ function writeIfChanged(path: string, content: string) {
 
   mkdirSync(dirname(path), { recursive: true })
 
+  // Another Oxlint process can import the module during the write, and a write in place truncates
+  // the file first. A rename replaces the file in one step.
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
 
   writeFileSync(temporary, content, { flag: "wx" })
@@ -175,11 +144,8 @@ function writeIfChanged(path: string, content: string) {
   }
 }
 
-/**
- * A folder in the OS temporary directory that only the current user can write. The temporary
- * directory can be shared, so another user could create a folder there first, and then replace an
- * entry module after `custom()` writes it. Windows gives each user a temporary directory.
- */
+// The OS temporary directory can be shared, so another user could create the folder first and
+// replace an entry module after the write. Windows gives each user a temporary directory.
 function getPrivateTemporaryDirectory() {
   // The effective user ID, without the account lookup of `os.userInfo()`, which throws for a user
   // without a passwd entry, such as in a container. Windows has no user IDs.
@@ -200,13 +166,8 @@ function getPrivateTemporaryDirectory() {
   return dir
 }
 
-/**
- * Write the entry module for a rules folder and return its file URL. The module goes to
- * `node_modules/.cache/adamantite` above the folder, or to a private folder in the OS temporary
- * directory when no `node_modules` folder is found or it cannot be written.
- */
 function writeEntryModule(dir: string, name: string) {
-  // The content names this Adamantite copy, so two installed copies get two files.
+  // Oxlint caches a plugin module by its path and drops the query string.
   const hash = createHash("sha256")
     .update(`${RULES_MODULE_URL}\0${dir}\0${name}`)
     .digest("hex")
@@ -221,8 +182,8 @@ function writeEntryModule(dir: string, name: string) {
     "",
   ].join("\n")
 
-  // File discovery is read-only. Keep its generated plugin entry outside the target project.
-  const root = process.argv.includes("--debug=files") ? undefined : findNodeModules(dir)
+  const isFileDiscovery = process.argv.includes("--debug=files")
+  const root = isFileDiscovery ? undefined : findNodeModules(dir)
 
   const folders = [
     ...(root === undefined ? [] : [() => join(root, CACHE_DIRECTORY)]),

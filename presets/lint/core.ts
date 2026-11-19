@@ -4,8 +4,8 @@ import { PRESET, type PresetIdentity } from "../identity.ts"
 /**
  * Canonical ignore patterns for dependencies, build output, and generated code.
  *
- * Oxlint does not merge `ignorePatterns` from extended configs — only the root config's patterns
- * apply — so extending the core preset is not enough. Hoist them explicitly:
+ * Oxlint does not merge `ignorePatterns` from extended configs. Only the patterns of the root
+ * config apply, so extending the core preset is not enough. Hoist them explicitly:
  *
  * ```ts
  * export default defineConfig({
@@ -15,13 +15,11 @@ import { PRESET, type PresetIdentity } from "../identity.ts"
  * ```
  */
 export const ignorePatterns: string[] = [
-  // Dependencies and VCS. Oxlint only skips node_modules when a .gitignore lists it, so
-  // projects without a .gitignore would otherwise lint installed packages.
+  // Oxlint skips `node_modules` only when a `.gitignore` lists it.
   "**/node_modules",
   "**/.yarn",
   "**/.git",
 
-  // Build and framework output
   "**/dist",
   "**/build",
   "**/out",
@@ -43,7 +41,6 @@ export const ignorePatterns: string[] = [
   "**/_astro",
   "**/storybook-static",
 
-  // Generated code
   "**/_generated",
   "**/__generated__",
   "**/*.gen.*",
@@ -53,15 +50,12 @@ export const ignorePatterns: string[] = [
   "**/graphql-types.*",
   "**/*.d.ts.map",
 
-  // Test coverage
   "**/coverage",
   "**/.nyc_output",
 
-  // Mobile build output
   "**/.expo",
   "**/.expo-shared",
 
-  // Framework type definitions
   "**/next-env.d.ts",
   "**/worker-configuration.d.ts",
 ]

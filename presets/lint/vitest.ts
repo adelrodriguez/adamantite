@@ -19,8 +19,6 @@ const plugins: OxlintConfig["plugins"] = ["vitest"]
 
 const identity: PresetIdentity = { module: "adamantite/lint/vitest" }
 
-// The rules name the preset too, so an override that spreads `vitest.rules`, as the comment of
-// `testFiles` shows, applies the preset for Doctor.
 const rules: OxlintConfig["rules"] = {
   [PRESET]: identity,
   "vitest/consistent-each-for": "error",
@@ -142,10 +140,7 @@ const config: OxlintConfig = {
   overrides: [{ files: testFiles, plugins, rules }],
 }
 
-// Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties. So a config
-// that extends the preset gets only the override for test files, while a project override can still
-// read `vitest.plugins` and `vitest.rules`. `presets/__tests__/vitest.test.ts`
-// checks both uses.
+// Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties.
 Object.defineProperties(config, { plugins: { value: plugins }, rules: { value: rules } })
 
 export default config

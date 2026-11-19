@@ -22,8 +22,6 @@ const plugins: OxlintConfig["plugins"] = ["jest"]
 
 const identity: PresetIdentity = { module: "adamantite/lint/jest" }
 
-// The rules name the preset too, so an override that spreads `jest.rules`, as the comment of
-// `testFiles` shows, applies the preset for Doctor.
 const rules: OxlintConfig["rules"] = {
   [PRESET]: identity,
   // TEMPORARY: The fix of the rule renames a test call, such as `test` to `it` in `describe`, but
@@ -115,10 +113,7 @@ const config: OxlintConfig = {
   overrides: [{ files: testFiles, plugins, rules }],
 }
 
-// Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties. So a config
-// that extends the preset gets only the override for test files, while a project override can still
-// read `jest.plugins` and `jest.rules`. `presets/__tests__/jest.test.ts`
-// checks both uses.
+// Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties.
 Object.defineProperties(config, { plugins: { value: plugins }, rules: { value: rules } })
 
 export default config

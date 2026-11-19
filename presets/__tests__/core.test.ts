@@ -15,10 +15,6 @@ const decodeOxlintJsonOutput = Schema.decodeUnknownSync(
   )
 )
 
-/**
- * Lint one file with the core preset in one real Oxlint run, through the Oxlint entry. The config
- * turns on the type-aware rules, as the config that init writes does.
- */
 function lint(file: string, source: string) {
   const project = mkdtempSync(join(tmpdir(), "adamantite-core-"))
 
@@ -86,8 +82,6 @@ describe("core preset", () => {
     expect(lint(file, source)).toStrictEqual([])
   })
 
-  // `no-await-in-loop` tells the author to start the calls together. That is a defect when each
-  // call needs the result of the call before it, and a lint rule cannot tell the two cases apart.
   it("accept an await in a loop", () => {
     const codes = lint(
       "index.ts",
@@ -104,8 +98,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
-  // `typescript/only-throw-error` reads the type of the thrown value, so it reports every throw
-  // that `no-throw-literal` reports. With both rules on, one throw needs two suppressions.
   it("report a thrown value that is not an error one time", () => {
     const codes = lint(
       "index.ts",
@@ -115,8 +107,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual(["typescript(only-throw-error)"])
   })
 
-  // Astro, Vue, and Svelte compile a component's script as a module, so the script needs no
-  // `import` or `export` to be one.
   it.each([
     ["card.astro", ["---", "const a = 1", "---", "<p>{a}</p>", ""]],
     [
@@ -142,8 +132,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual(["import(unambiguous)"])
   })
 
-  // A declaration file without an import or export is a script on purpose: only a script can
-  // declare a wildcard module or a global.
   it("accept a declaration file without an import or export", () => {
     const codes = lint(
       "raw.d.ts",
@@ -159,9 +147,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
-  // TypeScript lets a type and a value share a name, as in a schema and the type that it infers.
-  // `no-redeclare` reads the pair as one name declared two times. The type check reports a name
-  // that is declared two times as a value.
   it("accept a type and a value that share a name", () => {
     const codes = lint(
       "index.ts",
@@ -171,7 +156,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
-  // A JavaScript file has no type syntax, so JSDoc is its only way to state a type.
   it("accept JSDoc type tags in a JavaScript file and report them in a TypeScript file", () => {
     const source = ["/** @type {string[]} */", "export const names = []", ""].join("\n")
 
@@ -179,8 +163,6 @@ describe("core preset", () => {
     expect(lint("names.ts", source)).toContain("jsdoc(check-tag-names)")
   })
 
-  // A spread in a `map` callback is the usual way to copy an item with a change, as a React state
-  // update does.
   it("accept a spread copy of an item in a map callback", () => {
     const codes = lint(
       "index.ts",
@@ -202,8 +184,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
-  // A copy of a `reduce` accumulator with fixed keys cannot grow. `oxc/no-accumulating-spread`
-  // reports the spread form, so core must accept the `Object.assign({}, …)` form.
   it("accept an Object.assign copy of a reduce accumulator", () => {
     const codes = lint(
       "index.ts",
@@ -220,8 +200,6 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
-  // Keep required arguments and expression bodies. A block callback declares its optional result
-  // so `no-useless-undefined` preserves the return that `array-callback-return` needs.
   it("accept required undefined arguments and explicit callback results", () => {
     const codes = lint(
       "index.ts",
@@ -289,7 +267,6 @@ describe("core preset", () => {
     expect(lint("index.ts", `${source}\n`)).toContain(code)
   })
 
-  // `typescript/no-non-null-assertion` bans `maybe!`, so core must not tell the author to write it.
   it("not recommend the non-null assertion that core bans", () => {
     const codes = lint(
       "index.ts",

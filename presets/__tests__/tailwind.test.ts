@@ -27,10 +27,6 @@ const OxlintJsonOutput = Schema.Struct({
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
-/**
- * Lint the overlap fixtures with the react and tailwind presets in one real Oxlint run. The plugin
- * resolves from the repository's `node_modules`, as it does from a target project's.
- */
 function lintOverlapFixtures() {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-shadcn-overlap-"))
 

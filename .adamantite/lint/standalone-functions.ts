@@ -20,6 +20,7 @@ const PLAIN_VALUES = new Set([
   "UnaryExpression",
 ])
 
+// TypeScript erases `as`, `!`, and `satisfies`, so the wrapped expression is the runtime value.
 function unwrap(node: ESTree.Node): ESTree.Node {
   return node.type === "TSAsExpression"
     || node.type === "TSNonNullExpression"

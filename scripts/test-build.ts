@@ -111,6 +111,8 @@ const typescriptPreset = Schema.decodeUnknownSync(TypeScriptPreset)(
   Result.getOrThrow(Jsonc.parse(readFileSync(typescriptPresetPath, "utf8")))
 )
 
+// TypeScript resolves each entry of `files`, and each `/// <reference path>`, relative to the file
+// that declares it.
 function collectLoadedFiles(
   pending: readonly string[],
   loaded: ReadonlySet<string>

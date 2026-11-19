@@ -170,27 +170,29 @@ run of the workflow takes the same values in its `overrides` input.
 baseline. It then updates the packages that `ROOT_PACKAGES` in `scripts/test-latest.ts` lists, with
 the packages that keep the version of one of them, such as `@vitest/ui`, and every fixture package.
 It applies each override and runs the same tests again: the candidate. The script installs the
-fixture packages itself, not in the `globalSetup` of the tests, so the report names their versions
-and a failed install is not a test failure. `scripts/latest-reporter.ts` writes the results of each
-run with the diff of each failure, which names the fixture file and the rule. The steps share a
-budget of 45 minutes, so a step that hangs ends before the job limit of the workflow, and the run
-still writes a report. Before it starts, `run` deletes the files that it writes from the report
-folder, and no other file. The report has one outcome:
+fixture packages before it starts Vitest, so the report names their versions and a failed install
+is not a test failure. The `globalSetup` of the tests then repeats the frozen install.
+`scripts/latest-reporter.ts` writes the results of each run with the errors of each failure, and
+with the diff when Vitest gives one. The report names the fixture files and the rules that a
+failure message names, when it names any. The steps share a budget of 45 minutes, so a step that
+hangs ends before the job limit of the workflow, and the run still writes a report. Before it starts, `run` deletes the report files that `run` and `publish`
+write, and the override logs, from the report folder, and no other file. The report has one outcome:
 
-| Outcome            | When                                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `pass`             | The candidate passes, and no test regresses.                                                                                         |
-| `baseline-failure` | The baseline fails, so the run tests no newest version. Fix the tested `HEAD` first, which is `main` in the weekly workflow.         |
-| `install-failure`  | The update or an override does not install.                                                                                          |
-| `process-failure`  | The candidate writes no result, passes no test, such as when a test module cannot load its imports, or fails without a failing test. |
-| `regression`       | A test that the baseline passes fails, skips, or does not run in the candidate.                                                      |
+| Outcome            | When                                                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pass`             | The candidate passes, and no test regresses.                                                                                                                                     |
+| `baseline-failure` | The baseline fails, so the run tests no newest version. Fix the tested `HEAD` first, which is `main` in the weekly workflow.                                                     |
+| `install-failure`  | The update or an override does not install.                                                                                                                                      |
+| `process-failure`  | The baseline or the candidate writes no result, the candidate passes no test, such as when a test module cannot load its imports, or the candidate fails without a failing test. |
+| `regression`       | A test or a test module fails in the candidate, or a test that the baseline passes skips or does not run in the candidate.                                                       |
 
 A test that both runs skip is not a failure, because the environment skips it, such as a Bun test
 on a machine without Bun. `node scripts/test-latest.ts publish --out <folder> --repo <owner/name>`
 reads the report. For a failure, it comments on the open issue with the same fingerprint, or opens
 one. The fingerprint holds the outcome, the failing tests, and their rules, or the error codes of
 the logs, and no version, so a failure that repeats with a newer patch release keeps its issue.
-`--dry-run` prints the `gh` command instead of running it.
+`--dry-run` still lists the open issues and writes `issue-body.md`, but prints the command that
+opens the issue or adds the comment instead of running it.
 
 ### Time the toolchain
 

@@ -654,7 +654,8 @@ try {
     rmSync(userCache, { force: true, recursive: true })
   }
 
-  // Without a backend variable, Oxlint finds the `tsrs-lint` launcher of tsrs by itself.
+  // Outside Windows, the Oxlint launch sets no backend variable, so Oxlint finds the `tsrs-lint`
+  // launcher of tsrs by itself.
   console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')

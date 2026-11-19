@@ -10,6 +10,7 @@ import {
   listPresetModules,
 } from "#lib/project/lint-config.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
+import formatPreset from "#presets/format.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -23,8 +24,6 @@ const OPTIONS_GOAL =
 function getImportName(preset: LintPreset | "core") {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
-
-const FORMAT_PRESET_PRINT_WIDTH = 100
 
 export function toOxlintTsConfigContent(presets: readonly LintPreset[]) {
   const presetNames = ["core", ...presets] as const
@@ -48,7 +47,7 @@ export function toOxlintTsConfigContent(presets: readonly LintPreset[]) {
     ...imports.map(({ line }) => line),
     "",
     "export default defineConfig({",
-    ...(extendsLine.length <= FORMAT_PRESET_PRINT_WIDTH
+    ...(extendsLine.length <= formatPreset.printWidth
       ? [extendsLine]
       : ["  extends: [", ...entries.map((entry) => `    ${entry},`), "  ],"]),
     "  ignorePatterns: core.ignorePatterns,",

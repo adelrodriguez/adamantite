@@ -1,7 +1,7 @@
 import type { FormatConfig } from "oxfmt"
 import type { PresetIdentity } from "./identity.ts"
 
-const config: FormatConfig = {
+const config: FormatConfig & Required<Pick<FormatConfig, "printWidth">> = {
   [Symbol.for("adamantite.preset")]: { module: "adamantite/format" } satisfies PresetIdentity,
   arrowParens: "always",
   // Oxfmt formats Astro and Svelte files through bundled Prettier plugins, which import a package

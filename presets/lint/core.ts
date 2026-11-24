@@ -397,7 +397,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "typescript/no-misused-new": "error",
     // `"strict"` also reports a union such as `Promise<number> | number` in a condition. A promise is
     // always truthy, so the condition ignores the number that the promise resolves to. `"all"` would
-    // also report an optional promise, such as `if (pending) await pending`, which is correct code.
+    // also report an optional promise such as `Promise<void> | undefined` in
+    // `if (pending) await pending`, which is correct code. `"strict"` still reports
+    // `Promise<undefined> | undefined`, whose awaited type matches the other member.
     "typescript/no-misused-promises": ["error", { checksConditionals: { flagUnions: "strict" } }],
     "typescript/no-misused-spread": "error",
     "typescript/no-mixed-enums": "error",

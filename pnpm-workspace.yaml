@@ -1,16 +1,5 @@
 # This file must not gain a `packages` key, which would mark the repository as a monorepo.
 
-# pnpm 12 rejects packages younger than one day, even with a frozen lockfile. These were published
-# on 2026-11-17 at 02:06 UTC. Delete this file after 2026-11-18.
-minimumReleaseAgeExclude:
-  - "@effect/tsgo@0.70.0"
-  - "@effect/tsgo-darwin-arm64@0.70.0"
-  - "@effect/tsgo-darwin-x64@0.70.0"
-  - "@effect/tsgo-linux-arm@0.70.0"
-  - "@effect/tsgo-linux-arm64@0.70.0"
-  - "@effect/tsgo-linux-x64@0.70.0"
-  - "@effect/tsgo-win32-arm64@0.70.0"
-  - "@effect/tsgo-win32-x64@0.70.0"
 # The CLI bundle includes Effect, so this patch ships to users. Effect creates its grapheme
 # segmenter when `effect/cli` loads, and the first `Intl` object loads ICU's data, which slows
 # every command. The patch creates the segmenter on its first use. Remove it when Effect does

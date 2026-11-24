@@ -119,28 +119,6 @@
       "version": "6.45.1"
     },
     {
-      "name": "tsrs",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/tsrs/-/tsrs-0.25.0-ts7.1.0-beta.tgz"
-      },
-      "tracking": "dependency",
-      "version": "0.25.0-ts7.1.0-beta"
-    },
-    {
-      "name": "@effect/tsgo",
-      "registry": "npm",
-      "source": {
-        "directory": "_packages/tsgo",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/Effect-TS/tsgo"
-      },
-      "tracking": "dependency",
-      "version": "0.70.0"
-    },
-    {
       "name": "@oxlint/plugins",
       "registry": "npm",
       "source": {
@@ -159,6 +137,29 @@
       },
       "tracking": "dependency",
       "version": "1.94.0"
+    },
+    {
+      "name": "@effect/tsgo",
+      "registry": "npm",
+      "source": {
+        "directory": "_packages/tsgo",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/tsgo"
+      },
+      "tracking": "dependency",
+      "version": "0.73.4"
+    },
+    {
+      "name": "tsrs",
+      "registry": "npm",
+      "source": {
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/oxc-project/tsrs"
+      },
+      "tracking": "dependency",
+      "version": "7.1.0-beta.tsrs4"
     }
   ]
 }

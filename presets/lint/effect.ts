@@ -78,6 +78,8 @@ const config: OxlintConfig = {
     "effecttsgo/global-timers-in-effect": "error",
     "effecttsgo/instance-of-schema": "error",
     "effecttsgo/process-env-in-effect": "error",
+    "effecttsgo/promise-all-in-effect": "error",
+    "effecttsgo/promise-race-in-effect": "error",
 
     // Style: combinators and constructs with a direct, simpler Effect replacement.
     "effecttsgo/acquire-release-disposable": "error",
@@ -103,6 +105,7 @@ const config: OxlintConfig = {
     "effecttsgo/flat-map-conditional-to-filter-or-fail": "error",
     "effecttsgo/flat-map-identity-to-flatten": "error",
     "effecttsgo/flat-map-ignored-param-to-and-then": "error",
+    "effecttsgo/flat-map-map-to-zip-with": "error",
     "effecttsgo/flat-map-provide-service-to-provide-service-effect": "error",
     "effecttsgo/flat-map-to-map": "error",
     "effecttsgo/flat-map-to-tap": "error",

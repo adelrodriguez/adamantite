@@ -5,6 +5,7 @@ import { join } from "node:path"
 import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
+import { STACK_OPTIONS } from "./stacks.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 const CORE_PRESET = join(REPO_ROOT, "presets/lint/core.ts")
@@ -14,6 +15,79 @@ const decodeOxlintJsonOutput = Schema.decodeUnknownSync(
     Schema.Struct({ diagnostics: Schema.Array(Schema.Struct({ code: Schema.String })) })
   )
 )
+
+const decodeTypeCheckOutput = Schema.decodeUnknownSync(
+  Schema.fromJsonString(
+    Schema.Struct({
+      diagnostics: Schema.Array(Schema.Struct({ code: Schema.String, filename: Schema.String })),
+    })
+  )
+)
+
+interface TypeCheckTsconfig {
+  readonly compilerOptions?: Readonly<Record<string, boolean | string>>
+  readonly exclude?: readonly string[]
+}
+
+function typeCheck(
+  files: Record<string, string>,
+  { compilerOptions = {}, exclude }: TypeCheckTsconfig = {}
+) {
+  const project = mkdtempSync(join(tmpdir(), "adamantite-core-"))
+
+  try {
+    symlinkSync(join(REPO_ROOT, "node_modules"), join(project, "node_modules"))
+
+    for (const [file, source] of Object.entries(files)) {
+      writeFileSync(join(project, file), source)
+    }
+
+    writeFileSync(
+      join(project, "package.json"),
+      JSON.stringify({ name: "fixture", type: "module" })
+    )
+    writeFileSync(
+      join(project, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          module: "esnext",
+          moduleResolution: "bundler",
+          strict: true,
+          ...compilerOptions,
+        },
+        exclude,
+      })
+    )
+    writeFileSync(
+      join(project, "oxlint.config.ts"),
+      [
+        `import core from ${JSON.stringify(CORE_PRESET)}`,
+        "",
+        "export default {",
+        "  extends: [core],",
+        "  ignorePatterns: core.ignorePatterns,",
+        `  options: ${JSON.stringify(STACK_OPTIONS)},`,
+        "}",
+        "",
+      ].join("\n")
+    )
+
+    const result = spawnSync(
+      process.execPath,
+      [join(REPO_ROOT, "src/oxlint/index.ts"), "-c", "oxlint.config.ts", "-f", "json", "."],
+      { cwd: project, encoding: "utf8" }
+    )
+
+    // The config imports the preset by its absolute path, which `import/no-absolute-path` reports.
+    return decodeTypeCheckOutput(result.stdout).diagnostics.flatMap(({ code, filename }) =>
+      filename === "oxlint.config.ts" ? [] : [{ code, filename }]
+    )
+  } finally {
+    rmSync(project, { force: true, recursive: true })
+  }
+}
+
+const TYPE_ERROR = "export const answer: string = 42\n"
 
 function lint(file: string, source: string) {
   const project = mkdtempSync(join(tmpdir(), "adamantite-core-"))
@@ -280,5 +354,37 @@ describe("core preset", () => {
     )
 
     expect(codes).toStrictEqual(["typescript(no-non-null-assertion)"])
+  })
+})
+
+describe("core preset with the type check", () => {
+  it("report a type error in a linted file", () => {
+    expect(typeCheck({ "index.ts": TYPE_ERROR })).toStrictEqual([
+      { code: "typescript(TS2322)", filename: "index.ts" },
+    ])
+  })
+
+  it("skip a type error in generated code that the core ignore patterns cover", () => {
+    expect(
+      typeCheck({ "index.ts": "export const one = 1\n", "routes.gen.ts": TYPE_ERROR })
+    ).toStrictEqual([])
+  })
+
+  it("report a type error in a linted file that the tsconfig excludes", () => {
+    expect(
+      typeCheck(
+        { "excluded.ts": TYPE_ERROR, "index.ts": "export const one = 1\n" },
+        { exclude: ["excluded.ts"] }
+      )
+    ).toStrictEqual([{ code: "typescript(TS2322)", filename: "excluded.ts" }])
+  })
+
+  it("report an invalid compiler option", () => {
+    expect(
+      typeCheck(
+        { "index.ts": "export const one = 1\n" },
+        { compilerOptions: { notAnOption: true } }
+      )
+    ).toStrictEqual([{ code: "typescript(tsconfig-error)", filename: "tsconfig.json" }])
   })
 })

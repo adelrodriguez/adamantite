@@ -756,9 +756,7 @@ describe("rule ast", () => {
       ...args,
     ]).pipe(
       Effect.exit,
-      Effect.flatMap((exit) =>
-        TestConsole.logLines.pipe(Effect.map((logLines) => ({ exit, logLines })))
-      ),
+      Effect.zipWith(TestConsole.logLines, (exit, logLines) => ({ exit, logLines })),
       Effect.provideService(Project.Directory, project),
       Effect.provide(TEST_LAYER)
     )

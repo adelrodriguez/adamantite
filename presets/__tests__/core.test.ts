@@ -341,6 +341,38 @@ describe("core preset", () => {
     expect(lint("index.ts", `${source}\n`)).toContain(code)
   })
 
+  it("report a union of a promise and its awaited type in a condition", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "declare const value: Promise<number> | number",
+        "",
+        "export const ready = value ? 1 : 0",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual(["typescript(no-misused-promises)"])
+  })
+
+  it("accept an optional promise in a condition", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "declare const pending: Promise<void> | undefined",
+        "",
+        "export async function settle(): Promise<void> {",
+        "  if (pending) {",
+        "    await pending",
+        "  }",
+        "}",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
+
   it("not recommend the non-null assertion that core bans", () => {
     const codes = lint(
       "index.ts",

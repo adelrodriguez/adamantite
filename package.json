@@ -162,7 +162,7 @@
     "vitest": "5.0.5"
   },
   "peerDependencies": {
-    "oxlint": ">=1.92.0",
+    "oxlint": ">=1.94.0",
     "tsrs": ">=7.1.0-beta.tsrs4",
     "typescript": ">=7"
   },

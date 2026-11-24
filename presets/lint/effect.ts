@@ -78,6 +78,8 @@ const config: OxlintConfig = {
     "effecttsgo/global-timers-in-effect": "error",
     "effecttsgo/instance-of-schema": "error",
     "effecttsgo/process-env-in-effect": "error",
+    "effecttsgo/promise-all-in-effect": "error",
+    "effecttsgo/promise-race-in-effect": "error",
 
     // Style: combinators and constructs with a direct, simpler Effect replacement.
     "effecttsgo/acquire-release-disposable": "error",

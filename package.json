@@ -138,7 +138,7 @@
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
     "@effect/platform-node": "4.1.2",
-    "@effect/tsgo": "0.70.0",
+    "@effect/tsgo": "0.73.4",
     "@effect/vitest": "4.1.2",
     "@oxlint/plugins": "1.94.0",
     "@shadcn/lint": "0.2.1",
@@ -155,15 +155,15 @@
     "oxlint-plugin-react-doctor": "0.9.18",
     "sherif": "1.13.0",
     "tsdown": "0.23.1",
-    "tsrs": "0.25.0-ts7.1.0-beta",
+    "tsrs": "7.1.0-beta.tsrs4",
     "type-fest": "5.10.0",
     "typescript": "7.0.2",
     "unplugin-macros": "0.23.3",
     "vitest": "5.0.5"
   },
   "peerDependencies": {
-    "oxlint": ">=1.92.0",
-    "tsrs": ">=0.25.0-ts7.1.0-beta",
+    "oxlint": ">=1.94.0",
+    "tsrs": ">=7.1.0-beta.tsrs4",
     "typescript": ">=7"
   },
   "peerDependenciesMeta": {

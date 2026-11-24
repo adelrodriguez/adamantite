@@ -54,6 +54,11 @@ const EXCLUDED_RULES = new Set([
   "yield-in-call-argument",
   // `Effect.Service` exists only in Effect v3.
   "missing-effect-service-dependency",
+  // TEMPORARY: It reports an `Effect.flatMap` whose callback builds the inner effect from state that
+  // the outer effect changes, where `Effect.zipWith` gives a different result. Turn the rule on in
+  // the effect preset again when an `@effect/tsgo` release stops reporting that case:
+  // https://github.com/Effect-TS/tsgo/issues/1085
+  "flat-map-map-to-zip-with",
 ])
 
 const require = createRequire(import.meta.url)
